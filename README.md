@@ -9,12 +9,14 @@
 ### 1、环境需求
 * linux 编程环境；  
 * g++ 6.2编译器；（由于libDolphinDBAPI.so是由g++6.2编译的，为了保证ABI兼容，建议使用该版本的编译器）
- 
+
 ### 2、编译工程
 #### 2.1 下载bin文件和头文件
 下载api-cplusplus，包括bin和include文件夹，如下：
+
 > bin (libDolphinDBAPI.so)  
-  include (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h)  
+  include (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h) 
+  
 #### 2.2 编写main.cpp文件
 在与bin和include平级目录创建目录project，进入project并创建文件main.cpp，内容如下：
 ```
