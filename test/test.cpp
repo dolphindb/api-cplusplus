@@ -179,37 +179,66 @@ void testSet(){
 
 void testMemoryTable(){
     string script;
-    script += "t=loadText(\"/home/psui/C++API/api-cplusplus/test/candle_1.csv\");";
-    script += "select * from t;";
+    //模拟生成需要保存到内存表的数据
+    VectorSP names = Util::createVector(DT_STRING,5,100);
+    VectorSP dates = Util::createVector(DT_DATE,5,100);
+    VectorSP prices = Util::createVector(DT_DOUBLE,5,100);
+    for(int i = 0 ;i < 5;i++){
+        names->set(i,Util::createString("name_"+std::to_string(i)));
+        dates->set(i,Util::createDate(2010,1,i+1));
+        prices->set(i,Util::createDouble(i*i));
+    } 
+    vector<string> allnames = {"names","dates","prices"};
+    vector<ConstantSP> allcols = {names,dates,prices};
+    conn.upload(allnames,allcols);//将数据上传到server
+    script += "insert into tglobal values(names,dates,prices);"; //通过insert into 方法将数据保存到内存表中
+    script += "select * from tglobal;";
     TableSP table = conn.run(script); 
     cout<<table->getString()<<endl;
 }
 
+TableSP createDemoTable(){
+    vector<string> colNames = {"name","date","price"};
+    vector<DATA_TYPE> colTypes = {DT_STRING,DT_DATE,DT_DOUBLE};
+    int colNum = 3,rowNum = 3;
+    ConstantSP table = Util::createTable(colNames,colTypes,rowNum,100);
+    vector<VectorSP> columnVecs;
+    for(int i = 0 ;i < colNum ;i ++)
+        columnVecs.push_back(table->getColumn(i));
+        
+    for(int i =  0 ;i < rowNum; i++){
+        columnVecs[0]->set(i,Util::createString("name_"+std::to_string(i)));
+        columnVecs[1]->set(i,Util::createDate(2010,1,i+1));
+        columnVecs[2]->set(i,Util::createDouble(i*i));
+    }
+    return table;
+}
+   
+
 void testDiskTable(){
+    TableSP table = createDemoTable();
+    conn.upload("mt",table);
     string script;
-    script += "t=loadText(\"/home/psui/C++API/api-cplusplus/test/candle_1.csv\");";
-    script += "db=database(\"/home/psui/localDiskTable\");";
-    script += "saveTable(db,t,`t1);";
-    script += "tdisk=loadTable(db,`t1);";
-    script += "select * from tdisk;";
-    TableSP table = conn.run(script); 
-    cout<<table->getString()<<endl;
+    script += "db=database(\"/home/psui/demoTable1\");";
+    script += "tDiskGlobal.append!(mt);";
+    script += "saveTable(db,tDiskGlobal,`dt);";
+    script += "select * from tDiskGlobal;";
+    TableSP result = conn.run(script); 
+    cout<<result->getString()<<endl;
 }
 
 void testDFSTable(){
     string script;
+    TableSP table = createDemoTable();
+    conn.upload("mt",table);
     script += "login(`admin,`123456);";
     script += "dbPath = \"dfs://SAMPLE_TRDDB\";";
-    script += "tableName = `tradingDay;";
-    script += "allDays = 2018.01.01..2018.01.30;";
-    script += "db = database(dbPath, VALUE, allDays);";
-    script += "pt=db.createPartitionedTable(table(1000000:0, `symbol`exchange`cycle`tradingDay`date`time`open`high`low`close`volume`turnover`unixTime, [SYMBOL,SYMBOL,INT,DATE,DATE,TIME,DOUBLE,DOUBLE,DOUBLE,DOUBLE,LONG,DOUBLE,LONG]), tableName, `tradingDay);";
-    script += "t=loadText(\"/home/psui/C++API/api-cplusplus/test/candle_1.csv\");";
-    script += "database(dbPath).loadTable(tableName).append!(select symbol, exchange, cycle, tradingDay,date, datetimeParse(format(time,\"000000000\"),\"HHmmssSSS\"), open, high, low, close, volume, turnover,unixTime from t );";
+    script += "tableName = `demoTable;";
+    script += "database(dbPath).loadTable(tableName).append!(mt);";
     script += "tradTable= database(dbPath).loadTable(tableName);";
-    script += "select count(*) from tradTable;";
-    TableSP table = conn.run(script); 
-    cout<<table->getString()<<endl;
+    script += "select * from tradTable;";
+    TableSP result = conn.run(script); 
+    cout<<result->getString()<<endl;
 }
 
 int main(){
