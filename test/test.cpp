@@ -4,7 +4,6 @@
 #include <limits.h>
 using namespace dolphindb;
 using namespace std;
-static string csvFile= "/home/psui/C++API/api-cplusplus/test/candle_1.csv";
 static string hostName = "192.168.1.25";
 static int port = 8503;
 static string alphas = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
