@@ -4,7 +4,7 @@
 * 执行DolphinDB Script  
 * 调用内置函数  
 * 上传本地对象到Server  
-* 数据导入  
+* 数据表添加数据  
 
 ### 1、环境需求
 * linux 编程环境；  
@@ -194,28 +194,37 @@ cout<<result->getString()<<endl;
 ```
 C++ API提供了在本地灵活的创建各种对象的接口，利用 __upload__ 方法，可以方便的实现本地对象和Server对象的转换交互。
 
-### 6、数据表操作
+### 6、数据表添加数据
 利用C++ API可以方便的将第三方系统业务数据添加到DolphinDB数据表中。DolphinDB支持三种类型的表， __内存表__ 、 __本地磁盘表__ 及 __分布式表__ 。下面介绍如何利用Ｃ++ API将模拟的业务数据保存到不同类型的表中。  
 
 #### 6.1 内存表
-数据仅保存在本节点内存，存取速度最快，但是节点关闭数据就不存在了，适用于临时快速计算、临时保存计算结果等场景。由于全部保存在内存中，内存表不应太大。代码如下：
+数据仅保存在本节点内存，存取速度最快，但是节点关闭数据就不存在了，适用于临时快速计算、临时保存计算结果等场景。由于全部保存在内存中，内存表不应太大。
+
+##### 6.1.1 通过DolphinDB客户端创建内存表
+```
+t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]);
+share  t as tglobal
+```
+__table__ 创建内存表，指定capacity，size，列名以及类型；  
+__share__ 将表设置为跨session可见；  
+
+##### 6.1.2 通过C++ API保存数据到内存表
 ```
 string script;
-script += "t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]);";//创建内存表
 //模拟生成需要保存到内存表的数据
 VectorSP names = Util::createVector(DT_STRING,5,100);
 VectorSP dates = Util::createVector(DT_DATE,5,100);
 VectorSP prices = Util::createVector(DT_DOUBLE,5,100);
 for(int i = 0 ;i < 5;i++){
     names->set(i,Util::createString("name_"+std::to_string(i)));
-    dates->set(i,Util::createDate(2012,1,i));
+    dates->set(i,Util::createDate(2010,1,i+1));
     prices->set(i,Util::createDouble(i*i));
 } 
 vector<string> allnames = {"names","dates","prices"};
 vector<ConstantSP> allcols = {names,dates,prices};
 conn.upload(allnames,allcols);//将数据上传到server
-script += "insert into t values(names,dates,prices);"; //通过insert into 方法将数据保存到内存表中
-script += "select * from t;";
+script += "insert into tglobal values(names,dates,prices);"; //通过insert into 方法将数据保存到内存表中
+script += "select * from tglobal;";
 TableSP table = conn.run(script); 
 cout<<table->getString()<<endl;
 ```
@@ -226,7 +235,7 @@ table = createDemoTable();
 script += "t.append!(table);";
 ```
 注意:  
->本例中内存表t是通过C++ API创建的，当然也可以事先在DolphinDB Server存在，这时候如果想要在C++中访问t，需要使用 __share__ 函数（share t as tglobal），则t可以直接在C++ 中访问，share详细介绍请参考manual。
+>本例中使用 __share__ 来把内存表设置为跨session可见，这样多个客户端可以同时对t进行写入访问，share详细介绍请参考manual。
 
 
 #### 6.2 本地磁盘表
@@ -238,26 +247,29 @@ script += "t.append!(table);";
 t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]); //创建内存表
 db=database("/home/psui/demoTable"); //创建本地数据库
 saveTable(db,t,`dt); //保存本地表
+share t as tDiskGlobal
 ```
-__database__ 方法接受一个本地路径，创建一个本地数据库；  
-__saveTable__ 方法将内存内存表保存到本地数据库中，并存盘； 
+__database__ 接受一个本地路径，创建一个本地数据库；  
+__saveTable__ 将内存内存表保存到本地数据库中，并存盘； 
 
-##### 6.2.2 通过C++ API保存数据到table t
+##### 6.2.2 通过C++ API保存数据到本地磁盘表
 ```
-TableSP table = createDemoTable();//该函数定义在第5节
+TableSP table = createDemoTable();
 conn.upload("mt",table);
 string script;
-script += "db=database(\"/home/psui/demoTable\");";
-script += "t=loadTable(db,`dt).append!(mt);";
-script += "saveTable(db,t,`dt);";
-script += "select * from db.loadTable(`dt);";
+script += "db=database(\"/home/psui/demoTable1\");";
+script += "tDiskGlobal.append!(mt);";
+script += "saveTable(db,tDiskGlobal,`dt);";
+script += "select * from tDiskGlobal;";
 TableSP result = conn.run(script); 
 cout<<result->getString()<<endl;
 ```
-__loadTable__ 方法从本地数据库中加载一个table到内存；  
+__loadTable__ 从本地数据库中加载一个table到内存；   
+__append!__ 保存数据到内存表；  
 最后，run方法返回从磁盘载入内存的table。  
 注意:  
->对于本地磁盘表，append! 仅仅将数据添加到内存表，要将数据保存到磁盘，还必须使用saveTable函数。
+>1、对于本地磁盘表， __append!__ 仅仅将数据添加到内存表，要将数据保存到磁盘，还必须使用 __saveTable__ 函数。  
+2、除了使用share函数外，还可以在C++ API中使用loadTable函数加载表内容，然后append！。不过这种方法不推荐使用，原因是，loadTable需要读磁盘，耗时很大；如果多个客户端loadTable的话，内存中会存在表的多个拷贝，容易造成数据不一致；
 
 #### 6.3 分布式表
 利用DolphinDB底层提供的分布式文件系统DFS，将数据保存在不同的节点上，逻辑上仍然可以像本地表一样做统一查询。适用于保存企业级历史数据，作为数据仓库使用，提供查询、分析等功能。本例介绍如何通过C++ API保存数据到分布式表中。
@@ -272,13 +284,13 @@ db = database(dbPath, VALUE, 2010.01.01..2010.01.30)
 pt=db.createPartitionedTable(table(1000000:0,`name`date`price,[STRING,DATE,DOUBLE]),tableName,`date)
 ```
 __database__ 创建分区数据库，并指定分区类型；  
-__createPartitionedTable__ 创建分布式表，指定表类型和分区字段；
+__createPartitionedTable__ 创建分布式表，并指定表类型和分区字段；
 
 ##### 6.3.2 保存数据到分布式表
 
 ```
 string script;
-TableSP table = createDemoTable(); //该函数定义在第5节
+TableSP table = createDemoTable();
 conn.upload("mt",table);
 script += "login(`admin,`123456);";
 script += "dbPath = \"dfs://SAMPLE_TRDDB\";";
@@ -290,4 +302,4 @@ cout<<result->getString()<<endl;
 ```
 __append!__ 保存数据到分布式表中，并且保存到磁盘；  
 
-更多内容请参考头文件中提供的接口。
+关于C++ API的更多内容请参考头文件中提供的接口。
