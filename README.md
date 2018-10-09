@@ -66,7 +66,7 @@ bool ret = conn.connect("192.168.1.25", 8503,"admin","123456");
 #### 3.2 执行脚本
 通过 run 方法来执行脚本，脚本的最大长度是65535bytes，如下：
 ```
-ConstantSP v = conn.run("\`IBM\`GOOG\`YHOO");
+ConstantSP v = conn.run("`IBM`GOOG`YHOO");
 int size = v->size();
 for(int i = 0; i < size; i++)
     cout<<v->getString(i)<<endl;
