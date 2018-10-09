@@ -244,7 +244,7 @@ __saveTable__ 方法将内存内存表保存到本地数据库中，并存盘；
 
 ##### 6.2.2 通过C++ API保存数据到table t
 ```
-TableSP table = createDemoTable();
+TableSP table = createDemoTable();//该函数定义在第5节
 conn.upload("mt",table);
 string script;
 script += "db=database(\"/home/psui/demoTable\");";
@@ -278,7 +278,7 @@ __createPartitionedTable__ 创建分布式表，指定表类型和分区字段�
 
 ```
 string script;
-TableSP table = createDemoTable();
+TableSP table = createDemoTable(); //该函数定义在第5节
 conn.upload("mt",table);
 script += "login(`admin,`123456);";
 script += "dbPath = \"dfs://SAMPLE_TRDDB\";";
