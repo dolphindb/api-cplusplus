@@ -271,7 +271,7 @@ tableName = `demoTable
 db = database(dbPath, VALUE, 2010.01.01..2010.01.30)
 pt=db.createPartitionedTable(table(1000000:0,`name`date`price,[STRING,DATE,DOUBLE]),tableName,`date)
 ```
-__database__ 创建分区数据库，并指定分区类型；
+__database__ 创建分区数据库，并指定分区类型；  
 __createPartitionedTable__ 创建分布式表，指定表类型和分区字段；
 
 ##### 6.3.2 保存数据到分布式表
