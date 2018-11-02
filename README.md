@@ -1,8 +1,8 @@
 # DolphinDB C++ API
 This tutorial introduces how to use DolphinDB C++ API for application development in the Linux environment. It includes the following contents:
 * Compiling a project
-* Executing DolphinDB Script  
-* Calling built in function
+* Executing a DolphinDB Script  
+* Calling built in functions
 * Uploading local objects to DolphinDB server
 * Appending data to a DolphindB table
 
