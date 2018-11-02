@@ -12,15 +12,15 @@ This tutorial introduces how to use DolphinDB C++ API for application developmen
 
 ### 2、Compiling a project
 #### 2.1 Download bin file and header files
-Download api-cplusplus，including "bin" and "include" folders as the following：
+Download api-cplusplus from this git repo，including "bin" and "include" folders as the following in your project：
 
 > bin (libDolphinDBAPI.so)  
   include (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h) 
   
-#### 2.2 编写main.cpp文件
-Create project 
+#### 2.2 Compiling main.cpp
+Creating a project 
 
-Create a directory called "project" at the same level as the bin and include folders, enter the project folder, and then create the file main.cpp, as follows:
+Creat a directory called "project" at the same level as the bin and include folders, enter the project folder, and then create the file main.cpp, as follows:
 ```
 #include "DolphinDB.h"
 #include "Util.h"
@@ -68,7 +68,7 @@ DBConnection conn;
 bool ret = conn.connect("192.168.1.25", 8503,"admin","123456");
 ```
 
-#### 3.2 执行脚本
+#### 3.2 Executing a DolphinDB script
 
 By calling method "run", you can execute a dolphindb script(maximum 65535 bytes).  
 
@@ -156,14 +156,13 @@ ConstantSP result = conn.run("{1, 2, {1,3,5},{0.9, 0.8}}");
 cout<<result->getString()<<endl;
 ```
 
-
 Get the second element({1,3,5}) through method get.
 ```
 VectorSP v =  result->get(2);
 cout<<v->getString()<<endl;
 ```
 
-Output an int Vector：[1,3,5]。
+Output an int Vector：[1,3,5].
 
 ### 4、Calling DolphinDB built-in functions
 
@@ -178,7 +177,7 @@ ConstantSP result = conn.run("sum", args);//call built-in function "sum".
 cout<<result->getString()<<endl;
  ```
  
-The run method above returns the result of the sum function, which accepts a Vector of type Double and creates a Double Vector via Util::createVector(DT_DOUBLE, 3).
+The run method above returns the result of the sum function, which accepts a Double Vector via Util::createVector(DT_DOUBLE, 3).
 
 The first parameter of the run method is the function name of string type, the second parameter is the vector of ConstantSP type (the Constant class is the base class of all types in DolphinDB), and the output of sum is Double type.
 
@@ -216,7 +215,7 @@ cout<<result->getString()<<endl;
 
 ### 6、Appending data to DolphinDB table
 
-Data can be easily added to the DolphinDB data table using the C++ API. DolphinDB supports three types of tables, __memory table__, __local disk table__ and __distributed table__. Here's how to use the C++ API to save simulated business data to different types of tables.
+Data can be easily added to a DolphinDB table using C++ API. DolphinDB supports three types of tables, __memory table__, __local disk table__ and __distributed table__. Here's how to use the C++ API to save simulated business data to different types of tables.
 
 #### 6.1 Memory table
 
