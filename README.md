@@ -222,7 +222,7 @@ Data can be easily added to the DolphinDB data table using the C++ API. DolphinD
 
 The data is only stored in the memory of a data node, and the access speed is the fastest, but data will not exist after the session is closed. It is suitable for scenarios such as temporary fast calculation and temporary storage of calculation results. Since all data is stored in memory, the memory table should not be too large.
 
-##### 6.1.1 Build a memory table
+##### 6.1.1 Building a memory table
 ```
 t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]);
 share  t as tglobal
@@ -230,10 +230,10 @@ share  t as tglobal
 __table__ : create a memory table, specifying capacity, size, column name, and type;
 __share__ : set the table to be visible across sessions;
 
-##### 6.1.2 通过C++ API保存数据到内存表
+##### 6.1.2 Saving data to the memory table
 ```
 string script;
-//模拟生成需要保存到内存表的数据
+//simulate data to be stored
 VectorSP names = Util::createVector(DT_STRING,5,100);
 VectorSP dates = Util::createVector(DT_DATE,5,100);
 VectorSP prices = Util::createVector(DT_DOUBLE,5,100);
@@ -244,37 +244,40 @@ for(int i = 0 ;i < 5;i++){
 } 
 vector<string> allnames = {"names","dates","prices"};
 vector<ConstantSP> allcols = {names,dates,prices};
-conn.upload(allnames,allcols);//将数据上传到server
-script += "insert into tglobal values(names,dates,prices);"; //通过insert into 方法将数据保存到内存表中
+conn.upload(allnames,allcols);//upload data to server
+script += "insert into tglobal values(names,dates,prices);"; //insert data to table
 script += "select * from tglobal;";
-TableSP table = conn.run(script); 
+TableSP table = conn.run(script); //return the updated memory table
 cout<<table->getString()<<endl;
 ```
-run方法返回的table为内存表。  
-内存表中添加数据除了使用 __insert into__ 语法外，还可以使用 __append!__ ，其接受一个table作为参数，C++ API创建table的实例参考（5、上传本地对象到DolphinDB Server)，如下：
+
+
+To add data to a memory table, in addition to using the __insert into__ syntax, you can also use __append!__, which accepts a table as a parameter and creates an instance reference to the table, as follows:
 ```
 table = createDemoTable();
 script += "t.append!(table);";
 ```
-注意:  
->本例中使用 __share__ 来把内存表设置为跨session可见，这样多个客户端可以同时对t进行写入访问，share详细介绍请参考manual。
+Attention:
+
+>In this example, __share__ is used to set the memory table to be visible across all sessions, so multiple clients can write to table "t" at the same time. For details about method "share", please refer to DolphindB help manual.
 
 
-#### 6.2 本地磁盘表
-数据保存在本地磁盘上，即使节点关闭，再启动后，可以方便的将数据加载到内存。适用于数据量不是特别大，并且需要持久化到本地磁盘的数据。下面例子介绍，本地磁盘表tglobal已经创建，如何通过C++ API保存数据。
+#### 6.2 Local disk table
 
-##### 6.2.1 通过DolphinDB客户端创建本地磁盘表
-可以通过DolphinDB的任何客户端（GUI、Web notebook、console）创建本地磁盘表，代码如下
+The data is saved on the local disk, and even after the node is shut down, it can be easily loaded into the memory after booting. Applicable to data that is not particularly large and needs to be persisted to a local disk. The following example shows how the local disk table "tglobal" has been created and how to save data through the C++ API.
+
+##### 6.2.1 Creating a local disk table using DolphinDB script
+You can any DolphinDB clients（GUI、Web notebook、console）to create a local disk table as follows:
 ```
-t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]); //创建内存表
-db=database("/home/psui/demoTable"); //创建本地数据库
-saveTable(db,t,`dt); //保存本地表
+t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]); //Create a memory table
+db=database("/home/dolphindb/demoDB"); //create database "demoDB"
+saveTable(db,t,`dt); // save memory table to the database
 share t as tDiskGlobal
 ```
-__database__ 接受一个本地路径，创建一个本地数据库；  
-__saveTable__ 将内存内存表保存到本地数据库中，并存盘； 
+__database__ Accept a local path and create a local database;
+__saveTable__ Save the memory table to the local database and save it on disk;
 
-##### 6.2.2 通过C++ API保存数据到本地磁盘表
+##### 6.2.2 Saving data to a local disk table through API
 ```
 TableSP table = createDemoTable();
 conn.upload("mt",table);
@@ -283,21 +286,23 @@ script += "db=database(\"/home/psui/demoTable1\");";
 script += "tDiskGlobal.append!(mt);";
 script += "saveTable(db,tDiskGlobal,`dt);";
 script += "select * from tDiskGlobal;";
-TableSP result = conn.run(script); 
+TableSP result = conn.run(script); //return a memory table loading from the disk table. 
 cout<<result->getString()<<endl;
 ```
-__loadTable__ 从本地数据库中加载一个table到内存；   
-__append!__ 保存数据到内存表；  
-最后，run方法返回从磁盘载入内存的table。  
-注意:  
->1、对于本地磁盘表， __append!__ 仅仅将数据添加到内存表，要将数据保存到磁盘，还必须使用 __saveTable__ 函数。  
-2、除了使用share函数外，还可以在C++ API中使用loadTable函数加载表内容，然后append！。不过这种方法不推荐使用，原因是，loadTable需要读磁盘，耗时很大；如果多个客户端loadTable的话，内存中会存在表的多个拷贝，容易造成数据不一致；
+__loadTable__  load a local disk table to a memory table.   
+__append!__ append data to the table.  
 
-#### 6.3 分布式表
-利用DolphinDB底层提供的分布式文件系统DFS，将数据保存在不同的节点上，逻辑上仍然可以像本地表一样做统一查询。适用于保存企业级历史数据，作为数据仓库使用，提供查询、分析等功能。本例介绍如何通过C++ API保存数据到分布式表中。
+Attention:  
+>1.For local disk tables, __append!__ simply adds data to the in-memory table. To save the data to disk, you must also use the __saveTable__ function.
+ 2. In addition to using the share function, you can also use the loadTable function to load the table contents in the C++ API, and then append!. However, this method is not recommended. The reason is that the function loadTable needs to read the disk, which takes a lot of time. If there are multiple client loadTables, there will be multiple copies of the table in the memory, which may cause data inconsistency.
 
-##### 6.3.1 创建分布式表
-可以通过DolphinDB的任何客户端（GUI、Web notebook、console）创建分布式表，代码如下：
+#### 6.3 Distributed table
+
+Using the distributed file system DFS provided by the underlying DolphinDB, the data is stored on different nodes, a query can be performed like on a local table. It is suitable for saving enterprise-level historical data, used as a data warehouse, providing functions such as query and analysis. This example shows how to save data to a distributed table through the C++ API.
+
+##### 6.3.1 Building a distributed table
+
+You can any DolphinDB clients（GUI、Web notebook、console）to create a local disk table as follows:
 ```
 login(`admin,`123456)
 dbPath = "dfs://SAMPLE_TRDDB";
@@ -305,10 +310,10 @@ tableName = `demoTable
 db = database(dbPath, VALUE, 2010.01.01..2010.01.30)
 pt=db.createPartitionedTable(table(1000000:0,`name`date`price,[STRING,DATE,DOUBLE]),tableName,`date)
 ```
-__database__ 创建分区数据库，并指定分区类型；  
-__createPartitionedTable__ 创建分布式表，并指定表类型和分区字段；
+__database__ create a partitioned database and specify the partition type.
+__createPartitionedTable__ create a distributed table and specify the table type and partition fields.
 
-##### 6.3.2 保存数据到分布式表
+##### 6.3.2 Saving data to a distributed table
 
 ```
 string script;
@@ -322,7 +327,8 @@ script += "select * from database(dbPath).loadTable(tableName);";
 TableSP result = conn.run(script); 
 cout<<result->getString()<<endl;
 ```
-__append!__ 保存数据到分布式表中，并且保存到磁盘；  
+__append!__ Save the data to a distributed table and save to disk;
 
-关于C++ API的更多内容请参考头文件中提供的接口。
+
+For more on the C++ API, please refer to the interface provided in the header file.
 
