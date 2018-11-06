@@ -1,24 +1,28 @@
 # DolphinDB C++ API
-本教程介绍了在linux环境下，如何使用DolphinDB提供的C++ API进行应用开发。主要包括以下内容：
-* 工程编译  
-* 执行DolphinDB Script  
-* 调用内置函数  
-* 上传本地对象到Server  
-* 数据表添加数据  
 
-### 1、环境需求
-* linux 编程环境；  
-* g++ 6.2编译器；（由于libDolphinDBAPI.so是由g++6.2编译的，为了保证ABI兼容，建议使用该版本的编译器）
+This tutorial includes the following topics about how to use DolphinDB C++ API in Linux:
+* Compile a project
+* Execute DolphinDB script  
+* Call DolphinDB built-in functions
+* Upload local objects to DolphinDB server
+* Append data to DolphindB tables
 
-### 2、编译工程
-#### 2.1 下载bin文件和头文件
-下载api-cplusplus，包括bin和include文件夹，如下：
+### 1. Environment Setup
+
+To run DolphinDB C++ API, we need g++ 6.2 in Linux. 
+
+### 2. Compile a project
+
+#### 2.1 Download bin file and header files
+
+Download api-cplusplus from this git repo, including "bin" and "include" folders in your project.
 
 > bin (libDolphinDBAPI.so)  
   include (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h) 
   
-#### 2.2 编写main.cpp文件
-在与bin和include平级目录创建目录project，进入project并创建文件main.cpp，内容如下：
+#### 2.2 Compile main.cpp
+
+Create a directory "project" on the same level as "bin" and "include" folders, enter the project folder, and then create the file main.cpp:
 ```
 #include "DolphinDB.h"
 #include "Util.h"
@@ -29,7 +33,7 @@ using namespace std;
 
 int main(int argc, char *argv[]){
     DBConnection conn;
-    bool ret = conn.connect("192.168.1.25", 8503);
+    bool ret = conn.connect("111.222.3.44", 8503);
     if(!ret){
         cout<<"Failed to connect to the server"<<endl;
         return 0;
@@ -42,29 +46,36 @@ int main(int argc, char *argv[]){
 }
 ```
 
-#### 2.3 编译
-g++ 编译命令如下：
+#### 2.3 Compile
+
+g++ compiling command:
+
 > g++ main.cpp -std=c++11 -DLINUX -DLOGGING_LEVEL_2 -O2 -I../include -lDolphinDBAPI -lssl  -lpthread -luuid -L../bin  -Wl,-rpath ../bin/ -o main
 
-#### 2.4 运行
-运行main之前，需要启动DolphinDB Server，本例中连接到IP为192.168.1.25，端口为8503的DolphinDB Server。然后运行main程序，成功连接到DolphinDB Server。
+#### 2.4 Run
 
-### 3、执行DolphinDB Script
-#### 3.1 创建连接
-C++ API通过TCP/IP连接DolphinDB Server，connect方法通过ip和port两个参数来连接，代码如下：
+After successfully compiling the program main, start a DolphinDB server, then you can run the program "main", which connects to a DolphinDB server with IP address 111.222.3.44 and port number 8503 as specified in the program. 
+
+### 3. Execute DolphinDB script
+
+#### 3.1 Connect to a DolphinDB server
+
+The C++ API connects to a DolphinDB server via TCP/IP. The `connect` method uses parameters `ip` and `port`.
 ```
 DBConnection conn;
-bool ret = conn.connect("192.168.1.25", 8503);
+bool ret = conn.connect("111.222.3.44", 8503);
 ```
 
-连接服务器时，还可以同时指定用户名和密码进行登录，代码如下：
+To connect to a cluster, you need to log in with the username and password. The default administrator username and password are "admin" and "123456" respectively.
 ```
 DBConnection conn;
-bool ret = conn.connect("192.168.1.25", 8503,"admin","123456");
+bool ret = conn.connect("111.222.3.44", 8503,"admin","123456");
 ```
 
-#### 3.2 执行脚本
-通过 run 方法来执行脚本，脚本的最大长度是65535bytes，如下：
+#### 3.2 Execute DolphinDB script
+
+Execute Dolphindb script with method `run`.  
+
 ```
 ConstantSP v = conn.run("`IBM`GOOG`YHOO");
 int size = v->size();
@@ -72,17 +83,19 @@ for(int i = 0; i < size; i++)
     cout<<v->getString(i)<<endl;
 ```
 
-输出如下：
+Output:
 >IBM  
 GOOG  
 YHOO  
 
-如果脚本只包含一个语句，如上代码，则返回该语句的返回值；如果脚本包含多个语句，则只返回最后一个语句的返回值；如果脚本中有语法错误或者遇到网络问题，则抛出异常。
+If the script contains multiple statements, only the result of the last statement is returned. If there is a syntax error in the script or there is a network problem, an exception will be thrown.
 
-#### 3.3 支持的多种数据样式
-DolphinDB支持多种数据类型（Int、Long、String、Date、DataTime等）和多种数据样式（Vector、Set、Matrix、Dictionary、Table、AnyVector等），下面举例介绍。
+#### 3.3 Support multiple data types and data forms
+
+DolphinDB supports multiple data types (Int, Float, String, Date, DataTime, etc) and multiple data forms (Vector, Set, Matrix, Dictionary, Table, AnyVector, etc.)
+
 ##### 3.3.1 Vector
-Vector类似C++中的vector，可以支持各种不同的数据类型，Int类型Vector如下：
+
 ```
 VectorSP v = conn.run("1..10");
 int size = v->size();
@@ -90,8 +103,6 @@ for(int i = 0; i < size; i++)
     cout<<v->getInt(i)<<endl;
 ```
 
-run方法返回Int类型的Vector，输出为1到10；
-下面输出DateTime类型的Vector，如下：
 ```
 VectorSP v = conn.run("2010.10.01..2010.10.30");
 int size = v->size();
@@ -99,31 +110,31 @@ for(int i = 0; i < size; i++)
     cout<<v->getString(i)<<endl;
 ```
 
-run方法返回DataTime类型的Vector。
 ##### 3.3.2 Set
+
 ```
 VectorSP set = conn.run("set(4 5 5 2 3 11 6)");
 cout<<set->getString()<<endl;
 ```
 
-run方法返回Int类型的Set，输出：set(5,2,3,4,11,6)
 ##### 3.3.3 Matrix
+
 ```
 ConstantSP matrix = conn.run("1..6$2:3");
 cout<<matrix->getString()<<endl;
 ```
 
-run方法返回Int类型的Matrix。
-
 ##### 3.3.4 Dictionary
+
 ```
 ConstantSP dict = conn.run("dict(1 2 3,`IBM`MSFT`GOOG)");
 cout << dict->get(Util::createInt(1))->getString()<<endl;
 ```
 
-run方法返回Dictionary，输出：IBM；
-另外，Dictionary的get方法，接受一个词典的key类型的参数（本例中，keys为 1 2 3，为Int类型），通过Util::createInt()函数来创建一个Int类型的对象。
+You can use `get` method to retrieve a value. Note that you need to create an Int value through function `Util::createInt()` in order to do so. 
+
 ##### 3.3.5 Table
+
 ```
 string sb;
 sb.append("n=20000\n");
@@ -133,41 +144,45 @@ sb.append("select qty,price from mytrades where sym==`IBM;");
 ConstantSP table = conn.run(sb);
 ```
 
-run方法返回table，包含两列 qty 和 price。
 ##### 3.3.6 AnyVector
-AnyVector中可以包含不同的数据类型，如下：
+
 ```
 ConstantSP result = conn.run("{1, 2, {1,3,5},{0.9, 0.8}}");
 cout<<result->getString()<<endl;
 ```
 
-run方法返回AnyVector，可以通过result->get(2) 获取第2个元素{1,3,5}，如下：
+Get the third element with method `get`:
 ```
 VectorSP v =  result->get(2);
 cout<<v->getString()<<endl;
 ```
 
-输出Int类型Vector：[1,3,5]。
+The result is an Int Vector [1,3,5].
 
-### 4、调用DolphinDB内置函数
-DolphinDB C++ API提供了在C++层面调用DolphinDB内置函数的接口，代码如下：
+### 4. Call DolphinDB built-in functions
+
+The DolphinDB C++ API provides an interface to call DolphinDB built-in functions:
 ```
 vector<ConstantSP> args;
 double array[] = {1.5, 2.5, 7};
-ConstantSP vec = Util::createVector(DT_DOUBLE, 3);//创建Double类型的Vector，包含3个元素
-vec->setDouble(0, 3, array);//给vec赋值
+ConstantSP vec = Util::createVector(DT_DOUBLE, 3); // build a Double Vector with size of 3.
+vec->setDouble(0, 3, array); // assign values
 args.push_back(vec);
-ConstantSP result = conn.run("sum", args);//调用DolphinDB内置函数sum
+ConstantSP result = conn.run("sum", args); // call built-in function "sum".
 cout<<result->getString()<<endl;
  ```
  
-run方法返回sum函数的结果，sum函数接受一个Double类型的Vector，通过Util::createVector(DT_DOUBLE, 3)来创建Double Vector；
-run方法的第一个参数为string类型的函数名，第二个参数为ConstantSP类型的vector（Constant类为DolphinDB中所有类型的基类），sum输出为Double类型。
+The `run` method above returns the result of function `sum`, which accepts a Double Vector via `Util::createVector(DT_DOUBLE, 3)`.
 
-### 5、上传本地对象到DolphinDB Server
-通过C++ API可以把本地的对象上传到DolphinDB Server中，下面用例先在本地创建table对象，然后上传到Server，再从Server中获取该对象，完整代码如下：
+The first parameter of the `run` method is a function name; the second parameter is the vector of ConstantSP type (the Constant class is the base class of all types in DolphinDB).
+
+### 5. Upload local objects to DolphinDB Server
+
+The C++ API provides a flexible interface to create local objects. With the `upload` method, you can implement the conversion between local objects and Server objects.
+
+The local object can be uploaded to the DolphinDB Server through the C++ API. The following example first creates a local table object, then uploads it to the DolphinDB server, and then gets the object from the server. The complete code is as follows:
 ```
-//本地创建table对象，包含3列
+// Create a local table object with 3 columns
 TableSP createDemoTable(){
     vector<string> colNames = {"name","date","price"};
     vector<DATA_TYPE> colTypes = {DT_STRING,DT_DATE,DT_DOUBLE};
@@ -185,33 +200,32 @@ TableSP createDemoTable(){
     return table;
 }
    
-//将table对象上传到Server，并再从Server获取该对象
+// Upload the local table object to DolphinDB server，and then get back the object from the server through method run.
 table = createDemoTable();
 conn.upload("myTable", table);
 string script = "select * from myTable;";
 ConstantSP result = conn.run(script);
 cout<<result->getString()<<endl;
 ```
-C++ API提供了在本地灵活的创建各种对象的接口，利用 __upload__ 方法，可以方便的实现本地对象和Server对象的转换交互。
 
-### 6、数据表添加数据
-利用C++ API可以方便的将第三方系统业务数据添加到DolphinDB数据表中。DolphinDB支持三种类型的表， __内存表__ 、 __本地磁盘表__ 及 __分布式表__ 。下面介绍如何利用Ｃ++ API将模拟的业务数据保存到不同类型的表中。  
+### 6. Append data to DolphinDB tables
 
-#### 6.1 内存表
-数据仅保存在本节点内存，存取速度最快，但是节点关闭数据就不存在了，适用于临时快速计算、临时保存计算结果等场景。由于全部保存在内存中，内存表不应太大。
+Data can be appended to a DolphinDB table with C++ API. DolphinDB supports 3 types of tables: in-memory table, table on local disk, and distributed table. 
 
-##### 6.1.1 通过DolphinDB客户端创建内存表
+#### 6.1 In-memory table
+
+##### 6.1.1 Create an in-memory table
 ```
 t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]);
-share  t as tglobal
+share t as tglobal
 ```
-__table__ 创建内存表，指定capacity，size，列名以及类型；  
-__share__ 将表设置为跨session可见；  
+`table`: create an in-memory table and specify capacity, size, column names, and data types.
+`share`: share the table across sessions, so that multiple clients can write to table "t" at the same time.
 
-##### 6.1.2 通过C++ API保存数据到内存表
+##### 6.1.2 Save data to the in-memory table
 ```
 string script;
-//模拟生成需要保存到内存表的数据
+//simulate data
 VectorSP names = Util::createVector(DT_STRING,5,100);
 VectorSP dates = Util::createVector(DT_DATE,5,100);
 VectorSP prices = Util::createVector(DT_DOUBLE,5,100);
@@ -222,60 +236,57 @@ for(int i = 0 ;i < 5;i++){
 } 
 vector<string> allnames = {"names","dates","prices"};
 vector<ConstantSP> allcols = {names,dates,prices};
-conn.upload(allnames,allcols);//将数据上传到server
-script += "insert into tglobal values(names,dates,prices);"; //通过insert into 方法将数据保存到内存表中
+conn.upload(allnames,allcols); // upload data to a DolphinDB server
+script += "insert into tglobal values(names,dates,prices);"; // insert data to table
 script += "select * from tglobal;";
-TableSP table = conn.run(script); 
+TableSP table = conn.run(script); // return the updated in-memory table
 cout<<table->getString()<<endl;
 ```
-run方法返回的table为内存表。  
-内存表中添加数据除了使用 __insert into__ 语法外，还可以使用 __append!__ ，其接受一个table作为参数，C++ API创建table的实例参考（5、上传本地对象到DolphinDB Server)，如下：
+
+To append data to an in-memory table, in addition to using `insert into`, you can also use `append!`, which accepts a table as a parameter and creates an instance reference to the table:
 ```
 table = createDemoTable();
 script += "t.append!(table);";
 ```
-注意:  
->本例中使用 __share__ 来把内存表设置为跨session可见，这样多个客户端可以同时对t进行写入访问，share详细介绍请参考manual。
+#### 6.2 Table on local disk
 
-
-#### 6.2 本地磁盘表
-数据保存在本地磁盘上，即使节点关闭，再启动后，可以方便的将数据加载到内存。适用于数据量不是特别大，并且需要持久化到本地磁盘的数据。下面例子介绍，本地磁盘表tglobal已经创建，如何通过C++ API保存数据。
-
-##### 6.2.1 通过DolphinDB客户端创建本地磁盘表
-可以通过DolphinDB的任何客户端（GUI、Web notebook、console）创建本地磁盘表，代码如下
+##### 6.2.1 Create a local disk table with DolphinDB script
+You can use any DolphinDB client (GUI, Web notebook or console) to create a table on local disk:
 ```
-t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]); //创建内存表
-db=database("/home/psui/demoTable"); //创建本地数据库
-saveTable(db,t,`dt); //保存本地表
+t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]); // create an in-memory table
+db=database("/home/dolphindb/demoDB"); // create database "demoDB"
+saveTable(db,t,`dt); // save the in-memory table to the database
 share t as tDiskGlobal
 ```
-__database__ 接受一个本地路径，创建一个本地数据库；  
-__saveTable__ 将内存内存表保存到本地数据库中，并存盘； 
+`database`: create a local database at the specified path.
+`saveTable`: save the in-memory table to the local database on disk.
 
-##### 6.2.2 通过C++ API保存数据到本地磁盘表
+##### 6.2.2 Save data to a local disk table with API
 ```
 TableSP table = createDemoTable();
 conn.upload("mt",table);
 string script;
-script += "db=database(\"/home/psui/demoTable1\");";
+script += "db=database(\"/home/demoTable1\");";
 script += "tDiskGlobal.append!(mt);";
 script += "saveTable(db,tDiskGlobal,`dt);";
 script += "select * from tDiskGlobal;";
-TableSP result = conn.run(script); 
+TableSP result = conn.run(script); // load an in-memory table from the database 
 cout<<result->getString()<<endl;
 ```
-__loadTable__ 从本地数据库中加载一个table到内存；   
-__append!__ 保存数据到内存表；  
-最后，run方法返回从磁盘载入内存的table。  
-注意:  
->1、对于本地磁盘表， __append!__ 仅仅将数据添加到内存表，要将数据保存到磁盘，还必须使用 __saveTable__ 函数。  
-2、除了使用share函数外，还可以在C++ API中使用loadTable函数加载表内容，然后append！。不过这种方法不推荐使用，原因是，loadTable需要读磁盘，耗时很大；如果多个客户端loadTable的话，内存中会存在表的多个拷贝，容易造成数据不一致；
+`loadTable`: load a table from the database into memory.   
+`append!`: append data to the table.  
 
-#### 6.3 分布式表
-利用DolphinDB底层提供的分布式文件系统DFS，将数据保存在不同的节点上，逻辑上仍然可以像本地表一样做统一查询。适用于保存企业级历史数据，作为数据仓库使用，提供查询、分析等功能。本例介绍如何通过C++ API保存数据到分布式表中。
+Note:  
+1. For a table on local disk, `append!` only adds data to an in-memory copy of the table. To save the data to disk, you must also use function `saveTable`.
+2. Instead of using function `share`, you can also use function `loadTable` to load the table with the C++ API, and then `append!`. However, this method is not recommended. The reason is that function `loadTable` needs to load from the disk, which can take a long time. If there are multiple client using `loadTable`, there will be multiple copies of the table in the memory, which may cause data inconsistency.
 
-##### 6.3.1 创建分布式表
-可以通过DolphinDB的任何客户端（GUI、Web notebook、console）创建分布式表，代码如下：
+#### 6.3 Distributed table
+
+A distributed table in DolphinDB is stored on multiple nodes of a cluster. The following example shows how to save data to a distributed table with the C++ API.
+
+##### 6.3.1 Create a distributed table
+
+You can use any DolphinDB client (GUI, Web notebook or console) to create a local disk table:
 ```
 login(`admin,`123456)
 dbPath = "dfs://SAMPLE_TRDDB";
@@ -283,10 +294,10 @@ tableName = `demoTable
 db = database(dbPath, VALUE, 2010.01.01..2010.01.30)
 pt=db.createPartitionedTable(table(1000000:0,`name`date`price,[STRING,DATE,DOUBLE]),tableName,`date)
 ```
-__database__ 创建分区数据库，并指定分区类型；  
-__createPartitionedTable__ 创建分布式表，并指定表类型和分区字段；
+`database`: create a partitioned database with the specified partition scheme.
+`createPartitionedTable`: create a distributed table.
 
-##### 6.3.2 保存数据到分布式表
+##### 6.3.2 Save data to a distributed table
 
 ```
 string script;
@@ -300,6 +311,7 @@ script += "select * from database(dbPath).loadTable(tableName);";
 TableSP result = conn.run(script); 
 cout<<result->getString()<<endl;
 ```
-__append!__ 保存数据到分布式表中，并且保存到磁盘；  
+`append!` saves the data to a distributed table and saves to disk.
 
-关于C++ API的更多内容请参考头文件中提供的接口。
+For more on the C++ API, please refer to the interface provided in the header file.
+
