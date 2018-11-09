@@ -10,7 +10,6 @@
 
 #include <atomic>
 
-namespace dolphindb {
 class Counter {
 public:
 	Counter(void* p): p_(p), count_(0){}
@@ -115,7 +114,5 @@ private:
 	template<class U> friend class SmartPointer;
 	Counter* counterP_;
 };
-
-}
 
 #endif /* SMARTPOINTER_H_ */
