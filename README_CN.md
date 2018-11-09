@@ -6,7 +6,7 @@ DolphinDB C++ API提供了以下三种开发环境:
 
 本教程主要包括以下内容：
 * Linux 开发环境工程编译  
-* Windows Visual Stdio 开发环境工程编译
+* Windows Visual Studio 开发环境工程编译
 * 执行DolphinDB Script  
 * 调用内置函数  
 * 上传本地对象到Server  
