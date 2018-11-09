@@ -1,26 +1,31 @@
 # DolphinDB C++ API
+DolphinDB C++ API supports the following development environments:
+* Linux
+* Windows Visual Studio
+* Windows GNU(MingW)
 
 This tutorial includes the following topics about how to use DolphinDB C++ API in Linux:
-* Compile a project
+* Compile a project under Linux environment
+* Compile a project under Windows Visual Studio environment
 * Execute DolphinDB script  
 * Call DolphinDB built-in functions
 * Upload local objects to DolphinDB server
 * Append data to DolphindB tables
 
-### 1. Environment Setup
+### 1. Compile under Linux 
+
+#### 1.1 Environment Setup
 
 To run DolphinDB C++ API, we need g++ 6.2 in Linux. 
 
-### 2. Compile a project
-
-#### 2.1 Download bin file and header files
+#### 1.2 Download bin file and header files
 
 Download api-cplusplus from this git repo, including "bin" and "include" folders in your project.
 
 > bin (libDolphinDBAPI.so)  
   include (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h) 
   
-#### 2.2 Compile main.cpp
+#### 1.3 Compile main.cpp
 
 Create a directory "project" on the same level as "bin" and "include" folders, enter the project folder, and then create the file main.cpp:
 ```
@@ -46,15 +51,36 @@ int main(int argc, char *argv[]){
 }
 ```
 
-#### 2.3 Compile
+#### 1.4 Compile
 
 g++ compiling command:
 
 > g++ main.cpp -std=c++11 -DLINUX -DLOGGING_LEVEL_2 -O2 -I../include -lDolphinDBAPI -lssl  -lpthread -luuid -L../bin  -Wl,-rpath ../bin/ -o main
 
-#### 2.4 Run
+#### 1.5 Run
 
 After successfully compiling the program main, start a DolphinDB server, then you can run the program "main", which connects to a DolphinDB server with IP address 111.222.3.44 and port number 8503 as specified in the program. 
+
+### 2. Compile under Windows
+
+#### 2.1 Environment Setup
+
+This tutorial uses Visual Studio 2017 64 bit version. 
+
+#### 2.2 Download bin file and header files
+Download api-cplusplus.
+
+#### 2.3 Build Visual Studio Project
+Build win32 console project and import header files, create main.cpp as in section 1.3, import libDolphinDBAPI.lib and configure the additional library directory as the lib directory. 
+
+>Note: The min/max macros are defined by default in VS. To avoid conflicts with the min and max functions in the header file, __NOMINMAX__ needs to be added to the preprocessor macro definition.
+
+#### 2.4 Compile and Run
+
+Start the compilation, copy libDolphinDBAPI.dll to the executable program output directory, and execute the compiled executable program.
+
+The Windows gnu development environment is similar to Linux, please refer to the linux compilation. 
+
 
 ### 3. Execute DolphinDB script
 
@@ -66,7 +92,7 @@ DBConnection conn;
 bool ret = conn.connect("111.222.3.44", 8503);
 ```
 
-To connect to a cluster, you need to log in with the username and password. The default administrator username and password are "admin" and "123456" respectively.
+To connect to a cluster, you need to log in with a username and password. The default administrator username and password are "admin" and "123456" respectively.
 ```
 DBConnection conn;
 bool ret = conn.connect("111.222.3.44", 8503,"admin","123456");
@@ -156,12 +182,11 @@ Get the third element with method `get`:
 VectorSP v =  result->get(2);
 cout<<v->getString()<<endl;
 ```
-
 The result is an Int Vector [1,3,5].
 
 ### 4. Call DolphinDB built-in functions
 
-The DolphinDB C++ API provides an interface to call DolphinDB built-in functions:
+DolphinDB C++ API provides an interface to call DolphinDB built-in functions:
 ```
 vector<ConstantSP> args;
 double array[] = {1.5, 2.5, 7};
@@ -170,17 +195,17 @@ vec->setDouble(0, 3, array); // assign values
 args.push_back(vec);
 ConstantSP result = conn.run("sum", args); // call built-in function "sum".
 cout<<result->getString()<<endl;
- ```
- 
+```
+
 The `run` method above returns the result of function `sum`, which accepts a Double Vector via `Util::createVector(DT_DOUBLE, 3)`.
 
 The first parameter of the `run` method is a function name; the second parameter is the vector of ConstantSP type (the Constant class is the base class of all types in DolphinDB).
 
 ### 5. Upload local objects to DolphinDB Server
 
-The C++ API provides a flexible interface to create local objects. With the `upload` method, you can implement the conversion between local objects and Server objects.
+The C++ API provides a flexible interface to create local objects. With the `upload` method, you can implement the conversion between local objects and server objects.
 
-The local object can be uploaded to the DolphinDB Server through the C++ API. The following example first creates a local table object, then uploads it to the DolphinDB server, and then gets the object from the server. The complete code is as follows:
+The local object can be uploaded to a DolphinDB server through C++ API. The following example first creates a local table object, then uploads it to the DolphinDB server, then gets the object from the server.
 ```
 // Create a local table object with 3 columns
 TableSP createDemoTable(){
@@ -277,7 +302,7 @@ cout<<result->getString()<<endl;
 `append!`: append data to the table.  
 
 Note:  
-1. For a table on local disk, `append!` only adds data to an in-memory copy of the table. To save the data to disk, you must also use function `saveTable`.
+1. For a table on local disk, `append!` only appends data to an in-memory copy of the table. To save the data to disk, you must also use function `saveTable`.
 2. Instead of using function `share`, you can also use function `loadTable` to load the table with the C++ API, and then `append!`. However, this method is not recommended. The reason is that function `loadTable` needs to load from the disk, which can take a long time. If there are multiple client using `loadTable`, there will be multiple copies of the table in the memory, which may cause data inconsistency.
 
 #### 6.3 Distributed table
