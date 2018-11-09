@@ -2,7 +2,7 @@
 DolphinDB C++ API提供了以下三种开发环境:
 * Linux
 * Windows Visual Stdio
-* Windows gnu
+* Windows GNU
 
 本教程主要包括以下内容：
 * Linux 开发环境工程编译  
