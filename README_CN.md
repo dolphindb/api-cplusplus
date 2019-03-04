@@ -1,329 +1,483 @@
-# DolphinDB C++ API
-DolphinDB C++ API提供了以下三种开发环境:
-* Linux
-* Windows Visual Stdio
-* Windows gnu
+### 1.C++ API 概念
 
-本教程主要包括以下内容：
-* Linux 开发环境工程编译  
-* Windows Visual Studio 开发环境工程编译
-* 执行DolphinDB Script  
-* 调用内置函数  
-* 上传本地对象到Server  
-* 数据表添加数据  
+C++ API本质上实现了C++程序和DolphinDB服务器之间的消息传递和数据转换协议。
 
-### 1 Linux 开发环境工程编译
-#### 1.1 环境需求
-* linux 编程环境；  
-* g++ 6.2编译器；（由于libDolphinDBAPI.so是由g++6.2编译的，为了保证ABI兼容，建议使用该版本的编译器）
+#### 1.1.Linux下编译执行
 
-#### 1.2 下载bin文件和头文件
-下载api-cplusplus，包括bin和include文件夹，如下：
+C++ API需要用g++ 6.2，若遇到`undefined reference std::__cxx11::basic_string`，需要在编译时使用`-D_GLIBCXX_USE_CXX11_ABI=0`宏定义。
 
-> bin (libDolphinDBAPI.so)  
-  include (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h) 
-  
-#### 1.3 编写main.cpp文件
-在与bin和include平级目录创建目录project，进入project并创建文件main.cpp，内容如下：
+依赖: libpthread, libssl, libuuid, libDolphinDBAPI
+
+```
+g++ example.cpp -DLINUX -DLOGGING_LEVEL_2 -O3 -I./include -L./bin/linux_64 -lDolphinDBAPI -lpthread -uuid -ssl -o example
+```
+
+#### 1.2.Windows Visual Studio工程
+
+导入bin\vs2017_x64\libDolphinDBAPI.lib，并配置附加库。
+
+注意：由于VS里默认定义了min/max两个宏，与头文件中`min`、`max`函数冲突。为了解决这个问题，在预处理宏定义中需要加入 `__NOMINMAX__` 。
+
+将对应的libDolphinDBAPI.dll拷贝到可执行程序的输出目录，即可运行。
+
+#### 1.3.C++对象和DolphinDB对象之间的映射
+
+C++ API使用ConstantSP来指向DolphinDB返回的所有数据类型。根据DolphinDB的数据类型，C++ API主要提供了6种类，分别是Constant，Vector，Matrix，Set，Dictionary，Table。这些类的声明都包含在DolphinDB.h头文件中。
+
+#### 1.4.C++ API提供的主要函数
+
+DolphinDB C++ API提供的最核心的对象是DBConnection，它主要的功能就是让C++应用可以通过它调用DolphinDB的脚本和函数，在C++应用和DolphinDB服务器之间互通数据。
+DBConnection类提供如下主要方法:
+
+| 方法名        | 详情          |
+|:------------- |:-------------|
+|connect(host, port, [username, password])|将会话连接到DolphinDB服务器|
+|login(username,password,enableEncryption)|登陆服务器|
+|run(script)|将脚本在DolphinDB服务器运行|
+|run(functionName,args)|调用DolphinDB服务器上的函数|
+|upload(variableNames, variableValues)|将本地数据对象上传到DolphinDB服务器|
+|close()|关闭当前会话|
+|initialize()|静态方法，需要在使用其他方法前首先调用一次|
+
+**如果脚本含有错误或者出现网络问题，抛出`IOException`（定义在Exception.h头文件中）**
+
+**以下所有代码均在`example.cpp`中，建议在阅读过程中参考源代码**
+
+### 2.建立DolphinDB连接
+
+C++ API通过TCP/IP协议连接到DolphinDB服务器。 在下列例子中，我们连接正在运行的端口号为8848的本地DolphinDB服务器：
+
+```
+DBConnection conn;
+DBConnection::initialize();
+bool success = conn.connect("localhost", 8848);
+```
+使用用户名和密码建立连接：
+
+```
+bool success = conn.connect("localhost", 8848, "admin", "123456");
+```
+
+### 3.运行脚本
+
+在C++中运行DolphinDB脚本的语法如下：
+```
+conn.run("script");
+```
+其中，脚本的最大长度为65,535字节。
+
+如果脚本只包含一条语句，如表达式，DolphinDB会返回一个数据对象；否则返回NULL对象。如果脚本包含多条语句，将返回最后一个对象。
+
+### 4.调用DolphinDB函数
+
+调用的函数可以是内置函数或用户自定义函数。 下面的示例将一个`double`向量传递给服务器，并调用sum函数。
+使用`Util::create`（定义在Util头文件中）来构建DolphinDB的各种数据类型，如下代码中预留的size是2,因此可以直接用`setDouble(idx, value)`进行设置值，此后也可以通过`appendDouble(data, length)`直接批量添加原生数组或STL容器内的数据。
+
+```
+void testCallFunction(DBConnection &conn) {
+    VectorSP vec = Util::createVector(DT_DOUBLE, 2);
+    double data[] = {3.5, 4.5};
+    vec->setDouble(0, 1.5);
+    vec->setDouble(1, 2.5);
+    vec->appendDouble(data, 2);
+
+    std::vector<ConstantSP> args{vec};
+    ConstantSP result = conn.run("sum", args);
+    std::cout << result->getDouble() << std::endl;;
+}
+```
+
+### 5.将对象上传到DolphinDB服务器
+
+我们可以将二进制数据对象上传到DolphinDB服务器，并将其分配给一个变量以备将来使用。变量名称可以使用三种类型的字符：字母，数字或下划线；第一个字符必须是字母。
+
+```
+void testUpload(DBConnection &conn) {
+    ConstantSP vec = Util::createVector(DT_DOUBLE, 0);
+    double data[] = {1.5, 2.5, 3.5, 4.5};
+    ((Vector *)vec.get())->appendDouble(data, 4);
+
+    std::vector<std::string> vars{"a"};
+    std::vector<ConstantSP> args{vec};
+    conn.upload(vars, args);
+    ConstantSP result = conn.run("accumulate(+,a)");
+    std::cout << result->getString() << std::endl;
+}
+```
+
+### 6.DolphinDB读取数据结构实例
+
+下面介绍建立DolphinDB连接后，在C++环境中，对不同DolphinDB数据类型进行操作。
+
+首先包含DolphinDB的头文件：
+
 ```
 #include "DolphinDB.h"
 #include "Util.h"
-#include <iostream>
-#include <string>
-using namespace dolphindb;
-using namespace std;
+```
 
-int main(int argc, char *argv[]){
-    DBConnection conn;
-    bool ret = conn.connect("192.168.1.25", 8503);
-    if(!ret){
-        cout<<"Failed to connect to the server"<<endl;
-        return 0;
+- 向量Vector
+
+在下面的示例中，DolphinDB语句:
+```
+rand(`IBM`MSFT`GOOG`BIDU,10)
+```
+返回C++对象`ConstantSP`，`size()`方法能够获取向量的大小。我们可以使用`getString(i)`方法按照索引访问向量元素。
+
+```
+void testStringVector(DBConnection &conn) {
+    ConstantSP vector = conn.run("rand(`IBM`MSFT`GOOG`BIDU, 10)");
+
+    int size = vector->size();
+    for(int i = 0; i < size; ++i) {
+        std::cout << vector->getString(i) << " ";
     }
-    ConstantSP vector = conn.run("`IBM`GOOG`YHOO");
-    int size = vector->rows();
-    for(int i=0; i<size; ++i)
-        cout<<vector->getString(i)<<endl;
-    return 0;
+    std::cout << std::endl;
 }
 ```
 
-#### 1.4 编译
-g++ 编译命令如下：
-> g++ main.cpp -std=c++11 -DLINUX -DLOGGING_LEVEL_2 -O2 -I../include -lDolphinDBAPI -lssl  -lpthread -luuid -L../bin  -Wl,-rpath ../bin/ -o main
+类似的，也可以处理双精度浮点类型的向量或者其他类型的向量。
 
-#### 1.5 运行
-运行main之前，需要启动DolphinDB server，本例中连接到IP为192.168.1.25，端口为8503的DolphinDB Server。然后运行main程序，成功连接到DolphinDB Server。
+```
+void testDoubleVector(DBConnection &conn) {
+    ConstantSP vector = conn.run("rand(10.0, 10)");
 
-### 2 Windows Visual Stdio 开发环境工程编译
-#### 2.1 环境需求
-本教程用例在Visual Stdio 2017 下测试通过，建议用户使用该版本。
-> 注意：只支持 __x64__ 位，因此需要将工程配置为x64。
-
-#### 2.2 下载库文件和头文件
-下载api-cplusplus。
-
-#### 2.3 创建VS工程
-创建win32控制台程序，并导入头文件；
-编写cpp文件（如上）；
-导入libDolphinDBAPI.lib，并配置附加库目录为该lib的目录；
-> 注意：由于VS里默认定义了min/max两个宏，与头文件中`min`、`max`函数冲突。为了解决这个问题，在预处理宏定义中需要加入 `__NOMINMAX__` ；
-
-#### 2.4 编译执行
-启动编译，把libDolphinDBAPI.dll拷贝到可执行程序输出目录，执行编译出的可执行程序。
-
-Windows gnu开发环境与Linux类似，可参考Linux下工程编译。
-
-### 3 执行DolphinDB scriptf
-#### 3.1 创建连接
-C++ API通过TCP/IP连接DolphinDB server，`connect`方法通过`ip`和`port`两个参数来连接，代码如下：
-```
-DBConnection conn;
-bool ret = conn.connect("192.168.1.25", 8503);
-```
-
-连接服务器时，还可以同时指定用户名和密码进行登录，代码如下：
-```
-DBConnection conn;
-bool ret = conn.connect("192.168.1.25", 8503,"admin","123456");
-```
-
-#### 3.2 执行脚本
-通过 run 方法来执行脚本：
-```
-ConstantSP v = conn.run("`IBM`GOOG`YHOO");
-int size = v->size();
-for(int i = 0; i < size; i++)
-    cout<<v->getString(i)<<endl;
-```
-
-输出如下：
->IBM  
-GOOG  
-YHOO  
-
-如果脚本只包含一个语句，如上代码，则返回该语句的返回值；如果脚本包含多个语句，则只返回最后一个语句的返回值；如果脚本中有语法错误或者遇到网络问题，则抛出异常。
-
-#### 3.3 支持的多种数据样式
-DolphinDB支持多种数据类型（Int、Long、String、Date、DataTime等）和多种数据样式（Vector、Set、Matrix、Dictionary、Table、AnyVector等），下面举例介绍。
-
-##### 3.3.1 Vector
-Vector类似C++中的vector，可以支持各种不同的数据类型，Int类型Vector如下：
-```
-VectorSP v = conn.run("1..10");
-int size = v->size();
-for(int i = 0; i < size; i++)
-    cout<<v->getInt(i)<<endl;
-```
-`run`方法返回Int类型的Vector，输出为1到10；
-
-输出DateTime类型的Vector：
-```
-VectorSP v = conn.run("2010.10.01..2010.10.30");
-int size = v->size();
-for(int i = 0; i < size; i++)
-    cout<<v->getString(i)<<endl;
-```
-`run`方法返回DataTime类型的Vector。
-
-##### 3.3.2 Set
-```
-VectorSP set = conn.run("set(4 5 5 2 3 11 6)");
-cout<<set->getString()<<endl;
-```
-`run`方法返回Int类型的Set，输出：set(5,2,3,4,11,6)
-
-##### 3.3.3 Matrix
-```
-ConstantSP matrix = conn.run("1..6$2:3");
-cout<<matrix->getString()<<endl;
-```
-`run`方法返回Int类型的Matrix。
-
-##### 3.3.4 Dictionary
-```
-ConstantSP dict = conn.run("dict(1 2 3,`IBM`MSFT`GOOG)");
-cout << dict->get(Util::createInt(1))->getString()<<endl;
-```
-`run`方法返回Dictionary，输出：IBM。
-另外，Dictionary的`get`方法，接受一个词典的key类型的参数（本例中，keys为 1 2 3，为Int类型），通过`Util::createInt()`函数来创建一个Int类型的对象。
-
-##### 3.3.5 Table
-```
-string sb;
-sb.append("n=20000\n");
-sb.append("syms=`IBM`C`MS`MSFT`JPM`ORCL`BIDU`SOHU`GE`EBAY`GOOG`FORD`GS`PEP`USO`GLD`GDX`EEM`FXI`SLV`SINA`BAC`AAPL`PALL`YHOO`KOH`TSLA`CS`CISO`SUN\n");
-sb.append("mytrades=table(09:30:00+rand(18000,n) as timestamp,rand(syms,n) as sym, 10*(1+rand(100,n)) as qty,5.0+rand(100.0,n) as price);\n");
-sb.append("select qty,price from mytrades where sym==`IBM;");
-ConstantSP table = conn.run(sb);
-```
-`run`方法返回table，包含两列 qty 和 price。
-
-##### 3.3.6 AnyVector
-AnyVector中可以包含不同的数据类型，如下：
-```
-ConstantSP result = conn.run("{1, 2, {1,3,5},{0.9, 0.8}}");
-cout<<result->getString()<<endl;
-```
-`run`方法返回AnyVector，可以通过result->get(2) 获取第2个元素{1,3,5}，如下：
-```
-VectorSP v =  result->get(2);
-cout<<v->getString()<<endl;
-```
-
-输出Int类型Vector：[1,3,5]。
-
-### 4 调用DolphinDB内置函数
-DolphinDB C++ API提供了在C++层面调用DolphinDB内置函数的接口，代码如下：
-```
-vector<ConstantSP> args;
-double array[] = {1.5, 2.5, 7};
-ConstantSP vec = Util::createVector(DT_DOUBLE, 3);//创建Double类型的Vector，包含3个元素
-vec->setDouble(0, 3, array);//给vec赋值
-args.push_back(vec);
-ConstantSP result = conn.run("sum", args);//调用DolphinDB内置函数sum
-cout<<result->getString()<<endl;
- ```
- 
-`run`方法返回`sum`函数的结果，`sum`函数接受一个Double类型的Vector，通过Util::createVector(DT_DOUBLE, 3)来创建Double Vector。
-
-`run`方法的第一个参数为string类型的函数名，第二个参数为ConstantSP类型的vector（Constant类为DolphinDB中所有类型的基类），`sum`输出为Double类型。
-
-### 5 上传本地对象到DolphinDB server
-通过C++ API可以把本地的对象上传到DolphinDB server中，下面用例先在本地创建table对象，然后上传到server，再从server中获取该对象，完整代码如下：
-```
-//本地创建table对象，包含3列
-TableSP createDemoTable(){
-    vector<string> colNames = {"name","date","price"};
-    vector<DATA_TYPE> colTypes = {DT_STRING,DT_DATE,DT_DOUBLE};
-    int colNum = 3,rowNum = 3;
-    ConstantSP table = Util::createTable(colNames,colTypes,rowNum,100);
-    vector<VectorSP> columnVecs;
-    for(int i = 0 ;i < colNum ;i ++)
-        columnVecs.push_back(table->getColumn(i));
-        
-    for(unsigned int i =  0 ;i < rowNum; i++){
-        columnVecs[0]->set(i,Util::createString("name_"+std::to_string(i)));
-        columnVecs[1]->set(i,Util::createDate(2010,1,i+1));
-        columnVecs[2]->set(i,Util::createDouble(i*i));
+    int size = vector->size();
+    for(int i = 0; i < size; ++i) {
+        std::cout << vector->getDouble(i) << " ";
     }
-    return table;
+    std::cout << std::endl;
 }
-   
-//将table对象上传到Server，并再从Server获取该对象
-table = createDemoTable();
-conn.upload("myTable", table);
-string script = "select * from myTable;";
-ConstantSP result = conn.run(script);
-cout<<result->getString()<<endl;
 ```
-C++ API提供了在本地灵活的创建各种对象的接口，利用 `__upload__` 方法，可以方便的实现本地对象和server对象的转换交互。
 
-### 6 数据表添加数据
-利用C++ API可以方便的将第三方系统业务数据添加到DolphinDB数据表中。DolphinDB支持三种类型的表: 内存表、本地磁盘表及分布式表。下面介绍如何利用C++ API将模拟的业务数据保存到不同类型的表中。  
-
-#### 6.1 内存表
-数据仅保存在本节点内存，存取速度最快，但是节点关闭后数据就不存在了，适用于临时快速计算、临时保存计算结果等场景。由于全部保存在内存中，内存表不应太大。
-
-##### 6.1.1 通过DolphinDB客户端创建内存表
-```
-t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]);
-share  t as tglobal
-```
-`__table__` 创建内存表，指定capacity，size，列名以及类型；  
-`__share__` 将表设置为跨session可见；  
-
-##### 6.1.2 通过C++ API保存数据到内存表
-```
-string script;
-//模拟生成需要保存到内存表的数据
-VectorSP names = Util::createVector(DT_STRING,5,100);
-VectorSP dates = Util::createVector(DT_DATE,5,100);
-VectorSP prices = Util::createVector(DT_DOUBLE,5,100);
-for(int i = 0 ;i < 5;i++){
-    names->set(i,Util::createString("name_"+std::to_string(i)));
-    dates->set(i,Util::createDate(2010,1,i+1));
-    prices->set(i,Util::createDouble(i*i));
-} 
-vector<string> allnames = {"names","dates","prices"};
-vector<ConstantSP> allcols = {names,dates,prices};
-conn.upload(allnames,allcols);//将数据上传到server
-script += "insert into tglobal values(names,dates,prices);"; //通过insert into 方法将数据保存到内存表中
-script += "select * from tglobal;";
-TableSP table = conn.run(script); 
-cout<<table->getString()<<endl;
-```
-`run`方法返回的table为内存表。  
-内存表中添加数据除了使用 `__insert into__` 语法外，还可以使用 `__append!__`，其接受一个table作为参数，C++ API创建table的实例参考（5、上传本地对象到DolphinDB Server)，如下：
-```
-table = createDemoTable();
-script += "t.append!(table);";
-```
-注意:  
->本例中使用 `__share__` 来把内存表设置为跨session可见，这样多个客户端可以同时对表t进行写入访问，`share`详细介绍请参考manual。
-
-#### 6.2 本地磁盘表
-数据保存在本地磁盘上，即使节点关闭，再启动后，可以方便的将数据加载到内存。适用于数据量不是特别大，并且需要持久化到本地磁盘的数据。下面例子介绍，本地磁盘表tglobal已经创建，如何通过C++ API保存数据。
-
-##### 6.2.1 通过DolphinDB客户端创建本地磁盘表
-可以通过DolphinDB的任何客户端（GUI、Web notebook、console）创建本地磁盘表，代码如下
-```
-t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]); //创建内存表
-db=database("/home/psui/demoTable"); //创建本地数据库
-saveTable(db,t,`dt); //保存本地表
-share t as tDiskGlobal
-```
-`__database__` 接受一个本地路径，创建一个本地数据库
-`__saveTable__` 将内存内存表保存到本地数据库中，并存盘； 
-
-##### 6.2.2 通过C++ API保存数据到本地磁盘表
-```
-TableSP table = createDemoTable();
-conn.upload("mt",table);
-string script;
-script += "db=database(\"/home/psui/demoTable1\");";
-script += "tDiskGlobal.append!(mt);";
-script += "saveTable(db,tDiskGlobal,`dt);";
-script += "select * from tDiskGlobal;";
-TableSP result = conn.run(script); 
-cout<<result->getString()<<endl;
-```
-`__loadTable__` 从本地数据库中加载一个table到内存。   
-`__append!__` 保存数据到内存表。
-最后，`run`方法返回从磁盘载入内存的table。  
-注意:  
->1、对于本地磁盘表， `__append!__` 仅仅将数据添加到内存表，要将数据保存到磁盘，还必须使用 `__saveTable__` 函数。  
-2、除了使用`share`函数外，还可以在C++ API中使用`loadTable`函数加载表内容，然后使用`append！`。不过这种方法不推荐使用，原因是，`loadTable`需要读磁盘，耗时很大；如果多个客户端使用`loadTable`的话，内存中会存在表的多个拷贝，容易造成数据不一致；
-
-#### 6.3 分布式表
-利用DolphinDB底层提供的分布式文件系统DFS，将数据保存在不同的节点上，逻辑上仍然可以像本地表一样做统一查询。适用于保存企业级历史数据，作为数据仓库使用，提供查询、分析等功能。本例介绍如何通过C++ API保存数据到分布式表中。
-
-##### 6.3.1 创建分布式表
-可以通过DolphinDB的任何客户端（GUI、Web notebook、console）创建分布式表，代码如下：
-```
-login(`admin,`123456)
-dbPath = "dfs://SAMPLE_TRDDB";
-tableName = `demoTable
-db = database(dbPath, VALUE, 2010.01.01..2010.01.30)
-pt=db.createPartitionedTable(table(1000000:0,`name`date`price,[STRING,DATE,DOUBLE]),tableName,`date)
-```
-`__database__` 创建分区数据库，并指定分区类型；  
-`__createPartitionedTable__` 创建分布式表，并指定表类型和分区字段；
-
-##### 6.3.2 保存数据到分布式表
+- 集合Set
 
 ```
-string script;
-TableSP table = createDemoTable();
-conn.upload("mt",table);
-script += "login(`admin,`123456);";
-script += "dbPath = \"dfs://SAMPLE_TRDDB\";";
-script += "tableName = `demoTable;";
-script += "database(dbPath).loadTable(tableName).append!(mt);";
-script += "select * from database(dbPath).loadTable(tableName);";
-TableSP result = conn.run(script); 
-cout<<result->getString()<<endl;
+void testIntSet(DBConnection &conn) {
+    ConstantSP set = conn.run("set(1+3*1..10)");
+    std::cout << set->getString() << std::endl;
+}
 ```
-`__append!__` 保存数据到分布式表中，并且保存到磁盘；  
 
-关于C++ API的更多内容请参考头文件中提供的接口。
+- 矩阵Matrix
+
+`Matrix`不继承自`Constant`，用`get(idx)`来获取存储的元素。
+
+```
+void testIntMatrix(DBConnection &conn) {
+    ConstantSP matrix = conn.run("1..6$3:2");
+    std::cout << matrix->getString() << std::endl;
+}
+```
+
+- 字典Dictionary
+
+用函数`keys()`和`values()`可以从字典取得所有的键和值；要从一个键里取得它的值，可以调用`get(key)`。
+
+```
+void testDictionary(DBConnection &conn) {
+    ConstantSP dict = conn.run("dict(1 2 3,`IBM`MSFT`GOOG)");
+    std::cout << dict->getString() << std::endl;
+}
+```
+
+
+- 表Table
+
+要获取表的列，我们可以调用`getColumn(index)`；同样，我们可以调用`getColumnName(index)`获取列名。 对于列和行的数量，我们可以分别调用`columns()`和`rows()`。
+
+```
+void testTable(DBConnection &conn) {
+    string script;
+    script += "n=2000\n";
+    script += "syms=`IBM`C`MS`MSFT`JPM`ORCL\n";
+    script += "mytrades=table(09:30:00+rand(18000,n) as timestamp,rand(syms, n) as sym, 10*(1+rand(100,n)) as qty,5.0+rand(100.0,n) as price)\n";
+    script += "select qty,price,sym from mytrades";
+    ConstantSP table = conn.run(script);
+    std::cout << table->getString() << std::endl;
+}
+```
+
+当用户在C++程序中取到的值已经组成`std::vector`时，也可以很方便的构造出`Table`用于追加数据，比如现在已有`cbool, cint, cdouble, cdate, cstring`5个向量，可以通过以下语句构造`Table`对象。
+
+```
+void testCreateTable(DBConnection &conn) {
+    std::vector<char> cbool{1,0,1};
+    std::vector<int> cint{29,37,INT32_MIN};
+    std::vector<double> cdouble{4.9,1.2,7.7};
+
+    std::vector<std::string> colNames = {"cbool", "cint", "cdouble"};
+    std::vector<ConstantSP> cols;
+    cols.push_back(Util::createVector(DT_BOOL, 3));
+    cols[0]->setBool(0, 3, cbool.data());
+    cols.push_back(Util::createVector(DT_INT, 3));
+    cols[1]->setInt(0, 3, cint.data());
+    cols.push_back(Util::createVector(DT_DOUBLE, 3));
+    cols[2]->setDouble(0, 3, cdouble.data());
+    ConstantSP table = Util::createTable(colNames, cols);
+}
+```
+
+- Void和null
+
+对具体类型可以用`setNull()`将ConstantSP所指对象置为null。
+
+```
+void testVoid(DBConnection &conn) {
+    ConstantSP null = conn.run("NULL");
+    std::cout << null->getType() << std::endl;
+}
+
+void testIntNull(DBConnection &conn) {
+    ConstantSP null = conn.run("int(1)");
+    null->setNull();
+    std::cout << null->getInt() << std::endl;
+}
+```
+
+### 7.如何将C++数据表对象保存到DolphinDB的数据库中
+
+使用C++ API的一个重要场景是，用户从其他数据库系统或是第三方API中取到数据，将数据进行清洗后存入DolphinDB数据库中，本节将介绍通过C++ API将取到的数据上传并保存到DolphinDB的数据表中。
+
+DolphinDB数据表按存储方式分为三种:
+
+- 内存表: 数据仅保存在本节点内存，存取速度最快，但是节点关闭数据就不存在了。
+- 本地磁盘表：数据保存在本地磁盘上，即使节点关闭，通过脚本就可以方便的从磁盘加载到内存。
+- 分布式表：数据在物理上分布在不同的节点，通过DolphinDB的分布式计算引擎，逻辑上仍然可以像本地表一样做统一查询。
+
+下面分三部分介绍内存表数据追加及本地磁盘和分布式表的数据追加。
+
+#### 7.1.将数据保存到DolphinDB内存表
+
+DolphinDB提供多种方式来保存数据，分别对应以下几个场景：
+- 保存单点数据： 通过`insert into`方式保存单点数据；
+- 保存批量数据： 通过`tableInsert`函数保存多个数组对象；
+- 保存批量数据： 通过`append!`函数保存表对象。
+
+这三种方式的区别是接收的参数类型不同，具体业务场景中，可能从数据源取到的是单点数据，也可能是多个数组或者表的方式组成的数据集。
+
+下面分别介绍三种方式保存数据的实例，在例子中使用到的数据表有4个列，分别是`string,int,timestamp,double`类型，列名分别为`cstring,cint,ctimestamp,cdouble`，在DolphinDB上首先需要运行如下构建脚本：
+```
+login("admin","123456")
+t = table(10000:0,`cstring`cint`ctimestamp`cdouble,[STRING,INT,TIMESTAMP,DOUBLE])
+share t as sharedTable
+```
+由于内存表是会话隔离的，所以GUI中创建的内存表只有GUI会话可见，如果需要在C++或者其他终端查看数据，需要通过share关键字在会话间共享内存表。
+
+##### 7.1.1.保存单点数据
+
+若C++程序是每次获取单条数据记录保存到DolphinDB，那么可以通过类似SQL语句的`insert into`的方式保存数据，缺点是需要自行拼接字符串。
+```
+std::string s = "'test1'";
+int i = 1;
+long l = 10;
+double d = 11.0;
+std::string script;
+script += "insert into sharedTable values(";
+script += s + "," + std::to_string(i) + "," + std::to_string(l) + "," + std::to_string(d) +")";
+conn.run(script);
+```
+
+##### 7.1.2.使用多个数组方式批量保存
+
+若C++程序获取的数据易于组织成向量，使用`tableInsert`函数是一个比较适合的保存方式，这个函数可以接受多个数组作为参数，将数组追加到数据表中。
+
+```
+ConstantSP col0 = Util::createVector(DT_STRING, 1);       
+col0->setString(0, "test2");
+ConstantSP col1 = Util::createVector(DT_INT, 1);
+col1->setInt(0, 2);
+ConstantSP col2 = Util::createVector(DT_TIMESTAMP, 1);
+col2->setLong(0, 20);
+ConstantSP col3 = Util::createVector(DT_DOUBLE, 1);
+col3->setDouble(0, 22.0);
+
+vector<ConstantSP> cols{col0, col1, col2, col3};            //预先已组织好的向量直接构成参数
+ConstantSP result1 = conn.run("tableInsert{sharedTable}", cols);
+```
+
+实际运用的场景中，通常是C++程序往服务端已经存在的表中写入数据，在服务端可以用 `tableInsert(sharedTable,cols)` 这样的脚本，但是在C++里用 `conn.run("tableInsert",args)` 方式调用时，tableInsert的第一个参数是服务端表的对象引用，它无法在C++程序端获取到，所以常规的做法是在预先在服务端定义一个函数，把sharedTable固化的函数体内，比如：
+
+```
+def saveData(v1,v2,v3,v4){tableInsert(sharedTable,v1,v2,v3,v4)}
+```
+
+然后再通过`conn.run("saveData",args)`运行函数，虽然这样也能实现目标，但是对C++程序来说要多一次服务端的调用，多消耗了网络资源。
+在本例中，使用了DolphinDB中的`部分应用`这一特性，将服务端表名以`tableInsert{sharedTable}`这样的方式固化到tableInsert中，作为一个独立函数来使用，这样就不需要再使用自定义函数的方式来实现。
+具体的文档请参考[部分应用](https://www.dolphindb.com/cn/help/PartialApplication.html)。
+
+##### 7.1.3.使用表方式批量保存
+
+若C++程序利用`Util::createTable`构建表再保存，那么使用`append!`函数会更加方便，`append!`函数接受一个表对象作为参数，将数据追加到数据表中。
+
+```
+std::vector<std::string> cstring{"rec1", "rec2", "rec3"};
+std::vector<int> cint{1,0,1};
+std::vector<long long> ctimestamp{59603423,59604235,INT64_MIN};
+std::vector<double> cdouble{4.9,1.2,7.7};
+
+std::vector<std::string> colNames = {"cstring", "cint", "ctimestamp", "cdouble"};
+std::vector<ConstantSP> cols;
+cols.push_back(Util::createVector(DT_STRING, 3));
+cols[0]->setBool(0, 3, cstring.data());
+cols.push_back(Util::createVector(DT_INT, 3));
+cols[1]->setInt(0, 3, cint.data());
+cols.push_back(Util::createVector(DT_TIMESTAMP, 3));
+cols[2]->setLong(0, 3, ctimestamp.data());
+cols.push_back(Util::createVector(DT_DOUBLE, 3));
+cols[3]->setDouble(0, 3, cdouble.data());
+ConstantSP myTable = Util::createTable(colNames, cols);
+
+std::vector<ConstantSP> arg{myTable};
+ConstantSP result2 = conn.run("append!{sharedTable}", arg); //调用自定义函数来append!
+```
+
+#### 7.2.将数据保存到分布式表
+
+分布式表是DolphinDB推荐在生产环境下使用的数据存储方式，它支持快照级别的事务隔离，保证数据一致性; 分布式表支持多副本机制，既提供了数据容错能力，又能作为数据访问的负载均衡。
+
+本例中涉及到的数据表可以通过如下脚本构建 ：
+
+*请注意只有启用 `enableDFS=1` 的集群环境才能使用分布式表。*
+
+
+```
+login("admin","123456")
+//使用分布式表
+dbPath = 'dfs://testDatabase'
+tbName = 'tb1'
+
+t = table(10000:0,`cstring`cint`ctimestamp`cdouble,[STRING,INT,TIMESTAMP,DOUBLE])
+share t as sharedTable
+
+if(existsDatabase(dbPath)) { dropDatabase(dbPath) }
+db = database(dbPath,RANGE,2018.01.01..2018.12.31)
+db.createPartitionedTable(t,tbName,'ctimestamp')
+```
+
+DolphinDB提供`loadTable`方法可以加载分布式表，通过`append!`方式追加数据，具体的脚本示例如下：
+
+```
+std::vector<std::string> cstring{"rec4", "rec5", "rec6"};
+std::vector<int> cint{123,750,41};
+std::vector<long long> ctimestamp{59603423,59604235,98604937};
+std::vector<double> cdouble{4。0,0.2,73.7};
+
+std::vector<std::string> colNames = {"cstring", "cint", "ctimestamp", "cdouble"};
+std::vector<ConstantSP> cols;
+cols.push_back(Util::createVector(DT_STRING, 3));
+cols[0]->setBool(0, 3, cstring.data());
+cols.push_back(Util::createVector(DT_INT, 3));
+cols[1]->setInt(0, 3, cint.data());
+cols.push_back(Util::createVector(DT_TIMESTAMP, 3));
+cols[2]->setLong(0, 3, ctimestamp.data());
+cols.push_back(Util::createVector(DT_DOUBLE, 3));
+cols[3]->setDouble(0, 3, cdouble.data());
+ConstantSP myTable = Util::createTable(colNames, cols);
+
+vector<ConstantSP> args{myTable};
+conn.run("append!{loadTable('dfs://testDatabase','tb1')}", args);
+```
+
+#### 7.3.将数据保存到本地磁盘表
+
+通常本地磁盘表用于学习环境或者单机静态数据集测试，它不支持事务，不保证运行中的数据一致性，所以不建议在生产环境中使用。
+
+```
+//使用本地磁盘表
+dbPath = "C:/data/testDatabase"
+tbName = 'tb1'
+
+t = table(10000:0,`cstring`cint`ctimestamp`cdouble,[STRING,INT,TIMESTAMP,DOUBLE])
+share t as sharedTable
+
+if(existsDatabase(dbPath)){dropDatabase(dbPath)}
+db = database(dbPath,RANGE,2018.01.01..2018.12.31)
+db.createPartitionedTable(t,tbName,'ctimestamp')
+```
+
+DolphinDB提供`loadTable`方法可以加载本地磁盘表和分布式表，对于本地磁盘表而言，追加数据都是通过`append!`方式进行。
+
+```
+std::vector<std::string> cstring{"rec4", "rec5", "rec6"};
+std::vector<int> cint{123,750,41};
+std::vector<long long> ctimestamp{59603423,59604235,98604937};
+std::vector<double> cdouble{4。0,0.2,73.7};
+
+std::vector<std::string> colNames = {"cstring", "cint", "ctimestamp", "cdouble"};
+std::vector<ConstantSP> cols;
+cols.push_back(Util::createVector(DT_STRING, 3));
+cols[0]->setBool(0, 3, cstring.data());
+cols.push_back(Util::createVector(DT_INT, 3));
+cols[1]->setInt(0, 3, cint.data());
+cols.push_back(Util::createVector(DT_TIMESTAMP, 3));
+cols[2]->setLong(0, 3, ctimestamp.data());
+cols.push_back(Util::createVector(DT_DOUBLE, 3));
+cols[3]->setDouble(0, 3, cdouble.data());
+ConstantSP myTable = Util::createTable(colNames, cols);
+
+vector<ConstantSP> args{myTable};
+conn.run("append!{loadTable('C:/data/testDatabase','tb1')}", args);
+```
+
+#### 7.4.读取和使用数据
+
+在C++ API中，表数据保存为`Table`对象，由于`Table`是列式存储，因此需要通过先取出列，再循环取行的方式。
+
+例子中的表`sharedTable`的有4个列，分别是`string,int,timestamp,double`类型，列名分别为`cstring,cint,ctimestamp,cdouble`。
+
+```
+void testUseTable(DBConnection &conn) {
+    ConstantSP table = conn.run("select * from sharedTable");
+    vector<ConstantSP> cols;
+    for(int i = 0; i < table->columns(); ++i) {
+        cols.emplace_back(table->getColumn(i));
+    }
+    for(int row = 0; row < table->rows(); ++row) {
+        std::cout << "row " << row << ":";
+        for(int col = 0; col < cols.size(); ++col) {
+            std::cout << " " << cols[col]->get(row)->getString();
+        }
+        std::cout << std::endl;
+    }
+}
+```
+
+### 8.DolphinDB和C++ API之间的数据类型转换
+
+一些C++的基础类型，可以直接在DolphinDB的数据类型中使用，比如`setInt(5)`，`setString("abc")`，部分C++ STL容器对应C++ API中提供的Vector,Set,Dictionary等容器，可以通过Util::create+`<DataType>`这种方式来创建，比如`Util::createVector(DT_INT,0)`就创建了存储int的向量，初始元素个数为0；但是也有一些类型需要做一些转换，下面列出需要做简单转换的类型：
+
+- 时间类型：DolphinDB的时间类型内部是以`int`或者`long long`来描述的，DolphinDB提供`date, month, time, minute, second, datetime, timestamp, nanotime, nanotimestamp`九种类型的时间类型，最高精度可以到纳秒级。具体的描述可以参考[DolphinDB时序类型和转换](https://www.dolphindb.com/cn/help/TemporalTypeandConversion.html)。C++ API在Util类里里提供了创建所有DolphinDB时间类型的静态方法，对于具体时间类型的`ConstantSP`，直接用`getInt()`或`getLong()`就可以获得对应的`int`或`long long`值。
+
+以下展示C++ API中DolphinDB时间类型的构建以及与`int`和`long`的关系：
+
+```
+void testTimeTypes(DBConnection &conn) {
+    ConstantSP date = Util::createDate(1970, 1, 2);                             //1970.01.02
+    TEST("testDate", date->getInt(), 1);
+    
+    ConstantSP month = Util::createMonth(2018, 1);                              //2018.01M
+    TEST("testMonth", month->getInt(), 2018*12);
+    
+    ConstantSP time = Util::createTime(1, 1, 1, 1);                             //01:01:01:001
+    TEST("testTime", time->getInt(), 3600000+60000+1000+1);
+    
+    ConstantSP minute = Util::createMinute(2, 30);                              //02:30m
+    TEST("testMinute", minute->getInt(), 2*60+30);
+    
+    ConstantSP second = Util::createSecond(5,6,7);                              //05:06:07
+    TEST("testSecond", second->getInt(), 5*3600+6*60+7);
+    
+    ConstantSP datetime = Util::createDateTime(1970, 1, 1, 1, 1, 1);            //1970.01.01T01:01:01
+    TEST("testDatetime", datetime->getInt(),3600+60+1);
+    
+    ConstantSP timestamp = Util::createTimestamp(1970, 1, 1, 1, 1, 1, 123);     //1970.01.01T01:01:01.123
+    TEST("testTimestamp", timestamp->getLong(), (long long)3600000+60000+1000+123);
+    
+    ConstantSP nanotime = Util::createNanoTime(0, 0, 1, 123);                   //00:00:01.000000123
+    TEST("testNanotime", nanotime->getLong(), (long long)1000000123);
+    
+    ConstantSP nanotimestamp = Util::createNanoTimestamp(1970,1,1,0,0,0,567);   //1970.01.01T00:00:00.000000567
+    TEST("testNanotimestamp", nanotimestamp->getLong(), (long long)567);
+}
+```

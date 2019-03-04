@@ -24,7 +24,7 @@
 	typedef int SOCKET;
 	#define INVALID_SOCKET -1
 	#define SOCKET_ERROR   -1
-#else
+#else	
 	#include <winsock2.h>
 	#include<windows.h>
 #endif

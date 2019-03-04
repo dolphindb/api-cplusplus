@@ -22,6 +22,12 @@
 #include "Exceptions.h"
 #include "SysIO.h"
 
+#ifdef VS
+	#define EXPORT_DECL _declspec(dllexport)
+#else
+	#define EXPORT_DECL 
+#endif
+
 using std::string;
 using std::vector;
 using std::unordered_map;
@@ -77,51 +83,7 @@ private:
 };
 
 struct GuidHash {
-	inline uint64_t operator()(const Guid& guid) const {
-		const unsigned char* key = guid.bytes();
-		const uint32_t m = 0x5bd1e995;
-		const int r = 24;
-		uint32_t h = 16;
-
-		uint32_t k1 = *(uint32_t*)(key);
-		uint32_t k2 = *(uint32_t*)(key + 4);
-		uint32_t k3 = *(uint32_t*)(key + 8);
-		uint32_t k4 = *(uint32_t*)(key + 12);
-
-		k1 *= m;
-		k1 ^= k1 >> r;
-		k1 *= m;
-
-		k2 *= m;
-		k2 ^= k2 >> r;
-		k2 *= m;
-
-		k3 *= m;
-		k3 ^= k3 >> r;
-		k3 *= m;
-
-		k4 *= m;
-		k4 ^= k4 >> r;
-		k4 *= m;
-
-		// Mix 4 bytes at a time into the hash
-		h *= m;
-		h ^= k1;
-		h *= m;
-		h ^= k2;
-		h *= m;
-		h ^= k3;
-		h *= m;
-		h ^= k4;
-
-		// Do a few final mixes of the hash to ensure the last few
-		// bytes are well-incorporated.
-		h ^= h >> 13;
-		h *= m;
-		h ^= h >> 15;
-
-		return h;
-	}
+	uint64_t operator()(const Guid& guid) const;
 };
 
 class Constant {
@@ -380,48 +342,10 @@ public:
 	virtual bool validIndex(INDEX start, INDEX length, INDEX uplimit){return false;}
 	virtual void addIndex(INDEX start, INDEX length, INDEX offset){}
 	virtual void neg()=0;
-	virtual void binarySearch(const ConstantSP& target, const ConstantSP& resultSP){}
-	virtual void asof(const ConstantSP& target, const ConstantSP& resultSP){ throw RuntimeException("asof method not supported.");}
 	virtual void upper(){throw RuntimeException("upper method not supported");}
 	virtual void lower(){throw RuntimeException("lower method not supported");}
 	virtual void trim(){throw RuntimeException("trim method not supported");}
 	virtual void strip(){throw RuntimeException("strip method not supported");}
-	virtual long long count() const = 0;
-	virtual long long count(INDEX start, INDEX length) const = 0;
-	virtual ConstantSP minmax() const;
-	virtual ConstantSP minmax(INDEX start, INDEX length) const;
-	virtual ConstantSP max() const = 0;
-	virtual ConstantSP max(INDEX start, INDEX length) const = 0;
-	virtual INDEX imax() const = 0;
-	virtual INDEX imax(INDEX start, INDEX length) const = 0;
-	virtual ConstantSP min() const = 0;
-	virtual ConstantSP min(INDEX start, INDEX length) const = 0;
-	virtual INDEX imin() const = 0;
-	virtual INDEX imin(INDEX start, INDEX length) const = 0;
-	virtual ConstantSP avg() const = 0;
-	virtual ConstantSP avg(INDEX start, INDEX length) const = 0;
-	virtual ConstantSP sum() const = 0;
-	virtual ConstantSP sum(INDEX start, INDEX length) const = 0;
-	virtual ConstantSP sum2() const = 0;
-	virtual ConstantSP sum2(INDEX start, INDEX length) const = 0;
-	virtual ConstantSP prd() const = 0;
-	virtual ConstantSP prd(INDEX start, INDEX length) const = 0;
-	virtual ConstantSP var() const = 0;
-	virtual ConstantSP var(INDEX start, INDEX length) const = 0;
-	virtual ConstantSP std() const = 0;
-	virtual ConstantSP std(INDEX start, INDEX length) const = 0;
-	virtual ConstantSP mode() const = 0;
-	virtual ConstantSP mode(INDEX start, INDEX length) const = 0;
-	virtual ConstantSP stat() const;
-	virtual ConstantSP stat(INDEX start, INDEX length) const;
-	virtual ConstantSP lastNot(const ConstantSP& exclude) const = 0;
-	virtual ConstantSP lastNot(INDEX start, INDEX length, const ConstantSP& exclude) const = 0;
-
-	/**
-	 * Find the first element that is no less than the target value in the sorted vector.
-	 * start: the starting point of the search.
-	 */
-	virtual INDEX lowerBound(INDEX start, const ConstantSP& target)=0;
 	virtual long long getAllocatedMemory(INDEX size) const {return Constant::getAllocatedMemory();}
 private:
 	string name_;
@@ -594,7 +518,6 @@ public:
 	virtual ~ConstantMarshall(){}
 	virtual bool start(const ConstantSP& target, bool blocking, IO_ERR& ret)=0;
 	virtual bool start(const char* requestHeader, size_t headerSize, const ConstantSP& target, bool blocking, IO_ERR& ret)=0;
-	virtual bool resume(IO_ERR& ret)=0;
 	virtual void reset() = 0;
 	virtual IO_ERR flush() = 0;
 };
@@ -603,7 +526,6 @@ class ConstantUnmarshall{
 public:
 	virtual ~ConstantUnmarshall(){}
 	virtual bool start(short flag, bool blocking, IO_ERR& ret)=0;
-	virtual bool resume(IO_ERR& ret)=0;
 	virtual void reset() = 0;
 	ConstantSP getConstant(){return obj_;}
 
@@ -611,7 +533,7 @@ protected:
 	ConstantSP obj_;
 };
 
-class DBConnection {
+class EXPORT_DECL DBConnection {
 public:
 	DBConnection();
 	~DBConnection();

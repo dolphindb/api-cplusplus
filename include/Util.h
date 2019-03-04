@@ -12,8 +12,18 @@
 #include <vector>
 #include <unordered_set>
 #include <ctime>
-#include <tr1/random>
+#ifdef VS
+
+#else
+	#include <tr1/random>
+#endif
 #include <chrono>
+
+#ifdef VS
+	#define EXPORT_DECL _declspec(dllexport)
+#else
+	#define EXPORT_DECL 
+#endif
 
 #include "DolphinDB.h"
 
@@ -21,12 +31,16 @@ namespace dolphindb {
 
 class ConstantFactory;
 
-class Util{
+class EXPORT_DECL Util{
 public:
 	static string VER;
 	static int VERNUM;
 	static string BUILD;
-	static int BUF_SIZE;
+#ifdef VS
+	const static int BUF_SIZE = 1024;
+#else
+	const static int BUF_SIZE;
+#endif
 	static int DISPLAY_ROWS;
 	static int DISPLAY_COLS;
 	static int DISPLAY_WIDTH;

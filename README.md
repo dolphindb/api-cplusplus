@@ -7,24 +7,24 @@ DolphinDB C++ API supports the following development environments:
 This tutorial includes the following topics about how to use DolphinDB C++ API in Linux:
 * Compile a project under Linux environment
 * Compile a project under Windows Visual Studio environment
-* Execute DolphinDB script  
+* Execute DolphinDB script
 * Call DolphinDB built-in functions
 * Upload local objects to DolphinDB server
 * Append data to DolphindB tables
 
-### 1. Compile under Linux 
+### 1. Compile under Linux
 
 #### 1.1 Environment Setup
 
-To run DolphinDB C++ API, we need g++ 6.2 in Linux. 
+To run DolphinDB C++ API, we need g++ 6.2 in Linux.
 
 #### 1.2 Download bin file and header files
 
 Download api-cplusplus from this git repo, including "bin" and "include" folders in your project.
 
-> bin (libDolphinDBAPI.so)  
-  include (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h) 
-  
+> bin (libDolphinDBAPI.so)
+  include (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h)
+
 #### 1.3 Compile main.cpp
 
 Create a directory "project" on the same level as "bin" and "include" folders, enter the project folder, and then create the file main.cpp:
@@ -59,19 +59,19 @@ g++ compiling command:
 
 #### 1.5 Run
 
-After successfully compiling the program main, start a DolphinDB server, then you can run the program "main", which connects to a DolphinDB server with IP address 111.222.3.44 and port number 8503 as specified in the program. 
+After successfully compiling the program main, start a DolphinDB server, then you can run the program "main", which connects to a DolphinDB server with IP address 111.222.3.44 and port number 8503 as specified in the program.
 
 ### 2. Compile under Windows
 
 #### 2.1 Environment Setup
 
-This tutorial uses Visual Studio 2017 64 bit version. 
+This tutorial uses Visual Studio 2017 64 bit version.
 
 #### 2.2 Download bin file and header files
 Download api-cplusplus.
 
 #### 2.3 Build Visual Studio Project
-Build win32 console project and import header files, create main.cpp as in section 1.3, import libDolphinDBAPI.lib and configure the additional library directory as the lib directory. 
+Build win32 console project and import header files, create main.cpp as in section 1.3, import libDolphinDBAPI.lib and configure the additional library directory as the lib directory.
 
 >Note: The min/max macros are defined by default in VS. To avoid conflicts with the min and max functions in the header file, __NOMINMAX__ needs to be added to the preprocessor macro definition.
 
@@ -79,7 +79,7 @@ Build win32 console project and import header files, create main.cpp as in secti
 
 Start the compilation, copy libDolphinDBAPI.dll to the executable program output directory, and execute the compiled executable program.
 
-The Windows gnu development environment is similar to Linux, please refer to the linux compilation. 
+The Windows gnu development environment is similar to Linux, please refer to the linux compilation.
 
 
 ### 3. Execute DolphinDB script
@@ -100,7 +100,7 @@ bool ret = conn.connect("111.222.3.44", 8503,"admin","123456");
 
 #### 3.2 Execute DolphinDB script
 
-Execute Dolphindb script with method `run`.  
+Execute Dolphindb script with method `run`.
 
 ```
 ConstantSP v = conn.run("`IBM`GOOG`YHOO");
@@ -110,9 +110,9 @@ for(int i = 0; i < size; i++)
 ```
 
 Output:
->IBM  
-GOOG  
-YHOO  
+>IBM
+GOOG
+YHOO
 
 If the script contains multiple statements, only the result of the last statement is returned. If there is a syntax error in the script or there is a network problem, an exception will be thrown.
 
@@ -157,7 +157,7 @@ ConstantSP dict = conn.run("dict(1 2 3,`IBM`MSFT`GOOG)");
 cout << dict->get(Util::createInt(1))->getString()<<endl;
 ```
 
-You can use `get` method to retrieve a value. Note that you need to create an Int value through function `Util::createInt()` in order to do so. 
+You can use `get` method to retrieve a value. Note that you need to create an Int value through function `Util::createInt()` in order to do so.
 
 ##### 3.3.5 Table
 
@@ -216,7 +216,7 @@ TableSP createDemoTable(){
     vector<VectorSP> columnVecs;
     for(int i = 0 ;i < colNum ;i ++)
         columnVecs.push_back(table->getColumn(i));
-        
+
     for(unsigned int i =  0 ;i < rowNum; i++){
         columnVecs[0]->set(i,Util::createString("name_"+std::to_string(i)));
         columnVecs[1]->set(i,Util::createDate(2010,1,i+1));
@@ -224,7 +224,7 @@ TableSP createDemoTable(){
     }
     return table;
 }
-   
+
 // Upload the local table object to DolphinDB server，and then get back the object from the server through method run.
 table = createDemoTable();
 conn.upload("myTable", table);
@@ -235,7 +235,7 @@ cout<<result->getString()<<endl;
 
 ### 6. Append data to DolphinDB tables
 
-Data can be appended to a DolphinDB table with C++ API. DolphinDB supports 3 types of tables: in-memory table, table on local disk, and distributed table. 
+Data can be appended to a DolphinDB table with C++ API. DolphinDB supports 3 types of tables: in-memory table, table on local disk, and distributed table.
 
 #### 6.1 In-memory table
 
@@ -258,7 +258,7 @@ for(int i = 0 ;i < 5;i++){
     names->set(i,Util::createString("name_"+std::to_string(i)));
     dates->set(i,Util::createDate(2010,1,i+1));
     prices->set(i,Util::createDouble(i*i));
-} 
+}
 vector<string> allnames = {"names","dates","prices"};
 vector<ConstantSP> allcols = {names,dates,prices};
 conn.upload(allnames,allcols); // upload data to a DolphinDB server
@@ -295,13 +295,13 @@ script += "db=database(\"/home/demoTable1\");";
 script += "tDiskGlobal.append!(mt);";
 script += "saveTable(db,tDiskGlobal,`dt);";
 script += "select * from tDiskGlobal;";
-TableSP result = conn.run(script); // load an in-memory table from the database 
+TableSP result = conn.run(script); // load an in-memory table from the database
 cout<<result->getString()<<endl;
 ```
-`loadTable`: load a table from the database into memory.   
-`append!`: append data to the table.  
+`loadTable`: load a table from the database into memory.
+`append!`: append data to the table.
 
-Note:  
+Note:
 1. For a table on local disk, `append!` only appends data to an in-memory copy of the table. To save the data to disk, you must also use function `saveTable`.
 2. Instead of using function `share`, you can also use function `loadTable` to load the table with the C++ API, and then `append!`. However, this method is not recommended. The reason is that function `loadTable` needs to load from the disk, which can take a long time. If there are multiple client using `loadTable`, there will be multiple copies of the table in the memory, which may cause data inconsistency.
 
@@ -333,10 +333,207 @@ script += "dbPath = \"dfs://SAMPLE_TRDDB\";";
 script += "tableName = `demoTable;";
 script += "database(dbPath).loadTable(tableName).append!(mt);";
 script += "select * from database(dbPath).loadTable(tableName);";
-TableSP result = conn.run(script); 
+TableSP result = conn.run(script);
 cout<<result->getString()<<endl;
 ```
 `append!` saves the data to a distributed table and saves to disk.
 
 For more on the C++ API, please refer to the interface provided in the header file.
 
+# C++ Streaming API
+
+DolphinDB C++ Streaming API supports three types of computing modelings: single threading, pooled threading, and polling.
+
+For details, please refer to `test/StreamingThreadedClientTester.cpp`, `test/StreamingThreadPooledClientTester.cpp`, and `test/StreamingPollingClientTester.cpp`.
+
+### 1. Build
+
+With `cmake` using provided `CMakeLists.txt`, you can build three test examples, which can work on both Windows and Linux.
+
+**Note:** [cmake](https://cmake.org/) is a popular project build tool that helps solve third-party dependencies.
+
+#### 1.1 Linux64
+
+##### 1.1.1 Build with cmake
+
+Install cmake
+
+```bash
+sudo apt-get install cmake
+```
+
+Build the three examples:
+
+```bash
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release ../path_to_api-cplusplus/
+make -j`nproc`
+```
+
+The three test executables will be generated after the compilation.
+
+#### 1.2 Build under Windows with MinGW
+
+Install [MinGW](http://www.mingw.org/) and [CMake](https://cmake.org/)
+
+```bash
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release `path_to_api-cplusplus` -G "MinGW Makefiles"
+mingw32-make -j `nproc`
+```
+
+Three test executables will be generated after the compilation.
+
+**Note:** Before compiling, remember to copy `libDolphinDBAPI.dll` to the build directory.
+
+**Note:** Before running, remember to copy `libDolphinDBAPI.dll` and `libgcc_s_seh-1.dll` to the same directory as that of your executable file.
+
+### 2. User-API
+
+#### 2.1 ThreadedClient
+
+`ThreadedClient` starts a single thread calling for an user-defined handler on each incoming message.
+
+##### 2.1.1 `ThreadedClient::ThreadClient(int listeningPort);`
+
+###### Parameters
+
+- `listenport`: the subscription port number of the threaded client.
+
+##### 2.1.2 `ThreadSP ThreadedClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1);`
+
+###### Parameters
+
+- `host`: the hostname of the server.
+- `port`: the port number of the server.
+- `handler`: the user-defined callback function called on every incoming message. The input of the function is a `Message` and the return type of the function must be `void`. Each `Message` is a single row.
+- `tableName`: a string indicating the name of the shared streaming table on the server.
+- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
+- `offset`: the position of the first message to subscribe. A message is a row of the streaming table. If offset is unspecified, or negative, or more than the number of rows in the streaming table, the subscription starts from the first row. The offset is relative to the first row of the streaming table when it is created. If some rows were cleared from memory due to cache size limit, they are still considered in determining where the subscription starts.
+
+###### Returns
+
+-  a `ThreadSP` point to the handler loop thread, which will stop when `unsubscribe` to the same topic is called.
+
+###### Example
+
+```c++
+auto t = client.subscribe(host, port, [](Message msg) {
+    // user-defined routine
+    }, tableName);
+t->join();
+```
+
+##### 2.1.3 `void ThreadClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);`
+
+Unsubscribe a topic if already subscribed.
+
+###### Parameters
+
+- `host`: the hostname of the server.
+- `port`: the port number of the server.
+- `tableName`: a string indicating the name of the shared streaming table on the server.
+- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits and underscores.
+
+<!-- /////////////////////////////////////////////////////////////////////// -->
+
+#### 2.2 ThreadPooledClient
+
+Start n (user-defined) threads at once, poll and call handler simutaneously.
+
+##### 2.2.1 `ThreadPooledClient::ThreadPooledClient(int listeningPort, int threadCount);`
+
+###### Parameters
+
+- `listenport`: the subscription port number of the client node.
+- `threadCount`: the size of the thread pool.
+
+##### 2.2.2 `vector\<ThreadSP\> ThreadPooledClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1);`
+
+###### Parameters
+
+- `host`: the hostname of the server.
+- `port`: the port number of the server.
+- `handler`: the user-defined callback function called on every incoming message. The input of the function is a `Message` and the return type of the function must be `void`. Each `Message` is a single row.
+- `tableName`: a string indicating the name of the shared streaming table on the server.
+- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
+- `offset`: the position of the first message to subscribe. A message is a row of the streaming table. If offset is unspecified, or negative, or more than the number of rows in the streaming table, the subscription starts from the first row. The offset is relative to the first row of the streaming table when it is created. If some rows were cleared from memory due to cache size limit, they are still considered in determining where the subscription starts.
+
+###### Returns
+
+-  a vector of `ThreadSP` pointers, each of them point to a handler loop thread, and will stop when `unsubscribe` to the same topic is called.
+
+###### Example
+
+```c++
+auto vec = client.subscribe(host, port, [](Message msg) {
+    // user-defined routine
+    }, tableName);
+for(auto& t : vec) {
+    t->join();
+}
+```
+
+##### 2.2.3 `void ThreadPooledClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);`
+
+Unsubscribe a topic if already subscribed.
+
+###### Parameters
+
+- `host`: the hostname of the server.
+- `port`: the port number of the server.
+- `tableName`: a string indicating the name of the shared streaming table on the server.
+- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
+
+
+<!-- /////////////////////////////////////////////////////////////////////// -->
+
+#### 2.3 PollingClient
+
+When user subscribes a topic, a blocking message queue is returned, from which user can poll messages and handle it by themselves.
+
+##### 2.3.1 `PollingClient::PollingClient(int listeningPort);`
+
+###### Parameters
+
+- `listenport`: the subscription port number of the client node.
+
+##### 2.3.2 `MessageQueueSP PollingClient::subscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1);`
+
+###### Parameters
+
+- `host`: hostname of the server.
+- `port`: port number of the server.
+- `tableName`: a string indicating the name of the shared streaming table on the server.
+- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits and underscores.
+- `offset`: the position of the first message to subscribe. A message is row of the streaming table. If offset is unspecified, or negative, or above the number of rows of the streaming table, the subscription starts from the first row of the streaming table. The offset is relative to the first row of the streaming table when it is created. If some rows were cleared from memory due to cache size limit, they are still considered in determining where the subscription starts.
+
+###### Returns
+
+- `MessageQueueSP`: point to a `MessageQueue`, where user can poll messages from the server.
+
+**Note**: when `unsubscribe` is called, a NULL pointer will be pushed into the queue, user needs to handle this situation.
+
+###### Example
+
+```c++
+auto queue = client.subscribe(host, port, handler, tableName);
+Message msg;
+while(true) {
+    if(queue->poll(msg, 1000)) {
+        if(msg.isNull()) break;
+        // handle msg
+    }
+}
+```
+
+##### 2.3.3 `void PollingClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);`
+
+Unsubscribe a topic if already subscribed.
+
+###### Parameters
+
+- `host`: the hostname of the server.
+- `port`: the port number of the server.
+- `tableName`: a string indicating the name of the shared streaming table on the server.
+- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
