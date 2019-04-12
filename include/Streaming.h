@@ -102,6 +102,8 @@ class StreamingClient {
         string tableName;
         string actionName;
         long long offset = -1;
+        bool resub;
+        VectorSP filter;
     };
 
    public:
@@ -114,7 +116,8 @@ class StreamingClient {
                                      string tableName,
                                      string actionName = DEFAULT_ACTION_NAME,
                                      int64_t offset = -1,
-                                     bool resubscribe = false);
+                                     bool resubscribe = true,
+                                     VectorSP filter = nullptr);
 
     void unsubscribeInternal(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 
@@ -155,12 +158,7 @@ class ThreadedClient : private StreamingClient {
    public:
     explicit ThreadedClient(int listeningPort);
     ~ThreadedClient() override;
-    ThreadSP subscribe(string host,
-                       int port,
-                       MessageHandler handler,
-                       string tableName,
-                       string actionName = DEFAULT_ACTION_NAME,
-                       int64_t offset = -1);
+    ThreadSP subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
     void unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 };
 
@@ -168,12 +166,7 @@ class ThreadPooledClient : private StreamingClient {
    public:
     explicit ThreadPooledClient(int listeningPort, int threadCount);
     ~ThreadPooledClient() override;
-    vector<ThreadSP> subscribe(string host,
-                               int port,
-                               MessageHandler handler,
-                               string tableName,
-                               string actionName = DEFAULT_ACTION_NAME,
-                               int64_t offset = -1);
+    vector<ThreadSP> subscribe(string host, int port, MessageHandler handler, string tableName, string actionName, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
     void unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 
    private:
@@ -184,8 +177,7 @@ class PollingClient : private StreamingClient {
    public:
     explicit PollingClient(int listeningPort);
     ~PollingClient() override;
-    MessageQueueSP subscribe(
-        string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1);
+    MessageQueueSP subscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
     void unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 };
 
