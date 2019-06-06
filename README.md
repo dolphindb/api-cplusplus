@@ -340,20 +340,21 @@ cout<<result->getString()<<endl;
 
 For more on the C++ API, please refer to the interface provided in the header file.
 
-# DolphinDB C++ Streaming API
+# C++ Streaming API
 
-<!-- DolphinDB C++ Streaming API support for three models of computing:
+DolphinDB C++ Streaming API supports three types of computing modelings: single threading, pooled threading, and polling.
 
-Refer to `test/ThreadedClientTester.cpp`, `test/ThreadPooledClientTester.cpp` and `test/PollingClientTester.cpp` for examples.
+For details, please refer to `test/StreamingThreadedClientTester.cpp`, `test/StreamingThreadPooledClientTester.cpp`, and `test/StreamingPollingClientTester.cpp`.
 
 ### 1. Build
 
-The `CMakeLists.txt` works on both Windows and Linux.
+With `cmake` using provided `CMakeLists.txt`, you can build three test examples, which can work on both Windows and Linux.
 
-#### 1.1 Build under linux
+**Note:** [cmake](https://cmake.org/) is a popular project build tool that helps solve third-party dependencies.
+
+#### 1.1 Linux64
 
 ##### 1.1.1 Build with cmake
-**Note:** [cmake](https://cmake.org/) is a popular project build tool that helps solve third-party dependencies.
 
 Install cmake
 
@@ -361,7 +362,7 @@ Install cmake
 sudo apt-get install cmake
 ```
 
-Build the library
+Build the three examples:
 
 ```bash
 mkdir build && cd build
@@ -369,9 +370,9 @@ cmake -DCMAKE_BUILD_TYPE=Release ../path_to_api-cplusplus/
 make -j`nproc`
 ```
 
-The file `libStreamingClient.so` will be generated after the compilation.
+The three test executables will be generated after the compilation.
 
-#### 1.2 Build with MinGW
+#### 1.2 Build under Windows with MinGW
 
 Install [MinGW](http://www.mingw.org/) and [CMake](https://cmake.org/)
 
@@ -381,35 +382,36 @@ cmake -DCMAKE_BUILD_TYPE=Release `path_to_api-cplusplus` -G "MinGW Makefiles"
 mingw32-make -j `nproc`
 ```
 
-The file `libStreamingClient.dll` will be generated after the compilation.
+Three test executables will be generated after the compilation.
 
-**Note:** Before compiling, remember to copy `libDolphinDBAPI.dll` to build directory.
+**Note:** Before compiling, remember to copy `libDolphinDBAPI.dll` to the build directory.
 
-**Note:** Before running, remember to copy `libDolphinDBAPI.dll`, `libStreamingClient.dll` and `libgcc_s_seh-1.dll` to the same directory as your executable file. -->
+**Note:** Before running, remember to copy `libDolphinDBAPI.dll` and `libgcc_s_seh-1.dll` to the same directory as that of your executable file.
 
+### 2. User-API
 
-### 7. User-API
+#### 2.1 ThreadedClient
 
-#### 7.1 ThreadedClient
+`ThreadedClient` starts a single thread calling for an user-defined handler on each incoming message.
 
-A single thread calling user-defined handler on each incoming message.
-
-##### 7.1.1 `ThreadedClient::ThreadClient(int listeningPort);`
-
-###### Parameters
-
-- `listenport`: the subscription port number of the client node
-
-##### 7.1.2 `ThreadSP ThreadedClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1);`
+##### 2.1.1 `ThreadedClient::ThreadClient(int listeningPort);`
 
 ###### Parameters
 
-- `host`: hostname of the server
-- `port`: port number of the server
-- `handler`: user-defined callback function which is called on every incoming message, must have signature: `void(Message)`, `Message` is a single row
+- `listeningPort`: the subscription port number of the threaded client.
+
+##### 2.1.2 `ThreadSP ThreadedClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);`
+
+###### Parameters
+
+- `host`: the hostname of the server.
+- `port`: the port number of the server.
+- `handler`: the user-defined callback function called on every incoming message. The input of the function is a `Message` and the return type of the function must be `void`. Each `Message` is a single row.
 - `tableName`: a string indicating the name of the shared streaming table on the server.
-- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits and underscores.
-- `offset`: the position of the first message to subscribe. A message is row of the streaming table. If offset is unspecified, or negative, or above the number of rows of the streaming table, the subscription starts from the first row of the streaming table. The offset is relative to the first row of the streaming table when it is created. If some rows were cleared from memory due to cache size limit, they are still considered in determining where the subscription starts.
+- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
+- `offset`: the position of the first message to subscribe. A message is a row of the streaming table. If offset is unspecified, or negative, or more than the number of rows in the streaming table, the subscription starts from the first row. The offset is relative to the first row of the streaming table when it is created. If some rows were cleared from memory due to cache size limit, they are still considered in determining where the subscription starts.
+- `resub`: a bool indicating whether to resubscribe when network failure happens.
+- `filter`: a vector of selected values in the filtering column. Only the messages with specified filtering column values are subscribed. The filtering column is set with function `setStreamTableFilterColumn`.
 
 ###### Returns
 
@@ -424,43 +426,44 @@ auto t = client.subscribe(host, port, [](Message msg) {
 t->join();
 ```
 
-##### 7.1.3 `void ThreadClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);`
+##### 2.1.3 `void ThreadClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);`
 
 Unsubscribe a topic if already subscribed.
 
 ###### Parameters
 
-- `host`: hostname of the server
-- `port`: port number of the server
+- `host`: the hostname of the server.
+- `port`: the port number of the server.
 - `tableName`: a string indicating the name of the shared streaming table on the server.
 - `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits and underscores.
 
 <!-- /////////////////////////////////////////////////////////////////////// -->
 
-#### 7.2 ThreadPooledClient
+#### 2.2 ThreadPooledClient
 
 Start n (user-defined) threads at once, poll and call handler simutaneously.
 
-##### 7.2.1 `ThreadPooledClient::ThreadPooledClient(int listeningPort, int threadCount);`
+##### 2.2.1 `ThreadPooledClient::ThreadPooledClient(int listeningPort, int threadCount);`
 
 ###### Parameters
 
-- `listenport`: the subscription port number of the client node
-- `threadCount`: the size of the thread pool
+- `listeningPort`: the subscription port number of the client node.
+- `threadCount`: the size of the thread pool.
 
-##### 7.2.2 `vector\<ThreadSP\> ThreadPooledClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1);`
+##### 2.2.2 `vector<ThreadSP> ThreadPooledClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);`
 
 ###### Parameters
 
-- `host`: hostname of the server
-- `port`: port number of the server
-- `handler`: user-defined callback function which is called on every incoming message, must have signature: `void(Message)`
+- `host`: the hostname of the server.
+- `port`: the port number of the server.
+- `handler`: the user-defined callback function called on every incoming message. The input of the function is a `Message` and the return type of the function must be `void`. Each `Message` is a single row.
 - `tableName`: a string indicating the name of the shared streaming table on the server.
-- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits and underscores.
-- `offset`: the position of the first message to subscribe. A message is row of the streaming table. If offset is unspecified, or negative, or above the number of rows of the streaming table, the subscription starts from the first row of the streaming table. The offset is relative to the first row of the streaming table when it is created. If some rows were cleared from memory due to cache size limit, they are still considered in determining where the subscription starts.
+- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
+- `offset`: the position of the first message to subscribe. A message is a row of the streaming table. If offset is unspecified, or negative, or more than the number of rows in the streaming table, the subscription starts from the first row. The offset is relative to the first row of the streaming table when it is created. If some rows were cleared from memory due to cache size limit, they are still considered in determining where the subscription starts.
+- `resub`: a bool indicating whether to resubscribe when network failure happens.
+- `filter`: a vector of selected values in the filtering column. Only the messages with specified filtering column values are subscribed. The filtering column is set with function `setStreamTableFilterColumn`.
 
 ###### Returns
-
 -  a vector of `ThreadSP` pointers, each of them point to a handler loop thread, and will stop when `unsubscribe` to the same topic is called.
 
 ###### Example
@@ -474,50 +477,47 @@ for(auto& t : vec) {
 }
 ```
 
-##### 7.2.3 `void ThreadPooledClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);`
+##### 2.2.3 `void ThreadPooledClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);`
 
 Unsubscribe a topic if already subscribed.
 
 ###### Parameters
 
-- `host`: hostname of the server
-- `port`: port number of the server
+- `host`: the hostname of the server.
+- `port`: the port number of the server.
 - `tableName`: a string indicating the name of the shared streaming table on the server.
-- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits and underscores.
-
-
-
-
-
+- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
 
 
 <!-- /////////////////////////////////////////////////////////////////////// -->
 
-#### 7.3 PollingClient
+#### 2.3 PollingClient
 
 When user subscribes a topic, a blocking message queue is returned, from which user can poll messages and handle it by themselves.
 
-##### 7.3.1 `PollingClient::PollingClient(int listeningPort);`
+##### 2.3.1 `PollingClient::PollingClient(int listeningPort);`
 
 ###### Parameters
 
-- `listenport`: the subscription port number of the client node
+- `listeningPort`: the subscription port number of the client node.
 
-##### 7.3.2 `MessageQueueSP PollingClient::subscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1);`
+##### 2.3.2 `MessageQueueSP PollingClient::subscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);`
 
 ###### Parameters
 
-- `host`: hostname of the server
-- `port`: port number of the server
+- `host`: hostname of the server.
+- `port`: port number of the server.
 - `tableName`: a string indicating the name of the shared streaming table on the server.
 - `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits and underscores.
 - `offset`: the position of the first message to subscribe. A message is row of the streaming table. If offset is unspecified, or negative, or above the number of rows of the streaming table, the subscription starts from the first row of the streaming table. The offset is relative to the first row of the streaming table when it is created. If some rows were cleared from memory due to cache size limit, they are still considered in determining where the subscription starts.
+- `resub`: a bool indicating whether to resubscribe when network failure happens.
+- `filter`: a vector of selected values in the filtering column. Only the messages with specified filtering column values are subscribed. The filtering column is set with function `setStreamTableFilterColumn`.
 
 ###### Returns
 
--  a `MessageQueueSP` point to a MessageQueue, user can poll it to get messages from the server
+- `MessageQueueSP`: point to a `MessageQueue`, where user can poll messages from the server.
 
-**Note**: when `unsubscribe` is called, a NULL pointer will be pushed into the queue, so user should handle this.
+**Note**: when `unsubscribe` is called, a NULL pointer will be pushed into the queue, user needs to handle this situation.
 
 ###### Example
 
@@ -532,13 +532,13 @@ while(true) {
 }
 ```
 
-##### 7.3.3 `void PollingClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);`
+##### 2.3.3 `void PollingClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);`
 
 Unsubscribe a topic if already subscribed.
 
 ###### Parameters
 
-- `host`: hostname of the server
-- `port`: port number of the server
+- `host`: the hostname of the server.
+- `port`: the port number of the server.
 - `tableName`: a string indicating the name of the shared streaming table on the server.
-- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits and underscores.
+- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
