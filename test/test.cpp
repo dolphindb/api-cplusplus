@@ -4,8 +4,8 @@
 #include <limits.h>
 using namespace dolphindb;
 using namespace std;
-static string hostName = "192.168.1.25";
-static int port = 8503;
+static string hostName = "localhost";
+static int port = 8848;
 static string alphas = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 static int pass,fail;
 
