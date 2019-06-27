@@ -3,7 +3,7 @@ INCLUDES= -I../include
 OBJS=test.o
 
 all: $(OBJS)
-	g++ $(OBJS) $(CFLAGS)  -lDolphinDBAPI -lssl  -lpthread -luuid -L../bin  -Wl,-rpath ../bin/ -o test 
+	g++ -L../bin/linux_x64 -L../bin/mingw_x64 -L../bin/vx2017_x64 $(OBJS) $(CFLAGS)  -lDolphinDBAPI -lssl  -lpthread -luuid -L../bin  -Wl,-rpath ../bin/ -o test 
 test.o: test.cpp
 	g++ $(CFLAGS) $(INCLUDES) -c test.cpp -o test.o
 clean:
