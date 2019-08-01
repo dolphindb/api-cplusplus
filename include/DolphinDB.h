@@ -15,6 +15,7 @@
 #include <vector>
 #include <deque>
 #include <algorithm>
+#include <memory>
 #include <chrono>
 
 #include "Types.h"
@@ -47,6 +48,7 @@ class Dictionary;
 class DFSChunkMeta;
 class ConstantMarshall;
 class ConstantUnmarshall;
+class DBConnectionImpl;
 
 typedef SmartPointer<Constant> ConstantSP;
 typedef SmartPointer<Vector> VectorSP;
@@ -543,7 +545,7 @@ public:
 	 * will be performed along with connecting. If one would send userId and password in encrypted mode,
 	 * please use the login function for authentication separately.
 	 */
-	bool connect(const string& hostName, int port, const string& userId = "", const string& password = "");
+	bool connect(const string& hostName, int port, const string& userId = "", const string& password = "", const string& startup = "", bool highAvailability = false);
 
 	/**
 	 * Log onto the DolphinDB server using the given userId and password. If the parameter enableEncryption
@@ -558,14 +560,14 @@ public:
 	 * the function returns a void object. If error is raised on the server, the function throws an
 	 * exception.
 	 */
-	ConstantSP run(const string& script);
+	ConstantSP run(const string& script, int priority=4, int parallelism=2);
 
 	/**
 	 * Run the given function on the DolphinDB server using the local objects as the arguments
 	 * for the function and return the result to the client. If nothing returns, the function
 	 * returns a void object. If error is raised on the server, the function throws an exception.
 	 */
-	ConstantSP run(const string& funcName, vector<ConstantSP>& args);
+	ConstantSP run(const string& funcName, vector<ConstantSP>& args, int priority=4, int parallelism=2);
 
 	/**
 	 * upload a local object to the DolphinDB server and assign the given name in the session.
@@ -589,21 +591,16 @@ public:
 	static void initialize();
 
 private:
-	ConstantSP run(const string& script, const string& scriptType, vector<ConstantSP>& args);
-	bool connect();
-	void login();
+    void switchDataNode();
+    bool connected();
 
 private:
-	SocketSP conn_;
-	string sessionId_;
-	string hostName_;
-	int port_;
-	string userId_;
+    std::unique_ptr<DBConnectionImpl> conn_;
+	string uid_;
 	string pwd_;
-	bool encrypted_;
-	bool isConnected_;
-	bool littleEndian_;
-	static bool initialized_;
+	string startup_;
+    bool ha_;
+    ConstantSP nodes_;
 };
 
 };
