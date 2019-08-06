@@ -149,7 +149,7 @@ public:
 	inline static bool isDigit(char ch){return '0'<=ch && ch<='9';}
 	inline static bool isDateDelimitor(char ch){return ch=='.' || ch=='/' || ch=='-';}
 	inline static bool isLetter(char ch){return (ch>='a' && ch<='z') || (ch>='A' && ch<='Z');}
-	inline static char escape(char original){return escapes[(int)original];}
+	static char escape(char original);
 	static void writeDoubleQuotedString(string& dest, const string& source);
 
 	static int countDays(int year, int month, int day);
