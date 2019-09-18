@@ -115,7 +115,7 @@ bool ret = conn.connect("111.222.3.44", 8503);
 
 ```C++
 DBConnection conn;
-bool ret = conn.connect("111.222.3.44", 8503,"admin","123456");
+bool ret = conn.connect("111.222.3.44", 8503, "admin", "123456");
 ```
 
 若未使用用户名及密码连接成功，则脚本在Guest权限下运行。后续运行中若需要提升权限，可以通过`conn.login('admin','123456',true)`登录获取权限。
@@ -171,9 +171,8 @@ conn.run("x = [1,3,5]");
 ```C++
 vector<ConstantSP> args;
 ConstantSP y = Util::createVector(DT_DOUBLE, 3); 
-y->setDouble(0, 1.5);
-y->setDouble(1, 2.5);
-y->setDouble(2, 7);
+double array_y[] = {1.5, 2.5, 7};
+y->setDouble(0, 3, array_y); 
 args.push_back(y);
 ConstantSP result = conn.run("add{x,}", args);
 cout<<result->getString()<<endl;
@@ -205,26 +204,64 @@ cout<<result->getString()<<endl;
 
 C++ API提供`upload`方法，将本地对象上传到DolphinDB。
 
-下面的例子首先创建了一个本地的表对象，然后把它上传到DolphinDB，再从DolphinDB获取这个表的数据，保存到本地对象。
+下面的例子定义了一个`createDemoTable`函数，该函数创建了一个本地的表对象。
 
 ```C++
 TableSP createDemoTable(){
-    vector<string> colNames = {"name","date","price"};
-    vector<DATA_TYPE> colTypes = {DT_STRING,DT_DATE,DT_DOUBLE};
-    int colNum = 3,rowNum = 20,indexCapacity=20;
-    ConstantSP table = Util::createTable(colNames,colTypes,rowNum,100);
+    vector<string> colNames = {"name", "date"," price"};
+    vector<DATA_TYPE> colTypes = {DT_STRING, DT_DATE, DT_DOUBLE};
+    int colNum = 3, rowNum = 10000, indexCapacity=10000;
+    ConstantSP table = Util::createTable(colNames, colTypes, rowNum, indexCapacity);
     vector<VectorSP> columnVecs;
-    for(int i = 0 ;i < colNum ;i ++)
+    for(int i = 0; i < colNum; ++i)
         columnVecs.push_back(table->getColumn(i));
 
-    for(unsigned int i =  0 ;i < rowNum; i++){
-        columnVecs[0]->set(i,Util::createString("name_"+std::to_string(i)));
-        columnVecs[1]->set(i,Util::createDate(2010,1,i+1));
-        columnVecs[2]->set(i,Util::createDouble(i*i));
+    for(unsigned int i = 0  i < rowNum; ++i){
+        columnVecs[0]->set(i, Util::createString("name_"+std::to_string(i)));
+        columnVecs[1]->set(i, Util::createDate(2010, 1, i+1));
+        columnVecs[2]->set(i, Util::createDouble((rand()%100)/3.0));
     }
     return table;
 }
+```
 
+需要注意的是，上述例子中采用的`set`方法作为一个虚函数，会产生较大的开销，调用`set`方法对表的列向量逐个赋值，在数据量很大的情况下会导致效率低下。针对这种情况，相对合理的做法是定义一个相应类型的数组，通过诸如`setInt(INDEX start, int len, const int* buf)`的方式一次或者多次地将数据批量传给列向量。另一方面， `createString`、`createDate`、`createDouble`等构造方法要求OS分配内存，反复调用同样会产生很大的开销。因此，当表对象的行数较小时，允许采用上述例子中的方式生成`TableSP`对象的数据，但是当数据量较多时，建议采用如下方式来生成数据。
+
+```C++
+TableSP createDemoTable(){
+    vector<string> colNames = {"name", "date", "price"};
+    vector<DATA_TYPE> colTypes = {DT_STRING, DT_DATE, DT_DOUBLE};
+    int colNum = 3, rowNum = 10000, indexCapacity=10000;
+    ConstantSP table = Util::createTable(colNames, colTypes, rowNum, indexCapacity);
+    vector<VectorSP> columnVecs;
+    for(int i = 0; i < colNum; ++i)
+        columnVecs.push_back(table->getColumn(i));
+
+    int array_dt_buf[Util::BUF_SIZE]; //定义date列缓冲区数组
+    double array_db_buf[Util::BUF_SIZE]; //定义price列缓冲区数组
+
+    int start = 0;
+    int no=0;
+    while (start < rowNum) {
+        size_t len = std::min(Util::BUF_SIZE, rowNum - start);
+        int *dtp = columnVecs[1]->getIntBuffer(start, len, array_dt_buf); //dtp指向每次通过`getIntBuffer`得到的缓冲区的头部
+        double *dbp = columnVecs[2]->getDoubleBuffer(start, len, array_db_buf); //dbp指向每次通过`getDoubleBuffer`得到的缓冲区的头部
+        for (int i = 0; i < len; ++i) {
+            columnVecs[0]->setString(i+start, "name_"+std::to_string(++no)); //对string类型的name列直接进行赋值，不采用getbuffer的方式
+            dtp[i] = 17898+i; 
+            dbp[i] = (rand()%100)/3.0;
+        }
+        columnVecs[1]->setInt(start, len, dtp); //写完后使用`setInt`将缓冲区写回数组
+        columnVecs[2]->setDouble(start, len, dbp); //写完后使用`setDouble`将缓冲区写回数组
+        start += len;
+    }
+    return table;
+}
+```
+上述例子采用的诸如`getIntBuffer`等方法能够直接获取一个可读写的缓冲区，写完后使用`setInt`将缓冲区写回数组，这类函数会检查给定的缓冲区地址和变量底层储存的地址是否一致，如果一致就不会发生数据拷贝。在多数情况下，用`getIntBuffer`获得的缓冲区就是变量实际的存储区域，这样能减少数据拷贝，提高性能。
+
+利用自定义的`createDemoTable()`函数创建表对象之后，通过`upload`方法把它上传到DolphinDB，再从DolphinDB获取这个表的数据，保存到本地对象。
+```C++
 TableSP table = createDemoTable();
 conn.upload("myTable", table);
 string script = "select * from myTable;";
@@ -235,14 +272,13 @@ cout<<result->getString()<<endl;
 输出结果为：
 
 ```console
-name    date       price
-------- ---------- -----
-name_0  2010.01.01 0    
-name_1  2010.01.02 1    
-name_2  2010.01.03 4    
-name_3  2010.01.04 9    
-name_4  2010.01.05 16   
-name_5  2010.01.06 25   
+name    date       price    
+------- ---------- ---------
+name_1  2019.01.02 27.666667
+name_2  2019.01.03 28.666667
+name_3  2019.01.04 25.666667
+name_4  2019.01.05 5        
+name_5  2019.01.06 31       
 ...
 ```   
 
@@ -262,14 +298,14 @@ DolphinDB C++ API支持多种数据类型，包括Int, Float, String, Date, Data
 ```C++
 VectorSP v = conn.run("1..10");
 int size = v->size();
-for(int i = 0; i < size; i++)
+for(int i = 0; i < size; ++i)
     cout<<v->getInt(i)<<endl;
 ```
 
 ```C++
 VectorSP v = conn.run("2010.10.01..2010.10.30");
 int size = v->size();
-for(int i = 0; i < size; i++)
+for(int i = 0; i < size; ++i)
     cout<<v->getString(i)<<endl;
 ```
 
@@ -347,7 +383,7 @@ DolphinDB提供多种方式来保存数据到内存表：
 在DolphinDB中执行以下脚本创建内存表：
 
 ```
-t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]);
+t = table(100:0, `name`date`price, [STRING,DATE,DOUBLE]);
 share t as tglobal;
 ```
 
@@ -367,19 +403,34 @@ conn.run(script);
 
 ```C++
 string script;
-VectorSP names = Util::createVector(DT_STRING,5,100);
-VectorSP dates = Util::createVector(DT_DATE,5,100);
-VectorSP prices = Util::createVector(DT_DOUBLE,5,100);
-for(int i = 0 ;i < 5;i++){
-    names->set(i,Util::createString("name_"+std::to_string(i)));
-    dates->set(i,Util::createDate(2010,1,i+1));
-    prices->set(i,Util::createDouble(i*i));
-}
-vector<string> allnames = {"names","dates","prices"};
-vector<ConstantSP> allcols = {names,dates,prices};
-conn.upload(allnames,allcols); 
+int rowNum=10000, indexCapacity=10000;
+VectorSP names = Util::createVector(DT_STRING, rowNum, indexCapacity);
+VectorSP dates = Util::createVector(DT_DATE, rowNum, indexCapacity);
+VectorSP prices = Util::createVector(DT_DOUBLE, rowNum, indexCapacity);
 
-script += "insert into tglobal values(names,dates,prices);"; 
+int array_dt_buf[Util::BUF_SIZE]; //定义date列缓冲区数组
+double array_db_buf[Util::BUF_SIZE]; //定义price列缓冲区数组
+
+int start = 0;
+int no=0;
+while (start < rowNum) {
+    size_t len = std::min(Util::BUF_SIZE, rowNum - start);
+    int *dtp = columnVecs[1]->getIntBuffer(start, len, array_dt_buf); //dtp指向每次通过`getIntBuffer`得到的缓冲区的头部
+    double *dbp = columnVecs[2]->getDoubleBuffer(start, len, array_db_buf); //dbp指向每次通过`getDoubleBuffer`得到的缓冲区的头部
+    for (int i = 0; i < len; i++) {
+        columnVecs[0]->setString(i+start, "name_"+std::to_string(++no)); //对string类型的name列直接进行赋值，不采用getbuffer的方式
+        dtp[i] = 17898+i; 
+        dbp[i] = (rand()%100)/3.0;
+    }
+    dates->setInt(start, len, dtp); //写完后使用`setInt`将缓冲区写回数组
+    prices->setDouble(start, len, dbp); //写完后使用`setDouble`将缓冲区写回数组
+    start += len;
+}
+vector<string> allnames = {"names", "dates", "prices"};
+vector<ConstantSP> allcols = {names, dates, prices};
+conn.upload(allnames, allcols); 
+
+script += "insert into tglobal values(names,dates,prices); tglobal"; 
 TableSP table = conn.run(script); 
 ```
 
@@ -423,9 +474,9 @@ conn.run("append!(tglobal);", args);
 在DolphinDB中使用以下脚本创建一个本地磁盘表，使用`database`函数创建数据库，调用`saveTable`函数将内存表保存到磁盘中：
 
 ```C++
-t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]); 
+t = table(100:0, `name`date`price, [STRING,DATE,DOUBLE]); 
 db=database("/home/dolphindb/demoDB"); 
-saveTable(db,t,`dt); 
+saveTable(db, t, `dt); 
 share t as tDiskGlobal;
 ```
 
@@ -435,7 +486,7 @@ share t as tDiskGlobal;
 TableSP table = createDemoTable();
 vector<ConstantSP> args;
 args.push_back(table);
-conn.run("tableInsert{tDiskGlobal}",args);
+conn.run("tableInsert{tDiskGlobal}", args);
 conn.run("saveTable(db,tDiskGlobal,`dt);");
 ```
 
@@ -443,7 +494,7 @@ conn.run("saveTable(db,tDiskGlobal,`dt);");
 
 ```C++
 TableSP table = createDemoTable();
-conn.upload("mt",table);
+conn.upload("mt", table);
 string script;
 script += "db=database(\"/home/demoTable1\");";
 script += "tDiskGlobal.append!(mt);";
@@ -465,11 +516,11 @@ conn.run(script);
 在DolphinDB中使用以下脚本创建分布式表，脚本中，`database`函数用于创建数据库，对于分布式数据库，路径必须以“dfs”开头。`createPartitionedTable`函数用于创建分区表。
 
 ```
-login(`admin,`123456)
+login(`admin, `123456)
 dbPath = "dfs://SAMPLE_TRDDB";
 tableName = `demoTable
 db = database(dbPath, VALUE, 2010.01.01..2010.01.30)
-pt=db.createPartitionedTable(table(1000000:0,`name`date`price,[STRING,DATE,DOUBLE]),tableName,`date)
+pt=db.createPartitionedTable(table(1000000:0, `name`date`price, [STRING,DATE,DOUBLE]), tableName, `date)
 ```
 
 DolphinDB提供的`loadTable`方法同样可以加载分布式表，通过`tableInsert`方式追加数据，具体的脚本示例如下：
@@ -478,14 +529,14 @@ DolphinDB提供的`loadTable`方法同样可以加载分布式表，通过`table
 TableSP table = createDemoTable();
 vector<ConstantSP> args;
 args.push_back(table);
-conn.run("tableInsert{loadTable('dfs://SAMPLE_TRDDB', `demoTable)}",args);
+conn.run("tableInsert{loadTable('dfs://SAMPLE_TRDDB', `demoTable)}", args);
 ```
 
 同样地，`append!`函数也能向分布式表追加数据，但是性能与`tableInsert`相比要差一些，建议不要轻易使用：
 
 ```C++
 TableSP table = createDemoTable();
-conn.upload("mt",table);
+conn.upload("mt", table);
 conn.run("loadTable('dfs://SAMPLE_TRDDB', `demoTable).append!(mt);");
 conn.run(script);
 ```
