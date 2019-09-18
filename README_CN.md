@@ -415,10 +415,10 @@ int start = 0;
 int no=0;
 while (start < rowNum) {
     size_t len = std::min(Util::BUF_SIZE, rowNum - start);
-    int *dtp = columnVecs[1]->getIntBuffer(start, len, array_dt_buf); //dtp指向每次通过`getIntBuffer`得到的缓冲区的头部
-    double *dbp = columnVecs[2]->getDoubleBuffer(start, len, array_db_buf); //dbp指向每次通过`getDoubleBuffer`得到的缓冲区的头部
+    int *dtp = dates->getIntBuffer(start, len, array_dt_buf); //dtp指向每次通过`getIntBuffer`得到的缓冲区的头部
+    double *dbp = prices->getDoubleBuffer(start, len, array_db_buf); //dbp指向每次通过`getDoubleBuffer`得到的缓冲区的头部
     for (int i = 0; i < len; i++) {
-        columnVecs[0]->setString(i+start, "name_"+std::to_string(++no)); //对string类型的name列直接进行赋值，不采用getbuffer的方式
+        names->setString(i+start, "name_"+std::to_string(++no)); //对string类型的name列直接进行赋值，不采用getbuffer的方式
         dtp[i] = 17898+i; 
         dbp[i] = (rand()%100)/3.0;
     }
