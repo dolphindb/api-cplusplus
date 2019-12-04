@@ -12,14 +12,14 @@
 #include <vector>
 #include <unordered_set>
 #include <ctime>
-#ifdef VS
+#ifdef _MSC_VER
 
 #else
 	#include <tr1/random>
 #endif
 #include <chrono>
 
-#ifdef VS
+#ifdef _MSC_VER
 	#define EXPORT_DECL _declspec(dllexport)
 #else
 	#define EXPORT_DECL 
@@ -36,7 +36,7 @@ public:
 	static string VER;
 	static int VERNUM;
 	static string BUILD;
-#ifdef VS
+#ifdef _MSC_VER
 	const static int BUF_SIZE = 1024;
 #else
 	const static int BUF_SIZE;

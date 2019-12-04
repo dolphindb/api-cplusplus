@@ -23,7 +23,7 @@
 #include "Exceptions.h"
 #include "SysIO.h"
 
-#ifdef VS
+#ifdef _MSC_VER
 	#define EXPORT_DECL _declspec(dllexport)
 #else
 	#define EXPORT_DECL 
@@ -539,13 +539,15 @@ class EXPORT_DECL DBConnection {
 public:
 	DBConnection();
 	~DBConnection();
+	DBConnection(DBConnection&& oth);
+	DBConnection& operator=(DBConnection&& oth);
 
 	/**
 	 * Connect to the specified DolphinDB server. If userId and password are specified, authentication
 	 * will be performed along with connecting. If one would send userId and password in encrypted mode,
 	 * please use the login function for authentication separately.
 	 */
-	bool connect(const string& hostName, int port, const string& userId = "", const string& password = "", const string& startup = "", bool highAvailability = false);
+	bool connect(const string& hostName, int port, const string& userId = "", const string& password = "", const string& initialScript = "", bool highAvailability = false);
 
 	/**
 	 * Log onto the DolphinDB server using the given userId and password. If the parameter enableEncryption
@@ -591,15 +593,20 @@ public:
 	static void initialize();
 
 private:
-    void switchDataNode();
+    DBConnection(DBConnection& oth); // = delete
+    DBConnection& operator=(DBConnection& oth); // = delete
+
+private:
+    void switchDataNode(IOException& e);
     bool connected();
 
 private:
     std::unique_ptr<DBConnectionImpl> conn_;
-	string uid_;
-	string pwd_;
-	string startup_;
+    string uid_;
+    string pwd_;
+    string initialScript_;
     bool ha_;
+    const int maxRerunCnt_ = 30;
     ConstantSP nodes_;
 };
 

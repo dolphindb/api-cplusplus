@@ -2,32 +2,36 @@
 DolphinDB C++ API supports the following development environments:
 * Linux
 * Windows Visual Studio
-* Windows GNU(MingW)
+* Windows GNU (MingW)
 
 This tutorial includes the following topics about how to use DolphinDB C++ API in Linux:
-* Compile a project under Linux environment
-* Compile a project under Windows Visual Studio environment
+* Compilation
+* Establish DolphinDB connection
 * Execute DolphinDB script
-* Call DolphinDB built-in functions
+* Call DolphinDB functions
 * Upload local objects to DolphinDB server
-* Append data to DolphindB tables
+* Read data
+* Write to DolphinDB tables
+* C++ streaming API
 
-### 1. Compile under Linux
+## 1. Compilation
 
-#### 1.1 Environment Setup
+### 1.1 Compile under Linux
 
-To run DolphinDB C++ API, we need g++ 6.2 in Linux.
+#### 1.1.1 Environment Setup
 
-#### 1.2 Download bin file and header files
+DolphinDB C++ API requires g++ 6.2 or later versions in Linux.
 
-Download api-cplusplus from this git repo, including "bin" and "include" folders in your project.
+#### 1.1.2 Download bin file and header files
+
+Download the following files:
 
 > bin (libDolphinDBAPI.so)
   include (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h)
 
-#### 1.3 Compile main.cpp
+#### 1.1.3 Compile main.cpp
 
-Create a directory "project" on the same level as "bin" and "include" folders, enter the project folder, and then create the file main.cpp:
+Create a directory "project" on the same level as "bin" and "include" folders. Create the file main.cpp in the "project" folder. 
 ```
 #include "DolphinDB.h"
 #include "Util.h"
@@ -51,54 +55,64 @@ int main(int argc, char *argv[]){
 }
 ```
 
-#### 1.4 Compile
+#### 1.1.4 Compile
 
 g++ compiling command:
 
 > g++ main.cpp -std=c++11 -DLINUX -DLOGGING_LEVEL_2 -O2 -I../include -lDolphinDBAPI -lssl  -lpthread -luuid -L../bin  -Wl,-rpath ../bin/ -o main
 
-#### 1.5 Run
+#### 1.1.5 Run
 
-After successfully compiling the program main, start a DolphinDB server, then you can run the program "main", which connects to a DolphinDB server with IP address 111.222.3.44 and port number 8503 as specified in the program.
+After successfully compiling the program "main", start a DolphinDB server, then run the program "main", which connects to a DolphinDB server with IP address 111.222.3.44 and port number 8503 as specified in the program.
 
-### 2. Compile under Windows
+### 1.2 Compile under Windows
 
-#### 2.1 Environment Setup
+#### 1.2.1 Environment Setup
 
 This tutorial uses Visual Studio 2017 64 bit version.
 
-#### 2.2 Download bin file and header files
-Download api-cplusplus.
+#### 1.2.2 Download bin file and header files
 
-#### 2.3 Build Visual Studio Project
-Build win32 console project and import header files, create main.cpp as in section 1.3, import libDolphinDBAPI.lib and configure the additional library directory as the lib directory.
+#### 1.2.3 Build Visual Studio Project
 
->Note: The min/max macros are defined by default in VS. To avoid conflicts with the min and max functions in the header file, __NOMINMAX__ needs to be added to the preprocessor macro definition.
+Build win32 console project and import header files, create main.cpp as in section 1.1.3, import libDolphinDBAPI.lib and configure the additional library directory as the lib directory.
 
-#### 2.4 Compile and Run
+>Note: The min/max macros are defined by default in VS. To avoid conflicts with functions `min` and `max` in the header file, `__NOMINMAX__` needs to be added to the macro definition.
 
-Start the compilation, copy libDolphinDBAPI.dll to the executable program output directory, and execute the compiled executable program.
+#### 1.2.4 Compile and Run
 
-The Windows gnu development environment is similar to Linux, please refer to the linux compilation.
+Start the compilation, copy libDolphinDBAPI.dll to the output directory of the executable program. Now the compiled executable program is ready to be exuected.
+
+The Windows gnu development environment is similar to Linux.
 
 
-### 3. Execute DolphinDB script
+### 2. Establish DolphinDB connection
 
-#### 3.1 Connect to a DolphinDB server
+The most important object provided by DolphinDB C++ API is DBConnection. It allows C++ applications to execute script and functions on DolphinDB servers and transfer data between C++ applications and DolphinDB servers in both directions. The DBConnection class provides the following main methods:
 
-The C++ API connects to a DolphinDB server via TCP/IP. The `connect` method uses parameters `ip` and `port`.
+| Method Name | Details |
+|:------------- |:-------------|
+|connect(host, port, [username, password])|Connect the session to DolphinDB server|
+|login(username,password,enableEncryption)|Log in to DolphinDB server|
+|run(script)|Run script on DolphinDB server|
+|run(functionName,args)|Call a function on DolphinDB server|
+|upload(variableObjectMap)|Upload local data to DolphinDB server|
+|initialize()|Initialize the connection|
+|close()|Close the current session|
+
+The C++ API connects to a DolphinDB server via TCP/IP. The `connect` method uses parameters 'ip' and 'port'.
 ```
 DBConnection conn;
 bool ret = conn.connect("111.222.3.44", 8503);
 ```
 
-To connect to a cluster, you need to log in with a username and password. The default administrator username and password are "admin" and "123456" respectively.
+To connect to a cluster, we need to log in with a username and password. The default administrator username and password are "admin" and "123456" respectively.
 ```
 DBConnection conn;
 bool ret = conn.connect("111.222.3.44", 8503,"admin","123456");
 ```
 
-#### 3.2 Execute DolphinDB script
+#### 3. Execute DolphinDB script
 
 Execute Dolphindb script with method `run`.
 
@@ -114,52 +128,203 @@ Output:
 GOOG
 YHOO
 
-If the script contains multiple statements, only the result of the last statement is returned. If there is a syntax error in the script or there is a network problem, an exception will be thrown.
+The maximum length of the script is 65,535 bytes. If the script contains multiple statements, only the result of the last statement is returned. If there is a syntax error in the script or there is a network problem, an exception will be thrown.
 
-#### 3.3 Support multiple data types and data forms
+### 4. Call DolphinDB functions
 
-DolphinDB supports multiple data types (Int, Float, String, Date, DataTime, etc) and multiple data forms (Vector, Set, Matrix, Dictionary, Table, AnyVector, etc.)
+Other than running script, method `run` can also execute DolphinDB built-in functions or user-defined functions on a remote DolphinDB server. If method `run` has only one parameter, the parameter is script. If method `run` has 2 parameters, the first parameter is a DolphinDB function name and the second parameter is the function's parameters.
 
-##### 3.3.1 Vector
+The following examples illustrate 3 ways to call DolphinDB's built-in function `add` in C++, depending on the locations of the parameters "x" and "y" of function `add`.
+
+* Both parameters are on DolphinDB server
+
+If both variables "x" and "y" have been generated on DolphinDB server by C++ applications,
+```
+conn.run("x = [1,3,5];y = [2,4,6]");
+```
+then we can execute run("script") directly.
+```
+ConstantSP result = conn.run("add(x,y)");
+cout<<result->getString()<<endl;
+```
+Output:
+> [3,7,11]
+
+* Only 1 parameter exists on DolphinDB server
+
+Parameter "x" was generated on DolphinDB server by the C++ program, and parameter "y" is to be generated by the C++ program.
+```
+conn.run("x = [1,3,5]");
+```
+In this case, we need to use "partial application" to embed parameter "x" in function `add`. For details, please refer to [Partial Application Documentation](https://www.dolphindb.com/help/PartialApplication.html)。
 
 ```
+vector<ConstantSP> args;
+ConstantSP y = Util::createVector(DT_DOUBLE, 3); 
+double array_y[] = {1.5, 2.5, 7};
+y->setDouble(0, 3, array_y); 
+args.push_back(y);
+ConstantSP result = conn.run("add{x,}", args);
+cout<<result->getString()<<endl;
+```
+Output:
+> [2.5, 5.5, 12]
+
+* Both parameters are to be generated by C++ program
+
+```C++
+vector<ConstantSP> args;
+ConstantSP x = Util::createVector(DT_DOUBLE, 3); 
+double array_x[] = {1.5, 2.5, 7};
+x->setDouble(0, 3, array_x); 
+ConstantSP y = Util::createVector(DT_DOUBLE, 3); 
+double array_y[] = {8.5, 7.5, 3};
+y->setDouble(0, 3, array_y); 
+args.push_back(x);
+args.push_back(y);
+ConstantSP result = conn.run("add", args);
+cout<<result->getString()<<endl;
+```
+
+Output:
+> [10, 10, 10]
+
+### 5. Upload local objects to DolphinDB Server
+
+We can use method `upload` to upload local data to DolphinDB server. 
+
+In the following example, we define function `createDemoTable` in C++ to create a local table. 
+
+```C++
+TableSP createDemoTable(){
+    vector<string> colNames = {"name", "date"," price"};
+    vector<DATA_TYPE> colTypes = {DT_STRING, DT_DATE, DT_DOUBLE};
+    int colNum = 3, rowNum = 10000, indexCapacity=10000;
+    ConstantSP table = Util::createTable(colNames, colTypes, rowNum, indexCapacity);
+    vector<VectorSP> columnVecs;
+    for(int i = 0; i < colNum; ++i)
+        columnVecs.push_back(table->getColumn(i));
+
+    for(unsigned int i = 0  i < rowNum; ++i){
+        columnVecs[0]->set(i, Util::createString("name_"+std::to_string(i)));
+        columnVecs[1]->set(i, Util::createDate(2010, 1, i+1));
+        columnVecs[2]->set(i, Util::createDouble((rand()%100)/3.0));
+    }
+    return table;
+}
+```
+
+Please note that the example above, as the method `set` is a virtual function, it comes with costly overhead. It is quite inefficient to assign value to the table's columns one by one with the `set` method with large data volumes. In addition, as `createString`, `createDate`, `createDouble` methods require the operating system to allocate memory, repeated calls will also incur a lot of overhead.
+
+A more reasonable way is to define an array of the corresponding data type. For example: setInt(INDEX start, int len, const int* buf). Then pass the data to the array one or more times in batches. For example: .  
+
+Therefore, if the table has a small amount of data, we can use the method in the example above. If the table has a large number of data, we recommended to use the method in the example below.
+
+```C++
+TableSP createDemoTable(){
+    vector<string> colNames = {"name", "date", "price"};
+    vector<DATA_TYPE> colTypes = {DT_STRING, DT_DATE, DT_DOUBLE};
+    int colNum = 3, rowNum = 10000, indexCapacity=10000;
+    ConstantSP table = Util::createTable(colNames, colTypes, rowNum, indexCapacity);
+    vector<VectorSP> columnVecs;
+    for(int i = 0; i < colNum; ++i)
+        columnVecs.push_back(table->getColumn(i));
+
+    int array_dt_buf[Util::BUF_SIZE]; //定义date列缓冲区数组
+    double array_db_buf[Util::BUF_SIZE]; //定义price列缓冲区数组
+
+    int start = 0;
+    int no=0;
+    while (start < rowNum) {
+        size_t len = std::min(Util::BUF_SIZE, rowNum - start);
+        int *dtp = columnVecs[1]->getIntBuffer(start, len, array_dt_buf); //dtp points to the buffer head generated by `getIntBuffer` each time
+        double *dbp = columnVecs[2]->getDoubleBuffer(start, len, array_db_buf); //dbp points to the buffer head generated by `getDoubleBuffer` each time
+        for (int i = 0; i < len; ++i) {
+            columnVecs[0]->setString(i+start, "name_"+std::to_string(++no)); //assign value to column 'name' of string type instead of with method `getbuffer`
+            dtp[i] = 17898+i; 
+            dbp[i] = (rand()%100)/3.0;
+        }
+        columnVecs[1]->setInt(start, len, dtp); // write the contents of the buffer to the array with `setInt` method
+        columnVecs[2]->setDouble(start, len, dbp); //write the contents of the buffer to the array with `setDouble` method
+        start += len;
+    }
+    return table;
+}
+```
+The example above uses methods such as `getIntBuffer` to directly fetch a readable and writable buffer. After writing, it use methods such as `setInt` to write the buffer back to the array. Methods like `setInt` check the buffer address and address of the object. If the addresses are the same, no data copy will occur. In most cases, the two addresses are identical, which avoids unnecessary data copy and improves performance.
+
+In the following script, we create a table object with the function `createDemoTable()`, upload it to DolphinDB with method `upload`, then assign the data of this table to the local object 'result' and print it out.
+
+```C++
+TableSP table = createDemoTable();
+conn.upload("myTable", table);
+string script = "select * from myTable;";
+ConstantSP result = conn.run(script);
+cout<<result->getString()<<endl;
+```
+
+Output:
+```console
+name    date       price    
+------- ---------- ---------
+name_1  2019.01.02 27.666667
+name_2  2019.01.03 28.666667
+name_3  2019.01.04 25.666667
+name_4  2019.01.05 5        
+name_5  2019.01.06 31       
+...
+```
+
+### 6. Read data
+
+DolphinDB not only supports multiple data types (Int, Float, String, Date, DataTime, etc), but also multiple data forms (Vector, Set, Matrix, Dictionary, Table, AnyVector, etc). This section introduces how to read different data forms in DolphinDB with the DBConnection object.
+
+Required header files:
+
+```C++
+#include "DolphinDB.h"
+#include "Util.h"
+```
+- Vector
+
+```C++
 VectorSP v = conn.run("1..10");
 int size = v->size();
-for(int i = 0; i < size; i++)
+for(int i = 0; i < size; ++i)
     cout<<v->getInt(i)<<endl;
 ```
 
-```
+```C++
 VectorSP v = conn.run("2010.10.01..2010.10.30");
 int size = v->size();
-for(int i = 0; i < size; i++)
+for(int i = 0; i < size; ++i)
     cout<<v->getString(i)<<endl;
 ```
 
-##### 3.3.2 Set
+- Set
 
 ```
-VectorSP set = conn.run("set(4 5 5 2 3 11 6)");
+SetSP set = conn.run("set(4 5 5 2 3 11 6)");
 cout<<set->getString()<<endl;
 ```
 
-##### 3.3.3 Matrix
+- Matrix
 
 ```
 ConstantSP matrix = conn.run("1..6$2:3");
 cout<<matrix->getString()<<endl;
 ```
 
-##### 3.3.4 Dictionary
+- Dictionary
 
 ```
-ConstantSP dict = conn.run("dict(1 2 3,`IBM`MSFT`GOOG)");
+DictionarySP dict = conn.run("dict(1 2 3,`IBM`MSFT`GOOG)");
 cout << dict->get(Util::createInt(1))->getString()<<endl;
 ```
 
-You can use `get` method to retrieve a value. Note that you need to create an Int value through function `Util::createInt()` in order to do so.
+In the example above, we create an INT value with function `Util::createInt()` and use `get` method to retrieve a value for a key.
 
-##### 3.3.5 Table
+- Table
 
 ```
 string sb;
@@ -167,10 +332,13 @@ sb.append("n=20000\n");
 sb.append("syms=`IBM`C`MS`MSFT`JPM`ORCL`BIDU`SOHU`GE`EBAY`GOOG`FORD`GS`PEP`USO`GLD`GDX`EEM`FXI`SLV`SINA`BAC`AAPL`PALL`YHOO`KOH`TSLA`CS`CISO`SUN\n");
 sb.append("mytrades=table(09:30:00+rand(18000,n) as timestamp,rand(syms,n) as sym, 10*(1+rand(100,n)) as qty,5.0+rand(100.0,n) as price);\n");
 sb.append("select qty,price from mytrades where sym==`IBM;");
-ConstantSP table = conn.run(sb);
+TableSP table = conn.run(sb);
+cout<<table->getString()<<endl;
 ```
 
-##### 3.3.6 AnyVector
+- AnyVector
+
+Unlike a regular vector, the elements of an AnyVector can have different data types or data forms.
 
 ```
 ConstantSP result = conn.run("{1, 2, {1,3,5},{0.9, 0.8}}");
@@ -179,178 +347,183 @@ cout<<result->getString()<<endl;
 
 Get the third element with method `get`:
 ```
-VectorSP v =  result->get(2);
+VectorSP v = result->get(2);
 cout<<v->getString()<<endl;
 ```
 The result is an Int Vector [1,3,5].
 
-### 4. Call DolphinDB built-in functions
 
-DolphinDB C++ API provides an interface to call DolphinDB built-in functions:
+### 7. Write to DolphinDB tables
+
+There are 3 types of DolphinDB tables:
+
+- In-memory table: it has the fastest access speed, but if the node shuts down the data will be lost.
+- Local disk table: data are saved on the local disk and can be loaded into memory.
+- Distributed table: data are distributed across disks of multiple nodes. Users can query the table as if it is a local disk table.
+
+#### 7.1 Save data to a DolphinDB in-memory table
+
+DolphinDB offers several ways to save data to an in-memory table:
+- Save a single row of data with `insert into`
+- Save multiple rows of data in bulk with function `tableInsert`
+- Save a table object with function `tableInsert`
+
+It is not recommended to save data with function `append!`, as `append!` returns all records of a table and unnecessarily increases the network traffic.
+
+The table in the following examples has 3 columns. Their data types are STRING, DATE and DOUBLE. The column names are name, date and price, respectively.
+```
+t = table(100:0, `name`date`price, [STRING,DATE,DOUBLE]);
+share t as tglobal;
+```
+By default, an in-memory table is not shared among sessions. To access it in a different session, we need to share it among sessions with `share`.
+
+##### 7.1.1 Save data to an in-memory table with `insert into`
+
+To save a single record to an in-memory table with `insert into`:
+```
+char script[100];
+sprintf(script, "insert into tglobal values(%s, date(timestamp(%ld)), %lf)", "`a", 1546300800000, 1.5);
+conn.run(script);
+```
+
+To save multiple records to an in-memory table with `insert into`:
+```C++
+string script;
+int rowNum=10000, indexCapacity=10000;
+VectorSP names = Util::createVector(DT_STRING, rowNum, indexCapacity);
+VectorSP dates = Util::createVector(DT_DATE, rowNum, indexCapacity);
+VectorSP prices = Util::createVector(DT_DOUBLE, rowNum, indexCapacity);
+
+int array_dt_buf[Util::BUF_SIZE]; 
+double array_db_buf[Util::BUF_SIZE]; 
+
+int start = 0;
+int no=0;
+while (start < rowNum) {
+    size_t len = std::min(Util::BUF_SIZE, rowNum - start);
+    int *dtp = dates->getIntBuffer(start, len, array_dt_buf); 
+    double *dbp = prices->getDoubleBuffer(start, len, array_db_buf); 
+    for (int i = 0; i < len; i++) {
+        names->setString(i+start, "name_"+std::to_string(++no)); 
+        dtp[i] = 17898+i; 
+        dbp[i] = (rand()%100)/3.0;
+    }
+    dates->setInt(start, len, dtp); 
+    prices->setDouble(start, len, dbp); 
+    start += len;
+}
+vector<string> allnames = {"names", "dates", "prices"};
+vector<ConstantSP> allcols = {names, dates, prices};
+conn.upload(allnames, allcols); 
+
+script += "insert into tglobal values(names,dates,prices); tglobal"; 
+TableSP table = conn.run(script); 
+```
+
+##### 7.1.2 Save data in batches with `tableInsert`
+
 ```
 vector<ConstantSP> args;
-double array[] = {1.5, 2.5, 7};
-ConstantSP vec = Util::createVector(DT_DOUBLE, 3); // build a Double Vector with size of 3.
-vec->setDouble(0, 3, array); // assign values
-args.push_back(vec);
-ConstantSP result = conn.run("sum", args); // call built-in function "sum".
-cout<<result->getString()<<endl;
-```
-
-The `run` method above returns the result of function `sum`, which accepts a Double Vector via `Util::createVector(DT_DOUBLE, 3)`.
-
-The first parameter of the `run` method is a function name; the second parameter is the vector of ConstantSP type (the Constant class is the base class of all types in DolphinDB).
-
-### 5. Upload local objects to DolphinDB Server
-
-The C++ API provides a flexible interface to create local objects. With the `upload` method, you can implement the conversion between local objects and server objects.
-
-The local object can be uploaded to a DolphinDB server through C++ API. The following example first creates a local table object, then uploads it to the DolphinDB server, then gets the object from the server.
-```
-// Create a local table object with 3 columns
-TableSP createDemoTable(){
-    vector<string> colNames = {"name","date","price"};
-    vector<DATA_TYPE> colTypes = {DT_STRING,DT_DATE,DT_DOUBLE};
-    int colNum = 3,rowNum = 3;
-    ConstantSP table = Util::createTable(colNames,colTypes,rowNum,100);
-    vector<VectorSP> columnVecs;
-    for(int i = 0 ;i < colNum ;i ++)
-        columnVecs.push_back(table->getColumn(i));
-
-    for(unsigned int i =  0 ;i < rowNum; i++){
-        columnVecs[0]->set(i,Util::createString("name_"+std::to_string(i)));
-        columnVecs[1]->set(i,Util::createDate(2010,1,i+1));
-        columnVecs[2]->set(i,Util::createDouble(i*i));
-    }
-    return table;
-}
-
-// Upload the local table object to DolphinDB server，and then get back the object from the server through method run.
-table = createDemoTable();
-conn.upload("myTable", table);
-string script = "select * from myTable;";
-ConstantSP result = conn.run(script);
-cout<<result->getString()<<endl;
-```
-
-### 6. Append data to DolphinDB tables
-
-Data can be appended to a DolphinDB table with C++ API. DolphinDB supports 3 types of tables: in-memory table, table on local disk, and distributed table.
-
-#### 6.1 In-memory table
-
-##### 6.1.1 Create an in-memory table
-```
-t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]);
-share t as tglobal
-```
-`table`: create an in-memory table and specify capacity, size, column names, and data types.
-`share`: share the table across sessions, so that multiple clients can write to table "t" at the same time.
-
-##### 6.1.2 Save data to the in-memory table
-```
-string script;
-//simulate data
-VectorSP names = Util::createVector(DT_STRING,5,100);
-VectorSP dates = Util::createVector(DT_DATE,5,100);
-VectorSP prices = Util::createVector(DT_DOUBLE,5,100);
-for(int i = 0 ;i < 5;i++){
-    names->set(i,Util::createString("name_"+std::to_string(i)));
-    dates->set(i,Util::createDate(2010,1,i+1));
-    prices->set(i,Util::createDouble(i*i));
-}
-vector<string> allnames = {"names","dates","prices"};
-vector<ConstantSP> allcols = {names,dates,prices};
-conn.upload(allnames,allcols); // upload data to a DolphinDB server
-script += "insert into tglobal values(names,dates,prices);"; // insert data to table
-script += "select * from tglobal;";
-TableSP table = conn.run(script); // return the updated in-memory table
-cout<<table->getString()<<endl;
-```
-
-To append data to an in-memory table, in addition to using `insert into`, you can also use `append!`, which accepts a table as a parameter and creates an instance reference to the table:
-```
-table = createDemoTable();
-script += "t.append!(table);";
-```
-#### 6.2 Table on local disk
-
-##### 6.2.1 Create a local disk table with DolphinDB script
-You can use any DolphinDB client (GUI, Web notebook or console) to create a table on local disk:
-```
-t = table(100:0, `name`date`price, [STRING, DATE, DOUBLE]); // create an in-memory table
-db=database("/home/dolphindb/demoDB"); // create database "demoDB"
-saveTable(db,t,`dt); // save the in-memory table to the database
-share t as tDiskGlobal
-```
-`database`: create a local database at the specified path.
-`saveTable`: save the in-memory table to the local database on disk.
-
-##### 6.2.2 Save data to a local disk table with API
-```
 TableSP table = createDemoTable();
-conn.upload("mt",table);
+VectorSP range = Util::createPair(DT_INDEX);
+range->setIndex(0, 0);
+range->setIndex(1, 10);
+cout<<range->getString()<<endl;
+args.push_back(table->get(range));
+conn.run("tableInsert{tglobal}", args); 
+```
+
+The example above uses partial application in DolphinDB to embed a table in `tableInsert{tglobal}` as a function. For details about partial application, please refer to [Partial Application Documentation](https://www.dolphindb.com/help/PartialApplication.html).
+
+##### 7.1.3 Use function `tableInsert` to save TableSP objects
+
+```
+vector<ConstantSP> args;
+TableSP table = createDemoTable();
+args.push_back(table);
+conn.run("tableInsert{tglobal}", args); 
+```
+
+#### 7.2 Save data to a distributed table
+
+Distributed table is recommended by DolphinDB in production environment. It supports snapshot isolation and ensures data consistency. With data replication, Distributed tables offers fault tolerance and load balancing.
+
+Use the following script in DolphinDB to create a distributed table. Function `database` creates a database. The path of a distributed database must start with "dfs". Function `createPartitionedTable` creates a distributed table. 
+
+```
+login(`admin, `123456)
+dbPath = "dfs://SAMPLE_TRDDB";
+tableName = `demoTable
+db = database(dbPath, VALUE, 2010.01.01..2010.01.30)
+pt=db.createPartitionedTable(table(1000000:0, `name`date`price, [STRING,DATE,DOUBLE]), tableName, `date)
+```
+
+Use function `loadTable` to load a distributed table. Use function `tableInsert` to append data to the table.
+
+```C++
+TableSP table = createDemoTable();
+vector<ConstantSP> args;
+args.push_back(table);
+conn.run("tableInsert{loadTable('dfs://SAMPLE_TRDDB', `demoTable)}", args);
+```
+
+We can also use function `append!` to append data to a distributed table. However, its performance is worse than `tableInsert`. We recommend to use `tableInsert` instead of `append!`. 
+
+```C++
+TableSP table = createDemoTable();
+conn.upload("mt", table);
+conn.run("loadTable('dfs://SAMPLE_TRDDB', `demoTable).append!(mt);");
+conn.run(script);
+```
+
+#### 7.3 Save data to a local disk table
+
+Local disk tables can be used for data analysis on historical data sets. They do not support transactions, nor do they support concurrent read and write.
+
+Use the following script in DolphinDB to create a local disk table. Function `database` creates a database. Function `saveTable` saves an in-memory table to disk. 
+
+```
+t = table(100:0, `name`date`price, [STRING,DATE,DOUBLE]); 
+db=database("/home/dolphindb/demoDB"); 
+saveTable(db, t, `dt); 
+share t as tDiskGlobal;
+```
+
+Next, use `tableInsert` to append data to a shared in-memory table tDiskGlobal, then use `saveTable` to save the inserted data on disk.
+
+```C++
+TableSP table = createDemoTable();
+vector<ConstantSP> args;
+args.push_back(table);
+conn.run("tableInsert{tDiskGlobal}", args);
+conn.run("saveTable(db,tDiskGlobal,`dt);");
+```
+
+We can also use `append!` to append data to a local disk table. 
+
+```C++
+TableSP table = createDemoTable();
+conn.upload("mt", table);
 string script;
 script += "db=database(\"/home/demoTable1\");";
 script += "tDiskGlobal.append!(mt);";
 script += "saveTable(db,tDiskGlobal,`dt);";
-script += "select * from tDiskGlobal;";
-TableSP result = conn.run(script); // load an in-memory table from the database
-cout<<result->getString()<<endl;
+conn.run(script);
 ```
-`loadTable`: load a table from the database into memory.
-`append!`: append data to the table.
 
 Note:
-1. For a table on local disk, `append!` only appends data to an in-memory copy of the table. To save the data to disk, you must also use function `saveTable`.
-2. Instead of using function `share`, you can also use function `loadTable` to load the table with the C++ API, and then `append!`. However, this method is not recommended. The reason is that function `loadTable` needs to load from the disk, which can take a long time. If there are multiple client using `loadTable`, there will be multiple copies of the table in the memory, which may cause data inconsistency.
+For a local disk table, function `append!` appends data to memory only. To save the new data on disk, we must execute command `saveTable` afterwards. 
 
-#### 6.3 Distributed table
+For more information about DolphinDB C++ API, please refer to C++ API header file dolphindb.h. 
 
-A distributed table in DolphinDB is stored on multiple nodes of a cluster. The following example shows how to save data to a distributed table with the C++ API.
-
-##### 6.3.1 Create a distributed table
-
-You can use any DolphinDB client (GUI, Web notebook or console) to create a local disk table:
-```
-login(`admin,`123456)
-dbPath = "dfs://SAMPLE_TRDDB";
-tableName = `demoTable
-db = database(dbPath, VALUE, 2010.01.01..2010.01.30)
-pt=db.createPartitionedTable(table(1000000:0,`name`date`price,[STRING,DATE,DOUBLE]),tableName,`date)
-```
-`database`: create a partitioned database with the specified partition scheme.
-`createPartitionedTable`: create a distributed table.
-
-##### 6.3.2 Save data to a distributed table
-
-```
-string script;
-TableSP table = createDemoTable();
-conn.upload("mt",table);
-script += "login(`admin,`123456);";
-script += "dbPath = \"dfs://SAMPLE_TRDDB\";";
-script += "tableName = `demoTable;";
-script += "database(dbPath).loadTable(tableName).append!(mt);";
-script += "select * from database(dbPath).loadTable(tableName);";
-TableSP result = conn.run(script);
-cout<<result->getString()<<endl;
-```
-`append!` saves the data to a distributed table and saves to disk.
-
-For more on the C++ API, please refer to the interface provided in the header file.
-
+---
 # C++ Streaming API
 
-DolphinDB C++ Streaming API supports three types of computing modelings: single threading, pooled threading, and polling.
+DolphinDB C++ Streaming API processes streaming data in 3 ways: ThreadedClient, ThreadPooledClient and PollingClient.
 
-For details, please refer to `test/StreamingThreadedClientTester.cpp`, `test/StreamingThreadPooledClientTester.cpp`, and `test/StreamingPollingClientTester.cpp`.
+For details, please refer to test/StreamingThreadedClientTester.cpp, test/StreamingThreadPooledClientTester.cpp and test/StreamingPollingClientTester.cpp.
 
 ### 1. Build
-
-With `cmake` using provided `CMakeLists.txt`, you can build three test examples, which can work on both Windows and Linux.
-
-**Note:** [cmake](https://cmake.org/) is a popular project build tool that helps solve third-party dependencies.
 
 #### 1.1 Linux64
 
@@ -370,7 +543,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ../path_to_api-cplusplus/
 make -j`nproc`
 ```
 
-The three test executables will be generated after the compilation.
+3 executables will be generated after the compilation.
 
 #### 1.2 Build under Windows with MinGW
 
@@ -382,40 +555,42 @@ cmake -DCMAKE_BUILD_TYPE=Release `path_to_api-cplusplus` -G "MinGW Makefiles"
 mingw32-make -j `nproc`
 ```
 
-Three test executables will be generated after the compilation.
+3 executables will be generated after the compilation.
 
-**Note:** Before compiling, remember to copy `libDolphinDBAPI.dll` to the build directory.
+**Note:** Before compiling, copy libDolphinDBAPI.dll to the build directory.
 
-**Note:** Before running, remember to copy `libDolphinDBAPI.dll` and `libgcc_s_seh-1.dll` to the same directory as that of your executable file.
+**Note:** Before running, copy libDolphinDBAPI.dll and libgcc_s_seh-1.dll to the directory of your executable file.
 
-### 2. User-API
+### 2. API
 
 #### 2.1 ThreadedClient
 
-`ThreadedClient` starts a single thread calling for an user-defined handler on each incoming message.
+ThreadedClient produces a single thread that calls for a user-defined handler on each incoming message.
 
-##### 2.1.1 `ThreadedClient::ThreadClient(int listeningPort);`
+##### 2.1.1 Define the threaded client
 
+```
+ThreadedClient::ThreadClient(int listeningPort);
+```
 ###### Parameters
 
-- `listeningPort`: the subscription port number of the threaded client.
+- listeningPort: the subscription port number of the threaded client.
 
-##### 2.1.2 `ThreadSP ThreadedClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);`
+##### 2.1.2  Subscribe
 
-###### Parameters
+```
+ThreadSP ThreadedClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
+```
+- host: the hostname of the server.
+- port: the port number of the server.
+- handler: the user-defined function that is called on every incoming message. The input of the function is a message and function result must be void. Each message is a row of the streaming table. 
+- tableName: a string indicating the name of the shared streaming table on the server.
+- actionName: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
+- offset: the position of the first message to subscribe. If 'offset' is unspecified, or negative, or beyond the number of rows in the streaming table, the subscription starts from the first row. 'offset' is relative to the first row of the streaming table when it is created. If some rows were cleared from memory due to cache size limit, they are still considered in determining where the subscription starts.
+- resub: a bool indicating whether to resubscribe after the subscription is interrupted.
+- filter: a vector of selected values in the filtering column. Only the messages with the specified filtering column values are subscribed. The filtering column is set with function `setStreamTableFilterColumn`.
 
-- `host`: the hostname of the server.
-- `port`: the port number of the server.
-- `handler`: the user-defined callback function called on every incoming message. The input of the function is a `Message` and the return type of the function must be `void`. Each `Message` is a single row.
-- `tableName`: a string indicating the name of the shared streaming table on the server.
-- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
-- `offset`: the position of the first message to subscribe. A message is a row of the streaming table. If offset is unspecified, or negative, or more than the number of rows in the streaming table, the subscription starts from the first row. The offset is relative to the first row of the streaming table when it is created. If some rows were cleared from memory due to cache size limit, they are still considered in determining where the subscription starts.
-- `resub`: a bool indicating whether to resubscribe when network failure happens.
-- `filter`: a vector of selected values in the filtering column. Only the messages with specified filtering column values are subscribed. The filtering column is set with function `setStreamTableFilterColumn`.
-
-###### Returns
-
--  a `ThreadSP` point to the handler loop thread, which will stop when `unsubscribe` to the same topic is called.
+ThreadSP points to the handler loop thread, which will stop when function `unsubscribe` on the same topic is called.
 
 ###### Example
 
@@ -426,45 +601,37 @@ auto t = client.subscribe(host, port, [](Message msg) {
 t->join();
 ```
 
-##### 2.1.3 `void ThreadClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);`
+##### 2.1.3 Unsubscribe
+```
+void ThreadClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
+```
+Unsubscribe from a topic.
 
-Unsubscribe a topic if already subscribed.
-
-###### Parameters
-
-- `host`: the hostname of the server.
-- `port`: the port number of the server.
-- `tableName`: a string indicating the name of the shared streaming table on the server.
-- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits and underscores.
+- host: the hostname of the server.
+- port: the port number of the server.
+- tableName: a string indicating the name of the shared streaming table on the server.
+- actionName: a string indicating the name assigned to the subscription task. It can have letters, digits and underscores.
 
 <!-- /////////////////////////////////////////////////////////////////////// -->
 
 #### 2.2 ThreadPooledClient
 
-Start n (user-defined) threads at once, poll and call handler simutaneously.
+ThreadPooledClient produces multiple threads that poll and call a user-defined handler simultaneously on each incoming message.
 
-##### 2.2.1 `ThreadPooledClient::ThreadPooledClient(int listeningPort, int threadCount);`
+##### 2.2.1 Define ThreadPooledClient
+```
+ThreadPooledClient::ThreadPooledClient(int listeningPort, int threadCount);
+```
+- listeningPort: the subscription port number of the threadpooled client node.
+- threadCount: the size of the thread pool.
 
-###### Parameters
+##### 2.2.2 Subscribe
+```
+vector<ThreadSP> ThreadPooledClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
+```
+For explanation of the parameters, please check section 2.1.2.
 
-- `listeningPort`: the subscription port number of the client node.
-- `threadCount`: the size of the thread pool.
-
-##### 2.2.2 `vector<ThreadSP> ThreadPooledClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);`
-
-###### Parameters
-
-- `host`: the hostname of the server.
-- `port`: the port number of the server.
-- `handler`: the user-defined callback function called on every incoming message. The input of the function is a `Message` and the return type of the function must be `void`. Each `Message` is a single row.
-- `tableName`: a string indicating the name of the shared streaming table on the server.
-- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
-- `offset`: the position of the first message to subscribe. A message is a row of the streaming table. If offset is unspecified, or negative, or more than the number of rows in the streaming table, the subscription starts from the first row. The offset is relative to the first row of the streaming table when it is created. If some rows were cleared from memory due to cache size limit, they are still considered in determining where the subscription starts.
-- `resub`: a bool indicating whether to resubscribe when network failure happens.
-- `filter`: a vector of selected values in the filtering column. Only the messages with specified filtering column values are subscribed. The filtering column is set with function `setStreamTableFilterColumn`.
-
-###### Returns
--  a vector of `ThreadSP` pointers, each of them point to a handler loop thread, and will stop when `unsubscribe` to the same topic is called.
+Return a vector of ThreadSP pointers, each of them points to a handler loop thread that will stop when `unsubscribe` on the same topic is called.
 
 ###### Example
 
@@ -477,47 +644,35 @@ for(auto& t : vec) {
 }
 ```
 
-##### 2.2.3 `void ThreadPooledClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);`
+##### 2.2.3 Unsubscribe
+```
+void ThreadPooledClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
+```
+Unsubscribe from a topic. 
 
-Unsubscribe a topic if already subscribed.
-
-###### Parameters
-
-- `host`: the hostname of the server.
-- `port`: the port number of the server.
-- `tableName`: a string indicating the name of the shared streaming table on the server.
-- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
+For explanation of the parameters, please check section 2.1.3.
 
 
 <!-- /////////////////////////////////////////////////////////////////////// -->
 
 #### 2.3 PollingClient
 
-When user subscribes a topic, a blocking message queue is returned, from which user can poll messages and handle it by themselves.
+PollingClient returns a message queue, from which user can retrieve and process the messages.
 
-##### 2.3.1 `PollingClient::PollingClient(int listeningPort);`
+##### 2.3.1 Define PollingClient
+```
+PollingClient::PollingClient(int listeningPort);
+```
+- listeningPort: the subscription port number of the polling client node.
 
-###### Parameters
+##### Subscribe
+```
+2.3.2 MessageQueueSP PollingClient::subscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
+```
+For explanation of the parameters, please check section 2.1.2.
 
-- `listeningPort`: the subscription port number of the client node.
+MessageQueueSP points to a MessageQueue, where user can poll messages from the server.
 
-##### 2.3.2 `MessageQueueSP PollingClient::subscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);`
-
-###### Parameters
-
-- `host`: hostname of the server.
-- `port`: port number of the server.
-- `tableName`: a string indicating the name of the shared streaming table on the server.
-- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits and underscores.
-- `offset`: the position of the first message to subscribe. A message is row of the streaming table. If offset is unspecified, or negative, or above the number of rows of the streaming table, the subscription starts from the first row of the streaming table. The offset is relative to the first row of the streaming table when it is created. If some rows were cleared from memory due to cache size limit, they are still considered in determining where the subscription starts.
-- `resub`: a bool indicating whether to resubscribe when network failure happens.
-- `filter`: a vector of selected values in the filtering column. Only the messages with specified filtering column values are subscribed. The filtering column is set with function `setStreamTableFilterColumn`.
-
-###### Returns
-
-- `MessageQueueSP`: point to a `MessageQueue`, where user can poll messages from the server.
-
-**Note**: when `unsubscribe` is called, a NULL pointer will be pushed into the queue, user needs to handle this situation.
 
 ###### Example
 
@@ -532,13 +687,12 @@ while(true) {
 }
 ```
 
-##### 2.3.3 `void PollingClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);`
+##### 2.3.3 Unsubscribe
+```
+void PollingClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
+```
+Unsubscribe from a topic.
 
-Unsubscribe a topic if already subscribed.
+For explanation of the parameters, please check section 2.1.3.
 
-###### Parameters
-
-- `host`: the hostname of the server.
-- `port`: the port number of the server.
-- `tableName`: a string indicating the name of the shared streaming table on the server.
-- `actionName`: a string indicating the name assigned to the subscription task. It can have letters, digits, and underscores.
+**Note**: when `unsubscribe` is called, a NULL pointer will be pushed into the queue. Users need to handle this situation.
