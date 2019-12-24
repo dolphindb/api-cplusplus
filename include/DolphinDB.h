@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <memory>
 #include <chrono>
+#include <cstring>
 
 #include "Types.h"
 #include "SmartPointer.h"
@@ -27,6 +28,13 @@
 	#define EXPORT_DECL _declspec(dllexport)
 #else
 	#define EXPORT_DECL 
+#endif
+#if defined(__GNUC__) && __GNUC__ >= 4
+#define LIKELY(x) (__builtin_expect((x), 1))
+#define UNLIKELY(x) (__builtin_expect((x), 0))
+#else
+#define LIKELY(x) (x)
+#define UNLIKELY(x) (x)
 #endif
 
 using std::string;
@@ -62,23 +70,79 @@ typedef SmartPointer<ConstantUnmarshall> ConstantUnmarshallSP;
 
 class Guid {
 public:
-	Guid(bool newGuid);
+	Guid(bool newGuid = false);
 	Guid(unsigned char* guid);
 	Guid(const string& guid);
 	Guid(const Guid& copy);
-	bool operator==(const Guid &other) const;
-	bool operator!=(const Guid &other) const;
-	bool operator<(const Guid &other) const;
-	bool operator>(const Guid &other) const;
+	Guid(unsigned long long high, unsigned long long low){
+#ifndef BIGENDIANNESS
+		memcpy((char*)uuid_, (char*)&low, 8);
+		memcpy((char*)uuid_ + 8, (char*)&high, 8);
+#else
+		memcpy((char*)uuid_, (char*)&high, 8);
+		memcpy((char*)uuid_ + 8, (char*)&low, 8);
+#endif
+	}
+	inline bool operator==(const Guid &other) const {
+		const unsigned char* a = (const unsigned char*)uuid_;
+		const unsigned char* b = (const unsigned char*)other.uuid_;
+		return (*(long long*)a) == (*(long long*)b) && (*(long long*)(a+8)) == (*(long long*)(b+8));
+	}
+	inline bool operator!=(const Guid &other) const {
+		const unsigned char* a = (const unsigned char*)uuid_;
+		const unsigned char* b = (const unsigned char*)other.uuid_;
+		return (*(long long*)a) != (*(long long*)b) || (*(long long*)(a+8)) != (*(long long*)(b+8));
+	}
+	inline bool operator<(const Guid &other) const {
+		const unsigned char* a = (const unsigned char*)uuid_;
+		const unsigned char* b = (const unsigned char*)other.uuid_;
+#ifndef BIGENDIANNESS
+		return (*(unsigned long long*)(a+8)) < (*(unsigned long long*)(b+8)) || ((*(unsigned long long*)(a+8)) == (*(unsigned long long*)(b+8)) && (*(unsigned long long*)a) < (*(unsigned long long*)b));
+#else
+		return (*(unsigned long long*)a) < (*(unsigned long long*)b) || ((*(unsigned long long*)a) == (*(unsigned long long*)b) && (*(unsigned long long*)(a+8)) < (*(unsigned long long*)(b+8)));
+#endif
+	}
+	inline bool operator>(const Guid &other) const {
+		const unsigned char* a = (const unsigned char*)uuid_;
+		const unsigned char* b = (const unsigned char*)other.uuid_;
+#ifndef BIGENDIANNESS
+		return (*(unsigned long long*)(a+8)) > (*(unsigned long long*)(b+8)) || ((*(unsigned long long*)(a+8)) == (*(unsigned long long*)(b+8)) && (*(unsigned long long*)a) > (*(unsigned long long*)b));
+#else
+		return (*(unsigned long long*)a) > (*(unsigned long long*)b) || ((*(unsigned long long*)a) == (*(unsigned long long*)b) && (*(unsigned long long*)(a+8)) > (*(unsigned long long*)(b+8)));
+#endif
+	}
+	inline bool operator<=(const Guid &other) const {
+		const unsigned char* a = (const unsigned char*)uuid_;
+		const unsigned char* b = (const unsigned char*)other.uuid_;
+#ifndef BIGENDIANNESS
+		return (*(unsigned long long*)(a+8)) < (*(unsigned long long*)(b+8)) || ((*(unsigned long long*)(a+8)) == (*(unsigned long long*)(b+8)) && (*(unsigned long long*)a) <= (*(unsigned long long*)b));
+#else
+		return (*(unsigned long long*)a) < (*(unsigned long long*)b) || ((*(unsigned long long*)a) == (*(unsigned long long*)b) && (*(unsigned long long*)(a+8)) <= (*(unsigned long long*)(b+8)));
+#endif
+	}
+	inline bool operator>=(const Guid &other) const {
+		const unsigned char* a = (const unsigned char*)uuid_;
+		const unsigned char* b = (const unsigned char*)other.uuid_;
+#ifndef BIGENDIANNESS
+		return (*(unsigned long long*)(a+8)) > (*(unsigned long long*)(b+8)) || ((*(unsigned long long*)(a+8)) == (*(unsigned long long*)(b+8)) && (*(unsigned long long*)a) >= (*(unsigned long long*)b));
+#else
+		return (*(unsigned long long*)a) > (*(unsigned long long*)b) || ((*(unsigned long long*)a) == (*(unsigned long long*)b) && (*(unsigned long long*)(a+8)) >= (*(unsigned long long*)(b+8)));
+#endif
+	}
+	inline int compare(const Guid &other) const { return (*this < other) ? -1 : (*this > other ? 1 : 0);}
 	inline unsigned char operator[](int i) const { return uuid_[i];}
 	bool isZero() const;
+	inline bool isNull() const {
+		const unsigned char* a = (const unsigned char*)uuid_;
+		return (*(long long*)a) == 0 && (*(long long*)(a+8)) == 0;
+	}
+	inline bool isValid() const {
+		const unsigned char* a = (const unsigned char*)uuid_;
+		return (*(long long*)a) != 0 || (*(long long*)(a+8)) != 0;
+	}
     string getString() const;
     inline const unsigned char* bytes() const { return uuid_;}
-
-private:
-    unsigned char hexDigitToChar(char ch) const;
-    inline unsigned char hexPairToChar(char a, char b) const { return hexDigitToChar(a) * 16 + hexDigitToChar(b);}
-    void charToHexPair(unsigned char ch, char* buf) const;
+    static string getString(const unsigned char* guid);
 
 private:
 	unsigned char uuid_[16];
@@ -143,8 +207,11 @@ public:
 	virtual string getString() const {return "";}
 	virtual string getScript() const { return getString();}
 	virtual const string& getStringRef() const {return EMPTY;}
-    virtual const Guid getUuid() const {throw RuntimeException("The object can't be converted to uuid scalar.");}
+    virtual const Guid getUuid() const {return getInt128();}
+    virtual const Guid getInt128() const {throw RuntimeException("The object can't be converted to uuid scalar.");}
+    virtual const unsigned char* getBinary() const {throw RuntimeException("The object can't be converted to int128 scalar.");}
 	virtual bool isNull() const {return false;}
+	virtual unsigned int getHash() const {return 0;}
 
 	virtual void setBool(char val){}
 	virtual void setChar(char val){}
@@ -155,6 +222,7 @@ public:
 	virtual void setFloat(float val){}
 	virtual void setDouble(double val){}
 	virtual void setString(const string& val){}
+	virtual void setBinary(const unsigned char* val, int unitLength){}
 	virtual void setNull(){}
 
 	virtual char getBool(INDEX index) const {return getBool();}
@@ -191,6 +259,8 @@ public:
 	virtual bool getDouble(INDEX start, int len, double* buf) const {return false;}
 	virtual bool getString(INDEX start, int len, string** buf) const {return false;}
 	virtual bool getString(INDEX start, int len, char** buf) const {return false;}
+	virtual bool getBinary(INDEX start, int len, int unitLength, unsigned char* buf) const {return false;}
+	virtual bool getHash(INDEX start, int len, unsigned int* buf) const {return false;}
 
 	virtual const char* getBoolConst(INDEX start, int len, char* buf) const {throw RuntimeException("getBoolConst method not supported");}
 	virtual const char* getCharConst(INDEX start, int len,char* buf) const {throw RuntimeException("getCharConst method not supported");}
@@ -202,6 +272,7 @@ public:
 	virtual const double* getDoubleConst(INDEX start, int len, double* buf) const {throw RuntimeException("getDoubleConst method not supported");}
 	virtual string** getStringConst(INDEX start, int len, string** buf) const {throw RuntimeException("getStringConst method not supported");}
 	virtual char** getStringConst(INDEX start, int len, char** buf) const {throw RuntimeException("getStringConst method not supported");}
+	virtual const unsigned char* getBinaryConst(INDEX start, int len, int unitLength, unsigned char* buf) const {throw RuntimeException("getBinaryConst method not supported");}
 
 	virtual char* getBoolBuffer(INDEX start, int len, char* buf) const {return buf;}
 	virtual char* getCharBuffer(INDEX start, int len,char* buf) const {return buf;}
@@ -211,6 +282,7 @@ public:
 	virtual INDEX* getIndexBuffer(INDEX start, int len, INDEX* buf) const {return buf;}
 	virtual float* getFloatBuffer(INDEX start, int len, float* buf) const {return buf;}
 	virtual double* getDoubleBuffer(INDEX start, int len, double* buf) const {return buf;}
+	virtual unsigned char* getBinaryBuffer(INDEX start, int len, int unitLength, unsigned char* buf) const {return buf;}
 	virtual void* getDataBuffer(INDEX start, int len, void* buf) const {return buf;}
 
     virtual int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const {throw RuntimeException("serialize method not supported");}
@@ -226,6 +298,7 @@ public:
 	virtual void setFloat(INDEX index,float val){setFloat(val);}
 	virtual void setDouble(INDEX index, double val){setDouble(val);}
 	virtual void setString(INDEX index, const string& val){setString(val);}
+	virtual void setBinary(INDEX index, int unitLength, const unsigned char* val){setBinary(val, unitLength);}
 	virtual void setNull(INDEX index){setNull();}
 
 	virtual bool set(INDEX index, const ConstantSP& value){return false;}
@@ -248,6 +321,7 @@ public:
 	virtual bool setDouble(INDEX start, int len, const double* buf){return false;}
 	virtual bool setString(INDEX start, int len, const string* buf){return false;}
 	virtual bool setString(INDEX start, int len, char** buf){return false;}
+	virtual bool setBinary(INDEX start, int len, int unitLength, const unsigned char* buf){return false;}
 	virtual bool setData(INDEX start, int len, void* buf) {return false;}
 
 	virtual bool add(INDEX start, INDEX length, long long inc) { return false;}
@@ -547,7 +621,7 @@ public:
 	 * will be performed along with connecting. If one would send userId and password in encrypted mode,
 	 * please use the login function for authentication separately.
 	 */
-	bool connect(const string& hostName, int port, const string& userId = "", const string& password = "", const string& initialScript = "", bool highAvailability = false);
+	bool connect(const string& hostName, int port, const string& userId = "", const string& password = "", const string& initialScript = "", bool highAvailability = false, const vector<string>& highAvailabilitySites = vector<string>());
 
 	/**
 	 * Log onto the DolphinDB server using the given userId and password. If the parameter enableEncryption
@@ -592,6 +666,10 @@ public:
 	 */
 	static void initialize();
 
+	void setInitScript(const string& script);
+
+	const string& getInitScript() const;
+
 private:
     DBConnection(DBConnection& oth); // = delete
     DBConnection& operator=(DBConnection& oth); // = delete
@@ -606,7 +684,7 @@ private:
     string pwd_;
     string initialScript_;
     bool ha_;
-    const int maxRerunCnt_ = 30;
+    static const int maxRerunCnt_ = 30;
     ConstantSP nodes_;
 };
 

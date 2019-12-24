@@ -48,6 +48,7 @@ public:
 	static int SEQUENCE_SEARCH_NUM_THRESHOLD;
 	static double SEQUENCE_SEARCH_RATIO_THRESHOLD;
 	static int MAX_LENGTH_FOR_ANY_VECTOR;
+	static const bool LITTLE_ENDIAN_ORDER;
 
 private:
 	static int cumMonthDays[13];
@@ -108,6 +109,25 @@ public:
 	}
 	static Vector* createIndexVector(INDEX start, INDEX length);
 	static Vector* createIndexVector(INDEX length, bool arrayOnly);
+
+	/**
+	 * Convert unsigned byte sequences to hex string.
+	 *
+	 * littleEndian: if true, the first byte is the least significant and should be printed at the most right.
+	 * str: the length of buffer must be at least 2 * len.
+	 */
+	static void toHex(const unsigned char* data, int len, bool littleEndian, char* str);
+	/**
+	 * Convert hex string to unsigned byte sequences.
+	 *
+	 * len: must be a positive even number.
+	 * littleEndian: if true, the first byte is the least significant, i.e. the leftmost characters would be converted to the rightmost byte.
+	 * data: the length of buffer must be at least len/2
+	 */
+	static bool fromHex(const char* str, int len, bool littleEndian, unsigned char* data);
+
+	static void toGuid(const unsigned char*, char* str);
+	static bool fromGuid(const char* str, unsigned char* data);
 
 	static DATA_TYPE convertToIntegralDataType(DATA_TYPE type);
 	static long long getTemporalConversionRatio(DATA_TYPE first, DATA_TYPE second);

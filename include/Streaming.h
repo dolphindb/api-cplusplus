@@ -17,7 +17,7 @@ using MessageQueue = BlockingQueue<Message>;
 using MessageQueueSP = SmartPointer<MessageQueue>;
 using MessageHandler = std::function<void(Message)>;
 
-char const *DEFAULT_ACTION_NAME = "cppStreamingAPI";
+extern char const *DEFAULT_ACTION_NAME;
 
 template <typename T>
 class BlockingQueue {
