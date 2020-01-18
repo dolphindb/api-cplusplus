@@ -211,7 +211,7 @@ public:
     virtual const Guid getInt128() const {throw RuntimeException("The object can't be converted to uuid scalar.");}
     virtual const unsigned char* getBinary() const {throw RuntimeException("The object can't be converted to int128 scalar.");}
 	virtual bool isNull() const {return false;}
-	virtual unsigned int getHash() const {return 0;}
+	virtual int getHash(int buckets) const {return -1;}
 
 	virtual void setBool(char val){}
 	virtual void setChar(char val){}
@@ -260,7 +260,7 @@ public:
 	virtual bool getString(INDEX start, int len, string** buf) const {return false;}
 	virtual bool getString(INDEX start, int len, char** buf) const {return false;}
 	virtual bool getBinary(INDEX start, int len, int unitLength, unsigned char* buf) const {return false;}
-	virtual bool getHash(INDEX start, int len, unsigned int* buf) const {return false;}
+	virtual bool getHash(INDEX start, int len, int buckets, int* buf) const {return false;}
 
 	virtual const char* getBoolConst(INDEX start, int len, char* buf) const {throw RuntimeException("getBoolConst method not supported");}
 	virtual const char* getCharConst(INDEX start, int len,char* buf) const {throw RuntimeException("getCharConst method not supported");}
