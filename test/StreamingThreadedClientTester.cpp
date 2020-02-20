@@ -9,8 +9,16 @@ using namespace std::chrono;
 #define usleep(x) Sleep(x)
 #endif
 
-// const string host = "115.239.209.189";
-// const int serverport = 18202;
+class Executor : public dolphindb::Runnable {
+    using Func = std::function<void()>;
+
+public:
+    explicit Executor(Func f) : func_(std::move(f)){};
+    void run() override { func_(); };
+
+private:
+    Func func_;
+};
 
 
 /* test-suite

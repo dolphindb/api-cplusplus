@@ -52,7 +52,7 @@ public:
         while (size_ == 0) {
             if (!empty_.wait(lock_, milliSeconds)) return false;
         }
-        item = move(buf_[head_]);
+        item = std::move(buf_[head_]);
         buf_[head_] = T();
         head_ = (head_ + 1) % capacity_;
         --size_;
