@@ -22,7 +22,7 @@ struct parameter {
   long nTime;
 };
 
-void ShowUsage() {
+void showUsage() {
   cout << "DolpinDB Multi-threaded streaming date writing program" << endl;
   cout << "Usage example:--h=127.0.0.1 --p=8921 --c=1000 --n=5 --t=5 " << endl;
   cout << "Options :" << endl;
@@ -40,12 +40,7 @@ void ShowUsage() {
   cout << " --help Print this help." << endl;
   return;
 }
-/*
- *
- st=streamTable(n:0,`id`cbool`cchar`cshort`cint`clong`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cfloat`cdouble`csymbol`cstring`cuuid`cip`cint128,
-        [LONG,BOOL,CHAR,SHORT,INT,LONG,DATE,MONTH,TIME,MINUTE,SECOND,DATETIME,TIMESTAMP,NANOTIME,NANOTIMESTAMP,FLOAT,DOUBLE,SYMBOL,STRING,UUID,IPADDR,INT128])
-        enableTableShareAndPersistence(st,subTableName,true,false,1000000)
- * */
+
 TableSP createDemoTable(long rows) {
   vector<string> colNames = {
       "id",      "cbool",     "cchar",      "cshort",    "cint",
@@ -82,8 +77,7 @@ TableSP createDemoTable(long rows) {
     columnVecs[11]->setInt(i, 1577836800 + i);      // 2020.01.01 00:00:00+i
     columnVecs[12]->setLong(i, 1577836800000l + i); // 2020.01.01 00:00:00+i
     columnVecs[13]->setLong(i, i);
-    columnVecs[14]->setLong(i, 1577836800000000000l +
-                                   i); // 2020.01.01 00:00:00.000000000+i
+    columnVecs[14]->setLong(i, 1577836800000000000l +i); // 2020.01.01 00:00:00.000000000+i
     columnVecs[15]->setFloat(i, i);
     columnVecs[16]->setDouble(i, i);
     columnVecs[17]->setString(i, "sym" + to_string(i));
@@ -128,7 +122,7 @@ int main(int argc, char *argv[]) {
 
   if (argc < 2) {
     cout << "No arguments, you MUST give an argument at least!" << endl;
-    ShowUsage();
+    showUsage();
     return -1;
   }
 
@@ -140,8 +134,7 @@ int main(int argc, char *argv[]) {
 
   while (nOptionIndex < argc) {
 
-    if (strncmp(argv[nOptionIndex], "--c=", 4) ==
-        0) { // get records number per threads
+    if (strncmp(argv[nOptionIndex], "--c=", 4) == 0) { // get records number per threads
       cString = &argv[nOptionIndex][4];
     } else if (strncmp(argv[nOptionIndex], "--h=", 4) == 0) { // get host
       hString = &argv[nOptionIndex][4];
@@ -152,7 +145,7 @@ int main(int argc, char *argv[]) {
     } else if (strncmp(argv[nOptionIndex], "--t=", 4) == 0) { // get thread
       tString = &argv[nOptionIndex][4];
     } else if (strncmp(argv[nOptionIndex], "--help", 6) == 0) { // help
-      ShowUsage();
+      showUsage();
       return 0;
     } else {
       cout << "Options '" << argv[nOptionIndex] << "' not valid. Run '"
@@ -164,7 +157,7 @@ int main(int argc, char *argv[]) {
 
   if (cString.empty()) {
     cout << "--c is required" << endl;
-    ShowUsage();
+    showUsage();
     return -1;
   } else {
     cSS << cString;
@@ -172,14 +165,14 @@ int main(int argc, char *argv[]) {
   }
   if (pString.empty()) {
     cout << "--p is required" << endl;
-    ShowUsage();
+    showUsage();
     return -1;
   } else {
     vPort = Util::split(pString, ',');
   }
   if (hString.empty()) {
     cout << "--h is required" << endl;
-    ShowUsage();
+    showUsage();
     return -1;
   } else {
     vHost = Util::split(hString, ',');
@@ -200,7 +193,7 @@ int main(int argc, char *argv[]) {
   if (vHost.size() != vPort.size()) {
     cout << "The number of host and port must be the same! " << vHost.size()
          << ":" << vPort.size() << endl;
-    ShowUsage();
+    showUsage();
     return -1;
   }
   try {

@@ -1,13 +1,13 @@
-CFLAGS = -g -Wall -std=c++11 -fPIC -DLINUX -DLOGGING_LEVEL_2 -DLINUX -O0 
+CFLAGS = -g -Wall -std=c++11 -fPIC -DLINUX -DLOGGING_LEVEL_2 -DLINUX -O2 
 INCLUDES= -I../../include
-OBJS=dfsWriting.o
+OBJS=DFSWriting.o
 
 all: $(OBJS)
-	g++ -L../../bin/linux_x64 -L../../bin/mingw_x64 -L../../bin/vx2017_x64 $(OBJS) $(CFLAGS)  -lDolphinDBAPI -lssl  -lpthread -luuid -L../../bin  -Wl,-rpath,.:../../bin/linux_x64/ -o dfsWriting 
-dfsWriting.o: dfsWriting.cpp
-	g++ $(CFLAGS) $(INCLUDES) -c dfsWriting.cpp -o dfsWriting.o
+	g++ -L../../bin/linux_x64 -L../../bin/mingw_x64 -L../../bin/vx2017_x64 $(OBJS) $(CFLAGS)  -lDolphinDBAPI -lssl  -lpthread -luuid -L../../bin  -Wl,-rpath,.:../../bin/linux_x64/ -o DFSWriting 
+DFSWriting.o: DFSWriting.cpp
+	g++ $(CFLAGS) $(INCLUDES) -c DFSWriting.cpp -o DFSWriting.o
 clean:
-	rm *.o dfsWriting  core -rf
+	rm *.o DFSWriting  core -rf
 	
 	
 	

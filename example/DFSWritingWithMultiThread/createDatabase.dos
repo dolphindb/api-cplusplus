@@ -1,3 +1,4 @@
+// create database
 def createL3DB(dbName,tableName){
 	 login("admin","123456")
 	 db1 = database("", VALUE, datehour(2019.09.11T00:00:00)..datehour(2019.12.30T00:00:00) )//starttime,  newValuePartitionPolicy=add
@@ -8,12 +9,8 @@ def createL3DB(dbName,tableName){
  	db.createPartitionedTable(data,tableName,`starttime`source_address`destination_address)
 }
 login("admin","123456")
-//dropDatabase("dfs://natlog")
-
-// create database
 createL3DB("dfs://natlog","natlogrecords")
 
-dfsTable=loadTable("dfs://natlog","natlogrecords")  
-select count(*)  from dfsTable 
-select top 10  *  from dfsTable 
+  
+select count(*)  from loadTable("dfs://natlog","natlogrecords") 
 

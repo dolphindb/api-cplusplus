@@ -690,4 +690,13 @@ private:
 
 };
 
+namespace std {
+template<>
+struct hash<dolphindb::Guid> {
+	size_t operator()(const dolphindb::Guid& val) const;
+};
+
+};
+
+
 #endif /* DOLPHINDB_H_ */

@@ -24,7 +24,7 @@ struct parameter {
   long nStarttime;
 };
 
-void ShowUsage() {
+void showUsage() {
   cout << "DolpinDB Multi-threaded performance test program" << endl;
   cout << "Usage example:--h=127.0.0.1 --p=8921 --c=1000 --n=5 --t=5 "
           "--s=1579080800000"
@@ -87,9 +87,7 @@ TableSP createDemoTable(long rows, long startPartition, long partitionCount,
   unsigned char ip[16] = {0};
   for (int i = 0; i < rowNum; i++) {
     columnVecs[0]->setString(i, "10.189.45.2:9000");
-    columnVecs[1]->setString(
-        i, std::to_string(
-               startPartition)); //"FWLOG_IOT22502_20190827110710_0000.DAT"));
+    columnVecs[1]->setString(i, std::to_string(startPartition)); 
     columnVecs[2]->setBinary(i, 16, sip);
     columnVecs[3]->setInt(i, 1 * i);
     memcpy(ip, (unsigned char *)&i, 4);
@@ -140,7 +138,7 @@ int main(int argc, char *argv[]) {
 
   if (argc < 2) {
     cout << "No arguments, you MUST give an argument at least!" << endl;
-    ShowUsage();
+    showUsage();
     return -1;
   }
 
@@ -152,8 +150,7 @@ int main(int argc, char *argv[]) {
 
   while (nOptionIndex < argc) {
 
-    if (strncmp(argv[nOptionIndex], "--c=", 4) ==
-        0) { // get records number per threads
+    if (strncmp(argv[nOptionIndex], "--c=", 4) == 0) { // get records number per threads
       cString = &argv[nOptionIndex][4];
     } else if (strncmp(argv[nOptionIndex], "--h=", 4) == 0) { // get host
       hString = &argv[nOptionIndex][4];
@@ -166,7 +163,7 @@ int main(int argc, char *argv[]) {
     } else if (strncmp(argv[nOptionIndex], "--s=", 4) == 0) { // get start time
       sString = &argv[nOptionIndex][4];
     } else if (strncmp(argv[nOptionIndex], "--help", 6) == 0) { // help
-      ShowUsage();
+      showUsage();
       return 0;
     } else {
       cout << "Options '" << argv[nOptionIndex] << "' not valid. Run '"
@@ -178,7 +175,7 @@ int main(int argc, char *argv[]) {
 
   if (cString.empty()) {
     cout << "--c is required" << endl;
-    ShowUsage();
+    showUsage();
     return -1;
   } else {
     cSS << cString;
@@ -186,16 +183,14 @@ int main(int argc, char *argv[]) {
   }
   if (pString.empty()) {
     cout << "--p is required" << endl;
-    ShowUsage();
+    showUsage();
     return -1;
   } else {
-    // pSS << pString;
-    // pSS >> pLong;
     vPort = Util::split(pString, ',');
   }
   if (hString.empty()) {
     cout << "--h is required" << endl;
-    ShowUsage();
+    showUsage();
     return -1;
   } else {
     vHost = Util::split(hString, ',');
@@ -221,14 +216,14 @@ int main(int argc, char *argv[]) {
   }
   if (tLong > BUCKETS) {
     cout << "The number of threads must be less than " << BUCKETS << endl;
-    ShowUsage();
+    showUsage();
     return -1;
   }
 
   if (vHost.size() != vPort.size()) {
     cout << "The number of host and port must be the same! " << vHost.size()
          << ":" << vPort.size() << endl;
-    ShowUsage();
+    showUsage();
     return -1;
   }
   try {
@@ -271,8 +266,7 @@ int main(int argc, char *argv[]) {
   long long endTime = Util::getEpochTime();
   long long rowCount = cLong * nLong * tLong;
   cout << "Inserted " << rowCount
-       << " rows, took a total of  " + std::to_string(endTime - startTime) +
-              " ms.  "
+       << " rows, took a total of  " + std::to_string(endTime - startTime) + " ms.  "
        << rowCount / (endTime - startTime) * 1000 / 10000 << " w/s " << endl;
   long timeSum = arg[0].nTime;
   for (int i = 1; i < tLong; ++i) {

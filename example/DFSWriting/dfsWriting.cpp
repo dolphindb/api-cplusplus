@@ -4,264 +4,183 @@
 #include <sstream>
 #include <string>
 #include <sys/time.h>
+//#include <string.h>
 
 using namespace dolphindb;
 using namespace std;
 
-void ShowUsage() {
-  cout << "DolpinDB DFS writing demo" << endl;
-  cout << "Usage example:--h=127.0.0.1 --p=8921 --c=1000 --n=5 --s= " << endl;
-  cout << "Options :" << endl;
-  cout << " --h=127.0.0.1 Mandatory,dolphindb host" << endl;
-  cout << " --p=8921 Mandatory,dolphindb port" << endl;
-  cout << " --c=1000 Mandatory,The number of records inserted per batch"
-       << endl;
-  cout << " --n=5 Optional,batches,default is 1" << endl;
-  cout << " --s=1574380800 Optional,start time,default is now:"
-       << Util::getEpochTime() / 1000 << endl;
-  cout << " --help Print this help." << endl;
-  return;
-}
-
-TableSP createDemoTable1(long rows, long startTime, int timeInc) {
-  vector<string> colNames = {"timestamp",      "areaId",
-                             "deviceId",       "onlineStatus",
-                             "offlineReason",  "workStatus",
-                             "signalStatus",   "loginStatus",
-                             "detected",       "onlineStatusChangeTime",
-                             "devCurrentTime", "ntpTime",
-                             "clockDeviation", "clockStatusChangeTime",
-                             "clockStatus",    "statusErrorCode"};
-  vector<DATA_TYPE> colTypes = {DT_TIMESTAMP, DT_UUID,  DT_UUID,  DT_SHORT,
-                                DT_SHORT,     DT_SHORT, DT_SHORT, DT_SHORT,
-                                DT_SHORT,     DT_LONG,  DT_LONG,  DT_LONG,
-                                DT_INT,       DT_LONG,  DT_SHORT, DT_SYMBOL};
-  int colNum = 16, rowNum = rows, indexCapacity = rows;
-  ConstantSP table =
-      Util::createTable(colNames, colTypes, rowNum, indexCapacity);
-  vector<VectorSP> columnVecs;
-  for (int i = 0; i < colNum; i++)
-    columnVecs.push_back(table->getColumn(i));
-
-  for (int i = 0; i < rowNum; i++) {
-    columnVecs[0]->setLong(i, startTime + timeInc * i);
-    unsigned char data[16] = {1, 2,  3,  4,  5,  6,  7,  8,
-                              9, 10, 11, 12, 13, 14, 15, (unsigned char)i};
-    columnVecs[1]->setBinary(i, 16, data);
-    columnVecs[2]->setBinary(i, 16, data);
-    columnVecs[3]->setShort(i, 1 * i);
-
-    columnVecs[4]->setShort(i, 2 * i);
-    columnVecs[5]->setShort(i, 3 * i);
-    columnVecs[6]->setShort(i, 4 * i);
-    columnVecs[7]->setShort(i, 5 * i);
-    columnVecs[8]->setShort(i, 6 * i);
-    columnVecs[9]->setLong(i, 7 * i);
-    columnVecs[10]->setLong(i, 8 * i);
-    columnVecs[11]->setLong(i, 9 * i);
-    columnVecs[12]->setInt(i, 9 * i);
-    columnVecs[13]->setLong(i, 10 * i);
-    columnVecs[14]->setShort(i, 11 * i);
-    columnVecs[15]->setString(i, "just a demo");
-  }
-  return table;
-}
-TableSP createDemoTable2(long rows, long startTime, int timeInc) {
-
-  vector<string> colNames = {"timestamp",      "areaId",
-                             "deviceId",       "onlineStatus",
-                             "offlineReason",  "workStatus",
-                             "signalStatus",   "loginStatus",
-                             "detected",       "onlineStatusChangeTime",
-                             "devCurrentTime", "ntpTime",
-                             "clockDeviation", "clockStatusChangeTime",
-                             "clockStatus",    "statusErrorCode"};
-  vector<DATA_TYPE> colTypes = {DT_TIMESTAMP, DT_UUID,  DT_UUID,  DT_SHORT,
-                                DT_SHORT,     DT_SHORT, DT_SHORT, DT_SHORT,
-                                DT_SHORT,     DT_LONG,  DT_LONG,  DT_LONG,
-                                DT_INT,       DT_LONG,  DT_SHORT, DT_SYMBOL};
-  int colNum = 16, rowNum = rows, indexCapacity = rows;
-  ConstantSP table =
-      Util::createTable(colNames, colTypes, rowNum, indexCapacity);
-  vector<VectorSP> columnVecs;
-  for (int i = 0; i < colNum; i++)
-    columnVecs.push_back(table->getColumn(i));
-
-  long long timestampBuf[Util::BUF_SIZE];
-  short onlineStatusBuf[Util::BUF_SIZE];
-  short offlineReasonBuf[Util::BUF_SIZE];
-  short workStatusBuf[Util::BUF_SIZE];
-  short signalStatusBuf[Util::BUF_SIZE];
-  short loginStatusBuf[Util::BUF_SIZE];
-  short detectedBuf[Util::BUF_SIZE];
-  long long onlineStatusChangeTimeBuf[Util::BUF_SIZE];
-  long long devCurrentTimeTimeBuf[Util::BUF_SIZE];
-  long long ntpTimeBuf[Util::BUF_SIZE];
-  int clockDeviationBuf[Util::BUF_SIZE];
-  long long clockStatusChangeTimeBuf[Util::BUF_SIZE];
-  short clockStatusBuf[Util::BUF_SIZE];
-
-  int start = 0;
-  unsigned char data[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-  while (start < rowNum) {
-    size_t len = std::min(Util::BUF_SIZE, rowNum - start);
-    long long *timestamp =
-        columnVecs[0]->getLongBuffer(start, len, timestampBuf);
-    short *onlineStatus =
-        columnVecs[3]->getShortBuffer(start, len, onlineStatusBuf);
-    short *offlineReason =
-        columnVecs[4]->getShortBuffer(start, len, offlineReasonBuf);
-    short *workStatus =
-        columnVecs[5]->getShortBuffer(start, len, workStatusBuf);
-    short *signalStatus =
-        columnVecs[6]->getShortBuffer(start, len, signalStatusBuf);
-    short *loginStatus =
-        columnVecs[7]->getShortBuffer(start, len, loginStatusBuf);
-    short *detected = columnVecs[8]->getShortBuffer(start, len, detectedBuf);
-    long long *onlineStatusChangeTime =
-        columnVecs[9]->getLongBuffer(start, len, onlineStatusChangeTimeBuf);
-    long long *devCurrentTimeTime =
-        columnVecs[10]->getLongBuffer(start, len, devCurrentTimeTimeBuf);
-    long long *ntpTime = columnVecs[11]->getLongBuffer(start, len, ntpTimeBuf);
-    int *clockDeviation =
-        columnVecs[12]->getIntBuffer(start, len, clockDeviationBuf);
-    long long *clockStatusChangeTime =
-        columnVecs[13]->getLongBuffer(start, len, clockStatusChangeTimeBuf);
-    short *clockStatus =
-        columnVecs[14]->getShortBuffer(start, len, clockStatusBuf);
-    for (int i = 0; i < (int)len; ++i) {
-      timestamp[i] = startTime + timeInc * (i + start);
-      data[15] = (unsigned char)(i + start);
-      columnVecs[1]->setBinary(i + start, 16, data);
-      columnVecs[2]->setBinary(i + start, 16, data);
-
-      onlineStatus[i] = start + i;
-      offlineReason[i] = (start + i) * 2;
-      workStatus[i] = (start + i) * 3;
-      signalStatus[i] = (start + i) * 4;
-      loginStatus[i] = (start + i) * 5;
-      detected[i] = (start + i) * 6;
-      onlineStatusChangeTime[i] = (start + i) * 7;
-      devCurrentTimeTime[i] = (start + i) * 8;
-      ntpTime[i] = (start + i) * 9;
-      clockDeviation[i] = (start + i) * 10;
-      clockStatusChangeTime[i] = (start + i) * 11;
-      clockStatus[i] = (start + i) * 2;
-
-      columnVecs[15]->setString(i + start,
-                                "just a demo" + std::to_string(i + start));
+TableSP createDemoTable(long rows) {
+    vector < string > colNames = { "cbool", "cchar", "cshort", "cint", "clong", "cdate", "cmonth", "ctime", "cminute", "csecond", "cdatetime", "ctimestamp", "cnanotime",
+            "cnanotimestamp", "cfloat", "cdouble", "csymbol", "cstring", "cuuid", "cip", "cint128" };
+    vector<DATA_TYPE> colTypes = { DT_BOOL, DT_CHAR, DT_SHORT, DT_INT, DT_LONG, DT_DATE, DT_MONTH, DT_TIME, DT_MINUTE, DT_SECOND, DT_DATETIME, DT_TIMESTAMP, DT_NANOTIME,
+            DT_NANOTIMESTAMP, DT_FLOAT, DT_DOUBLE, DT_SYMBOL, DT_STRING, DT_UUID, DT_IP, DT_INT128 };
+    int colNum = 21, rowNum = rows, indexCapacity = rows;
+    ConstantSP table = Util::createTable(colNames, colTypes, rowNum, indexCapacity);
+    vector<VectorSP> columnVecs;
+    for (int i = 0; i < colNum; i++)
+        columnVecs.push_back(table->getColumn(i));
+    unsigned char data[16] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+    for (int i = 0; i < rowNum; i++) {
+        columnVecs[0]->setBool(i, i % 2);
+        columnVecs[1]->setChar(i, i * 2);
+        columnVecs[2]->setShort(i, i * 3);
+        columnVecs[3]->setInt(i, i * 4);
+        columnVecs[4]->setLong(i, i * 5);
+        columnVecs[5]->setInt(i, 18262); //set(i, Util::parseConstant(DT_DATE, "2020.01.01"));
+        columnVecs[6]->setInt(i, 24240); // 2020.01M
+        columnVecs[7]->setInt(i, i * 7);
+        columnVecs[8]->setInt(i, i * 8);
+        columnVecs[9]->setInt(i, i * 9);
+        columnVecs[10]->setInt(i, 1577836800 + i);      // 2020.01.01 00:00:00+i
+        columnVecs[11]->setLong(i, Util::getEpochTime());
+        columnVecs[12]->setLong(i, i * 12);
+        columnVecs[13]->setLong(i, 1577836800000000000l + i); // 2020.01.01 00:00:00.000000000+i
+        columnVecs[14]->setFloat(i, i * 14);
+        columnVecs[15]->setDouble(i, i * 15);
+        columnVecs[16]->setString(i, "sym"); //+ to_string(i));
+        columnVecs[17]->setString(i, "abc"); //+ to_string(i));
+        data[15] = i;
+        columnVecs[18]->setBinary(i, 16, data);
+        columnVecs[19]->setBinary(i, 16, data);
+        columnVecs[20]->setBinary(i, 16, data);
     }
-    columnVecs[0]->setLong(start, len, timestamp);
-    columnVecs[3]->setShort(start, len, onlineStatus);
-    columnVecs[4]->setShort(start, len, offlineReason);
-    columnVecs[5]->setShort(start, len, workStatus);
-    columnVecs[6]->setShort(start, len, signalStatus);
-    columnVecs[7]->setShort(start, len, loginStatus);
-    columnVecs[8]->setShort(start, len, detected);
-    columnVecs[9]->setLong(start, len, onlineStatusChangeTime);
-    columnVecs[10]->setLong(start, len, devCurrentTimeTime);
-    columnVecs[11]->setLong(start, len, ntpTime);
-    columnVecs[12]->setInt(start, len, clockDeviation);
-    columnVecs[13]->setLong(start, len, clockStatusChangeTime);
-    columnVecs[14]->setShort(start, len, clockStatus);
-    start += len;
-  }
-  return table;
+    return table;
+}
+
+TableSP createDemoTable2(long rows) {
+    vector < string > colNames = { "cbool", "cchar", "cshort", "cint", "clong", "cdate", "cmonth", "ctime", "cminute", "csecond", "cdatetime", "ctimestamp", "cnanotime",
+            "cnanotimestamp", "cfloat", "cdouble", "csymbol", "cstring", "cuuid", "cip", "cint128" };
+    vector<DATA_TYPE> colTypes = { DT_BOOL, DT_CHAR, DT_SHORT, DT_INT, DT_LONG, DT_DATE, DT_MONTH, DT_TIME, DT_MINUTE, DT_SECOND, DT_DATETIME, DT_TIMESTAMP, DT_NANOTIME,
+            DT_NANOTIMESTAMP, DT_FLOAT, DT_DOUBLE, DT_SYMBOL, DT_STRING, DT_UUID, DT_IP, DT_INT128 };
+    int colNum = 21, rowNum = rows, indexCapacity = rows;
+    ConstantSP table = Util::createTable(colNames, colTypes, rowNum, indexCapacity);
+    vector<VectorSP> columnVecs;
+    for (int i = 0; i < colNum; i++)
+        columnVecs.push_back(table->getColumn(i));
+
+    char boolBuf[Util::BUF_SIZE];
+    char charBuf[Util::BUF_SIZE];
+    short shortBuf[Util::BUF_SIZE];
+    int intBuf[Util::BUF_SIZE];
+    long long longBuf[Util::BUF_SIZE];
+    int dateBuf[Util::BUF_SIZE];
+    int monthBuf[Util::BUF_SIZE];
+    int timeBuf[Util::BUF_SIZE];
+    int minuteBuf[Util::BUF_SIZE];
+    int secondBuf[Util::BUF_SIZE];
+    int datetimeBuf[Util::BUF_SIZE];
+    long long timestampBuf[Util::BUF_SIZE];
+    long long nanotimeBuf[Util::BUF_SIZE];
+    long long nanotimeStampBuf[Util::BUF_SIZE];
+    float floatBuf[Util::BUF_SIZE];
+    double doubleBuf[Util::BUF_SIZE];
+    unsigned char uuidBuf[Util::BUF_SIZE * 16];
+    unsigned char ipBuf[Util::BUF_SIZE * 16];
+    unsigned char int128Buf[Util::BUF_SIZE * 16];
+
+    int start = 0;
+    unsigned char data[16] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
+    while (start < rowNum) {
+        size_t len = std::min(Util::BUF_SIZE, rowNum - start);
+        char *pBool = columnVecs[0]->getBoolBuffer(start, len, boolBuf);
+        char *pChar = columnVecs[1]->getCharBuffer(start, len, charBuf);
+        short *pShort = columnVecs[2]->getShortBuffer(start, len, shortBuf);
+        int *pInt = columnVecs[3]->getIntBuffer(start, len, intBuf);
+        long long *pLong = columnVecs[4]->getLongBuffer(start, len, longBuf);
+        int *pDate = columnVecs[5]->getIntBuffer(start, len, dateBuf);
+        int *pMonth = columnVecs[6]->getIntBuffer(start, len, monthBuf);
+        int *pTime = columnVecs[7]->getIntBuffer(start, len, timeBuf);
+        int *pMinute = columnVecs[8]->getIntBuffer(start, len, minuteBuf);
+        int *pSecond = columnVecs[9]->getIntBuffer(start, len, secondBuf);
+        int *pDatetime = columnVecs[10]->getIntBuffer(start, len, datetimeBuf);
+        long long *pTimestamp = columnVecs[11]->getLongBuffer(start, len, timestampBuf);
+        long long *pNanotime = columnVecs[12]->getLongBuffer(start, len, nanotimeBuf);
+        long long *pNanotimestamp = columnVecs[13]->getLongBuffer(start, len, nanotimeStampBuf);
+        float *pFloat = columnVecs[14]->getFloatBuffer(start, len, floatBuf);
+        double *pDouble = columnVecs[15]->getDoubleBuffer(start, len, doubleBuf);
+        unsigned char *pUuid = columnVecs[18]->getBinaryBuffer(start, len, 16, uuidBuf);
+        unsigned char *pIp = columnVecs[19]->getBinaryBuffer(start, len, 16, ipBuf);
+        unsigned char *pInt128 = columnVecs[20]->getBinaryBuffer(start, len, 16, int128Buf);
+
+        for (int i = 0; i < (int) len; ++i) {
+            pBool[i] = i % 2;
+            pChar[i] = i;
+            pShort[i] = i * 2;
+            pInt[i] = i * 3;
+            pLong[i] = i * 4;
+            pDate[i] = 18262;
+            pMonth[i] = 24240;
+            pTime[i] = i * 7;
+            pMinute[i] = i * 8;
+            pSecond[i] = i * 9;
+            pDatetime[i] = 1577836800 + i;
+            pTimestamp[i] = Util::getEpochTime() + i;
+            pNanotime[i] = i * 12;
+            pNanotimestamp[i] = 1577836800000000000l + i;
+            pFloat[i] = i * 2;
+            pDouble[i] = i * 2;
+
+            columnVecs[16]->setString(i, "sym123"); //+ to_string(i));
+            columnVecs[17]->setString(i, "abc123"); //+ to_string(i));
+            data[15] = i;
+            memcpy((void*) &pUuid[i * 16], (void*) data, 16);
+            memcpy((void*) &pIp[i * 16], (void*) data, 16);
+            memcpy((void*) &pInt128[i * 16], (void*) data, 16);
+
+        }
+
+        columnVecs[0]->setBool(start, len, pBool);
+        columnVecs[1]->setChar(start, len, pChar);
+        columnVecs[2]->setShort(start, len, pShort);
+        columnVecs[3]->setInt(start, len, pInt);
+        columnVecs[4]->setLong(start, len, pLong);
+        columnVecs[5]->setInt(start, len, pDate);
+        columnVecs[6]->setInt(start, len, pMonth);
+        columnVecs[7]->setInt(start, len, pTime);
+        columnVecs[8]->setInt(start, len, pMinute);
+        columnVecs[9]->setInt(start, len, pSecond);
+        columnVecs[10]->setInt(start, len, pDatetime);
+        columnVecs[11]->setLong(start, len, pTimestamp);
+        columnVecs[12]->setLong(start, len, pNanotime);
+        columnVecs[13]->setLong(start, len, pNanotimestamp);
+        columnVecs[14]->setFloat(start, len, pFloat);
+        columnVecs[15]->setDouble(start, len, pDouble);
+        columnVecs[18]->setBinary(start, len, 16, pUuid);
+        columnVecs[19]->setBinary(start, len, 16, pIp);
+        columnVecs[20]->setBinary(start, len, 16, pInt128);
+        start += len;
+    }
+    return table;
 }
 
 int main(int argc, char *argv[]) {
 
-  if (argc < 2) {
-    cout << "No arguments, you MUST give an argument at least!" << endl;
-    ShowUsage();
-    return -1;
-  }
+    string host = "127.0.0.1";
+    int port = 8848;
+    long rows = 100000;
+    long batches = 1000;
 
-  int nOptionIndex = 1;
-  string cString, nString, hString, pString, sString;
-  stringstream cSS, nSS, pSS, sSS;
-  long cLong, nLong, pLong, sLong;
-
-  while (nOptionIndex < argc) {
-
-    if (strncmp(argv[nOptionIndex], "--c=", 4) == 0) { // get records number
-      cString = &argv[nOptionIndex][4];
-    } else if (strncmp(argv[nOptionIndex], "--h=", 4) == 0) { // get host
-      hString = &argv[nOptionIndex][4];
-    } else if (strncmp(argv[nOptionIndex], "--p=", 4) == 0) { // get port
-      pString = &argv[nOptionIndex][4];
-    } else if (strncmp(argv[nOptionIndex], "--n=", 4) == 0) { // get batches
-      nString = &argv[nOptionIndex][4];
-    } else if (strncmp(argv[nOptionIndex], "--s=", 4) == 0) { // get start time
-      sString = &argv[nOptionIndex][4];
-    } else if (strncmp(argv[nOptionIndex], "--help", 6) == 0) { // help
-      ShowUsage();
-      return 0;
-    } else {
-      cout << "Options '" << argv[nOptionIndex] << "' not valid. Run '"
-           << argv[0] << "' for details." << endl;
-      return -1;
+    DBConnection conn;
+    try {
+        bool ret = conn.connect(host, port, "admin", "123456");
+        if (!ret) {
+            cout << "Failed to connect to the server" << endl;
+            return 0;
+        }
+    } catch (exception &ex) {
+        cout << "Failed to  connect  with error: " << ex.what();
+        return -1;
     }
-    nOptionIndex++;
-  }
+    cout << "Please waiting..." << endl;
 
-  if (cString.empty()) {
-    cout << "--c is required" << endl;
-    ShowUsage();
-    return -1;
-  } else {
-    cSS << cString;
-    cSS >> cLong;
-  }
-  if (pString.empty()) {
-    cout << "--p is required" << endl;
-    ShowUsage();
-    return -1;
-  } else {
-    pSS << pString;
-    pSS >> pLong;
-  }
-  if (hString.empty()) {
-    cout << "--h is required" << endl;
-    ShowUsage();
-    return -1;
-  }
-  if (nString.empty()) {
-    nLong = 1;
-  } else {
-    nSS << nString;
-    nSS >> nLong;
-  }
-
-  if (sString.empty()) {
-    sLong = Util::getEpochTime(); // 1574380800;
-    cout << "starttime=" << sLong << endl;
-  } else {
-    sSS << sString;
-    sSS >> sLong;
-  }
-  DBConnection conn;
-  try {
-    bool ret = conn.connect(hString, pLong, "admin", "123456");
-    if (!ret) {
-      cout << "Failed to connect to the server" << endl;
-      return 0;
+    long long startTime = Util::getEpochTime();
+    for (unsigned int i = 0; i < batches; i++) {
+        TableSP table = createDemoTable2(rows);
+        vector<ConstantSP> args;
+        args.push_back(table);
+        conn.run("tableInsert{loadTable('dfs://demo', `pt)}", args);
     }
-  } catch (exception &ex) {
-    cout << "Failed to  connect  with error: " << ex.what();
-    return -1;
-  }
-  cout << "Please waiting..." << endl;
-
-  TableSP table = createDemoTable2(cLong, sLong, 1);
-  long long startTime = Util::getEpochTime();
-  for (unsigned int i = 0; i < nLong; i++) {
-    vector<ConstantSP> args;
-    args.push_back(table);
-    conn.run("tableInsert{loadTable('dfs://DolphinDB', `device_status)}", args);
-  }
-  long long endTime = Util::getEpochTime();
-  printf("Insert %ld rows %ld times, used %lld ms.\n", cLong, nLong,
-         endTime - startTime);
-  return 0;
+    long long endTime = Util::getEpochTime();
+    printf("Insert %ld rows %ld batches, used %lld ms.\n", rows, batches, endTime - startTime);
+    return 0;
 }

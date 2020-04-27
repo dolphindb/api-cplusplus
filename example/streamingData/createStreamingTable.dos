@@ -1,19 +1,11 @@
+//create streaming table
 def createStreamingTable(subTableName){
 	n = 1000
 	st=streamTable(n:0,`id`cbool`cchar`cshort`cint`clong`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cfloat`cdouble`csymbol`cstring`cuuid`cip`cint128,[LONG,BOOL,CHAR,SHORT,INT,LONG,DATE,MONTH,TIME,MINUTE,SECOND,DATETIME,TIMESTAMP,NANOTIME,NANOTIMESTAMP,FLOAT,DOUBLE,SYMBOL,STRING,UUID,IPADDR,INT128])
 	enableTableShareAndPersistence(st,subTableName,true,false,1000000)
 }
 
-
-login("admin","123456")
-stName="st1"
-dropStreamTable(stName)
-
-createStreamingTable(stName)
-
-getPersistenceMeta(objByName(stName))
-
-
+//write data to streaming table
 def writeStreamTable(tableName, loopNum, initId, batchSize){
 	start=initId
 	n = batchSize
@@ -25,7 +17,7 @@ def writeStreamTable(tableName, loopNum, initId, batchSize){
 		vshort = take(-32767..32767,n)
 		vint = take(-214747..2143647,n)
 		vlong = rand(-92237..922807,n)
-		vdate = take(2019.06.01..2019.06.30,n) //first 
+		vdate = take(2019.06.01..2019.06.30,n) 
 		vmonth =take(2010.01M..2020.12M,n)
 		vtime = rand(00:00:00.001..00:00:59.999,n)
 		vminute =take(01:00m..23:02m,n)
@@ -36,7 +28,7 @@ def writeStreamTable(tableName, loopNum, initId, batchSize){
 		vnanotimestamp =take(2018.01.01T01:58:59.000000001..2018.01.01T01:58:59.000100001,n)
 		vfloat =take(1..10000,n)
 		vdouble = take(-19999..19999,n)
-		vsymbol = take("abc"+string(1..100),n) // second
+		vsymbol = take("abc"+string(1..100),n) 
 		vstring = rand(`APPL`GOOG`MS`INTEL`BBA,n)
 		vuuid=rand(uuid(),n)
 		vip=take(ipaddr("192.168.1."+string(1..200)),n)
@@ -47,22 +39,7 @@ def writeStreamTable(tableName, loopNum, initId, batchSize){
 	}
 	return start
 }
-submitJob("write_st1","st1",writeStreamTable,stName,100000,0,15)
-
-getRecentJobs()
-select count(*)  from objByName(stName)
-select top 15  *  from objByName(stName) 
-
-
-dropStreamTable("sub1")
-createStreamingTable("sub1")
-select count(*)  from objByName("sub1")
-select top 15  *  from objByName("sub1")
-
-getStreamingStat().pubTables
-getPersistenceMeta(sub1).totalSize
-
-
+//create dfs database
 def createDB(dbName,tableName){
 	if(existsDatabase(dbName)){
 		dropDatabase(dbName)
@@ -73,13 +50,24 @@ def createDB(dbName,tableName){
 	db=database(dbName,COMPO,[db1,db2])
 	db.createPartitionedTable(moduleT,tableName,`cdate`id)
 }
+
+//create streaming table st1
+login("admin","123456")
+stName="st1"
+createStreamingTable(stName)
+getPersistenceMeta(objByName(stName))
+
+//start job for writing streaming table st1
+submitJob("write_st1","st1",writeStreamTable,stName,100000,0,15)
+
+//create streaming table sub1
+createStreamingTable("sub1")
+
+//create database "dfs://dolphindb"
 login("admin","123456")
 dbName="dfs://dolphindb"
 tableName="demoTable"
-dropDatabase(dbName)
 createDB(dbName,tableName)
-
-getDFSDatabases()
 
 dfsTable=loadTable(dbName,tableName)
 select count(*) from dfsTable

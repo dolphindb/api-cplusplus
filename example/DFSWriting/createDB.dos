@@ -1,21 +1,16 @@
-
 def createDb(dbName,tableName){
-	db1=database("",VALUE, 2019.11.01..2020.12.31)
-	db2=database("",HASH,[UUID,10])
-	db3=database("",HASH,[UUID,10])
-	
-	t = table(200:0,`timestamp`areaId`deviceId`onlineStatus`offlineReason`workStatus`signalStatus`loginStatus`detected`onlineStatusChangeTime`devCurrentTime`ntpTime`clockDeviation`clockStatusChangeTime`clockStatus`statusErrorCode,[TIMESTAMP,UUID,UUID,SHORT, SHORT,SHORT,SHORT,SHORT, SHORT,LONG,LONG,LONG,INT,LONG,SHORT,SYMBOL])
-	
-	db = database(dbName, COMPO,[db1,db2,db3])
-	db.createPartitionedTable(t, tableName, `timestamp`areaId`deviceId)
+	t = table(200:0,`cbool`cchar`cshort`cint`clong`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cfloat`cdouble`csymbol`cstring`cuuid`cip`cint128,
+			[BOOL,CHAR,SHORT,INT,LONG,DATE,MONTH,TIME,MINUTE,SECOND,DATETIME,TIMESTAMP,NANOTIME,NANOTIMESTAMP,FLOAT,DOUBLE,SYMBOL,STRING,UUID,IPADDR,INT128])
+	db = database(dbName,VALUE,today()..(today()+60))
+	db.createPartitionedTable(t, tableName, `ctimestamp)
 }
+
 login("admin","123456")
-dbName="dfs://DolphinDB"
-tableName="device_status"
-dropDatabase("dfs://DolphinDB")
+dbName="dfs://demo"
+tableName="pt"
 createDb(dbName,tableName)
 
 login("admin","123456")
-dfs=loadTable("dfs://DolphinDB","device_status")
-select count(*) from dfs group by areaID
-
+dfsTable=loadTable("dfs://demo","pt")
+select count(*) from dfsdfsTable
+dropDatabase("dfs://demo")
