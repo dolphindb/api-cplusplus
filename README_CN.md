@@ -1,3 +1,61 @@
+本教程主要介绍以下内容：
+
+[DolphinDB C++ API](https://2xdb.net/dolphindb/api-cplusplus#dolphindb-c-api)
+- [1. 项目编译](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#1-%E9%A1%B9%E7%9B%AE%E7%BC%96%E8%AF%91)
+  - [1.1 在Linux环境下编译项目](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#11-%E5%9C%A8linux%E7%8E%AF%E5%A2%83%E4%B8%8B%E7%BC%96%E8%AF%91%E9%A1%B9%E7%9B%AE)
+    - [1.1.1 环境配置](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#111-%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE)
+    - [1.1.2 下载bin文件和头文件](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#112-%E4%B8%8B%E8%BD%BDbin%E6%96%87%E4%BB%B6%E5%92%8C%E5%A4%B4%E6%96%87%E4%BB%B6)
+    - [1.1.3 编译main.cpp](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#113-%E7%BC%96%E8%AF%91maincpp)
+    - [1.1.4 编译](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#114-%E7%BC%96%E8%AF%91)
+    - [1.1.5 运行](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#115-%E8%BF%90%E8%A1%8C)
+  - [1.2 Windows环境下编译](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#12-windows%E7%8E%AF%E5%A2%83%E4%B8%8B%E7%BC%96%E8%AF%91)
+    - [1.2.1 环境配置](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#121-%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE)
+    - [1.2.2 下载bin文件和头文件](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#122-%E4%B8%8B%E8%BD%BDbin%E6%96%87%E4%BB%B6%E5%92%8C%E5%A4%B4%E6%96%87%E4%BB%B6)
+    - [1.2.3 创建Visual Studio项目](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#123-%E5%88%9B%E5%BB%BAvisual-studio%E9%A1%B9%E7%9B%AE)
+    - [1.2.4 编译和运行](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#124-%E7%BC%96%E8%AF%91%E5%92%8C%E8%BF%90%E8%A1%8C)
+- [2. 建立DolphinDB连接](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#2-%E5%BB%BA%E7%AB%8Bdolphindb%E8%BF%9E%E6%8E%A5)
+- [3. 运行DolphinDB脚本](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#3-%E8%BF%90%E8%A1%8Cdolphindb%E8%84%9A%E6%9C%AC)
+- [4. 运行DolphinDB函数](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#4-%E8%BF%90%E8%A1%8Cdolphindb%E5%87%BD%E6%95%B0)
+- [5. 上传数据对象](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#5-%E4%B8%8A%E4%BC%A0%E6%95%B0%E6%8D%AE%E5%AF%B9%E8%B1%A1)
+- [6. 读取数据示例](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#6-%E8%AF%BB%E5%8F%96%E6%95%B0%E6%8D%AE%E7%A4%BA%E4%BE%8B)
+  - [6.1 向量](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#61-%E5%90%91%E9%87%8F)
+  - [6.2 集合](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#62-%E9%9B%86%E5%90%88)
+  - [6.3 矩阵](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#63-%E7%9F%A9%E9%98%B5)
+  - [6.4 字典](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#64-%E5%AD%97%E5%85%B8)
+  - [6.5 表](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#65-%E8%A1%A8)
+    - [6.5.1 getString()方法获取表的内容](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#651-getstring%E6%96%B9%E6%B3%95%E8%8E%B7%E5%8F%96%E8%A1%A8%E7%9A%84%E5%86%85%E5%AE%B9)
+    - [6.5.2 getColumn()方法按列获取表的内容](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#652-getcolumn%E6%96%B9%E6%B3%95%E6%8C%89%E5%88%97%E8%8E%B7%E5%8F%96%E8%A1%A8%E7%9A%84%E5%86%85%E5%AE%B9)
+    - [6.5.3 getRow()方法按照行获取表的内容](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#653-getrow%E6%96%B9%E6%B3%95%E6%8C%89%E7%85%A7%E8%A1%8C%E8%8E%B7%E5%8F%96%E8%A1%A8%E7%9A%84%E5%86%85%E5%AE%B9)
+  - [6.6 AnyVector](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#66-anyvector)
+- [7. 保存数据到DolphinDB数据表](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#7-%E4%BF%9D%E5%AD%98%E6%95%B0%E6%8D%AE%E5%88%B0dolphindb%E6%95%B0%E6%8D%AE%E8%A1%A8)
+  - [7.1 保存数据到DolphinDB内存表](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#71-%E4%BF%9D%E5%AD%98%E6%95%B0%E6%8D%AE%E5%88%B0dolphindb%E5%86%85%E5%AD%98%E8%A1%A8)
+    - [7.1.1 使用insert into语句保存数据](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#711-%E4%BD%BF%E7%94%A8insert-into%E8%AF%AD%E5%8F%A5%E4%BF%9D%E5%AD%98%E6%95%B0%E6%8D%AE)
+    - [7.1.2 使用tableInsert函数批量保存多条数据](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#712-%E4%BD%BF%E7%94%A8tableinsert%E5%87%BD%E6%95%B0%E6%89%B9%E9%87%8F%E4%BF%9D%E5%AD%98%E5%A4%9A%E6%9D%A1%E6%95%B0%E6%8D%AE)
+    - [7.1.3 使用tableInsert函数保存TableSP对象](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#713-%E4%BD%BF%E7%94%A8tableinsert%E5%87%BD%E6%95%B0%E4%BF%9D%E5%AD%98tablesp%E5%AF%B9%E8%B1%A1)
+  - [7.2 保存数据到本地磁盘表](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#72-%E4%BF%9D%E5%AD%98%E6%95%B0%E6%8D%AE%E5%88%B0%E6%9C%AC%E5%9C%B0%E7%A3%81%E7%9B%98%E8%A1%A8)
+  - [7.3 保存数据到分布式表](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#73-%E4%BF%9D%E5%AD%98%E6%95%B0%E6%8D%AE%E5%88%B0%E5%88%86%E5%B8%83%E5%BC%8F%E8%A1%A8)
+    - [7.3.1 使用tableInsert函数保存TableSP对象](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#731-%E4%BD%BF%E7%94%A8tableinsert%E5%87%BD%E6%95%B0%E4%BF%9D%E5%AD%98tablesp%E5%AF%B9%E8%B1%A1)
+    - [7.3.2 分布式表的并发写入](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#732-%E5%88%86%E5%B8%83%E5%BC%8F%E8%A1%A8%E7%9A%84%E5%B9%B6%E5%8F%91%E5%86%99%E5%85%A5)
+- [8. 注意事项](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#8-%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9)    
+[C++ Streaming API](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#c-streaming-api)  
+- [9. 编译](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#9-%E7%BC%96%E8%AF%91)
+  - [9.1 Linux 64位](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#91-linux-64%E4%BD%8D)
+    - [9.1.1 通过cmake](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#911-%E9%80%9A%E8%BF%87cmake)
+- [10. 在Windows中使用MinGW编译](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#10-%E5%9C%A8windows%E4%B8%AD%E4%BD%BF%E7%94%A8mingw%E7%BC%96%E8%AF%91)
+- [11. Streaming](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#11-api)
+  - [11.1 ThreadedClient](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#111-threadedclient)
+    - [11.1.1 定义线程客户端](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#1111-%E5%AE%9A%E4%B9%89%E7%BA%BF%E7%A8%8B%E5%AE%A2%E6%88%B7%E7%AB%AF)
+    - [11.1.2 调用订阅函数](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#1112-%E8%B0%83%E7%94%A8%E8%AE%A2%E9%98%85%E5%87%BD%E6%95%B0)
+    - [11.1.3 取消订阅](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#1123-%E5%8F%96%E6%B6%88%E8%AE%A2%E9%98%85)
+  - [11.2 ThreadPooledClient](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#112-threadpooledclient)
+    - [11.2.1 定义多线程客户端](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#1121-%E5%AE%9A%E4%B9%89%E5%A4%9A%E7%BA%BF%E7%A8%8B%E5%AE%A2%E6%88%B7%E7%AB%AF)
+    - [11.2.2 调用订阅函数](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#1122-%E8%B0%83%E7%94%A8%E8%AE%A2%E9%98%85%E5%87%BD%E6%95%B0)
+    - [11.2.3 取消订阅](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#1123-%E5%8F%96%E6%B6%88%E8%AE%A2%E9%98%85)
+  - [11.3 PollingClient](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#113-pollingclient)
+    - [11.3.1 定义客户端](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#1131-%E5%AE%9A%E4%B9%89%E5%AE%A2%E6%88%B7%E7%AB%AF)
+    - [11.3.2 订阅](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#1132-%E8%AE%A2%E9%98%85)
+    - [11.3.3 取消订阅](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README_CN.md#1133-%E5%8F%96%E6%B6%88%E8%AE%A2%E9%98%85)
+
 # DolphinDB C++ API
 
 DolphinDB C++ API支持以下开发环境：
@@ -6,17 +64,6 @@ DolphinDB C++ API支持以下开发环境：
 * Windows Visual Studio
 * Windows GNU(MinGW)
 
-本教程主要介绍以下内容：
-
-* 项目编译
-* 建立DolphinDB连接
-* 运行DolphinDB脚本
-* 运行DolphinDB函数
-* 上传本地对象到DolphinDB服务器
-* 读取数据示例
-* 读写DolphinDB数据表
-* 注意事项
-* C++流数据API
 
 ### 1. 项目编译
 
@@ -30,8 +77,8 @@ C++ API需要使用g++ 6.2及以上版本。
 
 从本GitHub项目中下载以下文件：
 
-- bin (libDolphinDBAPI.so)
-- include (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h)
+- [bin](./bin) (libDolphinDBAPI.so)
+- [include](./include) (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h)
 
 #### 1.1.3 编译main.cpp
 
@@ -63,15 +110,16 @@ int main(int argc, char *argv[]){
 
 #### 1.1.4 编译
 
-g++编译命令：
+为了兼容旧的编译器，libDolphinDBAPI.so提供了2个版本，一个版本在编译时使用了-D_GLIBCXX_USE_CXX11_ABI=0的选项，放在[bin/linux_x64/ABI0](./bin/linux_x64/ABI0)目录下，另一个版本未使用-D_GLIBCXX_USE_CXX11_ABI=0，放在[bin/linux_x64/ABI1](./bin/linux_x64/ABI1)目录下。下面是使用第一个动态库版本的g++编译命令：
 
 ```
-g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=0 -DLOGGING_LEVEL_2 -O2 -I../include  -lssl -lpthread -luuid -lDolphinDBAPI -L../bin  -Wl,-rpath ../bin/ -o main
-```
+g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=0 -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -L../bin/linux_x64/ABI0  -Wl,-rpath,.:../bin/linux_x64/ABI0 -o main
 
-> 请注意： 
-> 1. 为了兼容旧的编译器，libDolphinDBAPI.so编译时使用了-D_GLIBCXX_USE_CXX11_ABI=0的选项，因此用户在编译exec的时候也应该加入该选项。
-> 2. DolphinDBAPI编译时使用了1.0.0版本的ssl，如果用户系统上的ssl版本高于1.0.0，则需要另外安装1.0.0版本的ssl，然后将上面编译命令中的-lssl更换为libssl的绝对路径，如 /usr/lib/libssl.so.1.0.0**
+```
+ 下面是使用另一个动态库版本的g++编译命令：
+```
+g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=1 -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -L../bin/linux_x64/ABI1  -Wl,-rpath,.:../bin/linux_x64/ABI1 -o main
+```
 
 #### 1.1.5 运行
 
@@ -89,10 +137,9 @@ g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=0 -DLOGGING_LEVEL_2 -O2
 
 #### 1.2.3 创建Visual Studio项目
 
-创建win32 console project，导入头文件，创建1.1.3节中的main.cpp文件，导入libDolphinDBAPI.lib，并且配置lib目录。
-
-> 注意：由于VS里默认定义了min/max两个宏，会与头文件中 `min` 和 `max` 函数冲突。为了解决这个问题，在预处理宏定义中需要加入 `__NOMINMAX__` 。
-
+创建windows console project，导入[include](./include)目录下头文件，创建1.1.3节中的main.cpp文件，导入libDolphinDBAPI.lib，并且配置lib目录。注意：
+> 由于VS里默认定义了min/max两个宏，会与头文件中 `min` 和 `max` 函数冲突。为了解决这个问题，在预处理宏定义中需要加入 `__NOMINMAX__` 。
+> api源代码中用宏定义LINUX、WINDOWS等区分不同平台，因此在预处理宏定义中需要加入 `WINDOWS`。
 #### 1.2.4 编译和运行
 
 启动编译，将对应的libDolphinDBAPI.dll拷贝到可执行程序的输出目录，即可运行。
@@ -715,11 +762,11 @@ C++ API处理流数据的方式有三种：ThreadedClient, ThreadPooledClient �
 
 三种实现方式可以参考[test/StreamingThreadedClientTester.cpp](./test/StreamingThreadedClientTester.cpp), [test/StreamingThreadPooledClientTester.cpp](./test/StreamingThreadPooledClientTester.cpp) 和 [test/StreamingPollingClientTester.cpp](./test/StreamingPollingClientTester.cpp)。
 
-### 1 编译
+### 9 编译
 
-#### 1.1 Linux 64位
+#### 9.1 Linux 64位
 
-#### 1.1.1 通过cmake
+#### 9.1.1 通过cmake
 
 安装cmake：
 
@@ -737,7 +784,7 @@ make -j `nproc`
 
 编译成功后，会生成三个可执行文件。
 
-#### 1.2 在Windows中使用MinGW编译
+#### 10 在Windows中使用MinGW编译
 
 安装[MinGW](http://www.mingw.org/)和[cmake](https://cmake.org/):
 
@@ -754,13 +801,13 @@ mingw32-make -j `nproc`
 1. 编译前，需要把libDolphinDBAPI.dll复制到编译目录。
 2. 执行例子前，需要把libDolphinDBAPI.dll和libgcc_s_seh-1.dll复制到可执行文件的相同目录下。
 
-### 2. API
+### 11. API
 
-#### 2.1 ThreadedClient
+#### 11.1 ThreadedClient
 
 ThreadedClient 产生一个线程。每次新数据从流数据表发布时，该线程去获取和处理数据。
 
-#### 2.1.1 定义线程客户端
+#### 11.1.1 定义线程客户端
 
 ``` 
 ThreadedClient::ThreadClient(int listeningPort);
@@ -768,7 +815,7 @@ ThreadedClient::ThreadClient(int listeningPort);
 
 * listeningPort 是单线程客户端的订阅端口号。
 
-#### 2.1.2 调用订阅函数
+#### 11.1.2 调用订阅函数
 
 ``` 
 ThreadSP ThreadedClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
@@ -801,7 +848,7 @@ auto t = client.subscribe(host, port, [](Message msg) {
 t->join();
 ```
 
-#### 2.1.3 取消订阅
+#### 11.1.3 取消订阅
 
 ``` 
 void ThreadClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
@@ -817,11 +864,11 @@ void ThreadClient::unsubscribe(string host, int port, string tableName, string a
 
 该函数用于停止向发布者订阅数据。
 
-#### 2.2 ThreadPooledClient
+#### 11.2 ThreadPooledClient
 
 ThreadPooledClient 产生用户指定数量的多个线程。每次新数据从流数据表发布时，这些线程同时去获取和处理数据。当数据到达速度超过单个线程所能处理的限度时，ThreadPooledClient 比 ThreadedClient 有优势。
 
-#### 2.2.1 定义多线程客户端
+#### 11.2.1 定义多线程客户端
 
 ``` 
 ThreadPooledClient::ThreadPooledClient(int listeningPort, int threadCount);
@@ -831,7 +878,7 @@ ThreadPooledClient::ThreadPooledClient(int listeningPort, int threadCount);
 
 * threadCount 是线程池的大小。
 
-#### 2.2.2 调用订阅函数
+#### 11.2.2 调用订阅函数
 
 ``` 
 vector<ThreadSP> ThreadPooledClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
@@ -852,7 +899,7 @@ for(auto& t : vec) {
 }
 ```
 
-#### 2.2.3 取消订阅
+#### 11.2.3 取消订阅
 
 ``` 
 void ThreadPooledClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
@@ -860,11 +907,11 @@ void ThreadPooledClient::unsubscribe(string host, int port, string tableName, st
 
 参数参见2.1.3节。
 
-#### 2.3 PollingClient
+#### 11.3 PollingClient
 
 订阅数据时，会返回一个消息队列。用户可以从其中获取和处理数据。
 
-#### 2.3.1 定义客户端
+#### 11.3.1 定义客户端
 
 ``` 
 PollingClient::PollingClient(int listeningPort);
@@ -872,7 +919,7 @@ PollingClient::PollingClient(int listeningPort);
 
 * listeningPort 是客户端节点的订阅端口号。
 
-#### 2.3.2 订阅
+#### 11.3.2 订阅
 
 ``` 
 MessageQueueSP PollingClient::subscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1);
@@ -895,7 +942,7 @@ while(true) {
 }
 ```
 
-#### 2.3.3 取消订阅
+#### 11.3.3 取消订阅
 
 ``` 
 void PollingClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
