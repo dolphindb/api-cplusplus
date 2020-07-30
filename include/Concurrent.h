@@ -24,6 +24,11 @@
 #endif
 #include "SmartPointer.h"
 
+#ifdef _MSC_VER
+#define EXPORT_DECL _declspec(dllexport)
+#else
+#define EXPORT_DECL 
+#endif
 namespace dolphindb {
 
 class Thread;
@@ -33,7 +38,7 @@ typedef SmartPointer<Thread> ThreadSP;
 typedef SmartPointer<Runnable> RunnableSP;
 typedef SmartPointer<CountDownLatch> CountDownLatchSP;
 
-class Runnable{
+class EXPORT_DECL Runnable{
 public:
 	Runnable();
 	void start();
@@ -49,7 +54,7 @@ private:
 	std::atomic<char> status_;
 };
 
-class Mutex{
+class EXPORT_DECL Mutex{
 public:
 	Mutex();
 	~Mutex();
@@ -68,7 +73,7 @@ private:
 	friend class ConditionalVariable;
 };
 
-class RWLock{
+class EXPORT_DECL RWLock{
 public:
 	RWLock();
 	~RWLock();
@@ -86,7 +91,7 @@ private:
 #endif
 };
 
-class RWSpinLock{
+class EXPORT_DECL RWSpinLock{
 public:
 	RWSpinLock(){};
 	~RWSpinLock(){};
@@ -98,7 +103,7 @@ private:
 
 };
 
-class ConditionalVariable{
+class EXPORT_DECL ConditionalVariable{
 public:
 	ConditionalVariable();
 	~ConditionalVariable();
@@ -117,7 +122,7 @@ private:
 
 
 template<class T>
-class LockGuard{
+class EXPORT_DECL LockGuard{
 public:
 	LockGuard(T* res, bool acquireLock = true):res_(res){
 		if(acquireLock)
@@ -140,7 +145,7 @@ private:
 };
 
 template<class T>
-class TryLockGuard{
+class EXPORT_DECL TryLockGuard{
 public:
 	TryLockGuard(T* res, bool acquireLock = true):res_(res), locked_(false){
 		if(acquireLock)
@@ -159,7 +164,7 @@ private:
 };
 
 template<class T>
-class RWLockGuard{
+class EXPORT_DECL RWLockGuard{
 public:
 	RWLockGuard(T* res, bool exclusive, bool acquireLock = true):res_(res), exclusive_(exclusive){
 		if(res != NULL && acquireLock){
@@ -196,7 +201,7 @@ private:
 };
 
 template<class T>
-class TryRWLockGuard{
+class EXPORT_DECL TryRWLockGuard{
 public:
 	TryRWLockGuard(T* res, bool exclusive, bool acquireLock = true):res_(res), exclusive_(exclusive), locked_(false){
 		if(acquireLock){
@@ -220,7 +225,7 @@ private:
 	bool locked_;
 };
 
-class CountDownLatch{
+class EXPORT_DECL CountDownLatch{
 public:
 	CountDownLatch(int count) : count_(count){}
 	void wait();
@@ -238,7 +243,7 @@ private:
 
 
 template<class T>
-class Future {
+class EXPORT_DECL Future {
 public:
 	Future(): latch_(1) {}
 	//Wait till the result is ready or the specified milliseconds timeout. Return whether the result is ready.
@@ -260,7 +265,7 @@ private:
 	T val_;
 };
 
-class Semaphore{
+class EXPORT_DECL Semaphore{
 public:
 	Semaphore(int resources);
 	~Semaphore();
@@ -276,7 +281,7 @@ private:
 #endif
 };
 
-class ConditionalNotifier {
+class EXPORT_DECL ConditionalNotifier {
 public:
 	ConditionalNotifier() {}
 	~ConditionalNotifier() {}
@@ -290,7 +295,7 @@ private:
 };
 
 template<class T>
-class BoundedBlockingQueue{
+class EXPORT_DECL BoundedBlockingQueue{
 public:
 	BoundedBlockingQueue(size_t maxItems) : capacity_(maxItems), size_(0), head_(0), tail_(0){
 		buf_ = new T[maxItems];
@@ -339,7 +344,7 @@ private:
 };
 
 template<class T>
-class SynchronizedQueue{
+class EXPORT_DECL SynchronizedQueue{
 public:
 	SynchronizedQueue(){}
 	void push(const T& item){
@@ -427,7 +432,7 @@ private:
 	ConditionalVariable empty_;
 };
 
-class Thread{
+class EXPORT_DECL Thread{
 public:
 	Thread(const RunnableSP& run);
 	~Thread();
