@@ -1,18 +1,54 @@
+This tutorial includes the following topics about how to use DolphinDB C++ API in Linux:
+
+[DolphinDB C++ API](https://2xdb.net/dolphindb/api-cplusplus#dolphindb-c-api)
+- [1. Compilation](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README.md#1-compilation)
+  - [1.1 Compile under Linux](https://2xdb.net/dolphindb/api-cplusplus#11-compile-under-linux)
+    - [1.1.1 Environment Setup](https://2xdb.net/dolphindb/api-cplusplus#111-environment-setup)
+    - [1.1.2 Download bin file and header files](https://2xdb.net/dolphindb/api-cplusplus#112-download-bin-file-and-header-files)
+    - [1.1.3 Compile main.cpp](https://2xdb.net/dolphindb/api-cplusplus#113-compile-maincpp)
+    - [1.1.4 Compile](https://2xdb.net/dolphindb/api-cplusplus#114-compile)
+    - [1.1.5 Run](https://2xdb.net/dolphindb/api-cplusplus#115-run)
+  - [1.2 Compile under Linux](https://2xdb.net/dolphindb/api-cplusplus#12-compile-under-windows)
+    - [1.2.1 Environment Setup](https://2xdb.net/dolphindb/api-cplusplus#121-environment-setup)
+    - [1.2.2 Download bin file and header files](https://2xdb.net/dolphindb/api-cplusplus#122-download-bin-file-and-header-files)
+    - [1.2.3 Environment Setup](https://2xdb.net/dolphindb/api-cplusplus#123-build-visual-studio-project)
+    - [1.2.4 Environment Setup](https://2xdb.net/dolphindb/api-cplusplus#124-compile-and-run)
+- [2. Establish DolphinDB connection](https://2xdb.net/dolphindb/api-cplusplus#2-establish-dolphindb-connection)
+- [3. Execute DolphinDB script](https://2xdb.net/dolphindb/api-cplusplus#3-execute-dolphindb-script)
+- [4. Call DolphinDB functions](https://2xdb.net/dolphindb/api-cplusplus#4-call-dolphindb-functions)
+- [5. Upload local objects to DolphinDB Server](https://2xdb.net/dolphindb/api-cplusplus#5-upload-local-objects-to-dolphindb-server)
+- [6. Read data](https://2xdb.net/dolphindb/api-cplusplus#6-read-data)
+- [7. Write to DolphinDB tables](https://2xdb.net/dolphindb/api-cplusplus#7-write-to-dolphindb-tables)
+  - [7.1 Save data to a DolphinDB in-memory table](https://2xdb.net/dolphindb/api-cplusplus#71-save-data-to-a-dolphindb-in-memory-table)
+    - [7.1.1 Save data to an in-memory table with insert into](https://2xdb.net/dolphindb/api-cplusplus#711-save-data-to-an-in-memory-table-with-insert-into)
+    - [7.1.2 Save data in batches with tableInsert](https://2xdb.net/dolphindb/api-cplusplus#712-save-data-in-batches-with-tableinsert)
+    - [7.1.3 Use function tableInsert to save TableSP objects](https://2xdb.net/dolphindb/api-cplusplus#713-use-function-tableinsert-to-save-tablesp-objects)
+  - [7.2 Save data to a distributed table](https://2xdb.net/dolphindb/api-cplusplus#72-save-data-to-a-distributed-table)
+  - [7.3 Save data to a local disk table](https://2xdb.net/dolphindb/api-cplusplus#73-save-data-to-a-local-disk-table)
+[C++ Streaming API](https://2xdb.net/dolphindb/api-cplusplus#c-streaming-api)
+- [8. Build](https://2xdb.net/dolphindb/api-cplusplus#8-build)
+  -  [8.1 Linux64](https://2xdb.net/dolphindb/api-cplusplus#81-linux64)
+    - [8.1.1 Build with cmake](https://2xdb.net/dolphindb/api-cplusplus#811-build-with-cmake)
+  -  [8.2 Build under Windows with MinGW](https://2xdb.net/dolphindb/api-cplusplus#82-build-under-windows-with-mingw)
+- [9. Streaming](https://2xdb.net/dolphindb/api-cplusplus#9-streaming)
+  - [9.1 ThreadedClient](https://2xdb.net/dolphindb/api-cplusplus#91-threadedclient)
+    - [9.1.1 Define the threaded client](https://2xdb.net/dolphindb/api-cplusplus#911-define-the-threaded-client)
+    - [9.1.2  Subscribe](https://2xdb.net/dolphindb/api-cplusplus#912-subscribe)
+    - [9.1.3 Unsubscribe](https://2xdb.net/dolphindb/api-cplusplus#913-unsubscribe)
+  - [9.2 ThreadPooledClient](https://2xdb.net/dolphindb/api-cplusplus#92-threadpooledclient)
+    - [9.2.1 Define ThreadPooledClient](https://2xdb.net/dolphindb/api-cplusplus#921-define-threadpooledclient)
+    - [9.2.2 Subscribe](https://2xdb.net/dolphindb/api-cplusplus#922-subscribe)
+    - [9.2.3 Unsubscribe](https://2xdb.net/dolphindb/api-cplusplus#923-unsubscribe)
+  -  [9.3 PollingClient](https://2xdb.net/dolphindb/api-cplusplus#93-pollingclient)
+    - [9.3.1 Define PollingClient](https://2xdb.net/dolphindb/api-cplusplus#931-define-pollingclient)
+    - [9.3.2 Unsubscribe](https://2xdb.net/dolphindb/api-cplusplus#932-unsubscribe)
 # DolphinDB C++ API
 DolphinDB C++ API supports the following development environments:
 * Linux
 * Windows Visual Studio
 * Windows GNU (MingW)
 
-This tutorial includes the following topics about how to use DolphinDB C++ API in Linux:
-* Compilation
-* Establish DolphinDB connection
-* Execute DolphinDB script
-* Call DolphinDB functions
-* Upload local objects to DolphinDB server
-* Read data
-* Write to DolphinDB tables
-* C++ streaming API
+
 
 ## 1. Compilation
 
@@ -57,9 +93,16 @@ int main(int argc, char *argv[]){
 
 #### 1.1.4 Compile
 
-g++ compiling command:
+g++ compiling command if -D_GLIBCXX_USE_CXX11_ABI=0 added：
 
-> g++ main.cpp -std=c++11 -DLINUX -DLOGGING_LEVEL_2 -O2 -I../include -lDolphinDBAPI -lssl  -lpthread -luuid -L../bin  -Wl,-rpath ../bin/ -o main
+```
+g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=0 -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -L../bin/linux_x64/ABI0  -Wl,-rpath,.:../bin/linux_x64/ABI0 -o main
+
+```
+g++ compiling command if -D_GLIBCXX_USE_CXX11_ABI=0 not added：
+```
+g++ main.cpp -std=c++11 -DLINUX -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -L../bin/linux_x64/ABI1  -Wl,-rpath,.:../bin/linux_x64/ABI1 -o main
+```
 
 #### 1.1.5 Run
 
@@ -77,7 +120,8 @@ This tutorial uses Visual Studio 2017 64 bit version.
 
 Build win32 console project and import header files, create main.cpp as in section 1.1.3, import libDolphinDBAPI.lib and configure the additional library directory as the lib directory.
 
->Note: The min/max macros are defined by default in VS. To avoid conflicts with functions `min` and `max` in the header file, `__NOMINMAX__` needs to be added to the macro definition.
+>Note 1: The min/max macros are defined by default in VS. To avoid conflicts with functions `min` and `max` in the header file, `__NOMINMAX__` needs to be added to the macro definition.
+>Note 2:  `WINDOWS` needs to be added to the macro definition.
 
 #### 1.2.4 Compile and Run
 
@@ -523,11 +567,11 @@ DolphinDB C++ Streaming API processes streaming data in 3 ways: ThreadedClient, 
 
 For details, please refer to test/StreamingThreadedClientTester.cpp, test/StreamingThreadPooledClientTester.cpp and test/StreamingPollingClientTester.cpp.
 
-### 1. Build
+### 8. Build
 
-#### 1.1 Linux64
+#### 8.1 Linux64
 
-##### 1.1.1 Build with cmake
+##### 8.1.1 Build with cmake
 
 Install cmake
 
@@ -545,7 +589,7 @@ make -j`nproc`
 
 3 executables will be generated after the compilation.
 
-#### 1.2 Build under Windows with MinGW
+#### 8.2 Build under Windows with MinGW
 
 Install [MinGW](http://www.mingw.org/) and [CMake](https://cmake.org/)
 
@@ -561,13 +605,13 @@ mingw32-make -j `nproc`
 
 **Note:** Before running, copy libDolphinDBAPI.dll and libgcc_s_seh-1.dll to the directory of your executable file.
 
-### 2. API
+### 9. Streaming
 
-#### 2.1 ThreadedClient
+#### 9.1 ThreadedClient
 
 ThreadedClient produces a single thread that calls for a user-defined handler on each incoming message.
 
-##### 2.1.1 Define the threaded client
+##### 9.1.1 Define the threaded client
 
 ```
 ThreadedClient::ThreadClient(int listeningPort);
@@ -576,7 +620,7 @@ ThreadedClient::ThreadClient(int listeningPort);
 
 - listeningPort: the subscription port number of the threaded client.
 
-##### 2.1.2  Subscribe
+##### 9.1.2  Subscribe
 
 ```
 ThreadSP ThreadedClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
@@ -601,7 +645,7 @@ auto t = client.subscribe(host, port, [](Message msg) {
 t->join();
 ```
 
-##### 2.1.3 Unsubscribe
+##### 9.1.3 Unsubscribe
 ```
 void ThreadClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 ```
@@ -614,18 +658,18 @@ Unsubscribe from a topic.
 
 <!-- /////////////////////////////////////////////////////////////////////// -->
 
-#### 2.2 ThreadPooledClient
+#### 9.2 ThreadPooledClient
 
 ThreadPooledClient produces multiple threads that poll and call a user-defined handler simultaneously on each incoming message.
 
-##### 2.2.1 Define ThreadPooledClient
+##### 9.2.1 Define ThreadPooledClient
 ```
 ThreadPooledClient::ThreadPooledClient(int listeningPort, int threadCount);
 ```
 - listeningPort: the subscription port number of the threadpooled client node.
 - threadCount: the size of the thread pool.
 
-##### 2.2.2 Subscribe
+##### 9.2.2 Subscribe
 ```
 vector<ThreadSP> ThreadPooledClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
 ```
@@ -644,7 +688,7 @@ for(auto& t : vec) {
 }
 ```
 
-##### 2.2.3 Unsubscribe
+##### 9.2.3 Unsubscribe
 ```
 void ThreadPooledClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 ```
@@ -655,11 +699,11 @@ For explanation of the parameters, please check section 2.1.3.
 
 <!-- /////////////////////////////////////////////////////////////////////// -->
 
-#### 2.3 PollingClient
+#### 9.3 PollingClient
 
 PollingClient returns a message queue, from which user can retrieve and process the messages.
 
-##### 2.3.1 Define PollingClient
+##### 9.3.1 Define PollingClient
 ```
 PollingClient::PollingClient(int listeningPort);
 ```
@@ -687,7 +731,7 @@ while(true) {
 }
 ```
 
-##### 2.3.3 Unsubscribe
+##### 9.3.2 Unsubscribe
 ```
 void PollingClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 ```
