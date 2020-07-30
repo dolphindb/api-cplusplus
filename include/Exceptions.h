@@ -11,13 +11,17 @@
 #include <exception>
 #include <string>
 #include "Types.h"
-
+#ifdef _MSC_VER
+#define EXPORT_DECL _declspec(dllexport)
+#else
+#define EXPORT_DECL 
+#endif 
 using std::exception;
 using std::string;
 
 namespace dolphindb {
 
-class IncompatibleTypeException: public exception{
+class EXPORT_DECL IncompatibleTypeException: public exception{
 public:
 	IncompatibleTypeException(DATA_TYPE expected, DATA_TYPE actual);
 	virtual ~IncompatibleTypeException() throw(){}
@@ -30,7 +34,7 @@ private:
 	string errMsg_;
 };
 
-class SyntaxException: public exception{
+class EXPORT_DECL SyntaxException: public exception{
 public:
 	SyntaxException(const string& errMsg): errMsg_(errMsg){}
 	virtual const char* what() const throw(){
@@ -42,7 +46,7 @@ private:
 	const string errMsg_;
 };
 
-class IllegalArgumentException : public exception{
+class EXPORT_DECL IllegalArgumentException : public exception{
 public:
 	IllegalArgumentException(const string& functionName, const string& errMsg): functionName_(functionName), errMsg_(errMsg){}
 	virtual const char* what() const throw(){
@@ -56,7 +60,7 @@ private:
 	const string errMsg_;
 };
 
-class RuntimeException: public exception{
+class EXPORT_DECL RuntimeException: public exception{
 public:
 	RuntimeException(const string& errMsg):errMsg_(errMsg){}
 	virtual const char* what() const throw(){
@@ -68,7 +72,7 @@ private:
 	const string errMsg_;
 };
 
-class OperatorRuntimeException: public exception{
+class EXPORT_DECL OperatorRuntimeException: public exception{
 public:
 	OperatorRuntimeException(const string& optr,const string& errMsg): operator_(optr),errMsg_(errMsg){}
 	virtual const char* what() const throw(){
@@ -82,7 +86,7 @@ private:
 	const string errMsg_;
 };
 
-class TableRuntimeException: public exception{
+class EXPORT_DECL TableRuntimeException: public exception{
 public:
 	TableRuntimeException(const string& errMsg): errMsg_(errMsg){}
 	virtual const char* what() const throw(){
@@ -94,7 +98,7 @@ private:
 	const string errMsg_;
 };
 
-class MemoryException: public exception{
+class EXPORT_DECL MemoryException: public exception{
 public:
 	MemoryException():errMsg_("Out of memory"){}
 	virtual const char* what() const throw(){
@@ -106,7 +110,7 @@ private:
 	const string errMsg_;
 };
 
-class IOException: public exception{
+class EXPORT_DECL IOException: public exception{
 public:
 	IOException(const string& errMsg): errMsg_(errMsg), errCode_(OTHERERR){}
 	IOException(const string& errMsg, IO_ERR errCode): errMsg_(errMsg + ". " + getCodeDescription(errCode)), errCode_(errCode){}
@@ -136,7 +140,7 @@ private:
 	const string errMsg_;
 };
 
-class NotLeaderException: public exception {
+class EXPORT_DECL NotLeaderException: public exception {
 public:
 	//Electing a leader. Wait for a while to retry.
 	NotLeaderException() : errMsg_("<NotLeader>"){}
@@ -153,7 +157,7 @@ private:
 	const string newLeader_;
 };
 
-class MathException: public exception {
+class EXPORT_DECL  MathException: public exception {
 public:
 	MathException(const string& errMsg) : errMsg_(errMsg){}
 	virtual const char* what() const throw(){
@@ -165,7 +169,7 @@ private:
 	const string errMsg_;
 };
 
-class TestingException: public exception{
+class EXPORT_DECL TestingException: public exception{
 public:
 	TestingException(const string& caseName,const string& subCaseName): name_(caseName),subName_(subCaseName){
 		if(subName_.empty())
@@ -187,7 +191,7 @@ private:
 
 };
 
-class UserException: public exception{
+class EXPORT_DECL UserException: public exception{
 public:
 	UserException(const string exceptionType, const string& msg) : exceptionType_(exceptionType), msg_(msg){}
 	virtual const char* what() const throw(){
