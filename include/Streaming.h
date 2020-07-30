@@ -6,7 +6,11 @@
 #include "Concurrent.h"
 #include "DolphinDB.h"
 #include "Util.h"
-
+#ifdef _MSC_VER
+#define EXPORT_DECL _declspec(dllexport)
+#else
+#define EXPORT_DECL 
+#endif
 namespace dolphindb {
 
 template <typename T>
@@ -20,7 +24,7 @@ using MessageHandler = std::function<void(Message)>;
 extern char const *DEFAULT_ACTION_NAME;
 
 template <typename T>
-class BlockingQueue {
+class EXPORT_DECL BlockingQueue {
 public:
     explicit BlockingQueue(size_t maxItems)
         : buf_(new T[maxItems]), capacity_(maxItems), size_(0), head_(0), tail_(0) {}
@@ -52,7 +56,7 @@ public:
         while (size_ == 0) {
             if (!empty_.wait(lock_, milliSeconds)) return false;
         }
-        item = std::move(buf_[head_]);
+        item = move(buf_[head_]);
         buf_[head_] = T();
         head_ = (head_ + 1) % capacity_;
         --size_;
@@ -81,7 +85,7 @@ private:
     ConditionalVariable empty_;
 };
 class StreamingClientImpl;
-class StreamingClient {
+class EXPORT_DECL StreamingClient {
 public:
     explicit StreamingClient(int listeningPort);
     virtual ~StreamingClient();
@@ -96,7 +100,7 @@ private:
     std::unique_ptr<StreamingClientImpl> impl_;
 };
 
-class ThreadedClient : private StreamingClient {
+class EXPORT_DECL ThreadedClient : private StreamingClient {
 public:
     explicit ThreadedClient(int listeningPort);
     ~ThreadedClient() override = default;
@@ -106,7 +110,7 @@ public:
     void unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 };
 
-class ThreadPooledClient : private StreamingClient {
+class EXPORT_DECL ThreadPooledClient : private StreamingClient {
 public:
     explicit ThreadPooledClient(int listeningPort, int threadCount);
     ~ThreadPooledClient() override = default;
@@ -119,7 +123,7 @@ private:
     int threadCount_;
 };
 
-class PollingClient : private StreamingClient {
+class EXPORT_DECL PollingClient : private StreamingClient {
 public:
     explicit PollingClient(int listeningPort);
     ~PollingClient() override = default;
