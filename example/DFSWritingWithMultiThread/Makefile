@@ -1,13 +1,10 @@
-CFLAGS = -g -Wall -std=c++11 -fPIC -DLINUX -DLOGGING_LEVEL_2 -DLINUX -O2 
+CFLAGS = -g -Wall -std=c++11 -fPIC -DLINUX -DLOGGING_LEVEL_2 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=0 -O2 
 INCLUDES= -I../../include
 OBJS=MultiThreadDfsWriting.o
 
 all: $(OBJS)
-	g++ -L../../bin/linux_x64 -L../../bin/mingw_x64 -L../../bin/vx2017_x64 $(OBJS) $(CFLAGS)  -lDolphinDBAPI -lssl  -lpthread -luuid -L../../bin  -Wl,-rpath,.:../../bin/linux_x64/ -o MultiThreadDfsWriting 
+	g++ -L../../bin/linux_x64/ABI0 $(OBJS) $(CFLAGS)  -lDolphinDBAPI   -lpthread  -L../../bin  -Wl,-rpath,.:../../bin/linux_x64/ABI0/ -o MultiThreadDfsWriting 
 MultiThreadDfsWriting.o: MultiThreadDfsWriting.cpp
 	g++ $(CFLAGS) $(INCLUDES) -c MultiThreadDfsWriting.cpp -o MultiThreadDfsWriting.o
 clean:
 	rm *.o MultiThreadDfsWriting  core -rf
-	
-	
-	
