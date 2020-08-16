@@ -8,3 +8,6 @@ MultiThreadDfsWriting.o: MultiThreadDfsWriting.cpp
 	g++ $(CFLAGS) $(INCLUDES) -c MultiThreadDfsWriting.cpp -o MultiThreadDfsWriting.o
 clean:
 	rm *.o MultiThreadDfsWriting  core -rf
+	
+	
+	

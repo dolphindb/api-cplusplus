@@ -18,3 +18,4 @@ StreamingDataWriting.o: StreamingDataWriting.cpp
 clean:
 	rm *.o StreamingThreadedClientSubscriber  core -rf
 	rm *.o StreamingDataWriting  core -rf
+

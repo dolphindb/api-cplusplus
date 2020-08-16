@@ -8,7 +8,6 @@ DFSWriting.o: DFSWriting.cpp
 	g++ $(CFLAGS) $(INCLUDES) -c DFSWriting.cpp -o DFSWriting.o
 clean:
 	rm *.o DFSWriting  core -rf
-
 	
 	
 	
