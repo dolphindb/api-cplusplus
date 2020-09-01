@@ -38,7 +38,7 @@ endif ()
 
 #===============================================================
 macro(TEST module)
-    add_executable(${module} ${API_SRC}/test/Streaming${module}.cpp)
+    add_executable(${module} ${API_SRC}/test/${module}.cpp)
     target_link_libraries(${module} 
         DolphinDBAPI 
         ${platform_lib} 
@@ -46,7 +46,9 @@ macro(TEST module)
         uuid)
 endmacro()
 
-TEST(PollingClientTester)
-TEST(ThreadedClientTester)
-TEST(ThreadPooledClientTester)
 
+TEST(StreamingPollingClientTester)
+TEST(StreamingThreadedClientTester)
+TEST(StreamingThreadPooledClientTester)
+TEST(DolphinDBTest)
+#TEST(StreamingThreadedClientTester)
