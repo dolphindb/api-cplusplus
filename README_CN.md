@@ -13,7 +13,7 @@
     - [1.2.2 下载bin文件和头文件](https://github.com/dolphindb/api-cplusplus/-/blob/master/README_CN.md#122-%E4%B8%8B%E8%BD%BDbin%E6%96%87%E4%BB%B6%E5%92%8C%E5%A4%B4%E6%96%87%E4%BB%B6)
     - [1.2.3 创建Visual Studio项目](https://github.com/dolphindb/api-cplusplus/-/blob/master/README_CN.md#123-%E5%88%9B%E5%BB%BAvisual-studio%E9%A1%B9%E7%9B%AE)
     - [1.2.4 编译和运行](https://github.com/dolphindb/api-cplusplus/-/blob/master/README_CN.md#124-%E7%BC%96%E8%AF%91%E5%92%8C%E8%BF%90%E8%A1%8C)
-- [2. 建立DolphinDB连接](https://github.com/dolphindb/api-cplusplus/-/blob/master/README_CN.md#2-%E5%BB%BA%E7%AB%8Bdolphindb%E8%BF%9E%E6%8E%A5)
+- [2. 建立DolphinDB连接](README_CN.md#2-%E5%BB%BA%E7%AB%8Bdolphindb%E8%BF%9E%E6%8E%A5)
 - [3. 运行DolphinDB脚本](https://github.com/dolphindb/api-cplusplus/-/blob/master/README_CN.md#3-%E8%BF%90%E8%A1%8Cdolphindb%E8%84%9A%E6%9C%AC)
 - [4. 运行DolphinDB函数](https://github.com/dolphindb/api-cplusplus/-/blob/master/README_CN.md#4-%E8%BF%90%E8%A1%8Cdolphindb%E5%87%BD%E6%95%B0)
 - [5. 上传数据对象](https://github.com/dolphindb/api-cplusplus/-/blob/master/README_CN.md#5-%E4%B8%8A%E4%BC%A0%E6%95%B0%E6%8D%AE%E5%AF%B9%E8%B1%A1)
