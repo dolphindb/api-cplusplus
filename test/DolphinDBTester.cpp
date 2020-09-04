@@ -152,12 +152,12 @@ void testFunctionDef() {
     ASSERTION("testFunctionDef", result->getString(), string("300"));
 }
 
-void testMarics() {
+void testMatrix() {
     vector < string > expectResults = { "{1,2}", "{3,4}", "{5,6}" };
     string script = "1..6$2:3";
     ConstantSP result = conn.run(script);
     for (unsigned int i = 0; i < expectResults.size(); i++) {
-        ASSERTION("testMarics", result->getString(i), expectResults[i]);
+        ASSERTION("testMatrix", result->getString(i), expectResults[i]);
     }
 }
 
@@ -624,7 +624,7 @@ int main() {
     testDatetimeVector();
     testTimeStampVector();
     testFunctionDef();
-    testMarics();
+    testMatrix();
     testTable();
     testDictionary();
     testSet();
