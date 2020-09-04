@@ -716,9 +716,9 @@ int main(int argc, char ** argv){
     testSet();
     testSymbol();
     testmixtimevectorUpload();
-    testMemoryTable();
-    testDFSTable();
-    testDiskTable();
+   // testMemoryTable();
+   // testDFSTable();
+   // testDiskTable();
     testDimensionTable();
     testCharVectorHash();
     testShortVectorHash();
