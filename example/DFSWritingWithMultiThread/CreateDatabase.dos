@@ -1,0 +1,16 @@
+// create database
+def createL3DB(dbName,tableName){
+	 login("admin","123456")
+	 db1 = database("", VALUE, datehour(2019.09.11T00:00:00)..datehour(2019.12.30T00:00:00) )//starttime,  newValuePartitionPolicy=add
+	 db2 = database("", HASH, [IPADDR, 50]) //source_address 
+	 db3 = database("", HASH,  [IPADDR, 50]) //destination_address
+	 db = database(dbName, COMPO, [db1,db2,db3])
+	 data = table(1:0, ["fwname","filename","source_address","source_port","destination_address","destination_port","nat_source_address","nat_source_port","starttime","stoptime","elapsed_time"], [SYMBOL,STRING,IPADDR,INT,IPADDR,INT,IPADDR,INT,DATETIME,DATETIME,INT])
+ 	db.createPartitionedTable(data,tableName,`starttime`source_address`destination_address)
+}
+login("admin","123456")
+createL3DB("dfs://natlog","natlogrecords")
+
+  
+select count(*)  from loadTable("dfs://natlog","natlogrecords") 
+
