@@ -1,5 +1,4 @@
 #include "config.h"
-
 string genRandString(int maxSize){
     string result;
     int size = rand()%maxSize;
@@ -46,6 +45,22 @@ void testStringVector(int vecSize){
     }
 }
 
+
+void testStringNullVector(int vecSize){
+    vector<string> values(vecSize,"NULL");
+    string script;
+    for(int i = 0 ;i < vecSize; i++)
+        script += "`" + values[i];
+    ConstantSP result = conn.run(script);
+    for(int i = 0; i < vecSize; i++){
+        ASSERTION("testStringNullVector",result->getString(i),values[i]);
+    }
+
+
+
+}
+
+
 void testIntVector(int vecSize){
     vector<int> values;
     for(int i = 0 ;i < vecSize ; i++)
@@ -57,6 +72,19 @@ void testIntVector(int vecSize){
     for(int i = 0 ;i < vecSize; i++)
         ASSERTION("testIntVector",result->getInt(i),values[i]);
 }
+
+
+void testIntNullVector(int vecSize){
+    vector<ConstantSP> values(vecSize,Util::createNullConstant(DT_INT));
+    string script;
+    for(int i = 0 ;i < vecSize; i++)
+        script += " " + values[i]->getString();
+    ConstantSP result = conn.run(script);
+    for(int i = 0 ;i < vecSize; i++)
+        ASSERTION("testIntNullVector",result->getItem(i)->getString(),values[i]->getString());
+
+}
+
 
 void testDoubleVector(int vecSize){
     vector<double> values;
@@ -70,6 +98,17 @@ void testDoubleVector(int vecSize){
         ASSERTION("testDoubleVector",result->getDouble(i),values[i]);
 }
 
+
+void testDoubleNullVector(int vecSize){
+    vector<ConstantSP> values(vecSize,Util::createNullConstant(DT_DOUBLE));
+    string script;
+    for(int i = 0 ;i < vecSize; i++)
+        script += " " + values[i]->getString();
+    ConstantSP result = conn.run(script);
+    for(int i = 0 ;i < vecSize; i++)
+        ASSERTION("testDoubleNullVector",result->getString(),values[i]->getString());
+
+}
 
 void testDateVector(){
     string beginDate = "2010.08.20";
@@ -87,6 +126,15 @@ void testDateVector(){
 }
 
 
+void testDatenullVector(int vecSize){
+    vector<ConstantSP> values(vecSize,Util::createNullConstant(DT_DATE));
+    string script;
+    for(int i = 0 ;i < vecSize; i++)
+        script += " " + values[i]->getString();
+    ConstantSP result = conn.run(script);
+    for(int i = 0 ;i < vecSize; i++)
+        ASSERTION("testDateNullVector",result->getItem(i)->getString(),values[i]->getString());
+}
 
 void testDatetimeVector(){
     string beginDateTime = "2012.10.01 15:00:04";
@@ -122,22 +170,112 @@ void testTimeStampVector(){
     }
 }
 
+
+void testnanotimeVector(){
+    string beginNanotime = "13:30:10.008007006";
+    vector<long long> testValues = {1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000,10000000000,100000000000,1000000000000};
+    vector<string> expectResults = {"13:30:10.008007007","13:30:10.008007016","13:30:10.008007106",
+                                    "13:30:10.008008006","13:30:10.008017006","13:30:10.008107006","13:30:10.009007006",
+                                    "13:30:10.018007006","13:30:10.108007006","13:30:11.008007006","13:30:20.008007006",
+                                    "13:31:50.008007006","13:46:50.008007006"};
+    string script;
+    for(unsigned int i = 0; i < testValues.size(); i++){
+        script += " " + std::to_string(testValues[i]);
+    }
+    script = beginNanotime + " + " + script;
+    ConstantSP result = conn.run(script);
+    for(unsigned int i = 0; i < testValues.size(); i++){
+        ASSERTION("testnanotimeVector",result->getString(i),expectResults[i]);
+    }
+}
+
+
+void testnanotimestampVector(){
+    string beginNanotimestamp = "2012.06.13T13:30:10.008007006";
+    vector<long long> testValues = {1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000,10000000000,100000000000,1000000000000,10000000000000,100000000000000,1000000000000000,10000000000000000,100000000000000000};
+    vector<string> expectResults = {"2012.06.13T13:30:10.008007007","2012.06.13T13:30:10.008007016","2012.06.13T13:30:10.008007106",
+                                    "2012.06.13T13:30:10.008008006","2012.06.13T13:30:10.008017006","2012.06.13T13:30:10.008107006","2012.06.13T13:30:10.009007006",
+                                    "2012.06.13T13:30:10.018007006","2012.06.13T13:30:10.108007006","2012.06.13T13:30:11.008007006","2012.06.13T13:30:20.008007006",
+                                    "2012.06.13T13:31:50.008007006","2012.06.13T13:46:50.008007006","2012.06.13T16:16:50.008007006","2012.06.14T17:16:50.008007006","2012.06.25T03:16:50.008007006","2012.10.07T07:16:50.008007006","2015.08.14T23:16:50.008007006"};
+    string script;
+    for(unsigned int i = 0; i < testValues.size(); i++){
+        script += " " + std::to_string(testValues[i]);
+    }
+    script = beginNanotimestamp + " + " + script;
+    ConstantSP result = conn.run(script);
+    for(unsigned int i = 0; i < testValues.size(); i++){
+        ASSERTION("testnanotimestampVector",result->getString(i),expectResults[i]);
+    }
+}
+
+
+void testmonthVector(){
+    string beginmonth="2012.06M";
+    vector<int> testValues = {1,10,100,1000};
+    vector<string> expectResults = {"2012.07M","2013.04M","2020.10M","2095.10M"};
+    string script;
+    for(unsigned int i = 0; i < testValues.size(); i++){
+        script += " " + std::to_string(testValues[i]);
+    }
+    script = beginmonth + " + " + script;
+    ConstantSP result = conn.run(script);
+    for(unsigned int i = 0; i < testValues.size(); i++){
+        ASSERTION("testmonthVector",result->getString(i),expectResults[i]);
+    }
+}
+
+void testtimeVector(){
+    string begintime="13:30:10.008";
+    vector<int> testValues = {1,10,100,1000,10000,100000,1000000,10000000};
+    vector<string> expectResults = {"13:30:10.009","13:30:10.018","13:30:10.108","13:30:11.008","13:30:20.008","13:31:50.008","13:46:50.008","16:16:50.008"};
+    string script;
+    for(unsigned int i = 0; i < testValues.size(); i++){
+        script += " " + std::to_string(testValues[i]);
+    }
+    script = begintime + " + " + script;
+    ConstantSP result = conn.run(script);
+    for(unsigned int i = 0; i < testValues.size(); i++){
+        ASSERTION("testtimeVector",result->getString(i),expectResults[i]);
+    }
+}
+
+void testSymbol(){
+    vector<string> expectResults = {"XOM","y"};
+    string script;
+    script += "x=`XOM`y;y=symbol x;y;";
+    ConstantSP result = conn.run(script);
+    for(unsigned int i = 0 ;i < expectResults.size(); i++){
+        ASSERTION("testSymbol",result->getString(i),expectResults[i]);
+    }
+}
+
+
+void testmixtimevectorUpload(){
+    VectorSP dates = Util::createVector(DT_ANY,5,100);
+    dates->set(0, Util::createMonth(2016,6));
+    dates->set(1,Util::createDate(2016,5,16));
+    dates->set(2,Util::createDateTime(2016,6,6,6,12,12));
+    dates->set(3,Util::createNanoTime(6,28,36,00));
+    dates->set(4,Util::createNanoTimestamp(2020,8,20,2,20,20,00));
+    vector<ConstantSP> mixtimedata = {dates};
+    vector<string> mixtimename={"Mixtime"};
+    conn.upload(mixtimename,mixtimedata);
+}
+
 void testFunctionDef(){
     string script = "def funcAdd(a,b){return a + b};funcAdd(100,200);";
     ConstantSP result = conn.run(script);
     ASSERTION("testFunctionDef",result->getString(),string("300"));
 }
 
-void testMarics(){
+void testMatrix(){
     vector<string> expectResults = {"{1,2}","{3,4}","{5,6}"};
     string script = "1..6$2:3";
     ConstantSP result = conn.run(script);
     for(unsigned int i = 0 ;i < expectResults.size(); i++){
-        ASSERTION("testMarics",result->getString(i),expectResults[i]);
+        ASSERTION("testMatrix",result->getString(i),expectResults[i]);
     }
 }
-
-
 
 void testTable(){
     string script;
@@ -160,225 +298,13 @@ void testDictionary(){
     ASSERTION("testDictionary",dict->get(Util::createInt(1))->getString(),string("IBM"));
     ASSERTION("testDictionary",dict->get(Util::createInt(2))->getString(),string("MSFT"));
     ASSERTION("testDictionary",dict->get(Util::createInt(3))->getString(),string("GOOG"));
-
-    script = "x=[int128('1234567890abcdef1234567890abcdef'),int128('1234567890abcdef1234567890abcde0')];y=1..2;d=dict(x,y);d";
-    DictionarySP dict1 = conn.run(script);
-    ASSERTION("testDictionary",dict1->get(Util::parseConstant(DT_INT128,"1234567890abcdef1234567890abcdef"))->getInt(),1);
-    ASSERTION("testDictionary",dict1->get(Util::parseConstant(DT_INT128,"1234567890abcdef1234567890abcde0"))->getInt(),2);
-
-    script = "def addDict(mutable d,key,a){d[key]=a[key]};";
-    conn.run(script);
-    DictionarySP d1=Util::createDictionary(DT_IP,DT_INT128);
-    d1->set(Util::parseConstant(DT_INT128,"c93b83f13b579d8eea21f23a4ded5050"), Util::createInt(3));
-    vector<ConstantSP> args0;
-    args0.push_back(Util::parseConstant(DT_INT128,"c93b83f13b579d8eea21f23a4ded5050"));
-    args0.push_back(d1);
-    conn.run("addDict{d}",args0);
-    dict1=conn.run("d");
-    ASSERTION("testDictionary3",dict1->get(Util::parseConstant(DT_INT128,"1234567890abcdef1234567890abcdef"))->getInt(),1);
-    ASSERTION("testDictionary3",dict1->get(Util::parseConstant(DT_INT128,"c93b83f13b579d8eea21f23a4ded5050"))->getInt(),3);
-
-
-
-    script = "x=[uuid('12345678-90ab-cdef-1234-567890abcdef'),uuid('12345678-90ab-cdef-1234-567890abcde0')];y=1..2;dict(x,y)";
-    DictionarySP dict2 = conn.run(script);
-    ASSERTION("testDictionary",dict2->get(Util::parseConstant(DT_UUID,"12345678-90ab-cdef-1234-567890abcdef"))->getInt(),1);
-    ASSERTION("testDictionary",dict2->get(Util::parseConstant(DT_UUID,"12345678-90ab-cdef-1234-567890abcde0"))->getInt(),2);
-    DictionarySP d2=Util::createDictionary(DT_IP,DT_INT);
-    d2->set(Util::parseConstant(DT_UUID,"12345678-90ab-cdef-1234-567890ab5050"), Util::createInt(3));
-    vector<ConstantSP> args1;
-    args1.push_back(Util::parseConstant(DT_UUID,"12345678-90ab-cdef-1234-567890ab5050"));
-    args1.push_back(d2);
-    conn.run("addDict{d}",args1);
-    dict2=conn.run("d");
-    ASSERTION("testDictionary4",dict2->get(Util::parseConstant(DT_UUID,"12345678-90ab-cdef-1234-567890abcdef"))->getInt(),1);
-    ASSERTION("testDictionary4",dict2->get(Util::parseConstant(DT_UUID,"12345678-90ab-cdef-1234-567890ab5050"))->getInt(),3);
-
-
-
-    script = "d=dict([ipaddr('4a80:5098:a255:cf1e:d4b8:3f69:d1fb:a6fd'),ipaddr('c93b:83f1:3b57:9d8e:ea21:f23a:4ded:4949'),ipaddr('bb94:24d5:33f9:9363:f15c:f929:abde:9d19'),ipaddr('4782:29a8:6f0f:aa7b:73b9:759c:d81e:e42e'),ipaddr('4aac:44d8:18fd:40fe:60c5:5b43:6449:f0e1'),ipaddr('7069:8a02:3385:a5a4:60f3:5206:d69:bcde')], 1..6);d";
-    DictionarySP dict3= conn.run(script);
-    ASSERTION("testDictionary5",dict3->get(Util::parseConstant(DT_IP,"4a80:5098:a255:cf1e:d4b8:3f69:d1fb:a6fd"))->getInt(),1);
-    ASSERTION("testDictionary5",dict3->get(Util::parseConstant(DT_IP,"c93b:83f1:3b57:9d8e:ea21:f23a:4ded:4949"))->getInt(),2);
-    DictionarySP d=Util::createDictionary(DT_IP,DT_INT);
-    d->set(Util::parseConstant(DT_IP,"c93b:83f1:3b57:9d8e:ea21:f23a:4ded:5050"), Util::createInt(3));
-    vector<ConstantSP> args;
-    args.push_back(Util::parseConstant(DT_IP,"c93b:83f1:3b57:9d8e:ea21:f23a:4ded:5050"));
-    args.push_back(d);
-    conn.run("addDict{d}",args);
-    dict3=conn.run("d");
-    ASSERTION("testDictionary6",dict3->get(Util::parseConstant(DT_IP,"4a80:5098:a255:cf1e:d4b8:3f69:d1fb:a6fd"))->getInt(),1);
-    ASSERTION("testDictionary6",dict3->get(Util::parseConstant(DT_IP,"c93b:83f1:3b57:9d8e:ea21:f23a:4ded:5050"))->getInt(),3);
-
-    vector<string> codes = {"000001.SZ", "000002.SZ"};
-    VectorSP code_vec = Util::createVector(DT_SYMBOL, codes.size(), codes.size());
-    code_vec->setString(0, codes.size(), codes.data());
-
-    DictionarySP adict=Util::createDictionary(DT_INT,DT_ANY);
-    adict->set(Util::createInt(0), code_vec);
-    adict->set(Util::createInt(1), code_vec);
-    script="z=dict(INT,any); def add2dict(mutable z,d){ for(i in 0:d.size()) z[i]=d[i];}";
-    conn.run(script);
-    vector<ConstantSP> args10;
-    args10.push_back(adict);
-    conn.run("add2dict{z}",args10);
-    dict=conn.run("z");
-    ASSERTION("testDictionary7",dict->size(),2);
-    ASSERTION("testDictionary7",dict->get(Util::createInt(1))->get(0)->getString(),string("000001.SZ"));
-    ASSERTION("testDictionary7",dict->get(Util::createInt(0))->get(1)->getString(),string("000002.SZ"));
-
-    DictionarySP acdict=Util::createDictionary(DT_CHAR,DT_ANY);
-    acdict->set(Util::createChar(0), code_vec);
-    acdict->set(Util::createChar(1), code_vec);
-    script="z=dict(char,any); def add2dict(mutable z,d){ for(i in 0:d.size()) z[i]=d[i];}";
-    conn.run(script);
-    vector<ConstantSP> args11;
-    args11.push_back(acdict);
-    conn.run("add2dict{z}",args11);
-    dict=conn.run("z");
-    ASSERTION("testDictionary8",dict->size(),2);
-    ASSERTION("testDictionary8",dict->get(Util::createChar(1))->get(0)->getString(),string("000001.SZ"));
-    ASSERTION("testDictionary8",dict->get(Util::createChar(0))->get(1)->getString(),string("000002.SZ"));
-
-    DictionarySP asdict=Util::createDictionary(DT_SHORT,DT_ANY);
-    asdict->set(Util::createShort(0), code_vec);
-    asdict->set(Util::createShort(1), code_vec);
-    script="z=dict(SHORT,any); def add2dict(mutable z,d){ for(i in 0:d.size()) z[i]=d[i];}";
-    conn.run(script);
-    vector<ConstantSP> args12;
-    args12.push_back(asdict);
-    conn.run("add2dict{z}",args12);
-    dict=conn.run("z");
-    ASSERTION("testDictionary9",dict->size(),2);
-    ASSERTION("testDictionary9",dict->get(Util::createShort(1))->get(0)->getString(),string("000001.SZ"));
-    ASSERTION("testDictionary9",dict->get(Util::createShort(0))->get(1)->getString(),string("000002.SZ"));
-
-    DictionarySP aldict=Util::createDictionary(DT_LONG,DT_ANY);
-    aldict->set(Util::createLong(0), code_vec);
-    aldict->set(Util::createLong(1), code_vec);
-    script="z=dict(LONG,any); def add2dict(mutable z,d){ for(i in 0:d.size()) z[long(i)]=d[long(i)];}";
-    conn.run(script);
-    vector<ConstantSP> args13;
-    args13.push_back(aldict);
-    conn.run("add2dict{z}",args13);
-    dict=conn.run("z");
-    ASSERTION("testDictionary10",dict->size(),2);
-    ASSERTION("testDictionary10",dict->get(Util::createLong(1))->get(0)->getString(),string("000001.SZ"));
-    ASSERTION("testDictionary",dict->get(Util::createLong(0))->get(1)->getString(),string("000002.SZ"));
-
-    DictionarySP adtdict=Util::createDictionary(DT_DATE,DT_ANY);
-    adtdict->set(Util::createDate(2020,4,26), code_vec);
-    adtdict->set(Util::createDate(2020,4,27), code_vec);
-    script="z=dict(DATE,any); def add2dict(mutable z,d){ for(i in 0:d.size()) z[2020.04.26+i]=d[2020.04.26+i];}";
-    conn.run(script);
-    vector<ConstantSP> args14;
-    args14.push_back(adtdict);
-    conn.run("add2dict{z}",args14);
-    dict=conn.run("z");
-    ASSERTION("testDictionary11",dict->size(),2);
-    ASSERTION("testDictionary11",dict->get(Util::createDate(2020,4,27))->get(0)->getString(),string("000001.SZ"));
-    ASSERTION("testDictionary11",dict->get(Util::createDate(2020,4,26))->get(1)->getString(),string("000002.SZ"));
-
-
-    adtdict=Util::createDictionary(DT_DATETIME,DT_ANY);
-    adtdict->set(Util::createDateTime(2020,4,26,0,0,0), code_vec);
-    adtdict->set(Util::createDateTime(2020,4,26,0,0,1), code_vec);
-    script="z=dict(DATETIME,any); def add2dict(mutable z,d){ for(i in 0:d.size()) z[2020.04.26T00:00:00+i]=d[2020.04.26T00:00:00+i];}";
-    conn.run(script);
-    vector<ConstantSP> args15;
-    args15.push_back(adtdict);
-    conn.run("add2dict{z}",args15);
-    dict=conn.run("z");
-    ASSERTION("testDictionary12",dict->size(),2);
-    ASSERTION("testDictionary12",dict->get(Util::createDateTime(2020,4,26,0,0,0))->get(0)->getString(),string("000001.SZ"));
-    ASSERTION("testDictionary12",dict->get(Util::createDateTime(2020,4,26,0,0,1))->get(1)->getString(),string("000002.SZ"));
-
-    adtdict=Util::createDictionary(DT_TIMESTAMP,DT_ANY);
-    adtdict->set(Util::createTimestamp(2020,4,26,0,0,0,0), code_vec);
-    adtdict->set(Util::createTimestamp(2020,4,26,0,0,0,1), code_vec);
-    script="z=dict(TIMESTAMP,any); def add2dict(mutable z,d){ for(i in 0:d.size()) z[2020.04.26T00:00:00.000+i]=d[2020.04.26T00:00:00.000+i];}";
-    conn.run(script);
-    vector<ConstantSP> args16;
-    args16.push_back(adtdict);
-    conn.run("add2dict{z}",args16);
-    dict=conn.run("z");
-    ASSERTION("testDictionary13",dict->size(),2);
-	
-    ASSERTION("testDictionary13",dict->get(Util::createTimestamp(2020,4,26,0,0,0,0))->get(0)->getString(),string("000001.SZ"));
-    ASSERTION("testDictionary13",dict->get(Util::createTimestamp(2020,4,26,0,0,0,1))->get(1)->getString(),string("000002.SZ"));
-	
-	
-    adtdict=Util::createDictionary(DT_SECOND,DT_ANY);
-    adtdict->set(Util::createSecond(12,0,0), code_vec);
-    adtdict->set(Util::createSecond(12,0,1), code_vec);
-    script="z=dict(SECOND,any); def add2dict(mutable z,d){ for(i in 0:d.size()) z[12:00:00+i]=d[12:00:00+i];}";
-    conn.run(script);
-    vector<ConstantSP> args17;
-    args17.push_back(adtdict);
-    conn.run("add2dict{z}",args17);
-    dict=conn.run("z");
-    ASSERTION("testDictionary14",dict->size(),2);
-    ASSERTION("testDictionary14",dict->get(Util::createSecond(12,0,0))->get(0)->getString(),string("000001.SZ"));
-    ASSERTION("testDictionary14",dict->get(Util::createSecond(12,0,1))->get(1)->getString(),string("000002.SZ"));
-
-    adtdict=Util::createDictionary(DT_MINUTE,DT_ANY);
-    adtdict->set(Util::createMinute(12,0), code_vec);
-    adtdict->set(Util::createMinute(12,1), code_vec);
-    script="z=dict(MINUTE,any); def add2dict(mutable z,d){ for(i in 0:d.size()) z[12:00m+i]=d[12:00m+i];}";
-    conn.run(script);
-    vector<ConstantSP> args18;
-    args18.push_back(adtdict);
-    conn.run("add2dict{z}",args18);
-    dict=conn.run("z");
-    ASSERTION("testDictionary15",dict->size(),2);
-    ASSERTION("testDictionary15",dict->get(Util::createMinute(12,0))->get(0)->getString(),string("000001.SZ"));
-    ASSERTION("testDictionary15",dict->get(Util::createMinute(12,0))->get(1)->getString(),string("000002.SZ"));
-
-    adtdict=Util::createDictionary(DT_NANOTIMESTAMP,DT_ANY);
-    adtdict->set(Util::createNanoTimestamp(2020,4,26,0,0,0,0), code_vec);
-    adtdict->set(Util::createNanoTimestamp(2020,4,26,0,0,0,1), code_vec);
-    script="z=dict(NANOTIMESTAMP,any); def add2dict(mutable z,d){ for(i in 0:d.size()) z[2020.04.26T00:00:00.000000000+i]=d[2020.04.26T00:00:00.000000000+i];}";
-    conn.run(script);
-    vector<ConstantSP> args1a;
-    args1a.push_back(adtdict);
-    conn.run("add2dict{z}",args1a);
-    dict=conn.run("z");
-    ASSERTION("testDictionary17",dict->size(),2);
-    ASSERTION("testDictionary17",dict->get(Util::createNanoTimestamp(2020,4,26,0,0,0,0))->get(0)->getString(),string("000001.SZ"));
-    ASSERTION("testDictionary17",dict->get(Util::createNanoTimestamp(2020,4,26,0,0,0,1))->get(1)->getString(),string("000002.SZ"));
-
 }
+
 void testSet(){
     string script;
     script += "x=set(4 5 5 2 3 11 11 11 6 6  6 6  6);x;";
-    SetSP set = conn.run(script);
+    ConstantSP set = conn.run(script);
     ASSERTION("testSet",set->size(),6);
-
-    script = "y=(int128(\"1234567890abcdef1234567890abcdef\"),int128(\"1234567890abcdef1234567890abcdef\"));y";
-    set= conn.run(script);
-    ASSERTION("testSet",set->size(),2);
-    ASSERTION("testDictionary",set->get(0)->getString(),string("1234567890abcdef1234567890abcdef"));
-    ASSERTION("testDictionary",set->get(1)->getString(),string("1234567890abcdef1234567890abcdef"));
-
-    script = "z=(uuid('12345678-90ab-cdef-1234-567890abcdef'),uuid('12345678-90ab-cdef-1234-567890abcde0'));z";
-    set= conn.run(script);
-    ASSERTION("testSet",set->size(),2);
-    ASSERTION("testDictionary",set->get(0)->getString(),string("12345678-90ab-cdef-1234-567890abcdef"));
-    ASSERTION("testDictionary",set->get(1)->getString(),string("12345678-90ab-cdef-1234-567890abcde0"));
-
-    script = "u=(ipaddr('4a80:5098:a255:cf1e:d4b8:3f69:d1fb:a6fd'),ipaddr('c93b:83f1:3b57:9d8e:ea21:f23a:4ded:4949'),ipaddr('bb94:24d5:33f9:9363:f15c:f929:abde:9d19'),ipaddr('4782:29a8:6f0f:aa7b:73b9:759c:d81e:e42e'),ipaddr('4aac:44d8:18fd:40fe:60c5:5b43:6449:f0e1'),ipaddr('7069:8a02:3385:a5a4:60f3:5206:d69:bcde'));u";
-    set= conn.run(script);
-    ASSERTION("testSet",set->size(),6);
-    ASSERTION("testDictionary",set->get(0)->getString(),string("4a80:5098:a255:cf1e:d4b8:3f69:d1fb:a6fd"));
-    ASSERTION("testDictionary",set->get(1)->getString(),string("c93b:83f1:3b57:9d8e:ea21:f23a:4ded:4949"));
-
-    SetSP d=Util::createSet(DT_IP,1);
-    d->append(Util::parseConstant(DT_IP,"c93b:83f1:3b57:9d8e:ea21:f23a:4ded:6060"));
-    vector<ConstantSP> args;
-    args.push_back(d);
-    conn.run("append!{u}",args);
-    set=conn.run("u");
-    ASSERTION("testSet",set->size(),7);
 }
 
 void testMemoryTable(){
@@ -391,13 +317,24 @@ void testMemoryTable(){
         names->set(i,Util::createString("name_"+std::to_string(i)));
         dates->set(i,Util::createDate(2010,1,i+1));
         prices->set(i,Util::createDouble(i*i));
-    }
+    } 
     vector<string> allnames = {"names","dates","prices"};
     vector<ConstantSP> allcols = {names,dates,prices};
     conn.upload(allnames,allcols);//upload data to server
-    script += "insert into tglobal values(names,dates,prices);";
-    script += "select * from tglobal;";
-    TableSP table = conn.run(script);
+    script += "tglobal=table(names,dates,prices);";
+    script += "login(`admin,`123456);";
+    script += "dbPath = \"dfs://demodb2\";";
+    script += "if(existsDatabase(dbPath)){dropDatabase(dbPath)};";
+    script += "db=database(dbPath,VALUE,2010.01.01..2010.01.30);";
+    script += "pt=db.createPartitionedTable(tglobal,`pt,`dates);";
+    script += "pt.append!(tglobal);";
+    script += "dropPartition(db,2010.01.01);";
+    //script += "dropTable(db,`tglobal);";
+    //script += "dropDatabase(\"dfs://demodb2\");";
+    //script += "existsDatabase(\"dfs://demodb2\");";
+    //script += "insert into tglobal values(names,dates,prices);";
+    script += "select * from pt;";
+    TableSP table = conn.run(script); 
     cout<<table->getString()<<endl;
 }
 
@@ -409,7 +346,7 @@ TableSP createDemoTable(){
     vector<VectorSP> columnVecs;
     for(int i = 0 ;i < colNum ;i ++)
         columnVecs.push_back(table->getColumn(i));
-
+        
     for(int i =  0 ;i < rowNum; i++){
         columnVecs[0]->set(i,Util::createString("name_"+std::to_string(i)));
         columnVecs[1]->set(i,Util::createDate(2010,1,i+1));
@@ -423,12 +360,16 @@ void testDiskTable(){
     TableSP table = createDemoTable();
     conn.upload("mt",table);
     string script;
-    script += "db=database(\"/home/psui/demoTable1\");";
+    script += "dbPath= \"/home/swang/mytest/Demo2DB\";";
+    script += "if(existsDatabase(dbPath)){dropDatabase(dbPath)};";
+    script += "db=database(dbPath,VALUE,2010.01.01..2010.01.30);";
+    script += "tDiskGlobal=db.createPartitionedTable(mt,`tDiskGlobal,`date);";
     script += "tDiskGlobal.append!(mt);";
-    script += "saveTable(db,tDiskGlobal,`dt);";
+    //script += "saveTable(db,tDiskGlobal,`tDiskGlobal);";
     script += "select * from tDiskGlobal;";
     TableSP result = conn.run(script);
     cout<<result->getString()<<endl;
+
 }
 
 void testDFSTable(){
@@ -437,13 +378,39 @@ void testDFSTable(){
     conn.upload("mt",table);
     script += "login(`admin,`123456);";
     script += "dbPath = \"dfs://SAMPLE_TRDDB\";";
+    script += "if(existsDatabase(dbPath)){dropDatabase(dbPath)};";
     script += "tableName = `demoTable;";
-    script += "database(dbPath).loadTable(tableName).append!(mt);";
-    script += "tradTable= database(dbPath).loadTable(tableName);";
-    script += "select * from tradTable;";
+    script += "db = database(dbPath,VALUE,2010.01.01..2010.01.30);";
+    script += "date = db.createPartitionedTable(mt,tableName,`date);";
+    //script += "date.tableInsert(mt);";
+    script += "tradTable=database(dbPath).loadTable(tableName).append!(mt);";
+    //script += "tradTable= database(dbPath).loadTable(tableName);";
+    //script += "dropPartition(db,2010.01.01);";
+    //script += "dropTable(db,`demoTable);";
+    //script += "existsTable(\"dfs://SAMPLE_TRDDB\",`demoTable);";
+    //script += "dropDatabase(\"dfs://SAMPLE_TRDDB\");";
+    //script += "existsDatabase(\"dfs://SAMPLE_TRDDB\");";
+    script += "select * from date;";
+    //script += "select * from date where date>2020.01;";
+    TableSP result = conn.run(script); 
+    cout<<result->getString()<<endl;
+}
+
+
+void testDimensionTable(){
+    string script;
+    TableSP table = createDemoTable();
+    conn.upload("mt",table);
+    script += "login(`admin,`123456);";
+    script += "dbPath = \"dfs://db1\";";
+    script += "if(existsDatabase(dbPath)){dropDatabase(dbPath)};";
+    script += "db = database(dbPath,VALUE,2010.01.01..2010.01.30);";
+    script += "dt = db.createTable(mt,`dt).append!(mt);";
+    script += "select * from dt;";
     TableSP result = conn.run(script);
     cout<<result->getString()<<endl;
 }
+
 
 void ASSERTIONHASH(const string test, const int ret[], const int expect[],int len) {
 	bool equal=true;
@@ -674,6 +641,51 @@ void testInt128vectorHash(){
 }
 
 
+void testshare(){
+    string script;
+    script += "TickDB = database(\"/home/swang/mytest/shareEx\", RANGE, `A`M`ZZZZ, `DFS_NODE1`DFS_NODE2);";
+    script += "t=table(rand(`AAPL`IBM`C`F,100) as sym, rand(1..10, 100) as qty, rand(10.25 10.5 10.75, 100) as price);";
+    script += "share t as TickDB.Trades on sym;";
+    //script += "dropTable(TickDB,`TickDB.Trades);";
+    script += "select top 10 * from TickDB.Trades;";
+
+    //script += "select count(*) from TickDB.Trades;";
+    TableSP result = conn.run(script);
+    cout<<result->getString()<<endl;
+
+}
+
+void testRun(){
+    //所有参数都在服务器端
+    /*conn.run("x = [1, 3, 5]; y = [2, 4, 6]");
+    ConstantSP result = conn.run("add(x,y)");
+    cout<<result->getString()<<endl;*/
+    //仅有一个参数在服务器端
+    /*conn.run("x = [1, 3, 5]");
+    vector<ConstantSP> args;
+    ConstantSP y = Util::createVector(DT_DOUBLE, 3);
+    double array_y[] = {1.5, 2.5, 7};
+    y->setDouble(0, 3, array_y);
+    args.push_back(y);
+    ConstantSP result = conn.run("add{x,}", args);
+    cout<<result->getString()<<endl;*/
+    //两个参数都在客户端
+    vector<ConstantSP> args;
+    ConstantSP x = Util::createVector(DT_DOUBLE, 3);
+    double array_x[] = {1.5, 2.5, 7};
+    x->setDouble(0, 3, array_x);
+    ConstantSP y = Util::createVector(DT_DOUBLE, 3);
+    double array_y[] = {8.5, 7.5, 3};
+    y->setDouble(0, 3, array_y);
+    args.push_back(x);
+    args.push_back(y);
+    ConstantSP result = conn.run("add", args);
+    cout<<result->getString()<<endl;
+
+
+}
+
+
 int main(int argc, char ** argv){
     DBConnection::initialize();
     bool ret = conn.connect(hostName,port);
@@ -684,20 +696,30 @@ int main(int argc, char ** argv){
     int testVectorSize = 20;
 
     testStringVector(testVectorSize);
+    testStringNullVector(testVectorSize);
     testIntVector(testVectorSize);
+    testIntNullVector(testVectorSize);
     testDoubleVector(testVectorSize);
+    testDoubleNullVector(testVectorSize);
     testDateVector();
+    testDatenullVector(testVectorSize);
     testDatetimeVector();
     testTimeStampVector();
+    testnanotimeVector();
+    testnanotimestampVector();
+    testmonthVector();
+    testtimeVector();
     testFunctionDef();
-    testMarics();
+    testMatrix();
     testTable();
     testDictionary();
     testSet();
-    //testMemoryTable();
-    //testDiskTable();
-    //testDFSTable();
-
+    testSymbol();
+    testmixtimevectorUpload();
+    testMemoryTable();
+    testDFSTable();
+    testDiskTable();
+    testDimensionTable();
     testCharVectorHash();
     testShortVectorHash();
     testIntVectorHash();
@@ -706,9 +728,12 @@ int main(int argc, char ** argv){
     testUUIDvectorHash();
     testIpAddrvectorHash();
     testInt128vectorHash();
-
-    string fileName(argv[1]);
-    printTestResults(fileName);
+    testRun();
+    //testshare();
+    if (argc >= 2) {
+        string fileName(argv[1]);
+        printTestResults(fileName);
+    }
 
     return 0;
 }

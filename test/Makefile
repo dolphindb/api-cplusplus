@@ -18,3 +18,4 @@ all : $(OBJS)
 	$(CC) -o $@ -c $<  $(CXXFLAGS)
 clean:
 	rm $(OBJS) $(EXES)  -rf
+
