@@ -176,6 +176,21 @@ bool ret = conn.connect("127.0.0.1", 8848, "admin", "123456");
 
 若未使用用户名及密码连接成功，则脚本在Guest权限下运行。后续运行中若需要提升权限，可以使用 conn.login('admin','123456',true) 登录获取权限。
 
+
+声明connection变量的时候，有两个可选参数： enableSSL（支持SSL）, enableAYSN（支持一部分）.这两个参数默认值为false.
+
+下面例子是，建立支持SSL而非支持异步的connection，同时服务器端应该添加参数enableHTTPS=true。
+
+```C++
+DBConnection conn(true,false)
+```
+
+下面建立即不支持SSL，但支持异步的connection。异步情况下，步只能执行DolphinDB脚本和函数， 且不再有返回值，该功能适用于异步写入数据。
+
+```C++
+DBConnection conn(false,true)
+```
+
 ### 3. 运行DolphinDB脚本
 
 通过 `run` 方法运行DolphinDB脚本：
