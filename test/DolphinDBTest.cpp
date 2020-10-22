@@ -359,8 +359,9 @@ TableSP createDemoTable(){
 void testDiskTable(){
     TableSP table = createDemoTable();
     conn.upload("mt",table);
+    string dbPath = conn.run("getHomeDir()+\"/cpp_test\" ")->getString();
     string script;
-    script += "dbPath= \"/home/swang/mytest/Demo2DB\";";
+    script += "dbPath;";
     script += "if(existsDatabase(dbPath)){dropDatabase(dbPath)};";
     script += "db=database(dbPath,VALUE,2010.01.01..2010.01.30);";
     script += "tDiskGlobal=db.createPartitionedTable(mt,`tDiskGlobal,`date);";
@@ -642,8 +643,9 @@ void testInt128vectorHash(){
 
 
 void testshare(){
+    string dbPath = conn.run(" getHomeDir()+\"/cpp_test\"")->getString();
     string script;
-    script += "TickDB = database(\"/home/swang/mytest/shareEx\", RANGE, `A`M`ZZZZ, `DFS_NODE1`DFS_NODE2);";
+    script += "TickDB = database(dbPath, RANGE, `A`M`ZZZZ, `DFS_NODE1`DFS_NODE2);";
     script += "t=table(rand(`AAPL`IBM`C`F,100) as sym, rand(1..10, 100) as qty, rand(10.25 10.5 10.75, 100) as price);";
     script += "share t as TickDB.Trades on sym;";
     //script += "dropTable(TickDB,`TickDB.Trades);";
@@ -681,10 +683,218 @@ void testRun(){
     args.push_back(y);
     ConstantSP result = conn.run("add", args);
     cout<<result->getString()<<endl;
+}
 
+void tets_Block_Reader_DFStable(){
+    string script;
+    string script1;
+    TableSP table = createDemoTable();
+    conn.upload("mt",table);
+    script += "login(`admin,`123456);";
+    script += "dbPath = \"dfs://TEST_BLOCK\";";
+    script += "if(existsDatabase(dbPath)){dropDatabase(dbPath)};";
+    script += "tableName = `pt;";
+    script += "db = database(dbPath,VALUE,2010.01.01..2010.01.30);";
+    script += "pt = db.createPartitionedTable(mt,tableName,`date);";
+    script += "pt.append!(mt);";
+    script += "n=12450;";
+    script += "t1=table(take(`name_3,n) as name,take(2010.01.01,n) as date,rand(30,n) as price);";
+    script += "pt.append!(t1);";
+    conn.run(script);
+    script1 += "select * from pt;";
+    int fetchsize1 = 12453;
+    BlockReaderSP reader = conn.run(script1,4,2,fetchsize1);
+    ConstantSP t;
+    int total = 0;
+    while(reader->hasNext()){
+        t=reader->read();
+        total += t->size();
+        //cout<< "read" <<t->size()<<endl;
+        ASSERTION("tets_Block_Reader_DFStable",t->size(),fetchsize1);
+    }
+    //cout<<"total is"<<total<<endl;
+    ASSERTION("tets_Block_Reader_DFStable",total,12453);
+
+    int fetchsize2=8200;
+    BlockReaderSP reader2 = conn.run(script1,4,2,fetchsize2);
+    ConstantSP t2;
+    int total2 = 0;
+    int tmp = fetchsize2;
+    while(reader2->hasNext()){
+        t2=reader2->read();
+        total2 += t2->size();
+        //cout<< "read" <<t2->size()<<endl;
+        ASSERTION("tets_Block_Reader_DFStable",t2->size(),tmp);
+        tmp = 12453 - tmp;
+    }
+    //cout<<"total is"<<total<<endl;
+    ASSERTION("tets_Block_Reader_DFStable",total2,12453);
+
+    int fetchsize3=15000;
+    BlockReaderSP reader3 = conn.run(script1,4,2,fetchsize3);
+    ConstantSP t3;
+    int total3 = 0;
+    while(reader3->hasNext()){
+        t3=reader3->read();
+        total3 += t3->size();
+        //cout<< "read" <<t2->size()<<endl;
+        ASSERTION("tets_Block_Reader_DFStable",t3->size(),12453);
+    }
+    //cout<<"total is"<<total<<endl;
+    ASSERTION("tets_Block_Reader_DFStable",total3,12453);
+}
+
+void test_Block_Table(){
+    string script;
+    string script1;
+    script += "rows=12453;";
+    script += "testblock=table(take(1,rows) as id,take(`A,rows) as symbol,take(2020.08.01..2020.10.01,rows) as date, rand(50,rows) as size,rand(50.5,rows) as price);";
+    //script += "select count(*) from testblock;";
+    conn.run(script);
+    script1 += "select * from testblock ";
+    int fetchsize1 = 12453;
+    BlockReaderSP reader = conn.run(script1,4,2,fetchsize1);
+    ConstantSP t;
+    int total = 0;
+    while(reader->hasNext()){
+        t=reader->read();
+        total += t->size();
+        //cout<< "read" <<t->size()<<endl;
+        ASSERTION("test_Block_Table",t->size(),fetchsize1);
+    }
+    //cout<<"total is"<<total<<endl;
+    ASSERTION("test_Block_Table",total,12453);
+
+    int fetchsize2=8200;
+    BlockReaderSP reader2 = conn.run(script1,4,2,fetchsize2);
+    ConstantSP t2;
+    int total2 = 0;
+    int tmp = fetchsize2;
+    while(reader2->hasNext()){
+        t2=reader2->read();
+        total2 += t2->size();
+        //cout<< "read" <<t2->size()<<endl;
+        ASSERTION("test_Block_Table",t2->size(),tmp);
+        tmp = 12453 - tmp;
+    }
+    //cout<<"total is"<<total<<endl;
+    ASSERTION("test_Block_Table",total2,12453);
+
+    int fetchsize3=15000;
+    BlockReaderSP reader3 = conn.run(script1,4,2,fetchsize3);
+    ConstantSP t3;
+    int total3 = 0;
+    while(reader3->hasNext()){
+        t3=reader3->read();
+        total3 += t3->size();
+        //cout<< "read" <<t2->size()<<endl;
+        ASSERTION("test_Block_Table",t3->size(),12453);
+    }
+    //cout<<"total is"<<total<<endl;
+    ASSERTION("test_Block_Table",total3,12453);
+}
+
+void test_block_skipALL(){
+    string script;
+    script += "login(`admin,`123456);";
+    script += "select * from loadTable(\"dfs://TEST_BLOCK\",\"pt\");";
+    BlockReaderSP reader = conn.run(script,4,2,8200);
+    ConstantSP t = reader->read();
+    reader->skillAll();
+    TableSP result = conn.run("table(1..100 as id1)");
+    //cout<<result->getString()<<endl;
+    ASSERTION("test_block_skipALL",result->size(),100);
 
 }
 
+void test_huge_table(){
+    string script;
+    string script1;
+    script += "rows=20000000;";
+    script += "testblock=table(take(1,rows) as id,take(`A,rows) as symbol,take(2020.08.01..2020.10.01,rows) as date, rand(50,rows) as size,rand(50.5,rows) as price);";
+    conn.run(script);
+    script1 += "select * from testblock;";
+    BlockReaderSP reader = conn.run(script1,4,2,8200);
+    ConstantSP t;
+    int total = 0;
+    int i= 1;
+    int fetchsize =8200;
+    while(reader->hasNext()){
+        t=reader->read();
+        total += t->size();
+        //cout<< "read" <<t->size()<<endl;
+
+        if(t->size() == 8200){
+            ASSERTION("test_huge_table",t->size(),8200);
+        }
+        else {
+            ASSERTION("test_huge_table",t->size(),200);
+        }
+
+    }
+    //cout<<"total is"<<total<<endl;
+    ASSERTION("test_huge_table",total,20000000);
+}
+
+
+void test_huge_DFS(){
+    string script;
+    string script1;
+    TableSP table = createDemoTable();
+    conn.upload("mt",table);
+    script += "login(`admin,`123456);";
+    script += "dbPath = \"dfs://TEST_Huge_BLOCK\";";
+    script += "if(existsDatabase(dbPath)){dropDatabase(dbPath)};";
+    script += "tableName = `pt;";
+    script += "db = database(dbPath,VALUE,2010.01.01..2010.01.30);";
+    script += "pt = db.createPartitionedTable(mt,tableName,`date);";
+    script += "pt.append!(mt);";
+    script += "n=20000000;";
+    script += "t1=table(take(`name_3,n) as name,take(2010.01.01,n) as date,rand(30,n) as price);";
+    script += "pt.append!(t1);";
+    conn.run(script);
+    script1 += "select * from pt;";
+    int fetchsize1 = 8200;
+    BlockReaderSP reader = conn.run(script1,4,2,fetchsize1);
+    ConstantSP t;
+    int total = 0;
+    while(reader->hasNext()){
+        t=reader->read();
+        total += t->size();
+        //cout<< "read" <<t->size()<<endl;
+        if(t->size() == 8200){
+            ASSERTION("test_huge_DFS",t->size(),8200);
+        }
+        else {
+            ASSERTION("test_huge_DFS",t->size(),203);
+        }
+
+    }
+    //cout<<"total is"<<total<<endl;
+    ASSERTION("test_huge_DFS",total,20000003);
+
+    int fetchsize2 = 2000000;
+    BlockReaderSP reader2 = conn.run(script1,4,2,fetchsize2);
+    ConstantSP t2;
+    int total2 = 0;
+    while(reader2->hasNext()){
+        t2=reader2->read();
+        total2 += t2->size();
+        //cout<< "read" <<t2->size()<<endl;
+
+        if(t2->size() == 2000000){
+            ASSERTION("test_huge_DFS",t2->size(),2000000);
+        }
+        else {
+            ASSERTION("test_huge_DFS",t2->size(),3);
+        }
+
+        //ASSERTION("tets_Block_Reader_DFStable",t->size(),fetchsize1);
+    }
+    //cout<<"total is"<<total<<endl;
+    ASSERTION("test_huge_DFS",total2,20000003);
+
+}
 
 int main(int argc, char ** argv){
     DBConnection::initialize();
@@ -716,9 +926,9 @@ int main(int argc, char ** argv){
     testSet();
     testSymbol();
     testmixtimevectorUpload();
-    testMemoryTable();
-    testDFSTable();
-    testDiskTable();
+   // testMemoryTable();
+   // testDFSTable();
+   // testDiskTable();
     testDimensionTable();
     testCharVectorHash();
     testShortVectorHash();
@@ -730,6 +940,15 @@ int main(int argc, char ** argv){
     testInt128vectorHash();
     testRun();
     //testshare();
+    tets_Block_Reader_DFStable();
+    test_Block_Table();
+    test_block_skipALL();
+    test_huge_table();
+    test_huge_DFS();
+    std::thread t1(test_Block_Table);
+    t1.join();
+    std::thread t2(tets_Block_Reader_DFStable);
+    t2.join();
     if (argc >= 2) {
         string fileName(argv[1]);
         printTestResults(fileName);

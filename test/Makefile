@@ -1,5 +1,5 @@
 CXXFLAGS = -g -Wall -I../include -std=c++11 -fPIC -DLINUX -DLOGGING_LEVEL_2 -DLINUX -std=c++11 -L../bin/linux_x64/ABI0 -D_GLIBCXX_USE_CXX11_ABI=0
-LFLAGS=-lDolphinDBAPI  -lpthread  -L../bin/linux_x64/ABI0   -Wl,-rpath,.:../bin/linux_x64/ABI0/
+LFLAGS=-lDolphinDBAPI  -lpthread -lssl  -L../bin/linux_x64/ABI0   -Wl,-rpath,.:../bin/linux_x64/ABI0/
 SRCS=$(wildcard *.cpp)
 OBJS=$(patsubst %.cpp,%.o,$(SRCS))
 EXES=$(patsubst %.cpp,%,$(SRCS))
