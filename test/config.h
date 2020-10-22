@@ -17,4 +17,4 @@ static auto table = "trades";
 static vector<int> listenPorts = {18901,18902,18903,18904,18905,18906,18907,18908,18909,18910};
 static string alphas = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 static int pass,fail;
-DBConnection conn(true,false);
+DBConnection conn(false,false);
