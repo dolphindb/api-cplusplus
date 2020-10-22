@@ -611,7 +611,7 @@ protected:
 
 class EXPORT_DECL DBConnection {
 public:
-	DBConnection();
+	DBConnection(bool enableSSL = false, bool asynTask = false);
 	~DBConnection();
 	DBConnection(DBConnection&& oth);
 	DBConnection& operator=(DBConnection&& oth);
@@ -666,6 +666,12 @@ public:
 	 */
 	static void initialize();
 
+	/**
+	 * It is required to call setSSL before user use connect function to create a
+	 * SSL connection.
+	 */
+	void setSSL();
+
 	void setInitScript(const string& script);
 
 	const string& getInitScript() const;
@@ -684,6 +690,8 @@ private:
     string pwd_;
     string initialScript_;
     bool ha_;
+    bool enableSSL_;
+    bool asynTask_;
     static const int maxRerunCnt_ = 30;
     ConstantSP nodes_;
 };
