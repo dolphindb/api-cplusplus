@@ -122,6 +122,20 @@ DBConnection conn;
 bool ret = conn.connect("127.0.0.1", 8848);
 ```
 
+生命connection变量的时候，有两个可选参数： enableSSL（支持SSL）, enableAYSN（支持一部分）.这两个参数默认值为false.
+
+下面例子是，建立支持SSL而非支持异步的connection，同时服务器端应该添加参数enableHTTPS=true。
+
+```C++
+DBConnection conn(true,false)
+```
+
+下面建立即不支持SSL，但支持异步的connection。异步情况下，步只能执行DolphinDB脚本和函数， 且不再有返回值，该功能适用于异步写入数据。
+
+```C++
+DBConnection conn(false,true)
+```
+
 创建连接时也可以使用用户名和密码登录，默认的管理员名称为"admin"，密码是"123456"。
 
 ```C++
