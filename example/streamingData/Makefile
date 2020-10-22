@@ -10,10 +10,10 @@ all: $(OBJS)
 	g++ -L../../bin/linux_x64/ABI0  StreamingThreadedClientSubscriber.o $(CFLAGS)  -lDolphinDBAPI   -lpthread -lssl  -L../../bin  -Wl,-rpath,.:../../bin/linux_x64/ABI0/ -o StreamingThreadedClientSubscriber 
 	g++ -L../../bin/linux_x64/ABI0  StreamingDataWriting.o $(CFLAGS)  -lDolphinDBAPI   -lpthread -lssl  -L../../bin  -Wl,-rpath,.:../../bin/linux_x64/ABI0/ -o StreamingDataWriting
 StreamingThreadedClientSubscriber.o: StreamingThreadedClientSubscriber.cpp
-	g++ $(CFLAGS) $(INCLUDES) -lssl -c StreamingThreadedClientSubscriber.cpp -o StreamingThreadedClientSubscriber.o
+	g++ $(CFLAGS) $(INCLUDES) -c StreamingThreadedClientSubscriber.cpp -o StreamingThreadedClientSubscriber.o
 	
 StreamingDataWriting.o: StreamingDataWriting.cpp
-	g++ $(CFLAGS) $(INCLUDES) -lssl -c StreamingDataWriting.cpp -o StreamingDataWriting.o
+	g++ $(CFLAGS) $(INCLUDES) -c StreamingDataWriting.cpp -o StreamingDataWriting.o
 	
 clean:
 	rm *.o StreamingThreadedClientSubscriber  core -rf
