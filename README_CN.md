@@ -63,7 +63,7 @@ int main(int argc, char *argv[]){
 
 为了兼容旧的编译器，libDolphinDBAPI.so提供了2个版本，一个版本在编译时使用了-D_GLIBCXX_USE_CXX11_ABI=0的选项，放在[bin/linux_x64/ABI0](./bin/linux_x64/ABI0)目录下，另一个版本未使用-D_GLIBCXX_USE_CXX11_ABI=0，放在[bin/linux_x64/ABI1](./bin/linux_x64/ABI1)目录下。
 
-另外由于DolphinDB添加了(稳定版>=1.10.17,最新版>=1.20.6) SSL的支持， 所以编译前需要安装openssl。
+另外由于DolphinDB添加了(Linux64 稳定版>=1.10.17,最新版>=1.20.6) SSL的支持， 所以编译前需要安装openssl。
 
 以下是使用第一个动态库版本的g++编译命令：
 ```
@@ -124,7 +124,7 @@ DBConnection conn;
 bool ret = conn.connect("127.0.0.1", 8848);
 ```
 
-声明connection变量的时候，有两个可选参数： enableSSL（支持SSL）, enableAYSN（支持一部分）.这两个参数默认值为false。 目前只支持linux, 稳定版>=1.10.17,最新版>=1.20.6。 
+声明connection变量的时候，有两个可选参数： enableSSL（支持SSL）, enableAYSN（支持一部分）.这两个参数默认值为false。 目前只支持linux, 稳定版>=1.10.17,最新版>=1.20.6。  
 
 下面例子是，建立支持SSL而非支持异步的connection，同时服务器端应该添加参数enableHTTPS=true(单节点部署，需要添加到dolphindb.cfg;集群部署需要添加到cluster.cfg)。
 
