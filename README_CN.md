@@ -124,7 +124,7 @@ DBConnection conn;
 bool ret = conn.connect("127.0.0.1", 8848);
 ```
 
-声明connection变量的时候，有两个可选参数： enableSSL（支持SSL）, enableAYSN（支持一部分）.这两个参数默认值为false.
+声明connection变量的时候，有两个可选参数： enableSSL（支持SSL）, enableAYSN（支持一部分）.这两个参数默认值为false。 目前只支持linux, 稳定版>=1.10.17,最新版>=1.20.6。 
 
 下面例子是，建立支持SSL而非支持异步的connection，同时服务器端应该添加参数enableHTTPS=true(单节点部署，需要添加到dolphindb.cfg;集群部署需要添加到cluster.cfg)。
 
