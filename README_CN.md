@@ -63,7 +63,7 @@ int main(int argc, char *argv[]){
 
 为了兼容旧的编译器，libDolphinDBAPI.so提供了2个版本，一个版本在编译时使用了-D_GLIBCXX_USE_CXX11_ABI=0的选项，放在[bin/linux_x64/ABI0](./bin/linux_x64/ABI0)目录下，另一个版本未使用-D_GLIBCXX_USE_CXX11_ABI=0，放在[bin/linux_x64/ABI1](./bin/linux_x64/ABI1)目录下。
 
-另外由于DolphinDB添加了(server>=1.20.6) SSL的支持， 所以编译前需要安装openssl. 
+另外由于DolphinDB添加了(稳定版>=1.10.17,最新版>=1.20.6) SSL的支持， 所以编译前需要安装openssl。
 
 以下是使用第一个动态库版本的g++编译命令：
 ```
