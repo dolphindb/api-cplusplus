@@ -59,7 +59,7 @@ int main(int argc, char *argv[]){
 
 #### 1.1.4 Compile
 
-In order to be compatible with the old compiler, there are 2 versions of libDolphinDBAPI.so. 
+In order to be compatible with the old compiler, there are 2 versions of libDolphinDBAPI.so. Since DolphinDB API supports ssl connection, openssl should also installed before compilation using DolphinDB API.
 
 One version uses the -D_GLIBCXX_USE_CXX11_ABI=0 option when compiling, and it is under the [bin/linux_x64/ABI0](./bin/linux_x64/ABI0) directory. 
 
