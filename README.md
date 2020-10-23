@@ -133,6 +133,23 @@ If a connection is established without username and password, it has guest privi
 
 Please note that all functions of the DBConnection class are not thread-safe and therefore cannot be called in parallel, otherwise the program may crash.
 
+
+
+When declaring the connection variable, there are two optional parameters: enableSSL (supports SSL), enableAYSN (supports asynchronous communication). The default value of these two parameters is false.
+
+The following example is to establish a connection that supports SSL instead of asynchronous, and the server side should add the parameter `enableHTTPS=true` in dolphindb.cfg of single mode and cluster.cfg of cluster mode.
+
+```C++
+DBConnection conn(true,false)
+```
+
+The following establishment does not support SSL, but supports asynchronous connection. In the case of asynchronous, only DolphinDB scripts and functions through function `run` are allowed to be executed, and no values are returned. This function is suitable for asynchronous writing of data.
+
+```C++
+DBConnection conn(false,true)
+
+
+
 ## 3. Execute DolphinDB script
 
 Execute DolphinDB script with method `run`.
