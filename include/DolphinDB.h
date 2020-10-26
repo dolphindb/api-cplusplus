@@ -57,6 +57,7 @@ class DFSChunkMeta;
 class ConstantMarshall;
 class ConstantUnmarshall;
 class DBConnectionImpl;
+class BlockReader;
 
 typedef SmartPointer<Constant> ConstantSP;
 typedef SmartPointer<Vector> VectorSP;
@@ -67,6 +68,7 @@ typedef SmartPointer<Dictionary> DictionarySP;
 typedef SmartPointer<DFSChunkMeta> DFSChunkMetaSP;
 typedef SmartPointer<ConstantMarshall> ConstantMarshallSP;
 typedef SmartPointer<ConstantUnmarshall> ConstantUnmarshallSP;
+typedef SmartPointer<BlockReader> BlockReaderSP;
 
 class Guid {
 public:
@@ -636,14 +638,14 @@ public:
 	 * the function returns a void object. If error is raised on the server, the function throws an
 	 * exception.
 	 */
-	ConstantSP run(const string& script, int priority=4, int parallelism=2);
+	ConstantSP run(const string& script, int priority=4, int parallelism=2, int fetchSize=0);
 
 	/**
 	 * Run the given function on the DolphinDB server using the local objects as the arguments
 	 * for the function and return the result to the client. If nothing returns, the function
 	 * returns a void object. If error is raised on the server, the function throws an exception.
 	 */
-	ConstantSP run(const string& funcName, vector<ConstantSP>& args, int priority=4, int parallelism=2);
+	ConstantSP run(const string& funcName, vector<ConstantSP>& args, int priority=4, int parallelism=2, int fetchSize=0);
 
 	/**
 	 * upload a local object to the DolphinDB server and assign the given name in the session.
@@ -694,6 +696,23 @@ private:
     bool asynTask_;
     static const int maxRerunCnt_ = 30;
     ConstantSP nodes_;
+};
+
+class BlockReader : public Constant{
+public:
+    BlockReader(const DataInputStreamSP& in );
+    ConstantSP read();
+    void skillAll();
+    bool hasNext() const {return currentIndex_ < total_;}
+    virtual DATA_TYPE getType() const {return DT_ANY;}
+    virtual DATA_TYPE getRawType() const {return DT_ANY;}
+    virtual DATA_CATEGORY getCategory() const {return MIXED;}
+    virtual ConstantSP getInstance() const {return nullptr;}
+    virtual ConstantSP getValue() const {return nullptr;}
+private:
+    DataInputStreamSP in_;
+    int total_;
+    int currentIndex_;
 };
 
 };
