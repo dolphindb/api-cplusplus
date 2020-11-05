@@ -11,6 +11,7 @@
 
 #include <cfloat>
 #include <string>
+#include <limits.h>
 
 namespace dolphindb {
 
@@ -126,14 +127,14 @@ enum ACL_ACCESS_TYPE: short {TABLE_READ, TABLE_WRITE, DBOBJ_CREATE, DBOBJ_DELETE
 	typedef long long INDEX;
 	typedef unsigned long long UINDEX;
 	#define DT_INDEX DT_LONG
-	#define INDEX_MIN LLONG_MIN
-	#define INDEX_MAX LLONG_MAX
+	const long long INDEX_MIN = LLONG_MIN;
+	const long long INDEX_MAX = LLONG_MAX;
 #else
 	typedef int INDEX;
 	typedef unsigned int UINDEX;
 	#define DT_INDEX DT_INT
-	#define INDEX_MIN INT_MIN
-	#define INDEX_MAX INT_MAX
+	const int INDEX_MIN = INT_MIN;
+	const int INDEX_MAX = INT_MAX;
 #endif
 
 typedef union {
