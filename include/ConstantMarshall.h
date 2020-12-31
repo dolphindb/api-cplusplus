@@ -24,11 +24,14 @@ class CodeMarshall;
 class CodeUnmarshall;
 class ConstantMarshallFactory;
 class ConstantUnmarshallFactory;
+class SymbolBaseUnmarshall;
 
 typedef SmartPointer<CodeMarshall> CodeMarshallSP;
 typedef SmartPointer<CodeUnmarshall> CodeUnmarshallSP;
 typedef SmartPointer<ConstantMarshallFactory> ConstantMarshallFactorySP;
 typedef SmartPointer<ConstantUnmarshallFactory> ConstantUnmarshallFactorySP;
+typedef SmartPointer<vector<string>> SymbolBaseSP;
+typedef SmartPointer<SymbolBaseUnmarshall> SymbolBaseUnmarshallSP;
 
 class EXPORT_DECL ConstantMarshallImp : public ConstantMarshall {
 public:
@@ -168,18 +171,39 @@ private:
 	char functionType_;
 };
 
+class EXPORT_DECL SymbolBaseUnmarshall {
+public:
+	SymbolBaseUnmarshall(const DataInputStreamSP& in):symbaseId_(0), size_(0), in_(in){}
+	~SymbolBaseUnmarshall(){}
+	bool start(bool blocking, IO_ERR& ret);
+	void reset();
+	SymbolBaseSP getSymbolBase() const {
+		return obj_;
+	}
+
+private:
+	int symbaseId_;
+	int size_;
+	DataInputStreamSP in_;
+	SymbolBaseSP obj_;
+	unordered_map<int, SymbolBaseSP> dict_;
+};
+
 class EXPORT_DECL VectorUnmarshall: public ConstantUnmarshallImp{
 public:
 	VectorUnmarshall(const DataInputStreamSP& in):ConstantUnmarshallImp(in), flag_(0), rows_(0), columns_(0), nextStart_(0), unmarshall_(0){}
 	virtual ~VectorUnmarshall(){}
 	virtual bool start(short flag, bool blocking, IO_ERR& ret);
 	virtual void reset();
+	void resetSymbolBaseUnmarshall(bool createIfNotExist);
+
 private:
 	short flag_;
 	int rows_;
 	int columns_;
 	INDEX nextStart_;
 	ConstantUnmarshallSP unmarshall_;
+	SymbolBaseUnmarshallSP symbaseUnmarshall_;
 };
 
 class EXPORT_DECL MatrixUnmarshall: public ConstantUnmarshallImp{

@@ -668,12 +668,6 @@ public:
 	 */
 	static void initialize();
 
-	/**
-	 * It is required to call setSSL before user use connect function to create a
-	 * SSL connection.
-	 */
-	void setSSL();
-
 	void setInitScript(const string& script);
 
 	const string& getInitScript() const;
@@ -683,7 +677,7 @@ private:
     DBConnection& operator=(DBConnection& oth); // = delete
 
 private:
-    void switchDataNode(IOException& e);
+    void switchDataNode(const string& err);
     bool connected();
 
 private:

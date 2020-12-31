@@ -1,4 +1,10 @@
 #include "config.h"
+int64_t getTimeStampMs() {
+    struct timeval systemTime{};
+    gettimeofday(&systemTime, nullptr);
+    return (int64_t)systemTime.tv_sec * 1000L + (int64_t)systemTime.tv_usec / 1000;
+}
+
 string genRandString(int maxSize){
     string result;
     int size = rand()%maxSize;
@@ -10,7 +16,7 @@ string genRandString(int maxSize){
 }
 
 template<typename T>
-void ASSERTION(const string test, const T& ret, const T& expect) {
+void ASSERTION(const string& test, const T& ret, const T& expect) {
     if(ret != expect){
         std::cout<<"ASSERT FAIL--" << test<< "-- expect return --"<< (T)expect <<", real return--"<<(T)ret<< std::endl;
         fail++;
@@ -19,21 +25,41 @@ void ASSERTION(const string test, const T& ret, const T& expect) {
         pass++;
 }
 
+static string getSymbolVector(const string& name, int size)
+{
+    int kind = 50;
+    int count = size/kind;
+
+    string result;
+    char temp[200];
+    result+=name;
+    sprintf(temp, "=symbol(array(STRING,%d,%d,`0));", count,count);
+    result+=temp;
+    for(int i = 1;i<kind;i++) {
+        sprintf(temp, ".append!(symbol(array(STRING,%d,%d,`%d)));", count,count,i);
+        result+=name;
+        result+=string(temp);
+    }
+
+    return result;
+}
+
 void printTestResults(const string& fileName){
     FILE * fp = fopen(fileName.c_str(),"wb+");
-    if(fp == NULL)
+    if(fp == nullptr)
     	throw RuntimeException("Failed to open file [" + fileName + "].");
     vector<string> result;
     result.push_back("total:" + std::to_string(pass + fail) + "\n") ;
     result.push_back("pass:" + std::to_string(pass) + "\n");
     result.push_back("fail:" + std::to_string(fail) + "\n");
-    for(unsigned int i = 0 ;i < result.size(); i++)
-    	fwrite(result[i].c_str(), 1, result[i].size(),fp);
+    for(auto & i : result)
+    	fwrite(i.c_str(), 1, i.size(),fp);
 }
 
 
 void testStringVector(int vecSize){
     vector<string> values;
+    values.reserve(vecSize);
     for(int i = 0 ;i < vecSize; i++)
         values.push_back(genRandString(30));
     string script; 
@@ -55,14 +81,12 @@ void testStringNullVector(int vecSize){
     for(int i = 0; i < vecSize; i++){
         ASSERTION("testStringNullVector",result->getString(i),values[i]);
     }
-
-
-
 }
 
 
 void testIntVector(int vecSize){
     vector<int> values;
+    values.reserve(vecSize);
     for(int i = 0 ;i < vecSize ; i++)
         values.push_back(rand()%INT_MAX);
     string script;
@@ -88,6 +112,7 @@ void testIntNullVector(int vecSize){
 
 void testDoubleVector(int vecSize){
     vector<double> values;
+    values.reserve(vecSize);
     for(int i = 0 ;i < vecSize; i++)
         values.push_back((double)(rand()));
     string script;
@@ -115,8 +140,8 @@ void testDateVector(){
     vector<int> testValues = {1,10,100,1000,10000,100000};
     vector<string> expectResults = {"2010.08.21","2010.08.30","2010.11.28","2013.05.16","2038.01.05","2284.06.04"};
     string script;
-    for(unsigned int i = 0 ;i < testValues.size(); i++){
-        script += " "+ std::to_string(testValues[i]);
+    for(int testValue : testValues){
+        script += " "+ std::to_string(testValue);
     }
     script = beginDate + " + " + script;
     ConstantSP result = conn.run(script);
@@ -141,8 +166,8 @@ void testDatetimeVector(){
     vector<int> testValues = {1,100,1000,10000,100000,1000000,10000000};
     vector<string> expectResults = {"2012.10.01T15:00:05","2012.10.01T15:01:44","2012.10.01T15:16:44","2012.10.01T17:46:44","2012.10.02T18:46:44","2012.10.13T04:46:44","2013.01.25T08:46:44"};
     string script;
-    for(unsigned int i = 0 ;i < testValues.size(); i++){
-        script += " "+ std::to_string(testValues[i]);
+    for(int testValue : testValues){
+        script += " "+ std::to_string(testValue);
     }
     script = beginDateTime + " + " + script;
     ConstantSP result = conn.run(script);
@@ -160,8 +185,8 @@ void testTimeStampVector(){
             "2009.10.12T02:46:40.000","2009.10.13T03:46:40.000","2009.10.23T13:46:40.000","2010.02.04T17:46:40.000",
             "2012.12.12T09:46:40.000","2041.06.20T01:46:40.000"};
     string script;
-    for(unsigned int i = 0; i < testValues.size(); i++){
-       script += " " + std::to_string(testValues[i]);
+    for(long long testValue : testValues){
+       script += " " + std::to_string(testValue);
     }
     script = beginTimeStamp + " + " + script;
     ConstantSP result = conn.run(script);
@@ -179,8 +204,8 @@ void testnanotimeVector(){
                                     "13:30:10.018007006","13:30:10.108007006","13:30:11.008007006","13:30:20.008007006",
                                     "13:31:50.008007006","13:46:50.008007006"};
     string script;
-    for(unsigned int i = 0; i < testValues.size(); i++){
-        script += " " + std::to_string(testValues[i]);
+    for(long long testValue : testValues){
+        script += " " + std::to_string(testValue);
     }
     script = beginNanotime + " + " + script;
     ConstantSP result = conn.run(script);
@@ -198,8 +223,8 @@ void testnanotimestampVector(){
                                     "2012.06.13T13:30:10.018007006","2012.06.13T13:30:10.108007006","2012.06.13T13:30:11.008007006","2012.06.13T13:30:20.008007006",
                                     "2012.06.13T13:31:50.008007006","2012.06.13T13:46:50.008007006","2012.06.13T16:16:50.008007006","2012.06.14T17:16:50.008007006","2012.06.25T03:16:50.008007006","2012.10.07T07:16:50.008007006","2015.08.14T23:16:50.008007006"};
     string script;
-    for(unsigned int i = 0; i < testValues.size(); i++){
-        script += " " + std::to_string(testValues[i]);
+    for(long long testValue : testValues){
+        script += " " + std::to_string(testValue);
     }
     script = beginNanotimestamp + " + " + script;
     ConstantSP result = conn.run(script);
@@ -214,8 +239,8 @@ void testmonthVector(){
     vector<int> testValues = {1,10,100,1000};
     vector<string> expectResults = {"2012.07M","2013.04M","2020.10M","2095.10M"};
     string script;
-    for(unsigned int i = 0; i < testValues.size(); i++){
-        script += " " + std::to_string(testValues[i]);
+    for(int testValue : testValues){
+        script += " " + std::to_string(testValue);
     }
     script = beginmonth + " + " + script;
     ConstantSP result = conn.run(script);
@@ -229,8 +254,8 @@ void testtimeVector(){
     vector<int> testValues = {1,10,100,1000,10000,100000,1000000,10000000};
     vector<string> expectResults = {"13:30:10.009","13:30:10.018","13:30:10.108","13:30:11.008","13:30:20.008","13:31:50.008","13:46:50.008","16:16:50.008"};
     string script;
-    for(unsigned int i = 0; i < testValues.size(); i++){
-        script += " " + std::to_string(testValues[i]);
+    for(int testValue : testValues){
+        script += " " + std::to_string(testValue);
     }
     script = begintime + " + " + script;
     ConstantSP result = conn.run(script);
@@ -249,6 +274,215 @@ void testSymbol(){
     }
 }
 
+
+void testSymbolBase(){
+    int64_t startTime, time;
+
+    conn.run("v=symbol(string(1..2000000))");
+    startTime = getTimeStampMs();
+    conn.run("v");
+    time = getTimeStampMs()-startTime;
+    cout << "symbol vector：" << time << "ms" << endl;
+
+    conn.run("undef(all)");
+    conn.run(getSymbolVector("v",2000000));
+    startTime = getTimeStampMs();
+    conn.run("v");
+    time = getTimeStampMs()-startTime;
+    cout << "symbol vector optimize：" << time << "ms" << endl;
+
+    conn.run("undef(all)");
+    conn.run("t=table(symbol(string(1..2000000)) as sym)");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "table with one symbol vector：" << time << "ms" << endl;
+
+    conn.run("undef(all)");
+    conn.run(getSymbolVector("v",2000000));
+    conn.run("t=table(v as sym)");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "table with one symbol vector optimize：" << time << "ms" << endl;
+
+    conn.run("undef(all)");
+    conn.run("t=table(symbol(string(1..2000000)) as sym,symbol(string(1..2000000)) as sym1,symbol(string(1..2000000)) as sym2,symbol(string(1..2000000)) as sym3,symbol(string(1..2000000)) as sym4,symbol(string(1..2000000)) as sym5,symbol(string(1..2000000)) as sym6,symbol(string(1..2000000)) as sym7,symbol(string(1..2000000)) as sym8,symbol(string(1..2000000)) as sym9)");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "table with same symbol vectors：" << time << "ms" << endl;
+
+    conn.run("undef(all)");
+    conn.run("t=table(symbol(take(string(0..20000),2000000)) as sym,symbol(take(string(20000..40000),2000000)) as sym1,symbol(take(string(40000..60000),2000000)) as sym2,symbol(take(string(60000..80000),2000000)) as sym3,symbol(take(string(80000..100000),2000000)) as sym4,symbol(take(string(100000..120000),2000000)) as sym5,symbol(take(string(120000..140000),2000000)) as sym6,symbol(take(string(140000..160000),2000000)) as sym7,symbol(take(string(160000..180000),2000000)) as sym8,symbol(take(string(180000..200000),2000000)) as sym9)");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "table with diff symbol vectors：" << time << "ms" << endl;
+
+//    conn.run("undef(all)");
+//    conn.run("m=symbol(string(1..2000000))$1000:2000");
+//    startTime = getTimeStampMs();
+//    conn.run("m");
+//    time = getTimeStampMs()-startTime;
+//    cout << "symbol matrix：" << time << "ms" << endl;
+
+    conn.run("undef(all)");
+    conn.run("d=dict(symbol(string(1..2000000)),symbol(string(1..2000000)))");
+    startTime = getTimeStampMs();
+    conn.run("d");
+    time = getTimeStampMs()-startTime;
+    cout << "symbol dict：" << time <<  "ms" << endl;
+
+    conn.run("undef(all)");
+    conn.run("s=set(symbol(string(1..2000000)))");
+    startTime = getTimeStampMs();
+    conn.run("s");
+    time = getTimeStampMs()-startTime;
+    cout << "symbol set：" << time <<  "ms" << endl;
+
+    conn.run("undef(all)");
+    conn.run("t=(symbol(string(1..2000000)),symbol(string(1..2000000)))");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "tuple symbol tuple：" << time <<  "ms" << endl;
+
+    conn.run("undef(all)");
+}
+
+void testSymbolSmall(){
+    int64_t startTime, time;
+    conn.run("v=symbol(string(1..200))");
+    startTime = getTimeStampMs();
+    conn.run("v");
+    time = getTimeStampMs()-startTime;
+    cout << "symbol vector：" << time <<  "ms" << endl;
+    conn.run("undef(all)");
+
+    conn.run(getSymbolVector("v",200));
+    startTime = getTimeStampMs();
+    conn.run("v");
+    time = getTimeStampMs()-startTime;
+    cout << "symbol vector optimize：" << time <<  "ms" << endl;
+    conn.run("undef(all)");
+
+    conn.run("t=table(symbol(string(1..200)) as sym)");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "table with one symbol vector：" << time << "ms" << endl;
+    conn.run("undef(all)");
+
+    conn.run(getSymbolVector("v",200));
+    conn.run("t=table(v as sym)");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "table with one symbol vector optimize：" << time << "ms" << endl;
+    conn.run("undef(all)");
+
+    conn.run("t=table(symbol(string(1..200)) as sym,symbol(string(1..200)) as sym1,symbol(string(1..200)) as sym2,symbol(string(1..200)) as sym3,symbol(string(1..200)) as sym4,symbol(string(1..200)) as sym5,symbol(string(1..200)) as sym6,symbol(string(1..200)) as sym7,symbol(string(1..200)) as sym8,symbol(string(1..200)) as sym9)");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "table with same symbol vectors：" << time << "ms" << endl;
+    conn.run("undef(all)");
+
+    conn.run("t=table(symbol(take(string(0..20000),200)) as sym,symbol(take(string(20000..40000),200)) as sym1,symbol(take(string(40000..60000),200)) as sym2,symbol(take(string(60000..80000),200)) as sym3,symbol(take(string(80000..100000),200)) as sym4,symbol(take(string(100000..120000),200)) as sym5,symbol(take(string(120000..140000),200)) as sym6,symbol(take(string(140000..160000),200)) as sym7,symbol(take(string(160000..180000),200)) as sym8,symbol(take(string(180000..200000),200)) as sym9)");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "table with diff symbol vectors：" << time << "ms" << endl;
+    conn.run("undef(all)");
+
+//    conn.run("m =symbol(string(1..200))$10:20");
+//    startTime = getTimeStampMs();
+//    conn.run("m");
+//    time = getTimeStampMs()-startTime;
+//    cout << "symbol matrix：" << time << "ms" << endl;
+//    conn.run("undef(all)");
+
+    conn.run("d=dict(symbol(string(1..200)),symbol(string(1..200)))");
+    startTime = getTimeStampMs();
+    conn.run("d");
+    time = getTimeStampMs()-startTime;
+    cout << "symbol dict：" << time << "ms" << endl;
+    conn.run("undef(all)");
+
+    conn.run("s=set(symbol(string(1..200)))");
+    startTime = getTimeStampMs();
+    conn.run("s");
+    time = getTimeStampMs()-startTime;
+    cout << "symbol set：" << time << "ms" << endl;
+    conn.run("undef(all)");
+
+    conn.run("t=(symbol(string(1..200)),symbol(string(1..200)))");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "tuple symbol tuple：" << time << "ms" << endl;
+    conn.run("undef(all)");
+}
+
+void testSymbolNull(){
+    int64_t startTime, time;
+    conn.run("v=take(symbol(`cy`fty``56e`f65dfyfv),2000000)");
+    startTime = getTimeStampMs();
+    conn.run("v");
+    time = getTimeStampMs()-startTime;
+    cout << "symbol vector：" << time << "ms" << endl;
+    conn.run("undef(all)");
+
+    conn.run("t=table(take(symbol(`cy`fty``56e`f65dfyfv),2000000) as sym)");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "table with one symbol vector：" << time << "ms" << endl;
+    conn.run("undef(all)");
+
+    conn.run("t=table(take(symbol(`cy`fty``56e`f65dfyfv),2000000) as sym,take(symbol(`cy`fty``56e`f65dfyfv),2000000) as sym1,take(symbol(`cy`fty``56e`f65dfyfv),2000000) as sym2,take(symbol(`cy`fty``56e`f65dfyfv),2000000) as sym3,take(symbol(`cy`fty``56e`f65dfyfv),2000000) as sym4,take(symbol(`cy`fty``56e`f65dfyfv),2000000) as sym5,take(symbol(`cy`fty``56e`f65dfyfv),2000000) as sym6,take(symbol(`cy`fty``56e`f65dfyfv),2000000) as sym7,take(symbol(`cy`fty``56e`f65dfyfv),2000000) as sym8,take(symbol(`cy`fty``56e`f65dfyfv),2000000) as sym9)");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "table with same symbol vectors：" << time << "ms" << endl;
+    conn.run("undef(all)");
+
+    conn.run("t=table(take(symbol(`cdwy`fty``56e`f652dfyfv),2000000) as sym,take(symbol(`cy`f8ty``56e`f65dfyfv),2000000) as sym1,take(symbol(`c2587y`fty``56e`f65dfyfv),2000000) as sym2,take(symbol(`cy````f65dfy4fv),2000000) as sym3,take(symbol(`cy```56e`f65dfgyfv),2000000) as sym4,take(symbol(`cy`fty``56e`12547),2000000) as sym5,take(symbol(`cy`fty``e`f65d728fyfv),2000000) as sym6,take(symbol(`cy`fty``56e`),2000000) as sym7,take(symbol(`cy`fty``56e`111),2000000) as sym8,take(symbol(`c412y`ft575y```f65dfyfv),2000000) as sym9)");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "table with diff symbol vectors：" << time << "ms" << endl;
+    conn.run("undef(all)");
+
+//    conn.run("m =take(symbol(`cy`fty```f65dfyfv),2000000)$1000:2000");
+//    startTime = getTimeStampMs();
+//    conn.run("m");
+//    time = getTimeStampMs()-startTime;
+//    cout << "symbol matrix：" << time << "ms" << endl;
+//    conn.run("undef(all)");
+
+    conn.run("d=dict(take(symbol(`cy`fty``56e`f65dfyfv),2000000),take(symbol(`cy`fty``56e`f65dfyfv),2000000))");
+    startTime = getTimeStampMs();
+    conn.run("d");
+    time = getTimeStampMs()-startTime;
+    cout << "symbol dict：" << time << "ms" << endl;
+    conn.run("undef(all)");
+
+    conn.run("s=set(take(symbol(`cy`fty``56e`f65dfyfv),2000000))");
+    startTime = getTimeStampMs();
+    conn.run("s");
+    time = getTimeStampMs()-startTime;
+    cout << "symbol set：" << time << "ms" << endl;
+    conn.run("undef(all)");
+
+    conn.run("t=(take(symbol(`cy`fty``56e`f65dfyfv),2000000),take(symbol(`cy`fty``56e`f65dfyfv),2000000))");
+    startTime = getTimeStampMs();
+    conn.run("t");
+    time = getTimeStampMs()-startTime;
+    cout << "tuple symbol tuple：" << time << "ms" << endl;
+    conn.run("undef(all)");
+}
 
 void testmixtimevectorUpload(){
     VectorSP dates = Util::createVector(DT_ANY,5,100);
@@ -281,7 +515,7 @@ void testTable(){
     string script;
     script += "n=20000\n";
     script += "syms=`IBM`C`MS`MSFT`JPM`ORCL`BIDU`SOHU`GE`EBAY`GOOG`FORD`GS`PEP`USO`GLD`GDX`EEM`FXI`SLV`SINA`BAC`AAPL`PALL`YHOO`KOH`TSLA`CS`CISO`SUN\n";
-    script += "mytrades=table(09:30:00+rand(18000,n) as timestamp,rand(syms,n) as sym, 10*(1+rand(100,n)) as qty,5.0+rand(100.0,n) as price, 1..n as number);\n";
+    script += "mytrades=table(09:30:00+rand(18000,n) as timestamp,rand(syms,n) as sym, 10*(1+rand(100,n)) as qty,5.0+rand(100.0,n) as price, 1..n as number,rand(syms,n) as sym_2);\n";
     script += "select min(number) as minNum, max(number) as maxNum from mytrades";
 
     ConstantSP table = conn.run(script);
@@ -292,7 +526,7 @@ void testTable(){
 
 void testDictionary(){
     string script;
-    script += "dict(1 2 3,`IBM`MSFT`GOOG)";
+    script += "dict(1 2 3,symbol(`IBM`MSFT`GOOG))";
     DictionarySP dict = conn.run(script);
 
     ASSERTION("testDictionary",dict->get(Util::createInt(1))->getString(),string("IBM"));
@@ -344,8 +578,9 @@ TableSP createDemoTable(){
     int colNum = 3,rowNum = 3;
     ConstantSP table = Util::createTable(colNames,colTypes,rowNum,100);
     vector<VectorSP> columnVecs;
+    columnVecs.reserve(colNum);
     for(int i = 0 ;i < colNum ;i ++)
-        columnVecs.push_back(table->getColumn(i));
+        columnVecs.emplace_back(table->getColumn(i));
         
     for(int i =  0 ;i < rowNum; i++){
         columnVecs[0]->set(i,Util::createString("name_"+std::to_string(i)));
@@ -413,7 +648,7 @@ void testDimensionTable(){
 }
 
 
-void ASSERTIONHASH(const string test, const int ret[], const int expect[],int len) {
+void ASSERTIONHASH(const string& test, const int ret[], const int expect[],int len) {
 	bool equal=true;
 	for(int i=0;i<len;i++){
 		if(ret[i]!=expect[i])
@@ -563,6 +798,7 @@ void testStringVectorHash(){
 		ASSERTIONHASH("testShortVectorHash",hv,expected[j],6);
     }
 }
+
 void testUUIDvectorHash(){
     string script;
     script = "a=rand(uuid(),6);table(a as k,hashBucket(a,13) as v1,hashBucket(a,43) as v2,hashBucket(a,71) as v3,hashBucket(a,97) as v4,hashBucket(a,4097) as v5)";
@@ -587,8 +823,8 @@ void testUUIDvectorHash(){
  		v->getHash(0,6,buckets[j],hv);
  		ASSERTIONHASH("testUUIDvectorHash",hv,expected[j],6);
     }
-
 }
+
 void testIpAddrvectorHash(){
     string script;
     script = "a=rand(ipaddr(),6);table(a as k,hashBucket(a,13) as v1,hashBucket(a,43) as v2,hashBucket(a,71) as v3,hashBucket(a,97) as v4,hashBucket(a,4097) as v5)";
@@ -613,8 +849,8 @@ void testIpAddrvectorHash(){
  		v->getHash(0,6,buckets[j],hv);
  		ASSERTIONHASH("testIpAddrvectorHash",hv,expected[j],6);
     }
-
 }
+
 void testInt128vectorHash(){
     string script;
     script = "a=rand(int128(),6);table(a as k,hashBucket(a,13) as v1,hashBucket(a,43) as v2,hashBucket(a,71) as v3,hashBucket(a,97) as v4,hashBucket(a,4097) as v5)";
@@ -641,7 +877,7 @@ void testInt128vectorHash(){
     }
 }
 
-
+/*
 void testshare(){
     string dbPath = conn.run(" getHomeDir()+\"/cpp_test\"")->getString();
     string script;
@@ -656,6 +892,7 @@ void testshare(){
     cout<<result->getString()<<endl;
 
 }
+*/
 
 void testRun(){
     //所有参数都在服务器端
@@ -797,7 +1034,7 @@ void test_Block_Table(){
 void test_block_skipALL(){
     string script;
     script += "login(`admin,`123456);";
-    script += "select * from loadTable(\"dfs://TEST_BLOCK\",\"pt\");";
+    script += R"(select * from loadTable("dfs://TEST_BLOCK","pt");)";
     BlockReaderSP reader = conn.run(script,4,2,8200);
     ConstantSP t = reader->read();
     reader->skillAll();
@@ -925,6 +1162,9 @@ int main(int argc, char ** argv){
     testDictionary();
     testSet();
     testSymbol();
+    testSymbolBase();
+    testSymbolSmall();
+    testSymbolNull();
     testmixtimevectorUpload();
    // testMemoryTable();
    // testDFSTable();

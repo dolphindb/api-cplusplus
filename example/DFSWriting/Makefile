@@ -3,7 +3,7 @@ INCLUDES= -I../../include
 OBJS=DFSWriting.o
 
 all: $(OBJS)
-	g++ -L../../bin/linux_x64/ABI0 $(OBJS) $(CFLAGS)  -lDolphinDBAPI -lpthread -lssl -L../../bin  -Wl,-rpath,.:../../bin/linux_x64/ABI0/ -o DFSWriting 
+	g++ -L../../bin/linux_x64/ABI0 $(OBJS) $(CFLAGS)  -lDolphinDBAPI -lpthread -L../../bin  -Wl,-rpath,.:../../bin/linux_x64/ABI0/ -o DFSWriting 
 DFSWriting.o: DFSWriting.cpp
 	g++ $(CFLAGS) $(INCLUDES) -c DFSWriting.cpp -o DFSWriting.o
 clean:
