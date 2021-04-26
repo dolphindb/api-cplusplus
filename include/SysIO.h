@@ -26,10 +26,13 @@
 	typedef int SOCKET;
 	#define INVALID_SOCKET -1
 	#define SOCKET_ERROR   -1
-#else	
-	#include <winsock2.h>
-	#include<windows.h>
 #endif
+#ifdef _MSC_VER
+#define EXPORT_DECL _declspec(dllexport)
+#else
+#define EXPORT_DECL 
+#endif 
+
 using std::string;
 
 namespace dolphindb {
@@ -46,7 +49,7 @@ typedef SmartPointer<DataInputStream> DataInputStreamSP;
 typedef SmartPointer<DataOutputStream> DataOutputStreamSP;
 typedef SmartPointer<DataStream> DataStreamSP;
 
-class Socket{
+class EXPORT_DECL Socket{
 public:
 	Socket();
 	Socket(const string& host, int port, bool blocking, bool enableSSL = false);
@@ -89,7 +92,7 @@ private:
 	SSL* ssl_;
 };
 
-class UdpSocket{
+class EXPORT_DECL UdpSocket{
 public:
 	UdpSocket(int port);
 	UdpSocket(const string& remoteHost, int remotePort);
@@ -111,7 +114,7 @@ private:
 	struct sockaddr_in addrRemote_;
 };
 
-class DataInputStream{
+class EXPORT_DECL DataInputStream{
 public:
 	DataInputStream(STREAM_TYPE type, int bufSize = 2048);
 	DataInputStream(const char* data, int size, bool copy = true);
@@ -211,7 +214,7 @@ protected:
 	size_t cursor_;
 };
 
-class DataOutputStream {
+class EXPORT_DECL DataOutputStream {
 public:
 	DataOutputStream(const SocketSP& socket, size_t flushThreshold = 4096);
 	DataOutputStream(FILE* file, bool autoClose = false);
@@ -255,7 +258,7 @@ protected:
 	bool autoClose_;
 };
 
-class Buffer {
+class EXPORT_DECL Buffer {
 public:
 	Buffer(size_t capacity) : buf_(new char[capacity]), capacity_(capacity), size_(0), external_(false){}
 	Buffer() : buf_(new char[256]), capacity_(256), size_(0), external_(false){}
@@ -287,7 +290,7 @@ private:
 };
 
 template<class T>
-class BufferWriter{
+class EXPORT_DECL BufferWriter{
 public:
 	BufferWriter(const T& out) : out_(out), buffer_(0), size_(0){}
 
@@ -336,7 +339,7 @@ private:
 	size_t size_;
 };
 
-class DataStream : public DataInputStream{
+class EXPORT_DECL DataStream : public DataInputStream{
 public:
 	DataStream(const char* data, int size) : DataInputStream(data, size), flag_(1), outBuf_(0), outSize_(0){}
 	DataStream(const SocketSP& socket) : DataInputStream(socket), flag_(3), outBuf_(new char[2048]), outSize_(2048){}
@@ -360,7 +363,7 @@ private:
 	size_t outSize_;
 };
 
-struct FileAttributes{
+struct EXPORT_DECL FileAttributes{
 	string name;
 	bool isDir;
 	long long size;
