@@ -21,3 +21,4 @@ static vector<int> listenPorts = {18901,18902,18903,18904,18905,18906,18907,1890
 static string alphas = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 static int pass,fail;
 DBConnection conn(false, false);
+DBConnectionPool pool(hostName, port, 10, "admin", "123456");
