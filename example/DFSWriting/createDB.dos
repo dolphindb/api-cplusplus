@@ -1,0 +1,16 @@
+def createDb(dbName,tableName){
+	t = table(200:0,`cbool`cchar`cshort`cint`clong`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cfloat`cdouble`csymbol`cstring`cuuid`cip`cint128,
+			[BOOL,CHAR,SHORT,INT,LONG,DATE,MONTH,TIME,MINUTE,SECOND,DATETIME,TIMESTAMP,NANOTIME,NANOTIMESTAMP,FLOAT,DOUBLE,SYMBOL,STRING,UUID,IPADDR,INT128])
+	db = database(dbName,VALUE,today()..(today()+60))
+	db.createPartitionedTable(t, tableName, `ctimestamp)
+}
+
+login("admin","123456")
+dbName="dfs://demo"
+tableName="pt"
+createDb(dbName,tableName)
+
+login("admin","123456")
+dfsTable=loadTable("dfs://demo","pt")
+select count(*) from dfsdfsTable
+dropDatabase("dfs://demo")

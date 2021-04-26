@@ -1,16 +1,17 @@
 #include "Concurrent.h"
 #include "DolphinDB.h"
 #include "Util.h"
-#include <arpa/inet.h>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <sys/time.h>
 #include <thread>
+#include <arpa/inet.h>
 
 using namespace dolphindb;
 using namespace std;
-#define MAX_THREAD_NUM 50
+#define BUCKETS 50
+#define MAX_THREAD_NUM BUCKETS
 DBConnection conn[MAX_THREAD_NUM];
 SmartPointer<BoundedBlockingQueue<TableSP>> tableQueue[MAX_THREAD_NUM];
 
@@ -20,11 +21,14 @@ struct parameter {
   long cLong;
   long nLong;
   long nTime;
+  long nStarttime;
 };
 
 void showUsage() {
-  cout << "DolpinDB Multi-threaded streaming date writing program" << endl;
-  cout << "Usage example:--h=127.0.0.1 --p=8921 --c=1000 --n=5 --t=5 " << endl;
+  cout << "DolpinDB Multi-threaded performance test program" << endl;
+  cout << "Usage example:--h=127.0.0.1 --p=8921 --c=1000 --n=5 --t=5 "
+          "--s=1579080800000"
+       << endl;
   cout << "Options :" << endl;
   cout << " --h=127.0.0.1 Mandatory,dolphindb host，Multiple hosts separated "
           "by commas"
@@ -34,58 +38,66 @@ void showUsage() {
        << endl;
   cout << " --c=1000 Mandatory,The number of records inserted per thread"
        << endl;
-  cout << " --n=5 Optional,Batches insertions per thread,default is 1" << endl;
-  cout << " --t=5 Optional,Threads number,default is 1,max is "
-       << MAX_THREAD_NUM << endl;
+  cout << " --n=5 Optional,Batches  insertions per thread,default is 1" << endl;
+  cout << " --t=5 Optional,Threads number,default is 1,max is " << BUCKETS
+       << endl;
+  cout << " --s=1574380800 Optional,start time,default is "
+       << Util::getEpochTime() / 1000 << endl;
   cout << " --help Print this help." << endl;
   return;
 }
 
-TableSP createDemoTable(long rows) {
-  vector<string> colNames = {
-      "id",      "cbool",     "cchar",      "cshort",    "cint",
-      "clong",   "cdate",     "cmonth",     "ctime",     "cminute",
-      "csecond", "cdatetime", "ctimestamp", "cnanotime", "cnanotimestamp",
-      "cfloat",  "cdouble",   "csymbol",    "cstring",   "cuuid",
-      "cip",     "cint128"};
-
-  vector<DATA_TYPE> colTypes = {
-      DT_LONG,   DT_BOOL,     DT_CHAR,      DT_SHORT,    DT_INT,
-      DT_LONG,   DT_DATE,     DT_MONTH,     DT_TIME,     DT_MINUTE,
-      DT_SECOND, DT_DATETIME, DT_TIMESTAMP, DT_NANOTIME, DT_NANOTIMESTAMP,
-      DT_FLOAT,  DT_DOUBLE,   DT_SYMBOL,    DT_STRING,   DT_UUID,
-      DT_IP,     DT_INT128};
-  int colNum = 22, rowNum = rows, indexCapacity = rows;
+TableSP createDemoTable(long rows, long startPartition, long partitionCount,
+                        long startTime, int timeInc) {
+  vector<string> colNames = {"fwname",
+                             "filename",
+                             "source_address",
+                             "source_port",
+                             "destination_address",
+                             "destination_port",
+                             "nat_source_address",
+                             "nat_source_port",
+                             "starttime",
+                             "stoptime",
+                             "elapsed_time"};
+  vector<DATA_TYPE> colTypes = {DT_SYMBOL,   DT_STRING,   DT_IP, DT_INT,
+                                DT_IP,       DT_INT,      DT_IP, DT_INT,
+                                DT_DATETIME, DT_DATETIME, DT_INT};
+  int colNum = 11, rowNum = rows, indexCapacity = rows;
   ConstantSP table =
       Util::createTable(colNames, colTypes, rowNum, indexCapacity);
   vector<VectorSP> columnVecs;
   for (int i = 0; i < colNum; i++)
     columnVecs.push_back(table->getColumn(i));
-  unsigned char ip[16] = {0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+
+  unsigned char sip[16] = {0};
+  sip[3] = 192;
+  sip[2] = startPartition;
+  sip[1] = partitionCount;
+  ConstantSP spIP = Util::createConstant(DT_IP);
+  for (int j = 1; j < 255; j++) {
+    sip[0] = j;
+    spIP->setBinary(0, 16, sip);
+    if (spIP->getHash(BUCKETS) >= startPartition &&
+        spIP->getHash(BUCKETS) < startPartition + partitionCount) {
+      break;
+    }
+  }
+
+  unsigned char ip[16] = {0};
   for (int i = 0; i < rowNum; i++) {
-    columnVecs[0]->setLong(i, i);
-    columnVecs[1]->setBool(i, i % 2);
-    columnVecs[2]->setChar(i, i);
-    columnVecs[3]->setShort(i, i);
-    columnVecs[4]->setInt(i, i);
-    columnVecs[5]->setLong(i, i);
-    columnVecs[6]->set(i, Util::parseConstant(DT_DATE, "2020.01.01"));
-    columnVecs[7]->setInt(i, 24240); // 2020.01M
-    columnVecs[8]->setInt(i, i);
-    columnVecs[9]->setInt(i, i);
+    columnVecs[0]->setString(i, "10.189.45.2:9000");
+    columnVecs[1]->setString(i, std::to_string(startPartition)); 
+    columnVecs[2]->setBinary(i, 16, sip);
+    columnVecs[3]->setInt(i, 1 * i);
+    memcpy(ip, (unsigned char *)&i, 4);
+    columnVecs[4]->setBinary(i, 16, ip);
+    columnVecs[5]->setInt(i, 2 * i);
+    columnVecs[6]->set(i, Util::parseConstant(DT_IP, "192.168.1.1"));
+    columnVecs[7]->setInt(i, 3 * i);
+    columnVecs[8]->setLong(i, startTime + timeInc);
+    columnVecs[9]->setLong(i, i + startTime + 100);
     columnVecs[10]->setInt(i, i);
-    columnVecs[11]->setInt(i, 1577836800 + i);      // 2020.01.01 00:00:00+i
-    columnVecs[12]->setLong(i, 1577836800000l + i); // 2020.01.01 00:00:00+i
-    columnVecs[13]->setLong(i, i);
-    columnVecs[14]->setLong(i, 1577836800000000000l +i); // 2020.01.01 00:00:00.000000000+i
-    columnVecs[15]->setFloat(i, i);
-    columnVecs[16]->setDouble(i, i);
-    columnVecs[17]->setString(i, "sym" + to_string(i));
-    columnVecs[18]->setString(i, "abc" + to_string(i));
-    ip[15] = i;
-    columnVecs[19]->setBinary(i, 16, ip);
-    columnVecs[20]->setBinary(i, 16, ip);
-    columnVecs[21]->setBinary(i, 16, ip);
   }
   return table;
 }
@@ -100,7 +112,8 @@ void *writeData(void *arg) {
     long long startTime = Util::getEpochTime();
     vector<ConstantSP> args;
     args.push_back(table);
-    conn[pParam->index].run("tableInsert{objByName(`st1)}", args);
+    conn[pParam->index].run(
+        "tableInsert{loadTable('dfs://natlog', `natlogrecords)}", args);
     pParam->nTime += Util::getEpochTime() - startTime;
   }
   printf("Thread %d,insert %ld rows %ld times, used %ld ms.\n", pParam->index,
@@ -110,9 +123,12 @@ void *writeData(void *arg) {
 void *genData(void *arg) {
   struct parameter *pParam;
   pParam = (struct parameter *)arg;
+  long partitionCount = BUCKETS / pParam->count;
 
   for (unsigned int i = 0; i < pParam->nLong; i++) {
-    TableSP table = createDemoTable(pParam->cLong);
+    TableSP table =
+        createDemoTable(pParam->cLong, partitionCount * pParam->index,
+                        partitionCount, pParam->nStarttime, i * 5);
     tableQueue[pParam->index]->push(table);
   }
   return NULL;
@@ -128,8 +144,8 @@ int main(int argc, char *argv[]) {
 
   int nOptionIndex = 1;
   string cString, nString, hString, pString, tString, sString;
-  stringstream cSS, nSS, pSS, tSS;
-  long cLong, nLong, pLong, tLong;
+  stringstream cSS, nSS, pSS, tSS, sSS;
+  long cLong, nLong, pLong, tLong, sLong;
   vector<string> vHost, vPort;
 
   while (nOptionIndex < argc) {
@@ -144,6 +160,8 @@ int main(int argc, char *argv[]) {
       nString = &argv[nOptionIndex][4];
     } else if (strncmp(argv[nOptionIndex], "--t=", 4) == 0) { // get thread
       tString = &argv[nOptionIndex][4];
+    } else if (strncmp(argv[nOptionIndex], "--s=", 4) == 0) { // get start time
+      sString = &argv[nOptionIndex][4];
     } else if (strncmp(argv[nOptionIndex], "--help", 6) == 0) { // help
       showUsage();
       return 0;
@@ -189,6 +207,18 @@ int main(int argc, char *argv[]) {
     tSS << tString;
     tSS >> tLong;
   }
+  if (sString.empty()) {
+    sLong = Util::getEpochTime() / 1000; // 1574380800;
+    cout << "starttime=" << sLong << endl;
+  } else {
+    sSS << sString;
+    sSS >> sLong;
+  }
+  if (tLong > BUCKETS) {
+    cout << "The number of threads must be less than " << BUCKETS << endl;
+    showUsage();
+    return -1;
+  }
 
   if (vHost.size() != vPort.size()) {
     cout << "The number of host and port must be the same! " << vHost.size()
@@ -197,6 +227,7 @@ int main(int argc, char *argv[]) {
     return -1;
   }
   try {
+
     for (int i = 0; i < tLong; ++i) {
       hString = vHost[i % vHost.size()];
       pLong = std::stol(vPort[i % vPort.size()]);
@@ -223,6 +254,7 @@ int main(int argc, char *argv[]) {
     arg[i].nLong = nLong;
     arg[i].cLong = cLong;
     arg[i].nTime = 0;
+    arg[i].nStarttime = sLong;
     genThreads[i] = std::thread(genData, (void *)&arg[i]);
     writeThreads[i] = std::thread(writeData, (void *)&arg[i]);
   }
@@ -234,8 +266,7 @@ int main(int argc, char *argv[]) {
   long long endTime = Util::getEpochTime();
   long long rowCount = cLong * nLong * tLong;
   cout << "Inserted " << rowCount
-       << " rows, took a total of  " + std::to_string(endTime - startTime) +
-              " ms.  "
+       << " rows, took a total of  " + std::to_string(endTime - startTime) + " ms.  "
        << rowCount / (endTime - startTime) * 1000 / 10000 << " w/s " << endl;
   long timeSum = arg[0].nTime;
   for (int i = 1; i < tLong; ++i) {
