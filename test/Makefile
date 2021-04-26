@@ -7,6 +7,7 @@ CC=g++
 
 all : $(OBJS)
 	$(CC)  DolphinDBTest.o $(CFLAGS) $(LFLAGS)  -o DolphinDBTest 
+	$(CC)  DolphinDBTestINDEX_MAX.o $(CFLAGS) $(LFLAGS)  -o DolphinDBTestINDEX_MAX 
 	$(CC)  streamingMultithreadSubUnsub.o $(CFLAGS) $(LFLAGS)  -o streamingMultithreadSubUnsub 
 	$(CC)  streamingMulThreadMoreTables.o $(CFLAGS) $(LFLAGS)  -o streamingMulThreadMoreTables 
 	$(CC)  streamingPressureSub.o $(CFLAGS) $(LFLAGS)  -o streamingPressureSub 

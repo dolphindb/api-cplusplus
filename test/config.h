@@ -2,10 +2,13 @@
 #include "../include/Util.h"
 #include "Streaming.h"
 #include <vector>
-#include <limits.h>
+#include <climits>
 #include <thread>
 #include <atomic>
-#include <stdio.h>
+#include <cstdio>
+#include <random>
+#include <sys/time.h>
+
 using namespace dolphindb;
 using std::endl;
 using std::cout;
@@ -17,4 +20,5 @@ static auto table = "trades";
 static vector<int> listenPorts = {18901,18902,18903,18904,18905,18906,18907,18908,18909,18910};
 static string alphas = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 static int pass,fail;
-DBConnection conn(false,false);
+DBConnection conn(false, false);
+DBConnectionPool pool(hostName, port, 10, "admin", "123456");
