@@ -105,7 +105,7 @@ The Windows gnu development environment is similar to Linux.
 
 ## 2. Establish DolphinDB connection
 
-The most important object provided by DolphinDB C++ API is DBConnection. It allows C++ applications to execute script and functions on DolphinDB servers and transfer data between C++ applications and DolphinDB servers in both directions. The DBConnection class provides the following main methods:
+The most important object in DolphinDB C++ API is DBConnection. It allows C++ applications to execute script and functions on DolphinDB servers and transfer data between C++ applications and DolphinDB servers in both directions. The DBConnection class provides the following main methods:
 
 | Method Name | Details |
 |:------------- |:-------------|
@@ -117,7 +117,7 @@ The most important object provided by DolphinDB C++ API is DBConnection. It allo
 |initialize()|Initialize the connection|
 |close()|Close the current session|
 
-The C++ API connects to a DolphinDB server via TCP/IP. The `connect` method needs the IP address and port number of the DolphinDB server.
+The C++ API connects to a DolphinDB server via TCP/IP. Use the IP address and port number of the DolphinDB server in the `connect` method.
 ```
 DBConnection conn;
 bool ret = conn.connect("111.222.3.44", 8503);
@@ -133,8 +133,6 @@ If a connection is established without username and password, it has guest privi
 
 Please note that all functions of the DBConnection class are not thread-safe and therefore cannot be called in parallel, otherwise the program may crash.
 
-
-
 When declaring the connection variable, there are two optional parameters: enableSSL (supports SSL), enableAYSN (supports asynchronous communication). The default value of these two parameters is false.
 
 The following example is to establish a connection that supports SSL instead of asynchronous, and the server side should add the parameter `enableHTTPS=true` in dolphindb.cfg of single mode and cluster.cfg of cluster mode.
@@ -147,7 +145,6 @@ The following establishment does not support SSL, but supports asynchronous conn
 
 ```C++
 DBConnection conn(false,true)
-
 
 
 ## 3. Execute DolphinDB script
@@ -420,6 +417,34 @@ cout<<table->getRow(0)->getMember(Util::createString("price"))->getDouble()<<end
 
 It should be noted that accessing a table by rows is very inefficient. For better performance, it is recommended to access a table by columns as in section 6.5.2 and calculate in batches.
 
+#### 6.5.4 BlockReader
+
+For tables with large data volumes, the DolphinDB C++ API provides a block reading method. (This method is only applicable to DolphinDB 1.20.5, 1.10.16 and above)
+
+Create a table:
+```C++
+string script; 
+script.append("n=20000\n"); 
+script.append("syms= `IBM`C`MS`MSFT`JPM`ORCL`BIDU`SOHU`GE`EBAY`GOOG`FORD`GS`PEP`USO`GLD`GDX`EEM`FXI`SLV`SINA`BAC`AAPL`PALL`YHOO`KOH`TSLA`CS`CISO`SUN\n"); 
+script.append("mytrades=table(09:30:00+rand(18000, n) as timestamp, rand(syms, n) as sym, 10*(1+rand(100, n)) as qty, 5.0+rand(100.0, n) as price); \n"); 
+conn.run(script); 
+```
+
+Read the data in block reading method and use the `getString()` method to get the contents of the table. Note that the fetchSize must be no less than 8192.
+```C++
+string sb = "select * from mytrades";
+int fetchSize = 8192;
+BlockReaderSP reader = conn.run(sb,4,2,fetchSize);//priority=4, parallelism=2
+ConstantSP table;
+int total = 0;
+while(reader->hasNext()){
+    table=reader->read();
+    total += table->size();
+    cout<< "read" <<table->size()<<endl;
+    cout<<table->getString()<<endl; 
+}
+
+```
 
 ### 6.6 AnyVector
 
