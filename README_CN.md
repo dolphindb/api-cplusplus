@@ -15,6 +15,7 @@ DolphinDB C++ API支持以下开发环境：
 - [6. 读取数据示例](#6-读取数据示例)
 - [7. 保存数据到DolphinDB数据表](#7-保存数据到dolphindb数据表)
 - [8. C++ Streaming API](#8-c-streaming-api)
+- [9. openssl 1.0.2版本源码安装](#9-openssl-1.0.2版本源码安装)
 
 ## 1. 项目编译
 
@@ -64,6 +65,8 @@ int main(int argc, char *argv[]){
 为了兼容旧的编译器，libDolphinDBAPI.so提供了2个版本，一个版本在编译时使用了-D_GLIBCXX_USE_CXX11_ABI=0的选项，放在[bin/linux_x64/ABI0](./bin/linux_x64/ABI0)目录下，另一个版本未使用-D_GLIBCXX_USE_CXX11_ABI=0，放在[bin/linux_x64/ABI1](./bin/linux_x64/ABI1)目录下。
 
 另外由于DolphinDB添加了(Linux64 稳定版>=1.10.17,最新版>=1.20.6) SSL的支持， 所以编译前需要安装openssl。
+
+>注：当前需要openssl版本为1.0.2，高版本的1.1版本会报错。如果系统自带的openssl版本不是1.0.2的话，可以参考[openssl源码安装](#9-openssl-1.0.2版本源码安装)，或者使用已有的二进制包安装。
 
 以下是使用第一个动态库版本的g++编译命令：
 ```
@@ -248,7 +251,7 @@ TableSP createDemoTable(){
     for(int i = 0; i < colNum; ++i)
         columnVecs.push_back(table->getColumn(i));
 
-    for(unsigned int i = 0  i < rowNum; ++i){
+    for(unsigned int i = 0; i < rowNum; ++i){
         columnVecs[0]->set(i, Util::createString("name_"+std::to_string(i)));
         columnVecs[1]->set(i, Util::createDate(2010, 1, i+1));
         columnVecs[2]->set(i, Util::createDouble((rand()%100)/3.0));
@@ -443,6 +446,34 @@ cout<<table->getRow(0)->getMember(Util::createString("price"))->getDouble()<<end
 ```
 
 需要注意的是，按行访问table并逐一进行计算非常低效。为了达到更好的性能，建议参考[6.5.2小节](#652-getcolumn方法按列获取表的内容)的方式按列访问table并批量计算。
+
+#### 6.5.4 使用`BlockReaderSP`对象分段读取表数据
+
+对于大数据量的表，API提供了分段读取方法。(此方法仅适用于DolphinDB 1.20.5, 1.10.16及其以上版本)
+
+在C++客户端中执行以下脚本创建一个大数据量的表：
+```C++
+string script; 
+script.append("n=20000\n"); 
+script.append("syms= `IBM`C`MS`MSFT`JPM`ORCL`BIDU`SOHU`GE`EBAY`GOOG`FORD`GS`PEP`USO`GLD`GDX`EEM`FXI`SLV`SINA`BAC`AAPL`PALL`YHOO`KOH`TSLA`CS`CISO`SUN\n"); 
+script.append("mytrades=table(09:30:00+rand(18000, n) as timestamp, rand(syms, n) as sym, 10*(1+rand(100, n)) as qty, 5.0+rand(100.0, n) as price); \n"); 
+conn.run(script); 
+```
+
+分段读取数据并用getString()方法获取表的内容, 需要注意的是fetchSize必须不小于8192。
+```C++
+string sb = "select * from mytrades";
+int fetchSize = 8192;
+BlockReaderSP reader = conn.run(sb,4,2,fetchSize);//priority=4, parallelism=2
+ConstantSP table;
+int total = 0;
+while(reader->hasNext()){
+    table=reader->read();
+    total += table->size();
+    cout<< "read" <<table->size()<<endl;
+    cout<<table->getString()<<endl; 
+}
+```
 
 ### 6.6 AnyVector
 
@@ -914,3 +945,49 @@ void PollingClient::unsubscribe(string host, int port, string tableName, string 
 参数参见8.2.1.3节。
 
 注意，对于这种订阅模式，若返回一个空指针，说明已取消订阅。
+
+## 9. openssl 1.0.2版本源码安装
+这部分主要是介绍下没有1.0.2版本openssl的，从源码编译安装的过程。已有的话忽略本节。
+
+
+首先创建一个自定义目录，给自己编译的openssl使用。
+
+这个示例里，我们使用/newssl目录，实际可以自己修改。
+```console
+demo@ddb:~# mkdir /newssl
+```
+
+下载openssl源码
+```console
+demo@ddb:~# wget https://www.openssl.org/source/old/1.0.2/openssl-1.0.2u.tar.gz
+```
+
+解压缩后，进入源码目录，配置编译结果存放目录为刚才创建的newssl目录
+```console
+demo@ddb:~/openssl-1.0.2u# ./config shared --prefix=/newssl
+```
+
+
+编译安装
+```console
+demo@ddb:~/openssl-1.0.2u# make install
+```
+
+因为这里编译结果存放的目录是/newssl，在实际编译时，链接的头文件和库文件目录也需要添加上我们存放的目录/newssl
+
+比如[1.1.4编译](#114-编译)这个例子里，原先的g++编译命令是:
+
+```
+g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=1 -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -lssl -L../bin/linux_x64/ABI1  -Wl,-rpath,.:../bin/linux_x64/ABI1 -o main
+```
+要使用我们自己编译的openssl库，需要改成
+```
+g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=1 -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -L../bin/linux_x64/ABI1  -Wl,-rpath,.:../bin/linux_x64/ABI1 -L /newssl/lib/ -I /newssl/include -lssl -lcrypto -luuid -o main
+```
+本例中，编译文件后，直接运行main会报错，是由于我们的/newssl不在系统路径里，所以在运行main前，可以设置变量
+```
+export LD_LIBRARY_PATH=/newssl/lib
+```
+然后再运行./main就可以运行了
+
+
