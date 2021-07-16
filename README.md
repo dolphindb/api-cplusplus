@@ -161,7 +161,7 @@ for(int i = 0; i < size; i++)
 Output:
 > ["IBM", "GOOG", "YHOO"]
 
-The maximum length of the script is 65,535 bytes. If the script contains multiple statements, only the result of the last statement is returned. If there is a syntax error in the script or there is a network problem, an exception will be thrown.
+If the script contains multiple statements, only the result of the last statement is returned. If there is a syntax error in the script or there is a network problem, an exception will be thrown.
 
 ## 4. Call DolphinDB functions
 

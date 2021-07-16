@@ -165,8 +165,6 @@ cout<<v->getString()<<endl;
 
 > ["IBM", "GOOG", "YHOO"]
 
-需要注意的是，脚本的最大长度为65,535字节。
-
 ## 4. 运行DolphinDB函数
 
 除了运行脚本之外，run命令还可以直接在远程DolphinDB服务器上执行DolphinDB内置或用户自定义函数。若 `run` 方法只有一个参数，则该参数为脚本；若 `run` 方法有两个参数，则第一个参数为DolphinDB中的函数名，第二个参数是该函数的参数，为ConstantSP类型的向量。
