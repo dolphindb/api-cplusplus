@@ -20,6 +20,7 @@ using Message = ConstantSP;
 using MessageQueue = BlockingQueue<Message>;
 using MessageQueueSP = SmartPointer<MessageQueue>;
 using MessageHandler = std::function<void(Message)>;
+using MessageBatchHandler = std::function<void(vector<Message>)>;
 
 extern char const *DEFAULT_ACTION_NAME;
 
@@ -27,7 +28,9 @@ template <typename T>
 class EXPORT_DECL BlockingQueue {
 public:
     explicit BlockingQueue(size_t maxItems)
-        : buf_(new T[maxItems]), capacity_(maxItems), size_(0), head_(0), tail_(0) {}
+        : buf_(new T[maxItems]), capacity_(maxItems), batchSize_(1), size_(0), head_(0), tail_(0) {}
+    explicit BlockingQueue(size_t maxItems, size_t batchSize)
+        : buf_(new T[maxItems]), capacity_(maxItems), batchSize_(batchSize), size_(0), head_(0), tail_(0) {}
     void push(const T &item) {
         lock_.lock();
         while (size_ >= capacity_) full_.wait(lock_);
@@ -36,6 +39,7 @@ public:
         ++size_;
 
         if (size_ == 1) empty_.notifyAll();
+        if (size_ == batchSize_) batch_.notifyAll();
         lock_.unlock();
     }
     void emplace(T &&item) {
@@ -45,6 +49,7 @@ public:
         tail_ = (tail_ + 1) % capacity_;
         ++size_;
         if (size_ == 1) empty_.notifyAll();
+        if (size_ == batchSize_) batch_.notifyAll();
         lock_.unlock();
     }
     bool poll(T &item, int milliSeconds) {
@@ -74,15 +79,36 @@ public:
         lock_.unlock();
     }
 
+    bool pop(vector<T> &items, int milliSeconds) {
+        LockGuard<Mutex> guard(&lock_);
+        while (size_ < batchSize_){
+            if (!batch_.wait(lock_, milliSeconds)) break;
+        }
+        if(size_ == 0)
+            return false;
+        int n = std::min(batchSize_, size_);
+        items.resize(n);
+        for(int i = 0; i < n; i++){
+            items[i] = std::move(buf_[head_]);
+            buf_[head_] = T();
+            head_ = (head_ + 1) % capacity_;
+        }
+        if (n == capacity_) full_.notifyAll();
+        size_ -= n;
+        return true;
+    }
 private:
     std::unique_ptr<T[]> buf_;
     size_t capacity_;
+    size_t batchSize_;
     size_t size_;
     size_t head_;
     size_t tail_;
     Mutex lock_;
     ConditionalVariable full_;
     ConditionalVariable empty_;
+    ConditionalVariable batch_;
+    
 };
 class StreamingClientImpl;
 class EXPORT_DECL StreamingClient {
@@ -93,7 +119,7 @@ public:
 protected:
     MessageQueueSP subscribeInternal(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME,
                                      int64_t offset = -1, bool resubscribe = true, const VectorSP &filter = nullptr,
-                                     bool msgAsTable = false, bool allowExists = false);
+                                     bool msgAsTable = false, bool allowExists = false, int batchSize  = 1);
     void unsubscribeInternal(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 
 private:
@@ -107,6 +133,9 @@ public:
     ThreadSP subscribe(string host, int port, const MessageHandler &handler, string tableName,
                        string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true,
                        const VectorSP &filter = nullptr, bool msgAsTable = false, bool allowExists = false);
+    ThreadSP subscribe(string host, int port, const MessageBatchHandler &handler, string tableName,
+                       string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true,
+                       const VectorSP &filter = nullptr, bool allowExists = false, int batchSize = 1, double throttle = 1);
     void unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 };
 

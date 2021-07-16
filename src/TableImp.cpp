@@ -843,4 +843,12 @@ bool BasicTable::increaseCapacity(long long newCapacity, string& errMsg){
 	}
 }
 
+ConstantSP BasicTable::getSubTable(vector<int> indices) const{
+	int colCount = cols_.size();
+	vector<ConstantSP> cols(colCount);
+	for(int i = 0; i < colCount; i++){
+		cols[i] = Util::createSubVector(cols_[i], indices);
+	}
+	return new BasicTable(cols, *colNames_.get());
+}
 };

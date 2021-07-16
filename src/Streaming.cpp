@@ -236,7 +236,7 @@ class StreamingClientImpl {
               haSites(0),
               queue(nullptr) {}
         explicit SubscribeInfo(string host, int port, string tableName, string actionName, long long offset, bool resub,
-                               const VectorSP &filter, bool msgAsTable, bool allowExists)
+                               const VectorSP &filter, bool msgAsTable, bool allowExists, int batchSize)
             : host(move(host)),
               port(port),
               tableName(move(tableName)),
@@ -247,7 +247,7 @@ class StreamingClientImpl {
               msgAsTable(msgAsTable),
               allowExists(allowExists),
               haSites(0),
-              queue(new MessageQueue(DEFAULT_QUEUE_CAPACITY)) {}
+              queue(new MessageQueue(std::max(DEFAULT_QUEUE_CAPACITY, batchSize), batchSize)){}
 
         string host;
         int port;
@@ -299,7 +299,7 @@ public:
     MessageQueueSP subscribeInternal(const string &host, int port, const string &tableName,
                                      const string &actionName = DEFAULT_ACTION_NAME, int64_t offset = -1,
                                      bool resubscribe = true, const VectorSP &filter = nullptr, bool msgAsTable = false,
-                                     bool allowExists = false);
+                                     bool allowExists = false, int batchSize  = 1);
     string subscribeInternal(DBConnection &conn, SubscribeInfo &info);
     void insertMeta(SubscribeInfo &info, const string &topic);
     void delMeta(const string &topic);
@@ -739,14 +739,14 @@ void StreamingClientImpl::delMeta(const string &topic) {
 
 MessageQueueSP StreamingClientImpl::subscribeInternal(const string &host, int port, const string &tableName,
                                                       const string &actionName, int64_t offset, bool resubscribe,
-                                                      const VectorSP &filter, bool msgAsTable, bool allowExists) {
+                                                      const VectorSP &filter, bool msgAsTable, bool allowExists, int batchSize) {
     string topic;
     int attempt = 0;
     string _host = host;
     int _port = port;
     while (true) {
         ++attempt;
-        SubscribeInfo info(_host, _port, tableName, actionName, offset, resubscribe, filter, msgAsTable, allowExists);
+        SubscribeInfo info(_host, _port, tableName, actionName, offset, resubscribe, filter, msgAsTable, allowExists, batchSize);
         try {
             DBConnection conn = buildConn(_host, _port);
             topic = subscribeInternal(conn, info);
@@ -791,9 +791,9 @@ StreamingClient::~StreamingClient() {}
 
 MessageQueueSP StreamingClient::subscribeInternal(string host, int port, string tableName, string actionName,
                                                   int64_t offset, bool resubscribe, const dolphindb::VectorSP &filter,
-                                                  bool msgAsTable, bool allowExists) {
+                                                  bool msgAsTable, bool allowExists, int batchSize) {
     return impl_->subscribeInternal(host, port, tableName, actionName, offset, resubscribe, filter, msgAsTable,
-                                    allowExists);
+                                    allowExists, batchSize);
 }
 
 void StreamingClient::unsubscribeInternal(string host, int port, string tableName, string actionName) {
@@ -802,6 +802,45 @@ void StreamingClient::unsubscribeInternal(string host, int port, string tableNam
 
 /// ThreadedClient impl
 ThreadedClient::ThreadedClient(int listeningPort) : StreamingClient(listeningPort) {}
+
+ThreadSP ThreadedClient::subscribe(string host, int port, const MessageBatchHandler &handler, string tableName,
+                                   string actionName, int64_t offset, bool resub, const VectorSP &filter,
+                                   bool allowExists, int batchSize, double throttle) {
+    MessageQueueSP queue = subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset,
+                                             resub, filter, false, false, batchSize);
+    if (queue.isNull()) {
+        cerr << "Subscription already made, handler loop not created." << endl;
+        ThreadSP t = new Thread(new Executor([]() {}));
+        t->start();
+        return t;
+    }
+    int throttleTime;
+    if(batchSize <= 0){
+        throttleTime = 0; 
+    }else{
+        throttleTime = std::max(1, (int)(throttle * 1000));
+    }
+    ThreadSP t = new Thread(new Executor([handler, queue, throttleTime]() {
+        vector<Message> msgs;
+        while (true) {       
+            if(queue->pop(msgs, throttleTime)){
+                for(size_t i = 0; i < msgs.size(); i++){
+                    if (UNLIKELY(msgs[i].isNull())) {
+                        if(LIKELY(i == msgs.size() - 1 && i != 0)){
+                            msgs.pop_back();
+                            handler(msgs);
+                        }
+                        return;
+                    }
+                }
+                handler(msgs);
+            }
+        }
+    }));
+    t->start();
+    return t;
+}
+
 
 ThreadSP ThreadedClient::subscribe(string host, int port, const MessageHandler &handler, string tableName,
                                    string actionName, int64_t offset, bool resub, const VectorSP &filter,

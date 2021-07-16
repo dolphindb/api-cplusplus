@@ -37,6 +37,7 @@
 #include "Util.h"
 #include "ConstantFactory.h"
 #include "TableImp.h"
+#include "DomainImp.h"
 
 namespace dolphindb{
 
@@ -296,6 +297,14 @@ Constant* Util::createDateTime(int year, int month, int day, int hour, int minut
 
 Constant* Util::createDateTime(int seconds){
 	return new DateTime(seconds);
+}
+
+Constant * Util::createDateHour(int hours) {
+    return new DateHour(hours);
+}
+
+Constant * Util::createDateHour(int year, int month, int day, int hour) {
+    return new DateHour(year, month, day, hour);
 }
 
 bool Util::isFlatDictionary(Dictionary* dict){
@@ -1200,4 +1209,53 @@ string Util::getErrorMessage(int errCode){
 #endif
 }
 
+string Util::getPartitionTypeString(PARTITION_TYPE type){
+	return constFactory_->getPartitionTypeString(type);
+}
+
+string Util::getCategoryString(DATA_CATEGORY type){
+	return constFactory_->getCategoryString(type);
+}
+Domain* Util::createDomain(PARTITION_TYPE type, DATA_TYPE partitionColType, const ConstantSP& partitionSchema){
+	if(type == HASH){
+		return new HashDomain(partitionColType, partitionSchema);
+	}
+	else if(type == VALUE){
+		return new ValueDomain(partitionColType, partitionSchema);
+	}
+	else if(type == RANGE){
+		return new RangeDomain(partitionColType, partitionSchema);
+	}
+	else if(type == LIST){
+		return new ListDomain(partitionColType, partitionSchema);
+	}
+	throw RuntimeException("Unsupported partition type " + getPartitionTypeString(type));
+}
+Vector* Util::createSubVector(const VectorSP& source, vector<int> indices){
+	INDEX size = (INDEX)(indices.size());
+	Vector* result = createVector(source->getType(), size, size, source->isFastMode(), source->getExtraParamForType());
+	INDEX sourceSize = source->size();
+	for(INDEX i = 0; i < size; i++){
+		int index = indices[i];
+		if(index < 0 || index >= sourceSize){
+			throw RuntimeException("Failed to createSubVectot with index " + std::to_string(index));
+		}
+		result->set(i, source->get(index));
+	}
+	return result;
+}
+Vector* Util::createSymbolVector(const SymbolBaseSP& symbolBase, INDEX size, INDEX capacity, bool fast, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
+		if(data == NULL && dataSegment == NULL){
+			try{
+				data = (void*)new int[std::max(size, capacity)];
+			}
+			catch(...){
+				data = NULL;
+			}
+		}
+		if(data != NULL)
+			return new FastSymbolVector(symbolBase, size, capacity, (int*)data, containNull);
+		else
+			return NULL;
+}
 };

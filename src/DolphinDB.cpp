@@ -36,6 +36,10 @@ int min(INDEX a, int b) {
 }    // namespace std
 #endif
 
+#define APIMinVersionRequirement 100
+
+#define SYMBOLBASE_MAX_SIZE 1<<21
+
 static inline uint32_t murmur32_16b (const unsigned char* key){
 	const uint32_t m = 0x5bd1e995;
 	const int r = 24;
@@ -89,15 +93,15 @@ public:
     ~DBConnectionImpl();
     bool connect(const string& hostName, int port, const string& userId = "", const string& password = "",bool sslEnable = false, bool asynTask = false);
     void login(const string& userId, const string& password, bool enableEncryption);
-    ConstantSP run(const string& script, int priority = 4, int parallelism = 2, int fetchSize = 0);
-    ConstantSP run(const string& funcName, vector<ConstantSP>& args, int priority = 4, int parallelism = 2, int fetchSize = 0);
+    ConstantSP run(const string& script, int priority = 4, int parallelism = 2, int fetchSize = 0, bool clearMemory = false);
+    ConstantSP run(const string& funcName, vector<ConstantSP>& args, int priority = 4, int parallelism = 2, int fetchSize = 0, bool clearMemory = false);
     void upload(const string& name, const ConstantSP& obj);
     void upload(vector<string>& names, vector<ConstantSP>& objs);
     void close();
     static void initialize();
 
 private:
-    ConstantSP run(const string& script, const string& scriptType, vector<ConstantSP>& args, int priority = 4, int parallelism = 2,int fetchSize = 0);
+    ConstantSP run(const string& script, const string& scriptType, vector<ConstantSP>& args, int priority = 4, int parallelism = 2,int fetchSize = 0, bool clearMemory = false);
     bool connect();
     void login();
 
@@ -114,6 +118,109 @@ private:
     bool sslEnable_;
     bool asynTask_;
     static bool initialized_;
+};
+
+class TaskStatusMgmt{
+public:
+    enum TASK_STAGE{WAITING, FINISHED, ERRORED};
+    struct Result{
+        Result(TASK_STAGE s = WAITING, const ConstantSP c = Constant::void_, const string &msg = "") : stage(s), result(c), errMsg(msg){}
+        TASK_STAGE stage;
+        ConstantSP result;
+        string errMsg;
+    };
+
+    bool isFinished(int identity);
+    ConstantSP getData(int identity);
+    void setResult(int identity, Result);
+private:
+    Mutex mutex_;
+    unordered_map<int, Result> results;
+};
+
+class DBConnectionPoolImpl{
+public:
+    struct Task{
+        Task(const string& sc = "", int id = 0, int pr = 4, int pa = 2, bool clearM = false) : script(sc), identity(id), priority(pr), parallelism(pa), clearMemory(clearM){}
+        Task(const string& function, const vector<ConstantSP>& args, int id = 0, int pr = 4, int pa = 2, bool clearM = false) 
+			: script(function), arguments(args), identity(id), priority(pr), parallelism(pa), clearMemory(clearM){ isFunc = true; }
+		string script;
+		vector<ConstantSP> arguments;
+        int identity;
+        int priority;
+        int parallelism;
+		bool clearMemory;
+		bool isFunc = false;
+    };
+    
+    DBConnectionPoolImpl(const string& hostName, int port, int threadNum = 10, const string& userId = "", const string& password = "", bool loadBalance = true, bool reConnectFlag = true);
+    
+    ~DBConnectionPoolImpl(){
+        shutDown();
+        // for(auto& work : workers_){
+        //     work->join();
+        // }
+    }
+    void run(const string& script, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false){
+        queue_->push(Task(script, identity, priority, parallelism, clearMemory));
+        taskStatus_.setResult(identity, TaskStatusMgmt::Result());
+    }
+
+	void run(const string& functionName, const vector<ConstantSP>& args, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false){
+        queue_->push(Task(functionName, args, identity, priority, parallelism, clearMemory));
+        taskStatus_.setResult(identity, TaskStatusMgmt::Result());
+    }
+
+    bool isFinished(int identity){
+        return taskStatus_.isFinished(identity);
+    }
+
+    ConstantSP getData(int identity){
+        return taskStatus_.getData(identity);
+    }
+	
+    void shutDown(){
+        shutDownFlag_.store(true);
+        latch_->wait();
+    }
+
+    bool isShutDown(){
+        return shutDownFlag_.load();
+    }
+
+	int getConnectionCount(){
+		return workers_.size();
+	}
+private:
+    std::atomic<bool> shutDownFlag_;
+    CountDownLatchSP latch_;
+    vector<ThreadSP> workers_;
+    SmartPointer<SynchronizedQueue<Task>> queue_;
+    TaskStatusMgmt taskStatus_;
+};
+
+class AsynWorker: public Runnable {
+public:
+    using Task = DBConnectionPoolImpl::Task;
+    AsynWorker(DBConnectionPoolImpl& pool, CountDownLatchSP latch, const SmartPointer<DBConnection>& conn,
+               const SmartPointer<SynchronizedQueue<Task>>& queue, TaskStatusMgmt& status,
+               const string& hostName, int port, const string& userId , const string& password )
+            : pool_(pool), latch_(latch), conn_(conn), queue_(queue),taskStatus_(status),
+              hostName_(hostName), port_(port), userId_(userId), password_(password){}
+protected:
+    virtual void run();
+
+private:
+    DBConnectionPoolImpl& pool_;
+    CountDownLatchSP latch_;
+    SmartPointer<DBConnection> conn_;
+	SmartPointer<SynchronizedQueue<Task>> queue_;
+    TaskStatusMgmt& taskStatus_;
+    bool reConnectFlag_;
+    const string hostName_;
+    int port_;
+    const string userId_;
+    const string password_;
 };
 
 bool DBConnectionImpl::initialized_ = false;
@@ -722,6 +829,35 @@ bool DBConnectionImpl::connect() {
             throw;
         }
     }
+
+    ConstantSP requiredVersion;
+    
+    try {
+        if(asynTask_) {
+            SmartPointer<DBConnection> newConn = new DBConnection(false, false);
+            newConn->connect(hostName_, port_, userId_, pwd_);
+            requiredVersion =newConn->run("getRequiredAPIVersion()");
+        }else{
+            requiredVersion = run("getRequiredAPIVersion()");
+        }
+    }
+    catch(...){
+        return true;
+    }
+    if(!requiredVersion->isTuple()){
+        return true;
+    }else{
+        int apiVersion = requiredVersion->get(0)->getInt();
+        if(apiVersion > APIMinVersionRequirement){
+            conn_->close();
+            conn_.clear();
+            isConnected_ = false;
+            throw IOException("Required C++ API version at least "  + std::to_string(apiVersion) + ". Current C++ API version is "+ std::to_string(APIMinVersionRequirement) +". Please update DolphinDB C++ API. ");
+        }
+        if(requiredVersion->size() >= 2 && requiredVersion->get(1)->getString() != ""){
+            std::cout<<requiredVersion->get(1)->getString() <<std::endl;
+        }
+    }
     return true;
 }
 
@@ -743,13 +879,13 @@ void DBConnectionImpl::login() {
         throw IOException("Failed to authenticate the user " + userId_);
 }
 
-ConstantSP DBConnectionImpl::run(const string& script, int priority, int parallelism, int fetchSize) {
+ConstantSP DBConnectionImpl::run(const string& script, int priority, int parallelism, int fetchSize, bool clearMemory) {
     vector<ConstantSP> args;
-    return run(script, "script", args, priority, parallelism, fetchSize);
+    return run(script, "script", args, priority, parallelism, fetchSize, clearMemory);
 }
 
-ConstantSP DBConnectionImpl::run(const string& funcName, vector<ConstantSP>& args, int priority, int parallelism, int fetchSize) {
-    return run(funcName, "function", args, priority, parallelism, fetchSize);
+ConstantSP DBConnectionImpl::run(const string& funcName, vector<ConstantSP>& args, int priority, int parallelism, int fetchSize, bool clearMemory) {
+    return run(funcName, "function", args, priority, parallelism, fetchSize, clearMemory);
 }
 
 void DBConnectionImpl::upload(const string& name, const ConstantSP& obj) {
@@ -776,7 +912,7 @@ void DBConnectionImpl::upload(vector<string>& names, vector<ConstantSP>& objs) {
     run(varNames, "variable", objs);
 }
 
-ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType, vector<ConstantSP>& args, int priority, int parallelism, int fetchSize) {
+ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType, vector<ConstantSP>& args, int priority, int parallelism, int fetchSize, bool clearMemory) {
     if (!isConnected_)
         throw IOException("Couldn't send script/function to the remote host because the connection has been closed");
 
@@ -794,10 +930,12 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
     }
     string out("API " + sessionId_ + " ");
     out.append(Util::convert((int)body.size()));
+    short flag = 0; //32+8 means for python api
     if(asynTask_)
-        out.append(" / 4_1_" + std::to_string(priority) + "_" + std::to_string(parallelism));
-    else
-        out.append(" / 0_1_" + std::to_string(priority) + "_" + std::to_string(parallelism));
+        flag += 4;
+    if(clearMemory)
+        flag += 16;
+    out.append(" / " + std::to_string(flag) + "_1_" + std::to_string(priority) + "_" + std::to_string(parallelism));
     if(fetchSize > 0)
         out.append("__" + std::to_string(fetchSize));
     out.append(1, '\n');
@@ -878,7 +1016,7 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
         return new Void();
     }
 
-    short flag;
+    //short flag;
     if ((ret = in->readShort(flag)) != OK) {
         isConnected_ = false;
         conn_.clear();
@@ -1069,7 +1207,7 @@ void DBConnection::login(const string& userId, const string& password, bool enab
     pwd_ = password;
 }
 
-ConstantSP DBConnection::run(const string& script, int priority, int parallelism, int fetchSize) {
+ConstantSP DBConnection::run(const string& script, int priority, int parallelism, int fetchSize, bool clearMemory) {
     if (ha_) {
         try {
             return conn_->run(script);
@@ -1098,14 +1236,15 @@ ConstantSP DBConnection::run(const string& script, int priority, int parallelism
             }
         }
     } else {
-        return conn_->run(script, priority, parallelism, fetchSize);
+        return conn_->run(script, priority, parallelism, fetchSize, clearMemory);
     }
+    return NULL;
 }
 
-ConstantSP DBConnection::run(const string& funcName, vector<dolphindb::ConstantSP>& args, int priority, int parallelism, int fetchSize) {
+ConstantSP DBConnection::run(const string& funcName, vector<dolphindb::ConstantSP>& args, int priority, int parallelism, int fetchSize, bool clearMemory) {
     if (ha_) {
         try {
-            return conn_->run(funcName, args, priority, parallelism, fetchSize);
+            return conn_->run(funcName, args, priority, parallelism, fetchSize, clearMemory);
         } catch (IOException& e) {
             string host;
             int port;
@@ -1118,7 +1257,7 @@ ConstantSP DBConnection::run(const string& funcName, vector<dolphindb::ConstantS
                         if(!connected() || getNewLeader(err, host, port)){
                             switchDataNode(err);
                         }
-                        return conn_->run(funcName, args, priority, parallelism, fetchSize);
+                        return conn_->run(funcName, args, priority, parallelism, fetchSize, clearMemory);
                     }catch(exception& e){
                         if(i == maxRerunCnt_ - 1)
                             throw;
@@ -1130,8 +1269,9 @@ ConstantSP DBConnection::run(const string& funcName, vector<dolphindb::ConstantS
             }
         }
     } else {
-        return conn_->run(funcName, args, priority, parallelism, fetchSize);
+        return conn_->run(funcName, args, priority, parallelism, fetchSize, clearMemory);
     }
+    return NULL;
 }
 
 void DBConnection::upload(const string& name, const ConstantSP& obj) {
@@ -1217,6 +1357,472 @@ ConstantSP BlockReader::read(){
 void BlockReader::skipAll(){
     for(int i = currentIndex_; i < total_; i++)
         read();
+}
+
+Domain::Domain(PARTITION_TYPE partitionType, DATA_TYPE partitionColType) : partitionType_(partitionType), partitionColType_(partitionColType){
+	partitionColCategory_ = Util::getCategory(partitionColType_);
+}
+
+DBConnectionPoolImpl::DBConnectionPoolImpl(const string& hostName, int port, int threadNum, const string& userId, const string& password, bool loadBalance, bool highAvailability) :shutDownFlag_(
+        false), queue_(new SynchronizedQueue<Task>){
+    DBConnection::initialize();
+    latch_ = new CountDownLatch(threadNum);
+    if(!loadBalance){
+        for(int i = 0 ;i < threadNum; i++){
+            SmartPointer<DBConnection> conn = new DBConnection(false, false);
+            bool ret = conn->connect(hostName, port, userId, password, "", highAvailability);
+            if(!ret)
+                throw RuntimeException("Failed to connect to " + hostName + ":" + std::to_string(port));
+            workers_.push_back(new Thread(new AsynWorker(*this,latch_, conn, queue_, taskStatus_, hostName, port, userId, password)));
+            workers_.back()->start();
+        }
+    }
+    else{
+        SmartPointer<DBConnection> entryPoint = new DBConnection(false, false);
+        bool ret = entryPoint->connect(hostName, port, userId, password);
+        if(!ret)
+           throw RuntimeException("Failed to connect to " + hostName + ":" + std::to_string(port));
+	    ConstantSP nodes = entryPoint->run("rpc(getControllerAlias(), getClusterLiveDataNodes{false})");
+        INDEX nodeCount = nodes->size();
+        vector<string> hosts(nodeCount);
+        vector<int> ports(nodeCount);
+        for(int i = 0; i < nodeCount; i++){
+            string fields = nodes->getString();
+            size_t p = fields.find(":");
+            if(p == string::npos)
+				throw  RuntimeException("Invalid data node address: " + fields);
+            hosts[i] = fields.substr(0, p);
+            ports[i] = std::atoi(fields.substr(p + 1, fields.size()).data());
+        }
+        for(int i = 0 ;i < threadNum; i++){
+            SmartPointer<DBConnection> conn = new DBConnection(false, false);
+            bool ret = conn->connect(hosts[i % nodeCount], ports[i % nodeCount], userId, password, "", highAvailability);
+            if(!ret)
+                throw RuntimeException("Failed to connect to " + hostName + ":" + std::to_string(port));
+            workers_.push_back(new Thread(new AsynWorker(*this,latch_, conn, queue_, taskStatus_, hostName, port, userId, password)));
+            workers_.back()->start();
+        }
+    }
+}
+
+void AsynWorker::run() {
+    while(true) {
+        if(pool_.isShutDown()){
+            conn_->close();
+            latch_->countDown();
+            std::cout<<"Asyn worker closed peacefully."<<std::endl;
+            break;
+        }
+
+        Task task;
+        ConstantSP result;
+        bool errorFlag = false;
+        if (!queue_->blockingPop(task, 1000))
+            continue;
+        while(true) {
+            try {
+                if(task.isFunc){
+                    result = conn_->run(task.script, task.arguments, task.priority, task.parallelism, 0, task.clearMemory);
+                }
+                else{
+                    result = conn_->run(task.script, task.priority, task.parallelism, 0, task.clearMemory);
+                }
+                break;
+            }
+            catch(IOException & ex){
+                errorFlag = true;
+                std::cerr<<"Async task worker come across exception : "<<ex.what()<<std::endl;
+                taskStatus_.setResult(task.identity, TaskStatusMgmt::Result(TaskStatusMgmt::ERRORED, new Void(), ex.what()));
+                break;
+                // if(reConnectFlag_ && !conn_->connected()){
+                //     while(true){
+                //         try {
+                //             if(conn_->connect(hostName_, port_, userId_, password_))
+                //                 break;
+                //             std::cerr << "Connect Failed, retry in one second." << std::endl;
+                //             Thread::sleep(1000);
+                //         } catch (IOException &e) {
+                //             std::cerr << "Connect Failed, retry in one second." << std::endl;
+                //             Thread::sleep(1000);
+                //         }
+                //     }
+                // } else {
+                //     
+                // }
+            }
+        }
+        if(!errorFlag)
+            taskStatus_.setResult(task.identity, TaskStatusMgmt::Result(TaskStatusMgmt::FINISHED,  result));
+    }
+}
+
+bool TaskStatusMgmt::isFinished(int identity){
+    LockGuard<Mutex> guard(&mutex_);
+    if(results.count(identity) == 0)
+        throw RuntimeException("Task [" + std::to_string(identity) + "] does not exist.");
+    if(results[identity].stage == ERRORED)
+        throw RuntimeException("Task [" + std::to_string(identity) + "] come across exception : " + results[identity].errMsg);
+    return results[identity].stage == FINISHED;
+}
+
+void TaskStatusMgmt::setResult(int identity, Result r){
+    LockGuard<Mutex> guard(&mutex_);
+    results[identity] = r;
+}
+
+ConstantSP TaskStatusMgmt::getData(int identity){
+    LockGuard<Mutex> guard(&mutex_);
+    if(results.count(identity) == 0)
+        throw RuntimeException("Task [" + std::to_string(identity) + "] does not exist, the result may be fetched yet.");
+    assert(results[identity].stage == FINISHED);
+    ConstantSP re = results[identity].result;
+    results.erase(identity);
+    return re;
+}
+
+DBConnectionPool::DBConnectionPool(const string& hostName, int port, int threadNum, const string& userId, const string& password, bool loadBalance, bool highAvailability){
+    pool_ = new DBConnectionPoolImpl(hostName, port, threadNum, userId, password, loadBalance, highAvailability);
+}
+
+void DBConnectionPool::run(const string& script, int identity, int priority, int parallelism, int fetchSize, bool clearMemory){
+    if(identity < 0)
+        throw RuntimeException("Invalid identity: " + std::to_string(identity) + ". Identity must be a non-negative integer.");
+    pool_->run(script, identity, priority, parallelism, fetchSize, clearMemory);
+}
+
+void DBConnectionPool::run(const string& functionName, const vector<ConstantSP>& args, int identity, int priority, int parallelism, int fetchSize, bool clearMemory){
+    if(identity < 0)
+        throw RuntimeException("Invalid identity: " + std::to_string(identity) + ". Identity must be a non-negative integer.");
+    pool_->run(functionName, args, identity, priority, parallelism, fetchSize, clearMemory);
+}
+
+bool DBConnectionPool::isFinished(int identity){
+    return pool_->isFinished(identity);
+}
+
+ConstantSP DBConnectionPool::getData(int identity){
+    return pool_->getData(identity);
+}
+	
+void DBConnectionPool::shutDown(){
+    pool_->shutDown();
+}
+
+bool DBConnectionPool::isShutDown(){
+    return pool_->isShutDown();
+}
+
+int DBConnectionPool::getConnectionCount(){
+    return pool_->getConnectionCount();
+}
+
+PartitionedTableAppender::PartitionedTableAppender(string dbUrl, string tableName, string partitionColName, DBConnectionPool& pool) {
+    pool_ = pool.pool_;
+    init(dbUrl, tableName, partitionColName, "");
+}
+
+PartitionedTableAppender::PartitionedTableAppender(string dbUrl, string tableName, string partitionColName, string appendFunction, DBConnectionPool& pool) {
+    pool_ = pool.pool_;
+    init(dbUrl, tableName, partitionColName, appendFunction);
+}
+
+void PartitionedTableAppender::init(string dbUrl, string tableName, string partitionColName, string appendFunction){
+    threadCount_ = pool_->getConnectionCount();
+    chunkIndices_.resize(threadCount_);
+    ConstantSP partitionSchema;
+    TableSP colDefs;
+    VectorSP typeInts;
+    int partitionType;
+    DATA_TYPE partitionColType;
+    
+    try {
+        string task;
+        if(dbUrl == ""){
+            task = "schema(" + tableName+ ")";
+            appendScript_ = "tableInsert{" + tableName + "}";
+        }
+        else{
+            task = "schema(loadTable(\"" + dbUrl + "\", \"" + tableName + "\"))";
+            appendScript_ = "tableInsert{loadTable('" + dbUrl + "', '" + tableName + "')}";
+        }
+        if(appendFunction != ""){
+            appendScript_ = appendFunction;
+        }
+        
+        pool_->run(task,identity_);
+
+        while(!pool_->isFinished(identity_)){
+            Util::sleep(10);
+        }
+        
+        tableInfo_ = pool_->getData(identity_);
+        identity_ --;
+        ConstantSP partColNames = tableInfo_->getMember("partitionColumnName");
+        if(partColNames->isNull())
+            throw RuntimeException("Can't find specified partition column name.");
+        
+        if(partColNames->isScalar()){
+            if(partColNames->getString() != partitionColName)
+                throw  RuntimeException("Can't find specified partition column name.");
+            partitionColumnIdx_ = tableInfo_->getMember("partitionColumnIndex")->getInt();
+            partitionSchema = tableInfo_->getMember("partitionSchema");
+            partitionType =  tableInfo_->getMember("partitionType")->getInt();
+        }
+        else{
+            int dims = partColNames->size();
+            int index = -1;
+            for(int i=0; i<dims; ++i){
+                if(partColNames->getString(i) == partitionColName){
+                    index = i;
+                    break;
+                }
+            }
+            if(index < 0)
+                throw RuntimeException("Can't find specified partition column name.");
+            partitionColumnIdx_ = tableInfo_->getMember("partitionColumnIndex")->getInt(index);
+            partitionSchema = tableInfo_->getMember("partitionSchema")->get(index);
+            partitionType =  tableInfo_->getMember("partitionType")->getInt(index);
+        }
+
+        colDefs = tableInfo_->getMember("colDefs");
+        cols_ = colDefs->rows();
+        typeInts = colDefs->getColumn("typeInt");
+        partitionColType = (DATA_TYPE)typeInts->getInt(partitionColumnIdx_);
+        columnCategories_.resize(cols_);
+        columnTypes_.resize(cols_);
+        for (int i = 0; i < cols_; ++i) {
+            columnTypes_[i] = (DATA_TYPE)typeInts->getInt(i);
+            columnCategories_[i] = Util::getCategory(columnTypes_[i]);
+        }
+        
+        domain_ = Util::createDomain((PARTITION_TYPE)partitionType, partitionColType, partitionSchema);
+    } catch (exception& e) {
+        throw;
+    } 
+}
+
+int PartitionedTableAppender::append(TableSP table){
+    if(cols_ != table->columns())
+        throw RuntimeException("The input table doesn't match the schema of the target table.");
+    for(int i=0; i<cols_; ++i){
+        VectorSP curCol = table->getColumn(i);
+        checkColumnType(i, curCol->getCategory(), curCol->getType());
+    }
+    
+    for(int i=0; i<threadCount_; ++i)
+        chunkIndices_[i].clear();
+    vector<int> keys = domain_->getPartitionKeys(table->getColumn(partitionColumnIdx_));
+    vector<int> tasks;
+    int rows = keys.size();
+    for(int i=0; i<rows; ++i){
+        int key = keys[i];
+        if(key >= 0)
+            chunkIndices_[key % threadCount_].emplace_back(i);
+    }
+    for(int i=0; i<threadCount_; ++i){
+        if(chunkIndices_[i].size() == 0)
+            continue;
+        TableSP subTable = table->getSubTable(chunkIndices_[i]);
+        tasks.push_back(identity_);
+        vector<ConstantSP> args = {subTable};
+        pool_->run(appendScript_, args, identity_--); 
+        
+    }
+    int affected = 0;
+    for(auto& task : tasks){
+        while(!pool_->isFinished(task)){
+            Util::sleep(100);
+        }
+        ConstantSP res = pool_->getData(task);
+        if(res->isNull()){
+            affected = 0;
+        }
+        else{
+            affected += res->getInt();
+        }
+    }
+    return affected;
+}
+
+void PartitionedTableAppender::checkColumnType(int col, DATA_CATEGORY category, DATA_TYPE type) {
+    DATA_CATEGORY expectCategory = columnCategories_[col];
+    DATA_TYPE expectType = columnTypes_[col];
+    if (category != expectCategory) {
+        throw  RuntimeException("column " + std::to_string(col) + ", expect category " + Util::getCategoryString(expectCategory) + ", got category " + Util::getCategoryString(category));
+    } else if (category == TEMPORAL && type != expectType) {
+        throw  RuntimeException("column " + std::to_string(col) + ", temporal column must have exactly the same type, expect " + Util::getDataTypeString(expectType) + ", got " + Util::getDataTypeString(type));
+    }
+}
+
+AutoFitTableAppender::AutoFitTableAppender(string dbUrl, string tableName, DBConnection& conn) : conn_(conn){
+    ConstantSP schema;
+    TableSP colDefs;
+    VectorSP typeInts;
+    DictionarySP tableInfo;
+    VectorSP colNames;
+    try {
+        string task;
+        if(dbUrl == ""){
+            task = "schema(" + tableName+ ")";
+            appendScript_ = "tableInsert{" + tableName + "}";
+        }
+        else{
+            task = "schema(loadTable(\"" + dbUrl + "\", \"" + tableName + "\"))";
+            appendScript_ = "tableInsert{loadTable('" + dbUrl + "', '" + tableName + "')}";
+        }
+        
+        tableInfo =  conn_.run(task);
+        colDefs = tableInfo->getMember("colDefs");
+        cols_ = colDefs->rows();
+        typeInts = colDefs->getColumn("typeInt");
+        colNames = colDefs->getColumn("name");
+        columnCategories_.resize(cols_);
+        columnTypes_.resize(cols_);
+        columnNames_.resize(cols_);
+        for (int i = 0; i < cols_; ++i) {
+            columnTypes_[i] = (DATA_TYPE)typeInts->getInt(i);
+            columnCategories_[i] = Util::getCategory(columnTypes_[i]);
+            columnNames_[i] = colNames->getString(i);
+        }
+        
+    } catch (exception& e) {
+        throw;
+    } 
+}
+
+int AutoFitTableAppender::append(TableSP table){
+    if(cols_ != table->columns())
+        throw RuntimeException("The input table columns doesn't match the columns of the target table.");
+    
+    vector<ConstantSP> columns;
+    for(int i = 0; i < cols_; i++){
+        VectorSP curCol = table->getColumn(i);
+        checkColumnType(i, curCol->getCategory(), curCol->getType());
+        if(columnCategories_[i] == TEMPORAL && curCol->getType() != columnTypes_[i]){
+            columns.push_back(curCol->castTemporal(columnTypes_[i]));
+        }else{
+            columns.push_back(curCol);
+        }
+    }
+    TableSP tableInput = Util::createTable(columnNames_, columns);
+    vector<ConstantSP> arg = {tableInput};
+    ConstantSP res =  conn_.run(appendScript_, arg);
+    if(res->isNull())
+        return 0;
+    else
+        return res->getInt();
+}
+
+void AutoFitTableAppender::checkColumnType(int col, DATA_CATEGORY category, DATA_TYPE type) {
+    DATA_CATEGORY expectCategory = columnCategories_[col];
+    if (category != expectCategory) {
+        throw  RuntimeException("column " + std::to_string(col) + ", expect category " + Util::getCategoryString(expectCategory) + ", got category " + Util::getCategoryString(category));
+    };
+}
+
+SymbolBase::SymbolBase(const DataInputStreamSP& in, IO_ERR& ret){
+    ret = in->readInt(id_);
+    if(ret != OK)
+        return;
+    int size;
+    ret = in->readInt(size);
+    if(ret != OK)
+        return;
+
+    for(int i = 0; i < size; i++){
+        string s;
+        ret = in->readString(s);
+        if(ret != OK) return;
+        syms_.emplace_back(s);
+    }
+}
+
+SymbolBase::SymbolBase(int id, const DataInputStreamSP& in, IO_ERR& ret){
+    id_ = id;
+    int size;
+    ret =  in->readInt(size);
+    if(ret != OK)
+        return;
+    for(int i = 0; i < size; i++){
+        string s;
+        ret = in->readString(s);
+        if(ret != OK)
+            return;
+        syms_.emplace_back(s);
+    }
+}
+
+int SymbolBase::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const {
+    if(indexStart >= (INDEX)syms_.size())
+        return -1;
+    int index = indexStart;
+    int initSize = bufSize;
+    while(index < (int)syms_.size() && bufSize > 0){
+        int size = std::min(bufSize, (int)syms_[index].size() + 1 - offset);
+        memcpy(buf, syms_[index].data() + offset,  size);
+        buf += size;
+        bufSize -= size;
+        offset += size;
+        if(offset == (int)syms_[index].size() + 1){
+            offset = 0;
+            index ++;
+        }
+    }
+    partial = offset;
+    numElement = index - indexStart;
+    return initSize - bufSize;
+}
+
+int SymbolBase::find(const string& symbol){
+    if(symMap_.empty()){
+        if(syms_.size() > 0 && syms_[0] != "")
+            throw RuntimeException("A symbol base's first key must be empty string.");
+        if(syms_.size() == 0){
+            symMap_[""] = 0;
+            syms_.emplace_back("");
+        }	
+        else {
+            int count = syms_.size();
+            for(int i = 0; i < count; ++i)
+                symMap_[syms_[i]] = i;
+        }
+    }
+    int index = -1;
+    auto it = symMap_.find(symbol);
+    if(it != symMap_.end()) index = it->second;
+    return index;
+}
+
+int SymbolBase::findAndInsert(const string& symbol){
+    if(symbol == "")
+        throw RuntimeException("A symbol base key string can't be null.");
+    if(symMap_.empty()){
+        if(syms_.size() > 0 && syms_[0] != "")
+            throw RuntimeException("A symbol base's first key must be empty string.");
+        if(syms_.size() == 0){
+            symMap_[""] = 0;
+            syms_.emplace_back("");
+        }	
+        else {
+            int count = syms_.size();
+            for(int i = 0; i < count; ++i)
+                symMap_[syms_[i]] = i;
+        }
+    }
+    int index = -1;
+    auto it = symMap_.find(symbol);
+    if(it == symMap_.end()){
+        index = symMap_.size();
+        if(index >= SYMBOLBASE_MAX_SIZE){
+            throw RuntimeException("One symbol base's size can't exceed 2097152.");
+        }
+        symMap_[symbol] = index;
+        syms_.emplace_back(symbol);
+    }
+    else{
+        index = it->second;
+    }
+    return index;
 }
 
 };    // namespace dolphindb

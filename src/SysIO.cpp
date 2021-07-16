@@ -260,15 +260,14 @@ IO_ERR Socket::connect(){
 	    }
 
         int enabled = 1;
-        int idleTime = 30;
-        int interval = 5;
-        int count = 3;
-        unsigned int timeout = 30000;
 #ifdef WINDOWS
         if(::setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, (const char*)&enabled, sizeof(int)) != 0)
             LOG_ERR("Subscription socket failed to enable TCP_KEEPALIVE with error: " +  std::to_string(getErrorCode()));
 #else
-
+        int idleTime = 30;
+        int interval = 5;
+        int count = 3;
+        unsigned int timeout = 30000;
         if(::setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, &enabled, sizeof(enabled)) != 0)
             LOG_ERR("Failed to enable SO_KEEPALIVE with error: " +  std::to_string(getErrorCode()));
         if(::setsockopt(handle_, SOL_TCP, TCP_KEEPIDLE, &idleTime, sizeof(idleTime)) != 0)

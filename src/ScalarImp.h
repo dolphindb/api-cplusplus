@@ -296,7 +296,7 @@ private:
 
 class String: public Constant{
 public:
-	String(string val=""):val_(val){}
+	String(string val="", bool blob=false):val_(val), blob_(blob){}
 	virtual ~String(){}
 	virtual char getBool() const {throw IncompatibleTypeException(DT_BOOL,DT_STRING);}
 	virtual char getChar() const {throw IncompatibleTypeException(DT_CHAR,DT_STRING);}
@@ -345,8 +345,8 @@ public:
 			buf[i]=val;
 		return buf;
 	}
-	virtual ConstantSP getInstance() const {return ConstantSP(new String());}
-	virtual ConstantSP getValue() const {return ConstantSP(new String(val_));}
+	virtual ConstantSP getInstance() const {return ConstantSP(new String("", blob_));}
+	virtual ConstantSP getValue() const {return ConstantSP(new String(val_, blob_));}
 	virtual DATA_TYPE getType() const {return DT_STRING;}
 	virtual DATA_TYPE getRawType() const { return DT_STRING;}
 	virtual DATA_CATEGORY getCategory() const {return LITERAL;}
@@ -360,6 +360,7 @@ public:
 
 private:
 	mutable string val_;
+    bool blob_;
 };
 
 template <class T>
@@ -880,6 +881,19 @@ public:
 	virtual string getString() const { return toString(val_);}
 	static DateTime* parseDateTime(const string& str);
 	static string toString(int val);
+};
+
+class DateHour:public TemporalScalar{
+public:
+    DateHour(int val=0):TemporalScalar(val){}
+    DateHour(int year, int month, int day, int hour);
+    virtual ~DateHour(){}
+    virtual DATA_TYPE getType() const {return DT_DATEHOUR;}
+    virtual ConstantSP getInstance() const {return ConstantSP(new DateHour());}
+    virtual ConstantSP getValue() const {return ConstantSP(new DateHour(val_));}
+    virtual string getString() const { return toString(val_);}
+    static DateHour* parseDateHour(const string& str);
+    static string toString(int val);
 };
 
 };

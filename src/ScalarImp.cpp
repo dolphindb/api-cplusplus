@@ -27,6 +27,7 @@ static TemporalFormat* timestampFormat_;
 static TemporalFormat* nanotimeFormat_;
 static TemporalFormat* nanotimestampFormat_;
 static TemporalFormat* datetimeFormat_;
+static TemporalFormat* datehourFormat_;
 static NumberFormat* floatingNormFormat_;
 static NumberFormat* floatingSciFormat_;
 
@@ -40,6 +41,7 @@ void initFormatters(){
 	nanotimeFormat_ = new TemporalFormat("HH:mm:ss.nnnnnnnnn");
 	nanotimestampFormat_ = new TemporalFormat("yyyy.MM.ddTHH:mm:ss.nnnnnnnnn");
 	datetimeFormat_ = new TemporalFormat("yyyy.MM.ddTHH:mm:ss");
+	datehourFormat_ = new TemporalFormat("yyyy.MM.ddTHH");
 	floatingNormFormat_  = new NumberFormat("0.######");
 	floatingSciFormat_ = new NumberFormat("0.0#####E0");
 }
@@ -204,28 +206,69 @@ IO_ERR Void::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumE
 }
 
 int String::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const {
-	if(offset > (int)val_.size())
-		return -1;
-	else if(bufSize >= (int)(val_.size()-offset+1)){
-		numElement = 1;
-		partial = 0;
-		memcpy(buf,val_.c_str()+offset,val_.size()-offset+1);
-		return val_.size()-offset+1;
-	}
-	else{
-		numElement = 0;
-		partial = offset + bufSize;
-		memcpy(buf,val_.c_str()+offset, bufSize);
-		return bufSize;
-	}
+    int len = val_.size();
+    if (!blob_) {
+        if (offset > len)
+            return -1;
+        if (bufSize >= len - offset + 1) {
+            numElement = 1;
+            partial = 0;
+            memcpy(buf, val_.data() + offset, len - offset + 1);
+            return len - offset + 1;
+        } else {
+            numElement = 0;
+            partial = offset + bufSize;
+            memcpy(buf, val_.data() + offset, bufSize);
+            return bufSize;
+        }
+    } else {
+        int bytes = 0;
+        if (offset > 0) {
+            offset -= 4;
+            if (UNLIKELY(offset < 0))
+                return -1;
+        } else {
+            if (UNLIKELY((size_t)bufSize < sizeof(int)))
+                return 0;
+            int len = val_.size();
+            memcpy(buf, &len, sizeof(int));
+            buf += sizeof(int);
+            bufSize -= sizeof(int);
+            bytes += sizeof(int);
+        }
+        if (bufSize >= len - offset) {
+            numElement = 1;
+            partial = 0;
+            memcpy(buf, val_.data() + offset, len - offset);
+            bytes += len - offset;
+        } else {
+            numElement = 0;
+            partial = sizeof(int) + offset + bufSize;
+            memcpy(buf, val_.data() + offset, bufSize);
+            bytes += bufSize;
+        }
+        return bytes;
+    }
 }
 
 IO_ERR String::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
-	//numElement < 0 indicate read line from input stream
-	IO_ERR ret = numElement>=0 ? in->readString(val_) : in->readLine(val_);
-	if(ret == OK)
-		numElement = 1;
-	return ret;
+    IO_ERR ret;
+    if (blob_) {
+        int len;
+        if ((ret = in->readInt(len)) != OK)
+            return ret;
+        std::unique_ptr<char[]> buf(new char[len]);
+        if ((ret = in->read(buf.get(), len)) != OK)
+            return ret;
+        val_.clear();
+        val_.append(buf.get(), len);
+    } else {
+        // numElement < 0 indicate read line from input stream
+        ret = numElement >= 0 ? in->readString(val_) : in->readLine(val_);
+        if (ret == OK)
+            numElement = 1;
+    }
+    return ret;
 }
 
 Bool* Bool::parseBool(const string& str){
@@ -1220,5 +1263,46 @@ NanoTimestamp* NanoTimestamp::parseNanoTimestamp(const string& str){
 	p=new NanoTimestamp(year,month,day,hour,minute,second,nanosecond);
 	return p;
 }
+
+DateHour::DateHour(int year, int month, int day, int hour):
+    TemporalScalar(countTemporalUnit(Util::countDays(year,month,day),24,hour)){
+}
+
+string DateHour::toString(int val){
+    if(val == INT_MIN)
+        return "";
+    else
+        return datehourFormat_->format(val, DT_DATEHOUR);
+}
+
+DateHour* DateHour::parseDateHour(const string& str){
+    DateHour* p=0;
+
+    if(str.compare("00")==0){
+        p=new DateHour();
+        p->setNull();
+        return p;
+    }
+
+    if(UNLIKELY(str.size() < 13))
+        return p;
+    int year,month,day,hour;
+    year=atoi(str.substr(0,4).c_str());
+    if(year==0 ||str[4]!='.')
+        return p;
+    month=atoi(str.substr(5,2).c_str());
+    if(month==0 || str[7]!='.')
+        return p;
+    day=atoi(str.substr(8,2).c_str());
+    if(day==0 || (str[10]!=' ' && str[10]!='T'))
+        return p;
+
+    hour=atoi(str.substr(11,2).c_str());
+    if(hour>=24)
+        return p;
+    p=new DateHour(year,month,day,hour);
+    return p;
+}
+
 
 };
