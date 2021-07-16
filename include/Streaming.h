@@ -79,10 +79,10 @@ public:
         lock_.unlock();
     }
 
-    bool pop(vector<T> &items, int throttle) {
+    bool pop(vector<T> &items, int milliSeconds) {
         LockGuard<Mutex> guard(&lock_);
         while (size_ < batchSize_){
-            if (!batch_.wait(lock_, throttle * 1000)) break;
+            if (!batch_.wait(lock_, milliSeconds)) break;
         }
         if(size_ == 0)
             return false;
@@ -135,7 +135,7 @@ public:
                        const VectorSP &filter = nullptr, bool msgAsTable = false, bool allowExists = false);
     ThreadSP subscribe(string host, int port, const MessageBatchHandler &handler, string tableName,
                        string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true,
-                       const VectorSP &filter = nullptr, bool allowExists = false, int batchSize = 1, int throttle = 1);
+                       const VectorSP &filter = nullptr, bool allowExists = false, int batchSize = 1, double throttle = 1);
     void unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 };
 
