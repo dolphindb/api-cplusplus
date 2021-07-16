@@ -130,6 +130,7 @@ public:
 	bool isHomogeneousScalar(DATA_TYPE& type) const;
 	bool isTabular() const;
 	ConstantSP convertToRegularVector() const;
+	virtual int asof(const ConstantSP& value) const {throw RuntimeException("asof not supported.");}
 
 private:
 	mutable deque<ConstantSP> data_;
@@ -791,6 +792,32 @@ public:
 		memcpy(buf,(char*)(data_+indexStart),len * numElement);
 		return len * numElement;
 	}
+	virtual int asof(const ConstantSP& value) const{
+		T target;
+		try{
+			if(getCategory() == FLOATING){
+				target = (T)value->getDouble();
+			}
+			else{
+				target = (T)value->getLong();
+			}
+		}
+		catch(exception ex){
+			throw ex;
+		}
+
+		int start = 0;
+		int end = size_ - 1;
+		int mid;
+		while(start <= end){
+			mid = (start + end)/2;
+			if(data_[mid] <= target)
+				start = mid + 1;
+			else
+				end = mid - 1;
+		}
+		return end;
+	}
 
 protected:
 	void replaceNull(T replace){
@@ -1032,6 +1059,7 @@ public:
 	virtual bool add(INDEX start, INDEX length, long long inc) {return false;}
 	virtual bool add(INDEX start, INDEX length, double inc) {return false;}
 	virtual int compare(INDEX index, const ConstantSP& target) const;
+	virtual int asof(const ConstantSP& value) const {throw RuntimeException("asof not supported.");}
 };
 
 class FastCharVector:public AbstractFastVector<char>{
@@ -1301,6 +1329,7 @@ public:
 	virtual ConstantSP get(INDEX index) const {return ConstantSP(new Date(data_[index]));}
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual string getString(INDEX index) const {return Date::toString(data_[index]);}
+	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
 class FastDateTimeVector:public FastTemporalVector{
@@ -1311,6 +1340,18 @@ public:
 	virtual ConstantSP get(INDEX index) const {return ConstantSP(new DateTime(data_[index]));}
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual string getString(INDEX index) const { return DateTime::toString(data_[index]);}
+	virtual ConstantSP castTemporal(DATA_TYPE expectType);
+};
+
+class FastDateHourVector:public FastTemporalVector{
+public:
+    FastDateHourVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){}
+    virtual ~FastDateHourVector(){}
+    virtual DATA_TYPE getType() const {return DT_DATEHOUR;}
+    virtual ConstantSP get(INDEX index) const {return ConstantSP(new DateHour(data_[index]));}
+    virtual ConstantSP get(const ConstantSP& index) const;
+    virtual string getString(INDEX index) const { return DateHour::toString(data_[index]);}
+    virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
 class FastMonthVector:public FastTemporalVector{
@@ -1321,6 +1362,12 @@ public:
 	virtual ConstantSP get(INDEX index) const {return ConstantSP(new Month(data_[index]));}
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual string getString(INDEX index) const { return Month::toString(data_[index]);}
+	virtual ConstantSP castTemporal(DATA_TYPE expectType){
+		if(expectType == DT_MONTH)
+			return getValue();
+		else
+			throw RuntimeException("castTemporal from MONTH to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
 };
 
 class FastTimeVector:public FastTemporalVector{
@@ -1332,6 +1379,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual string getString(INDEX index) const { return Time::toString(data_[index]);}
 	virtual void validate();
+	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
 class FastMinuteVector:public FastTemporalVector{
@@ -1343,6 +1391,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual string getString(INDEX index) const { return Minute::toString(data_[index]);}
 	virtual void validate();
+	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
 class FastSecondVector:public FastTemporalVector{
@@ -1354,6 +1403,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual string getString(INDEX index) const { return Second::toString(data_[index]);}
 	virtual void validate();
+	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
 class FastNanoTimeVector:public FastLongVector{
@@ -1366,6 +1416,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual string getString(INDEX index) const { return NanoTime::toString(data_[index]);}
 	virtual void validate();
+	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
 class FastTimestampVector:public FastLongVector{
@@ -1377,6 +1428,7 @@ public:
 	virtual ConstantSP get(INDEX index) const {return ConstantSP(new Timestamp(data_[index]));}
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual string getString(INDEX index) const { return Timestamp::toString(data_[index]);}
+	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
 class FastNanoTimestampVector:public FastLongVector{
@@ -1388,6 +1440,7 @@ public:
 	virtual ConstantSP get(INDEX index) const {return ConstantSP(new NanoTimestamp(data_[index]));}
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual string getString(INDEX index) const { return NanoTimestamp::toString(data_[index]);}
+	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
 class FastCompressedVector : public FastCharVector {
@@ -1397,6 +1450,7 @@ public:
 	virtual ~FastCompressedVector(){}
 	virtual DATA_TYPE getType() const {return DT_COMPRESS;}
 	virtual INDEX uncompressedRows() const;
+	virtual int asof(const ConstantSP& value) const {throw RuntimeException("asof not supported.");}
 };
 
 class FastBoolMatrix:public Matrix, public FastBoolVector{
@@ -1664,6 +1718,37 @@ public:
 	virtual ConstantSP get(INDEX column, INDEX row) const {return FastDateTimeVector::get(column*rows_+row);}
 };
 
+class FastDateHourMatrix:public Matrix, public FastDateHourVector{
+public:
+    FastDateHourMatrix(int cols, int rows, int colCapacity, int* data, bool containNull):Matrix(cols,rows),FastDateHourVector(cols*rows,colCapacity*rows,data,containNull){setForm(DF_MATRIX);}
+    virtual ~FastDateHourMatrix(){}
+    virtual ConstantSP getValue() const;
+    virtual INDEX columns() const {return cols_;}
+    virtual INDEX rows() const {return rows_;}
+    virtual bool reshape(INDEX cols, INDEX rows) {return Matrix::reshape(cols, rows);}
+    virtual ConstantSP getRowLabel() const {return rowLabel_;}
+    virtual void setRowLabel(const ConstantSP& label){Matrix::setRowLabel(label);}
+    virtual ConstantSP getColumnLabel() const {return colLabel_;}
+    virtual void setColumnLabel(const ConstantSP& label){Matrix::setColumnLabel(label);}
+    virtual string getString(int column, int row) const {
+        return FastDateHourVector::getString(column*rows_+row);
+    }
+    virtual string getString() const { return Matrix::getString();}
+    virtual string getString(INDEX index) const {return Matrix::getString(index);}
+    virtual bool set(INDEX column, INDEX row, const ConstantSP& value);
+    virtual bool set(const ConstantSP& index, const ConstantSP& value){return Matrix::set(index,value);}
+    virtual ConstantSP get(const ConstantSP& index) const {return Matrix::get(index);}
+    virtual ConstantSP getItem(INDEX index) const {return getColumn(index);}
+    virtual bool setItem(INDEX index, const ConstantSP& value){return setColumn(index,value);}
+    virtual ConstantSP getRow(INDEX index) const;
+    virtual ConstantSP getWindow(INDEX colStart, int colLength,INDEX rowStart, int rowLength) const;
+    virtual ConstantSP  getColumn(INDEX index) const;
+    virtual bool setColumn(INDEX index, const ConstantSP& value){fill(index*rows_,rows_,value);return true;}
+    virtual ConstantSP getInstance(INDEX size) const { return Util::createMatrix(getType(),size,rows_,size,getExtraParamForType());}
+    virtual ConstantSP getInstance() const { return Util::createMatrix(getType(),cols_,rows_,cols_,getExtraParamForType());}
+    virtual ConstantSP get(INDEX column, INDEX row) const {return FastDateHourVector::get(column*rows_+row);}
+};
+
 class FastMonthMatrix:public Matrix, public FastMonthVector{
 public:
 	FastMonthMatrix(int cols, int rows, int colCapacity, int* data, bool containNull):Matrix(cols,rows),FastMonthVector(cols*rows,colCapacity*rows,data,containNull){setForm(DF_MATRIX);}
@@ -1883,9 +1968,6 @@ public:
 
 class AbstractStringVector : public Vector{
 public:
-	virtual DATA_TYPE getType() const {return DT_STRING;}
-	virtual DATA_TYPE getRawType() const { return DT_STRING;}
-	virtual DATA_CATEGORY getCategory() const {return LITERAL;}
 	virtual bool getNullFlag() const {return containNull_;}
 	virtual void setNullFlag(bool containNull){containNull_=containNull;}
 	virtual char getBool() const {throw IncompatibleTypeException(DT_BOOL,DT_STRING);}
@@ -1904,8 +1986,12 @@ protected:
 
 class StringVector: public AbstractStringVector{
 public:
-	StringVector(INDEX size, INDEX capacity);
-	StringVector(const vector<string>& data, INDEX capacity, bool containNull);
+	StringVector(INDEX size, INDEX capacity, bool blob = false);
+	StringVector(const vector<string>& data, INDEX capacity, bool containNull, bool blob = false);
+    virtual DATA_TYPE getType() const {return blob_ ? DT_BLOB: DT_STRING;}
+    virtual DATA_TYPE getRawType() const { return blob_ ? DT_BLOB: DT_STRING;}
+    virtual DATA_CATEGORY getCategory() const {return blob_ ? BINARY : LITERAL;}
+
 	virtual ~StringVector(){}
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
 	virtual INDEX getCapacity() const {return data_.capacity();}
@@ -1929,7 +2015,7 @@ public:
 	}
 	virtual bool set(const ConstantSP& index, const ConstantSP& value);
 	virtual bool assign(const ConstantSP& value);
-	virtual ConstantSP get(INDEX index) const {return ConstantSP(new String(data_[index]));}
+	virtual ConstantSP get(INDEX index) const {return ConstantSP(new String(data_[index], blob_));}
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual bool isNull(INDEX index) const {return data_[index].size()==0;}
 	virtual bool isNull() const {return false;}
@@ -1943,9 +2029,9 @@ public:
 	virtual bool isNull(INDEX start, int len, char* buf) const;
 	virtual ConstantSP getSubVector(INDEX start, INDEX length) const { return getSubVector(start, length, std::abs(length));}
 	virtual ConstantSP getSubVector(INDEX start, INDEX length, INDEX capacity) const;
-	virtual ConstantSP getInstance(INDEX size) const {return ConstantSP(new StringVector(size, size));}
+	virtual ConstantSP getInstance(INDEX size) const {return ConstantSP(new StringVector(size, size, blob_));}
 	virtual ConstantSP getValue() const;
-	virtual ConstantSP getValue(INDEX capacity) const {return ConstantSP(new StringVector(data_, capacity, containNull_));}
+	virtual ConstantSP getValue(INDEX capacity) const {return ConstantSP(new StringVector(data_, capacity, containNull_, blob_));}
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
 	virtual bool appendString(string* buf, int len);
 	virtual bool appendString(char** buf, int len);
@@ -1987,9 +2073,28 @@ public:
 			buf[i] = murmur32(data_[start + i].data(), data_[start + i].size()) % buckets;
 		return true;
 	}
+	virtual void* getDataArray() const {return (void*)&data_[0];}
+
+	virtual int asof(const ConstantSP& value) const{
+		const string& target = value->getStringRef();
+		int start = 0;
+		int end = size() - 1;
+		int mid;
+		while(start <= end){
+			mid = (start + end) / 2;
+			if(data_[mid].compare(target) <= 0){
+				start = mid + 1;
+			}
+			else {
+				end = mid - 1;
+			}
+		}
+		return end;
+	}
 
 private:
 	mutable vector<string> data_;
+    bool blob_;
 };
 
 class FastFixedLengthVector : public Vector {
@@ -2184,6 +2289,186 @@ public:
 	virtual string getString(INDEX index) const { return IPAddr::toString(data_ + index * fixedLength_);}
 };
 
+class FastSymbolVector : public AbstractFastVector<int> {
+public:
+	FastSymbolVector(SymbolBaseSP base, int size, int capacity, int* srcData, bool containNull) :AbstractFastVector(size, capacity, srcData, 0, containNull),  base_(base){
+		if(size > 0){
+			base_->find("");
+		}
+	}
+	virtual ~FastSymbolVector(){}
+	virtual DATA_TYPE getType() const {return DT_SYMBOL;}
+	virtual DATA_CATEGORY getCategory() const {return LITERAL;}
+	virtual DATA_TYPE getRawType() const {return DT_INT;};
+	virtual int compare(INDEX index, const ConstantSP& target) const {return base_->getSymbol(data_[index]).compare(target->getString());}
+	virtual string getString(INDEX index) const {return base_->getSymbol(data_[index]);}
+	virtual bool set(INDEX index, const ConstantSP& value);
+	virtual bool set(const ConstantSP& index, const ConstantSP& value);
+	virtual ConstantSP get(INDEX index) const;
+	virtual ConstantSP get(const ConstantSP& index) const;
+	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
+	virtual void nullFill(const ConstantSP& val){
+		int id = base_->findAndInsert(val->getString());
+		for(int i = 0; i < size_; i++){
+			if(data_[i] == 0) data_[i] = id;
+		}
+	}
+	virtual ConstantSP getSubVector(INDEX start, INDEX length) const { return getSubVector(start, length, std::abs(length));}
+	virtual ConstantSP getSubVector(INDEX start, INDEX length, INDEX capacity) const{
+		int* data = getDataArray(start,length,capacity);
+		if(data)
+			return new FastSymbolVector(base_, length, capacity, data, false);
+		else
+			throw MemoryException();
+	}
+	virtual ConstantSP getInstance(INDEX size) const {
+		INDEX capacity = (std::max)(1, size);
+		int* data = new int[capacity];
+		return new FastSymbolVector(new SymbolBase(0), size, capacity, data, false);
+
+	}
+	virtual ConstantSP getValue() const{return ConstantSP(new FastSymbolVector(base_, size_, 0, data_, false));}
+	virtual ConstantSP getValue(INDEX capacity) const {return ConstantSP(new FastSymbolVector(base_, size_, capacity, data_, false));}
+	virtual bool append(const ConstantSP& value, INDEX appendSize){
+		if(!checkCapacity(appendSize))
+			return false;
+
+		if(appendSize==1)
+			data_[size_] = base_->findAndInsert(value->getString());
+		else{
+			if(value->getCategory() != LITERAL || value->size() < appendSize)
+				return false;
+			for(int i = 0; i < appendSize; i++){
+				int fillVal = base_->findAndInsert(value->getString(i));
+				data_[i + size_]=fillVal;
+			}
+		}
+		size_+=appendSize;
+		if(value->getNullFlag())
+			containNull_=true;
+		return true;
+	}
+	virtual bool appendString(string* buf, int len){
+		if(!checkCapacity(len))
+			return false;
+		for(int i=0;i<len;++i)
+			data_[size_+i] = base_->findAndInsert(buf[i]);
+		size_+=len;
+		return true;
+	}
+	virtual bool appendString(char** buf, int len){
+		if(!checkCapacity(len))
+			return false;
+		for(int i=0;i<len;++i)
+			data_[size_+i] = base_->findAndInsert(string(buf[i]));
+		size_+=len;
+		return true;
+	}
+	virtual bool getString(INDEX start, int len, char** buf) const{
+		for(int i=0;i<len;++i)
+			buf[i]=(char*)getString(i).c_str();
+		return true;
+	}
+	virtual void setString(const string& val){data_[0] = base_->findAndInsert(val);}
+	virtual void setString(INDEX index, const string& val){data_[index] = base_->findAndInsert(val);}
+	virtual bool setString(INDEX start, int len, const string* buf){
+		if(start + len > size()) return false;
+		for(int i = 0; i < len; i++){
+			data_[start + i] = base_->findAndInsert(buf[i]);
+		}
+		return true;
+	}
+	virtual bool setString(INDEX start, int len, char** buf){
+		if(start + len > size()) return false;
+		for(int i = 0; i < len; i++){
+			data_[start + i] = base_->findAndInsert(buf[i]);
+		}
+		return true;
+	}
+	bool has(const string& val) const {
+		int id = base_->find(val);
+		if(id == -1){
+			return false;
+		}else{
+			int i;
+			for(i=0;i<size_ && data_[i]!=id;++i);
+			if(i<size_)
+				return true;
+			else
+				return false;
+		}
+	}
+	INDEX search(const string& val){
+		int id = base_->find(val);
+		if(id != -1){
+			int i;
+			for(i=0;i<size_ && data_[i]!=id;++i);
+			if(i<size_)
+				return i;
+			else
+				return -1;
+		}else{
+			return -1;
+		}
+	}
+	virtual void replace(const ConstantSP& oldVal, const ConstantSP& newVal){
+		const string oldV = oldVal->getString();
+		const string newV = newVal->getString();
+		int oldId = base_->find(oldV);
+		if(oldId == -1) return;
+		int newId = base_->findAndInsert(newV);
+		for(INDEX i=0; i<size_; ++i){
+			if(data_[i] == oldId)
+				data_[i] = newId;
+		}
+	}
+	virtual bool isIndexArray() const { return false;}
+	virtual INDEX* getIndexArray() const { return NULL;}
+	virtual bool validIndex(INDEX uplimit);
+	virtual bool validIndex(INDEX start, INDEX length, INDEX uplimit);
+	virtual bool getHash(INDEX start, int len, int buckets, int* buf) const {
+		for(int i=0; i<len; ++i){
+			string s = base_->getSymbol(data_[i + start]);
+			buf[i] = murmur32(s.data(), s.size()) % buckets;
+		}
+		return true;
+	}
+	virtual int asof(const ConstantSP& value) const{
+		const string& target = value->getStringRef();
+		int start = 0;
+		int end = size() - 1;
+		int mid;
+		while(start <= end){
+			mid = (start + end) / 2;
+			if(base_->getSymbol(data_[mid]).compare(target) <= 0)
+				start = mid + 1;
+			else 
+				end = mid - 1;
+		}
+		return end;
+	}
+	ConstantSP retrieve(Vector* index) const {
+		INDEX length = index->size();
+		bool hasNull =containNull_;
+		int* data = getDataArray(index, hasNull);
+		if(data)
+			return new FastSymbolVector(base_, length, length, data, hasNull);
+		else
+			throw MemoryException();
+	}
+	virtual char getBool() const {throw IncompatibleTypeException(DT_BOOL,DT_SYMBOL);}
+	virtual char getChar() const {throw IncompatibleTypeException(DT_CHAR,DT_SYMBOL);}
+	virtual short getShort() const {throw IncompatibleTypeException(DT_SHORT,DT_SYMBOL);}
+	virtual long long getLong() const {throw IncompatibleTypeException(DT_LONG,DT_SYMBOL);}
+	virtual INDEX getIndex() const {throw IncompatibleTypeException(DT_INDEX,DT_SYMBOL);}
+	virtual float getFloat() const {throw IncompatibleTypeException(DT_FLOAT,DT_SYMBOL);}
+	virtual double getDouble() const {throw IncompatibleTypeException(DT_DOUBLE,DT_SYMBOL);}
+	virtual void neg(){throw IncompatibleTypeException(DT_DOUBLE,DT_SYMBOL);}
+	virtual SymbolBaseSP getSymbolBase() const {return base_;}
+private:
+	SymbolBaseSP base_;
+
+};
 
 };
 #endif /* CONSTANTIMP_H_ */

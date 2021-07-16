@@ -472,6 +472,14 @@ string TemporalFormat::format(long long nowtime, DATA_TYPE dtype) const{
 			timeNumber[3] = timeNumber[4] % 12;
 			break;
 		}
+		case DT_DATEHOUR: {
+            int tmp = nowtime / 24;
+            timeNumber[4] = nowtime % 24;
+            Util::parseDate(tmp, timeNumber[0], timeNumber[1], timeNumber[2]);
+            timeNumber[5] = timeNumber[4] / 12;
+            timeNumber[3] = timeNumber[4] % 12;
+            break;
+		}
 		case DT_TIMESTAMP: {
 			int tmp = nowtime / 86400000ll;
 			nowtime = nowtime % 86400000ll;

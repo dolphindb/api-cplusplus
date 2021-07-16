@@ -17,7 +17,7 @@ short ConstantMarshallImp::encodeFlag(const ConstantSP& target){
 	if(target->isTable())
 		flag += ((Table*)target.get())->getTableType();
 	else
-		flag += (target->transferAsString() && target->getType() == DT_SYMBOL) ? DT_STRING: target->getType();
+		flag += (target->isVector() && target->getType() == DT_SYMBOL) ? DT_SYMBOL + 128: target->getType();
 	return flag;
 }
 
@@ -117,7 +117,7 @@ bool VectorMarshall::start(const char* requestHeader, size_t headerSize, const C
 		vec = target->getValue();
 
 	INDEX actualSize = 0;
-	if(size>0 && vec->getType() != DT_ANY){
+	if(size>0 && vec->getType() != DT_ANY && vec->getType() != DT_SYMBOL){
 		actualSize = vec->serialize(buf_+offset,MARSHALL_BUFFER_SIZE-offset,0,0,numElement,partial_);
 		if(actualSize < 0){
 			ret = OTHERERR;
@@ -125,10 +125,16 @@ bool VectorMarshall::start(const char* requestHeader, size_t headerSize, const C
 		}
 		nextStart_ += numElement;
 	}
+	ret =out_.start(buf_,actualSize + offset);
 
+	if(ret == OK && size > 0 && vec->getType() == DT_SYMBOL){
+		if(symbaseMarshall_.isNull())
+			resetSymbolBaseMarshall(true);
+		if(!symbaseMarshall_->start(target->getSymbolBase(), true, ret))
+			return false;
+	}
 	if(!blocking)
 		target_ = vec;
-	ret =out_.start(buf_,actualSize + offset);
 
 	if(vec->getType() == DT_ANY){
 		while(ret == OK && nextStart_ < size){
@@ -159,6 +165,15 @@ void VectorMarshall::reset(){
 	target_.clear();
 	if(!marshall_.isNull())
 		marshall_.clear();
+}
+
+void VectorMarshall::resetSymbolBaseMarshall(bool createIfNotExist){
+	if(!symbaseMarshall_.isNull()){
+		symbaseMarshall_->reset();
+	}
+	else if(createIfNotExist){
+		symbaseMarshall_ = new SymbolBaseMarshall(out_.getDataOutputStream());
+	}
 }
 
 bool MatrixMarshall::sendMeta(const char* requestHeader, size_t headerSize, const ConstantSP& target, bool blocking, IO_ERR& ret){
@@ -295,6 +310,7 @@ bool TableMarshall::start(const char* requestHeader, size_t headerSize, const Co
 void TableMarshall::reset(){
 	target_.clear();
 	vectorMarshall_.reset();
+	vectorMarshall_.resetSymbolBaseMarshall(false);
 }
 
 bool SetMarshall::sendMeta(const char* requestHeader, size_t headerSize, const ConstantSP& target, bool blocking, IO_ERR& ret){
@@ -414,6 +430,46 @@ bool ChunkMarshall::start(const char* requestHeader, size_t headerSize, const Co
 
 void  ChunkMarshall::reset(){}
 
+bool SymbolBaseMarshall::start(const SymbolBaseSP target, bool blocking, IO_ERR& ret){
+	if(!blocking)
+		target_ = target;
+	memcpy(buf_, &dict_, sizeof(int));
+	int count;
+	dict_++;
+	count = target->size();
+	memcpy(buf_ + sizeof(int), &count, sizeof(int));
+	int numElement, actualSize;
+	nextStart_ = 0;
+	partial_ = 0;
+	actualSize = target->serialize(buf_ + sizeof(int) * 2, MARSHALL_BUFFER_SIZE - sizeof(int) * 2, 0, 0, numElement, partial_);
+	if(actualSize < 0){
+		ret = OTHERERR;
+		return false;
+	}
+	ret = out_.start(buf_, actualSize + sizeof(int) * 2);
+	nextStart_ += numElement;
+	while(nextStart_ < count && ret == OK){
+		actualSize = target->serialize(buf_, MARSHALL_BUFFER_SIZE, nextStart_, partial_, numElement, partial_);
+		if(actualSize < 0){
+			ret = OTHERERR;
+			return false;
+		}
+		else
+			nextStart_ += numElement;
+		ret = out_.start(buf_, actualSize);
+	}
+	complete_ = (ret == OK);
+	return complete_;
+}
+
+void SymbolBaseMarshall::reset(){
+	target_.clear();
+	dict_ = 0;
+	complete_ = false;
+	nextStart_ = 0;
+	partial_ = 0;
+}
+
 bool ScalarUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 	DATA_FORM form;
 	DATA_TYPE type;
@@ -459,32 +515,8 @@ bool SymbolBaseUnmarshall::start(bool blocking, IO_ERR& ret){
 		ret = INVALIDDATA;
 		return false;
 	}
-
-	if((ret = in_->readInt(size_)) != OK)
-		return false;
-	else if(size_ < 0){
-		ret = INVALIDDATA;
-		return false;
-	}
-
-	if(size_ == 0){
-		obj_ = dict_[symbaseId_];
-		if(obj_.isNull())
-			ret = INVALIDDATA;
-		return ret == OK;
-	}
-
-	SymbolBaseSP cache = new vector<string>();
-	vector<string>& symbols = *cache;
-	symbols.reserve(size_);
-	string sym;
-	while(symbols.size() < (size_t)size_){
-		ret = in_->readString(sym);
-		if(UNLIKELY(ret != OK))
-			return false;
-		else
-			symbols.push_back(sym);
-	}
+	SymbolBaseSP cache = new SymbolBase(symbaseId_, in_, ret);
+	if(ret != OK)	return false;
 	obj_ = cache;
 	dict_[symbaseId_] = obj_;
 	return ret == OK;
@@ -523,12 +555,28 @@ bool VectorUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 	DATA_FORM form;
 	DATA_TYPE type;
 	decodeFlag(flag, form, type);
+	DATA_TYPE actualType = type;
+	SymbolBaseSP sym;
+	if(actualType == 128 + DT_SYMBOL){
+		if(symbaseUnmarshall_.isNull())
+			resetSymbolBaseUnmarshall(true);
+		if(!symbaseUnmarshall_->start(blocking, ret))
+			return false;
+		sym = symbaseUnmarshall_->getSymbolBase();
+	}
+	else if(actualType == DT_SYMBOL){
+		actualType = DT_STRING;
+	}
 	if(form == DF_PAIR)
-		obj_ = Util::createPair(type);
-	else if(form == DF_VECTOR)
-		obj_ = Util::createVector(type, rows_);
+		obj_ = Util::createPair(actualType);
+	else if(form == DF_VECTOR){
+		if(actualType == 128 + DT_SYMBOL)
+			obj_ = Util::createSymbolVector(sym, rows_);
+		else
+			obj_ = Util::createVector(actualType, rows_);
+	}
 	else if(form == DF_MATRIX)
-		obj_ = Util::createMatrix(type, columns_, rows_, columns_);
+		obj_ = Util::createMatrix(actualType, columns_, rows_, columns_);
 	else{
 		ret = INVALIDDATA;
 		return false;
@@ -564,41 +612,10 @@ bool VectorUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 			}
 		}
 	}
-	else if(type != DT_SYMBOL + 128){
+	else{
 		INDEX numElements = 0;
 		ret = obj_->deserialize(in_.get(), 0, obj_->size(), numElements);
 		nextStart_ = numElements;
-	}
-	else{
-		if(symbaseUnmarshall_.isNull())
-			resetSymbolBaseUnmarshall(true);
-		if(!symbaseUnmarshall_->start(blocking, ret))
-			return false;
-
-		string* pdata = (string*)obj_->getDataArray();
-		vector<string>& symbols = *symbaseUnmarshall_->getSymbolBase();
-		size_t unitLength = sizeof(int);
-		if(!in_->isIntegerReversed()){
-			size_t actualLength;
-			int buf[Util::BUF_SIZE];
-			while(ret == OK && nextStart_ < rows_){
-				int count = std::min(rows_ - nextStart_, Util::BUF_SIZE);
-				ret = in_->readBytes((char*)buf, unitLength,  count, actualLength);
-				for(size_t i=0; i<actualLength; ++i)
-					pdata[nextStart_ + i] = symbols[buf[i]];
-				nextStart_ += actualLength;
-			}
-		}
-		else{
-			int symIndex;
-			while(ret == OK && nextStart_ < rows_){
-				if((ret = in_->readInt(symIndex)) != OK) continue;
-				pdata[nextStart_] = symbols[symIndex];
-				++nextStart_;
-			}
-		}
-		if(ret == OK)
-			obj_->setNullFlag(obj_->hasNull());
 	}
 	return ret == OK;
 }
@@ -607,6 +624,9 @@ void VectorUnmarshall::reset(){
 	obj_.clear();
 	if(!unmarshall_.isNull())
 		unmarshall_.clear();
+	if(!symbaseUnmarshall_.isNull()){
+		symbaseUnmarshall_->reset();
+	}
 }
 
 bool MatrixUnmarshall::start(short flag, bool blocking, IO_ERR& ret){

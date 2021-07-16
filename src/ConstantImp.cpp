@@ -8,14 +8,14 @@
 
 namespace dolphindb {
 
-StringVector::StringVector(INDEX size, INDEX capacity){
+StringVector::StringVector(INDEX size, INDEX capacity, bool blob) : blob_(blob){
 	data_.reserve((std::max)(size, capacity));
 	if(size > 0)
 		data_.resize(size);
 	containNull_ = false;
 }
 
-StringVector::StringVector(const vector<string>& data, INDEX capacity, bool containNull){
+StringVector::StringVector(const vector<string>& data, INDEX capacity, bool containNull, bool blob) : blob_(blob) {
 	data_.reserve((std::max)(data.size(), (size_t)capacity));
 	data_.assign(data.begin(), data.end());
 	containNull_ = containNull;
@@ -27,12 +27,29 @@ INDEX StringVector::reserve(INDEX capacity){
 }
 
 IO_ERR StringVector::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
-	if(numElement >= 0){
-		//read string
+    auto readBlob = [&](string& value) -> IO_ERR {
+        IO_ERR ret;
+        int len;
+        if ((ret = in->readInt(len)) != OK)
+            return ret;
+        std::unique_ptr<char[]> buf(new char[len]);
+        if ((ret = in->read(buf.get(), len)) != OK)
+            return ret;
+        value.clear();
+        value.append(buf.get(), len);
+        return ret;
+    };
+    if(numElement >= 0){
+        //read string
 		numElement = 0;
 		INDEX firstTarget = ((std::min))(size() - indexStart, targetNumElement);
 		while(numElement < firstTarget){
-			IO_ERR ret = in->readString(data_[indexStart]);
+            IO_ERR ret;
+            if (blob_) {
+                ret = readBlob(data_[indexStart]);
+            } else {
+                ret = in->readString(data_[indexStart]);
+            }
 			if(ret != OK)
 				return ret;
 			++indexStart;
@@ -40,10 +57,15 @@ IO_ERR StringVector::deserialize(DataInputStream* in, INDEX indexStart, INDEX ta
 		}
 		string value;
 		while(numElement < targetNumElement){
-			IO_ERR ret = in->readString(value);
-			if(ret != OK)
-				return ret;
-			data_.push_back(value);
+            IO_ERR ret;
+            if (blob_) {
+                ret = readBlob(value);
+            } else {
+                ret = in->readString(value);
+            }
+            if(ret != OK)
+                return ret;
+            data_.push_back(value);
 			++numElement;
 		}
 		return OK;
@@ -176,13 +198,13 @@ INDEX StringVector::search(const string& val){
 }
 
 ConstantSP StringVector::getValue() const {
-	Vector* copy = new StringVector(data_, data_.size(), containNull_);
+	Vector* copy = new StringVector(data_, data_.size(), containNull_, blob_);
 	copy->setForm(getForm());
 	return copy;
 }
 
 ConstantSP StringVector::getSubVector(INDEX start, INDEX length, INDEX capacity) const {
-	StringVector* vec=new StringVector(0, capacity);
+	StringVector* vec=new StringVector(0, capacity, blob_);
 	ConstantSP result(vec);
 	if(start<0 || start>=size() || std::abs(length)>size())
 		return result;
@@ -199,7 +221,7 @@ ConstantSP StringVector::get(const ConstantSP& index) const {
 	UINDEX size=data_.size();
 	if(index->isVector()){
 		INDEX len=index->size();
-		StringVector* p=new StringVector(len, len);
+		StringVector* p=new StringVector(len, len, blob_);
 		ConstantSP result(p);
 		if(index->isIndexArray()){
 			UINDEX* bufIndex=(UINDEX*)index->getIndexArray();
@@ -227,7 +249,7 @@ ConstantSP StringVector::get(const ConstantSP& index) const {
 	}
 	else{
 		UINDEX idx=(UINDEX)index->getIndex();
-		return ConstantSP(new String(idx<size?data_[idx]:""));
+		return ConstantSP(new String(idx<size?data_[idx]:"", blob_));
 	}
 }
 
@@ -422,31 +444,61 @@ bool StringVector::hasNullInRange(INDEX start, INDEX end){
 }
 
 int StringVector::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const {
-	int size_ = size();
-	if(indexStart >= size_)
-		return -1;
-	partial = 0;
-	int initialBufSize = bufSize;
-	int initialIndex = indexStart;
+    int size_ = size();
+    if (indexStart >= size_)
+        return -1;
+    partial = 0;
+    int initialBufSize = bufSize;
+    int initialIndex = indexStart;
 
-	while(bufSize>0 && indexStart < size_){
-		const string& str = data_[indexStart];
-		int len = str.size() + 1 - offset;
-		if(bufSize >= len){
-			memcpy(buf, str.c_str() + offset, len);
-			buf += len;
-			bufSize -= len;
-			++indexStart;
-			offset = 0;
-		}
-		else{
-			memcpy(buf, str.c_str() + offset, bufSize);
-			partial = offset + bufSize;
-			bufSize = 0;
-		}
-	}
+    if (!blob_) {
+        while (bufSize > 0 && indexStart < size_) {
+            const string& str = data_[indexStart];
+            int len = str.size() + 1 - offset;
+            if (bufSize >= len) {
+                memcpy(buf, str.c_str() + offset, len);
+                buf += len;
+                bufSize -= len;
+                ++indexStart;
+                offset = 0;
+            } else {
+                memcpy(buf, str.c_str() + offset, bufSize);
+                partial = offset + bufSize;
+                bufSize = 0;
+            }
+        }
+    } else {
+        const int lenBytes = sizeof(int);
+        while (bufSize > 0 && indexStart < size_) {
+            const string& str = data_[indexStart];
+            int len = str.size();
+            if (LIKELY(offset == 0)) {
+                if (UNLIKELY(bufSize < lenBytes)) {
+                    partial = 0;
+                    break;
+                }
+                memcpy(buf, &len, lenBytes);
+                buf += lenBytes;
+                bufSize -= lenBytes;
+            } else {
+                offset -= lenBytes;
+            }
 
-	numElement = indexStart - initialIndex;
+            if (bufSize >= len - offset) {
+                memcpy(buf, str.data() + offset, len - offset);
+                buf += len - offset;
+                bufSize -= len - offset;
+                ++indexStart;
+                offset = 0;
+            } else {
+                memcpy(buf, str.data() + offset, bufSize);
+                partial = lenBytes + offset + bufSize;
+                bufSize = 0;
+            }
+        }
+    }
+
+    numElement = indexStart - initialIndex;
     return initialBufSize - bufSize;
 }
 
@@ -1583,6 +1635,52 @@ ConstantSP FastDateVector::get(const ConstantSP& index) const {
 	}
 }
 
+ConstantSP FastDateVector::castTemporal(DATA_TYPE expectType){
+	if(expectType != DT_DATEHOUR && (expectType < DT_DATE || expectType > DT_NANOTIMESTAMP)){
+		throw RuntimeException("castTemporal from DATE to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType != DT_DATE && expectType != DT_TIMESTAMP && expectType != DT_NANOTIMESTAMP && expectType != DT_MONTH && expectType != DT_DATETIME && expectType != DT_DATEHOUR){
+		throw RuntimeException("castTemporal from DATE to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType == DT_DATE)
+		return getValue();
+
+	VectorSP res = Util::createVector(expectType, size_);
+	if(expectType == DT_DATEHOUR){
+        int *pbuf = (int*)res->getDataArray();
+        for(int i = 0; i < size_; i++){
+            data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] * 24;
+        }
+        return res;
+	}
+	long long ratio = Util::getTemporalConversionRatio(DT_DATE, expectType);
+	if(expectType == DT_NANOTIMESTAMP ||  expectType  == DT_TIMESTAMP){
+		long long *pbuf = (long long*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			data_[i] == INT_MIN ? pbuf[i] = LLONG_MIN : pbuf[i] = (long long)data_[i] * ratio;
+		}
+	}
+	else if(expectType == DT_DATETIME){
+		int *pbuf = (int*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] * ratio;
+		}
+	}
+	else{
+		int *pbuf = (int*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			if(data_[i] == INT_MIN){
+				pbuf[i] = INT_MIN;
+				continue;
+			}
+			int year, month, day;
+			Util::parseDate(data_[i], year, month, day);
+			pbuf[i] = year*12+month-1;
+		}
+	}
+	return res;
+}
+
 ConstantSP FastDateTimeVector::get(const ConstantSP& index) const {
 	if(index->isVector()){
 		return retrieve((Vector*)index.get());
@@ -1591,6 +1689,148 @@ ConstantSP FastDateTimeVector::get(const ConstantSP& index) const {
 		UINDEX idx=(UINDEX)index->getIndex();
 		return ConstantSP(new DateTime(idx<(UINDEX)size_?data_[idx]:nullVal_));
 	}
+}
+
+ConstantSP FastDateTimeVector::castTemporal(DATA_TYPE expectType){
+	if(expectType != DT_DATEHOUR && (expectType < DT_DATE || expectType > DT_NANOTIMESTAMP)){
+		throw RuntimeException("castTemporal from DATETIME to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType == DT_DATETIME)
+		return getValue();
+
+	VectorSP res = Util::createVector(expectType, size_);
+	if(expectType == DT_DATEHOUR){
+        int *pbuf = (int*)res->getDataArray();
+        for(int i = 0; i < size_; i++){
+			int tail = (data_[i] < 0) && (data_[i] % 3600);
+            data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] / 3600 - tail;
+        }
+        return res;
+	}
+	long long ratio = Util::getTemporalConversionRatio(DT_DATETIME, expectType);
+	if(expectType == DT_NANOTIMESTAMP ||  expectType  == DT_TIMESTAMP){
+		long long *pbuf = (long long*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			data_[i] == INT_MIN ? pbuf[i] = LLONG_MIN : pbuf[i] = (long long)data_[i] * ratio;
+		}
+	}
+	else if(expectType == DT_DATE){
+		int *pbuf = (int*)res->getDataArray();
+		ratio = -ratio;
+		for(int i = 0; i < size_; i++){
+			int tail = (data_[i] < 0) && (data_[i] % ratio);
+			data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] / ratio - tail;
+		}
+	}
+	else if(expectType == DT_MONTH){
+		int *pbuf = (int*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			if(data_[i] == INT_MIN){
+				pbuf[i] = INT_MIN;
+				continue;
+			}
+			int year, month, day;
+			Util::parseDate(data_[i] / 86400, year, month, day);
+			pbuf[i] = year*12+month-1;
+		}
+	}
+	else if(expectType == DT_NANOTIME){
+		long long *pbuf = (long long*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			int remainder = data_[i] % 86400;
+			data_[i] == INT_MIN ? pbuf[i] = LLONG_MIN : pbuf[i] = (long long)(remainder + ((data_[i] < 0) && remainder) * 86400) * 1000000000LL;
+		}
+	}
+	else{
+		ratio = Util::getTemporalConversionRatio(DT_SECOND, expectType);
+		int *pbuf = (int*)res->getDataArray();
+		if(ratio > 0){
+			for(int i = 0; i < size_; i++){
+				int remainder = data_[i] % 86400;
+				data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = (remainder + ((data_[i] < 0) && remainder) * 86400) * ratio;
+			}
+		}
+		else{
+			ratio = -ratio;
+			for(int i = 0; i < size_; i++){
+				int remainder = data_[i] % 86400;
+				data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = (remainder + ((data_[i] < 0) && remainder) * 86400) / ratio;
+			}
+		}
+	}
+	return res;
+}
+
+ConstantSP FastDateHourVector::get(const ConstantSP& index) const {
+    if(index->isVector()){
+        return retrieve((Vector*)index.get());
+    }
+    else{
+        UINDEX idx=(UINDEX)index->getIndex();
+        return ConstantSP(new DateHour(idx<(UINDEX)size_?data_[idx]:nullVal_));
+    }
+}
+
+ConstantSP FastDateHourVector::castTemporal(DATA_TYPE expectType){
+    if(expectType != DT_DATEHOUR && (expectType < DT_DATE || expectType > DT_NANOTIMESTAMP)){
+        throw RuntimeException("castTemporal from DATEHOUR to "+ Util::getDataTypeString(expectType)+" not supported ");
+    }
+    if(expectType == DT_DATEHOUR)
+        return getValue();
+
+    VectorSP res = Util::createVector(expectType, size_);
+    long long ratio = Util::getTemporalConversionRatio(DT_DATETIME, expectType);
+    if(expectType == DT_NANOTIMESTAMP ||  expectType  == DT_TIMESTAMP){
+        long long *pbuf = (long long*)res->getDataArray();
+        for(int i = 0; i < size_; i++){
+            data_[i] == INT_MIN ? pbuf[i] = LLONG_MIN : pbuf[i] = (long long)data_[i] * ratio * 3600;
+        }
+    }
+    else if(expectType == DT_DATETIME){
+        int *pbuf = (int*)res->getDataArray();
+        for(int i = 0; i < size_; i++){
+            data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] * 3600;
+        }
+    }
+    else if(expectType == DT_DATE){
+        int *pbuf = (int*)res->getDataArray();
+        for(int i = 0; i < size_; i++){
+            data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] * 3600 / (-ratio) ;
+        }
+    }
+    else if(expectType == DT_MONTH){
+        int *pbuf = (int*)res->getDataArray();
+        for(int i = 0; i < size_; i++){
+            if(data_[i] == INT_MIN){
+                pbuf[i] = INT_MIN;
+                continue;
+            }
+            int year, month, day;
+            Util::parseDate(data_[i] * 3600 / 86400, year, month, day);
+            pbuf[i] = year*12+month-1;
+        }
+    }
+    else if(expectType == DT_NANOTIME){
+        long long *pbuf = (long long*)res->getDataArray();
+        for(int i = 0; i < size_; i++){
+            data_[i] == INT_MIN ? pbuf[i] = LLONG_MIN : pbuf[i] = (long long)data_[i] * 3600 % 86400 * 1000000000LL;
+        }
+    }
+    else{
+        ratio = Util::getTemporalConversionRatio(DT_SECOND, expectType);
+        int *pbuf = (int*)res->getDataArray();
+        if(ratio > 0){
+            for(int i = 0; i < size_; i++){
+                data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] * 3600 % 86400 * ratio;
+            }
+        }
+        else{
+            for(int i = 0; i < size_; i++){
+                data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] * 3600 % 86400 / (-ratio);
+            }
+        }
+    }
+    return res;
 }
 
 ConstantSP FastMonthVector::get(const ConstantSP& index) const {
@@ -1623,6 +1863,33 @@ void FastTimeVector::validate(){
 	}
 }
 
+ConstantSP FastTimeVector::castTemporal(DATA_TYPE expectType){
+	if(expectType < DT_DATE || expectType > DT_NANOTIMESTAMP){
+		throw RuntimeException("castTemporal from TIME to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType != DT_TIME && expectType != DT_NANOTIME && expectType != DT_SECOND && expectType != DT_MINUTE){
+		throw RuntimeException("castTemporal from TIME to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType == DT_TIME)
+		return getValue();
+
+	VectorSP res = Util::createVector(expectType, size_);
+	long long ratio = Util::getTemporalConversionRatio(DT_TIME, expectType);
+	if(expectType == DT_NANOTIME){
+		long long *pbuf = (long long*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			data_[i] == INT_MIN ? pbuf[i] = LLONG_MIN : pbuf[i] = (long long)data_[i] * ratio;
+		}
+	}
+	else{
+		int *pbuf = (int*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] / (-ratio);
+		}
+	}
+	return res;
+}
+
 ConstantSP FastMinuteVector::get(const ConstantSP& index) const {
 	if(index->isVector()){
 		return retrieve((Vector*)index.get());
@@ -1641,6 +1908,33 @@ void FastMinuteVector::validate(){
 			containNull_ = true;
 		}
 	}
+}
+
+ConstantSP FastMinuteVector::castTemporal(DATA_TYPE expectType){
+	if(expectType < DT_DATE || expectType > DT_NANOTIMESTAMP){
+		throw RuntimeException("castTemporal from MINUTE to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType != DT_TIME && expectType != DT_NANOTIME && expectType != DT_SECOND && expectType != DT_MINUTE){
+		throw RuntimeException("castTemporal from MINUTE to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType == DT_MINUTE)
+		return getValue();
+
+	VectorSP res = Util::createVector(expectType, size_);
+	long long ratio = Util::getTemporalConversionRatio(DT_MINUTE, expectType);
+	if(expectType == DT_NANOTIME){
+		long long *pbuf = (long long*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			data_[i] == INT_MIN ? pbuf[i] = LLONG_MIN : pbuf[i] = (long long)data_[i] * ratio;
+		}
+	}
+	else{
+		int *pbuf = (int*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] * ratio;
+		}
+	}
+	return res;
 }
 
 ConstantSP FastSecondVector::get(const ConstantSP& index) const {
@@ -1663,6 +1957,39 @@ void FastSecondVector::validate(){
 	}
 }
 
+ConstantSP FastSecondVector::castTemporal(DATA_TYPE expectType){
+	if(expectType < DT_DATE || expectType > DT_NANOTIMESTAMP){
+		throw RuntimeException("castTemporal from SECOND to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType != DT_TIME && expectType != DT_NANOTIME && expectType != DT_SECOND && expectType != DT_MINUTE){
+		throw RuntimeException("castTemporal from SECOND to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType == DT_SECOND)
+		return getValue();
+
+	VectorSP res = Util::createVector(expectType, size_);
+	long long ratio = Util::getTemporalConversionRatio(DT_SECOND, expectType);
+	if(expectType == DT_NANOTIME){
+		long long *pbuf = (long long*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			data_[i] == INT_MIN ? pbuf[i] = LLONG_MIN : pbuf[i] = data_[i] * ratio;
+		}
+	}
+	else if(expectType == DT_TIME){
+		int *pbuf = (int*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] * ratio;
+		}
+	}
+	else{
+		int *pbuf = (int*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			data_[i] == INT_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] / (-ratio);
+		}
+	}
+	return res;
+}
+
 ConstantSP FastNanoTimeVector::get(const ConstantSP& index) const {
 	if(index->isVector()){
 		return retrieve((Vector*)index.get());
@@ -1683,6 +2010,26 @@ void FastNanoTimeVector::validate(){
 	}
 }
 
+ConstantSP FastNanoTimeVector::castTemporal(DATA_TYPE expectType){
+	if(expectType < DT_DATE || expectType > DT_NANOTIMESTAMP){
+		throw RuntimeException("castTemporal from NANOTIME to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType != DT_TIME && expectType != DT_NANOTIME && expectType != DT_SECOND && expectType != DT_MINUTE){
+		throw RuntimeException("castTemporal from NANOTIME to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType == DT_NANOTIME)
+		return getValue();
+
+	VectorSP res = Util::createVector(expectType, size_);
+	long long ratio = Util::getTemporalConversionRatio(DT_NANOTIME, expectType);
+
+	int *pbuf = (int*)res->getDataArray();
+	for(int i = 0; i < size_; i++){
+		data_[i] == LLONG_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] / (-ratio);
+	}
+	return res;
+}
+
 ConstantSP FastTimestampVector::get(const ConstantSP& index) const {
 	if(index->isVector()){
 		return retrieve((Vector*)index.get());
@@ -1691,6 +2038,68 @@ ConstantSP FastTimestampVector::get(const ConstantSP& index) const {
 		UINDEX idx=(UINDEX)index->getIndex();
 		return ConstantSP(new Timestamp(idx<(UINDEX)size_?data_[idx]:nullVal_));
 	}
+}
+
+ConstantSP FastTimestampVector::castTemporal(DATA_TYPE expectType){
+	if(expectType != DT_DATEHOUR && (expectType < DT_DATE || expectType > DT_NANOTIMESTAMP)){
+		throw RuntimeException("castTemporal from TIMESTAMP to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType == DT_TIMESTAMP)
+		return getValue();
+
+	VectorSP res = Util::createVector(expectType, size_);
+	if(expectType == DT_DATEHOUR){
+        int *pbuf = (int*)res->getDataArray();
+        for(int i = 0; i < size_; i++){
+			int tail = (data_[i] < 0) && (data_[i] % 3600);
+            data_[i] == LLONG_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] / 3600000LL - tail;
+        }
+        return res;
+	}
+	long long ratio = Util::getTemporalConversionRatio(DT_TIMESTAMP, expectType);
+	if(expectType == DT_NANOTIMESTAMP){
+		long long *pbuf = (long long*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			data_[i] == LLONG_MIN ? pbuf[i] = LLONG_MIN : pbuf[i] = data_[i] * ratio;
+		}
+	}
+	else if(expectType == DT_DATE || expectType == DT_DATETIME){
+		int *pbuf = (int*)res->getDataArray();
+		ratio = -ratio;
+		for(int i = 0; i < size_; i++){
+			int tail = (data_[i] < 0) && (data_[i] % ratio);
+			data_[i] == LLONG_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] / ratio - tail;		
+		}
+	}
+	else if(expectType == DT_MONTH){
+		int *pbuf = (int*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			if(data_[i] == LLONG_MIN){
+				pbuf[i] = INT_MIN;
+				continue;
+			}
+			int year, month, day;
+			Util::parseDate(data_[i] / 86400000, year, month, day);
+			pbuf[i] = year*12+month-1;
+		}
+	}
+	else if(expectType == DT_NANOTIME){
+		long long *pbuf = (long long*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			int remainder = data_[i] % 86400000;
+			data_[i] == LLONG_MIN ? pbuf[i] = LLONG_MIN : pbuf[i] = (remainder + ((data_[i] < 0) && remainder) * 86400000) * 1000000ll;
+		}
+	}
+	else{
+		ratio = Util::getTemporalConversionRatio(DT_TIME, expectType);
+		int *pbuf = (int*)res->getDataArray();
+		if(ratio < 0) ratio = -ratio;
+		for(int i = 0; i < size_; i++){
+			int remainder = data_[i] % 86400000;
+			data_[i] == LLONG_MIN ? pbuf[i] = INT_MIN : pbuf[i] = (remainder + ((data_[i] < 0) && remainder) * 86400000) / ratio;
+		}
+	}
+	return res;
 }
 
 ConstantSP FastNanoTimestampVector::get(const ConstantSP& index) const {
@@ -1703,6 +2112,67 @@ ConstantSP FastNanoTimestampVector::get(const ConstantSP& index) const {
 	}
 }
 
+ConstantSP FastNanoTimestampVector::castTemporal(DATA_TYPE expectType){
+	if(expectType != DT_DATEHOUR && (expectType < DT_DATE || expectType > DT_NANOTIMESTAMP)){
+		throw RuntimeException("castTemporal from NANOTIMESTAMP to "+ Util::getDataTypeString(expectType)+" not supported ");
+	}
+	if(expectType == DT_NANOTIMESTAMP)
+		return getValue();
+
+	VectorSP res = Util::createVector(expectType, size_);
+	if(expectType == DT_DATEHOUR){
+        int *pbuf = (int*)res->getDataArray();
+        for(int i = 0; i < size_; i++){
+			int tail = (data_[i] < 0) && (data_[i] % 3600000000000ll);
+            data_[i] == LLONG_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] / 3600000000000ll - tail;
+        }
+        return res;
+	}
+	long long ratio = -Util::getTemporalConversionRatio(DT_NANOTIMESTAMP, expectType);
+	if(expectType == DT_TIMESTAMP){
+		long long *pbuf = (long long*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			int tail = (data_[i] < 0) && (data_[i] % ratio);
+			data_[i] == LLONG_MIN ? pbuf[i] = LLONG_MIN : pbuf[i] = data_[i] / ratio - tail;
+		}
+	}
+	else if(expectType == DT_DATE || expectType == DT_DATETIME){
+		int *pbuf = (int*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			int tail = (data_[i] < 0) && (data_[i] % ratio);
+			data_[i] == LLONG_MIN ? pbuf[i] = INT_MIN : pbuf[i] = data_[i] / ratio - tail;
+		}
+	}
+	else if(expectType == DT_MONTH){
+		int *pbuf = (int*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			if(data_[i]  == LLONG_MIN){
+				pbuf[i] = INT_MIN;
+				continue;
+			}
+			int year, month, day;
+			Util::parseDate(data_[i] / 86400000000000ll, year, month, day);
+			pbuf[i] = year*12+month-1;
+		}
+	}
+	else if(expectType == DT_NANOTIME){
+		long long *pbuf = (long long*)res->getDataArray();
+		for(int i = 0; i < size_; i++){
+			long long remainder = data_[i] % 86400000000000ll;
+			data_[i] == LLONG_MIN ? pbuf[i] = LLONG_MIN : pbuf[i] = (remainder + (data_[i] < 0 && remainder) * 86400000000000ll);
+		}
+	}
+	else{
+		ratio = Util::getTemporalConversionRatio(DT_NANOTIME, expectType);
+		int *pbuf = (int*)res->getDataArray();
+		ratio = -ratio;
+		for(int i = 0; i < size_; i++){
+			long long remainder = data_[i] % 86400000000000ll;
+			data_[i] == LLONG_MIN ? pbuf[i] = INT_MIN : pbuf[i] =(remainder + (data_[i] < 0 && remainder) * 86400000000000ll) / ratio;
+		}
+	}
+	return res;
+}
 
 ConstantSP FastBoolMatrix::getValue() const{
 	char* data = new char[cols_ * rows_];
@@ -2154,6 +2624,56 @@ ConstantSP FastDateTimeMatrix::getColumn(INDEX index) const {
 	VectorSP col=getSubVector(rows_*index,rows_);
 	if(!colLabel_->isNull()) col->setName(colLabel_->getString(index));
 	return col;
+}
+
+ConstantSP FastDateHourMatrix::getValue() const {
+    int* data = new int[cols_ * rows_];
+    memcpy(data, data_, size_ * sizeof(int));
+    return ConstantSP(new FastDateTimeMatrix(cols_,rows_,cols_,data,containNull_));
+}
+
+bool FastDateHourMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
+    if(value->size()==1)
+        data_[column*rows_+row]=value->getInt();
+    else
+        fill(column*rows_+row,value->size(),value);
+    return true;
+}
+
+ConstantSP FastDateHourMatrix::getRow(INDEX index) const {
+    int* data = new int[cols_];
+    for(int i=0;i<cols_;++i)
+        data[i]=data_[i*rows_+index];
+    VectorSP row=ConstantSP(new FastDateTimeVector(cols_,0,data,containNull_));
+    if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
+    return row;
+}
+
+ConstantSP FastDateHourMatrix::getWindow(INDEX colStart, int colLength,INDEX rowStart, int rowLength) const {
+    int cols=std::abs(colLength);
+    int rows=std::abs(rowLength);
+    int* data = new int[cols * rows];
+    int* dest=data;
+    int start=rowStart+colStart*rows_;
+    bool reverseCol=colLength<0;
+    for(int i=0;i<cols;++i){
+        getDataArray(start,rowLength,dest);
+        if(reverseCol)
+            start-=rows_;
+        else
+            start+=rows_;
+        dest+=rows;
+    }
+    ConstantSP matrix=ConstantSP(new FastDateTimeMatrix(cols,rows,cols,data,containNull_));
+    if(!rowLabel_->isNull()) matrix->setRowLabel(((Vector*)rowLabel_.get())->getSubVector(rowStart,rowLength));
+    if(!colLabel_->isNull()) matrix->setColumnLabel(((Vector*)colLabel_.get())->getSubVector(colStart,colLength));
+    return matrix;
+}
+
+ConstantSP FastDateHourMatrix::getColumn(INDEX index) const {
+    VectorSP col = getSubVector(rows_ * index, rows_);
+    if (!colLabel_->isNull()) col->setName(colLabel_->getString(index));
+    return col;
 }
 
 ConstantSP FastMonthMatrix::getValue() const {
@@ -2949,4 +3469,104 @@ FastUuidVector::FastUuidVector(int size, int capacity, unsigned char* srcData, b
 FastIPAddrVector::FastIPAddrVector(int size, int capacity, unsigned char* srcData, bool containNull) : FastInt128Vector(DT_IP, size, capacity, srcData, containNull){
 }
 
+bool FastSymbolVector::set(INDEX index, const ConstantSP& value){
+	data_[index] = base_->findAndInsert(value->getString());
+	if(data_[index]==nullVal_)
+		containNull_=true;
+	return true;
+}
+
+ConstantSP  FastSymbolVector::get(INDEX index) const {
+	return ConstantSP(new String(getString(index)));
+}
+
+ConstantSP  FastSymbolVector::get(const ConstantSP& index) const {
+	if(index->isVector()){
+		INDEX len=index->size();
+		StringVector* p=new StringVector(len, len, false);
+		string *pdata=(string*)p->getDataArray();
+		ConstantSP result(p);
+		if(index->isIndexArray()){
+			UINDEX* bufIndex=(UINDEX*)index->getIndexArray();
+			for(INDEX i=0;i<len;++i)
+				pdata[i] = (int)bufIndex[i] < size_ ? base_->getSymbol(data_[bufIndex[i]]) : "";
+		}
+		else{
+			const int bufSize=Util::BUF_SIZE;
+			UINDEX bufIndex[bufSize];
+			INDEX start=0;
+			int count=0;
+			int i;
+			while(start<len){
+				count=((std::min))(len-start,bufSize);
+				index->getIndex(start,count,(INDEX*)bufIndex);
+				for(i=0;i<count;i++){
+					pdata[start+i]=(int)bufIndex[i] < size_ ? base_->getSymbol(data_[bufIndex[i]]) : "";
+				}
+				start+=count;
+			}
+		}
+		p->setNullFlag(containNull_ || p->hasNull());
+		return result;
+	}
+	else{
+		UINDEX idx=(UINDEX)index->getIndex();
+		return get(idx);
+	}
+}
+
+void  FastSymbolVector::fill(INDEX start, INDEX length, const ConstantSP& value){
+	if(value->size()==1 || value->size()!=length){
+		int fillVal = base_->findAndInsert(value->getString());
+		int end=start+length;
+		for(int i=start;i<end;++i)
+			data_[i]=fillVal;
+	}
+	else{
+		if(value->getCategory() != LITERAL || value->size() < length)
+			throw RuntimeException("Failed to read int data from the given vector.");
+		for(int i = 0; i < length; i++){
+			int fillVal = base_->findAndInsert(value->getString(i));
+			data_[i + start]=fillVal;
+		}
+	}
+	if(value->getNullFlag())
+		containNull_=true;
+}
+
+bool  FastSymbolVector::validIndex(INDEX uplimit){
+	return validIndex(0, size_, uplimit);
+}
+
+bool  FastSymbolVector::validIndex(INDEX start, INDEX length, INDEX uplimit){
+	unsigned int limit=(unsigned int)uplimit;
+	unsigned int* data=(unsigned int*)data_;
+	INDEX end = start + length;
+	for(INDEX i=start;i<end;++i)
+		if(data[i]>limit)
+			return false;
+	return true;
+}
+
+bool FastSymbolVector::set(const ConstantSP& index, const ConstantSP& value){
+	if(index->isVector()){
+		INDEX len=index->size();
+		INDEX bufIndex[Util::BUF_SIZE];
+		const INDEX* pindex;
+		INDEX start=0;
+		int count;
+		while(start<len){
+			count=((std::min))(len-start,Util::BUF_SIZE);
+			pindex=index->getIndexConst(start,count,bufIndex);
+			for(int i=0;i<count;i++)
+				data_[pindex[i]]=base_->findAndInsert(value->getString(start + i));
+			start+=count;
+		}
+	}
+	else
+		data_[index->getIndex()]=base_->findAndInsert(value->getString());
+	if(value->getNullFlag())
+		containNull_=true;
+	return true;
+}
 };

@@ -59,6 +59,8 @@ public:
 	virtual bool append(vector<ConstantSP>& values, INDEX& insertedRows, string& errMsg);
 	virtual bool update(vector<ConstantSP>& values, const ConstantSP& indexSP, vector<string>& colNames, string& errMsg);
 	virtual bool remove(const ConstantSP& indexSP, string& errMsg);
+	virtual ConstantSP getSubTable(vector<int> indices) const = 0;
+
 
 protected:
 	ConstantSP getInternal(INDEX index) const;
@@ -106,6 +108,7 @@ public:
 	bool join(vector<ConstantSP>& columns);
 	bool clear();
 	void updateSize();
+	virtual ConstantSP getSubTable(vector<int> indices) const;
 
 private:
 	bool increaseCapacity(long long newCapacity, string& errMsg);

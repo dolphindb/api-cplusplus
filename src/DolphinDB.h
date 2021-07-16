@@ -58,6 +58,10 @@ class ConstantMarshall;
 class ConstantUnmarshall;
 class DBConnectionImpl;
 class BlockReader;
+class Domain; 
+class DBConnectionPoolImpl;
+class PartitionedTableAppender;
+class SymbolBase;
 
 typedef SmartPointer<Constant> ConstantSP;
 typedef SmartPointer<Vector> VectorSP;
@@ -69,6 +73,8 @@ typedef SmartPointer<DFSChunkMeta> DFSChunkMetaSP;
 typedef SmartPointer<ConstantMarshall> ConstantMarshallSP;
 typedef SmartPointer<ConstantUnmarshall> ConstantUnmarshallSP;
 typedef SmartPointer<BlockReader> BlockReaderSP;
+typedef SmartPointer<Domain> DomainSP;
+typedef SmartPointer<SymbolBase> SymbolBaseSP;
 
 class Guid {
 public:
@@ -259,6 +265,7 @@ public:
 	virtual bool getIndex(INDEX start, int len, INDEX* buf) const {return false;}
 	virtual bool getFloat(INDEX start, int len, float* buf) const {return false;}
 	virtual bool getDouble(INDEX start, int len, double* buf) const {return false;}
+	virtual bool getSymbol(INDEX start, int len, int* buf, SymbolBase* symBase,bool insertIfNotThere) const {return false;}
 	virtual bool getString(INDEX start, int len, string** buf) const {return false;}
 	virtual bool getString(INDEX start, int len, char** buf) const {return false;}
 	virtual bool getBinary(INDEX start, int len, int unitLength, unsigned char* buf) const {return false;}
@@ -272,6 +279,7 @@ public:
 	virtual const INDEX* getIndexConst(INDEX start, int len, INDEX* buf) const {throw RuntimeException("getIndexConst method not supported");}
 	virtual const float* getFloatConst(INDEX start, int len, float* buf) const {throw RuntimeException("getFloatConst method not supported");}
 	virtual const double* getDoubleConst(INDEX start, int len, double* buf) const {throw RuntimeException("getDoubleConst method not supported");}
+	virtual const int* getSymbolConst(INDEX start, int len, int* buf, SymbolBase* symBase, bool insertIfNotThere) const {throw RuntimeException("getSymbolConst method not supported");}
 	virtual string** getStringConst(INDEX start, int len, string** buf) const {throw RuntimeException("getStringConst method not supported");}
 	virtual char** getStringConst(INDEX start, int len, char** buf) const {throw RuntimeException("getStringConst method not supported");}
 	virtual const unsigned char* getBinaryConst(INDEX start, int len, int unitLength, unsigned char* buf) const {throw RuntimeException("getBinaryConst method not supported");}
@@ -354,6 +362,7 @@ public:
 	virtual int getExtraParamForType() const { return 0;}
 	virtual DATA_CATEGORY getCategory() const =0;
 
+	virtual SymbolBaseSP getSymbolBase() const {return SymbolBaseSP();}
 	virtual ConstantSP getInstance() const =0;
 	virtual ConstantSP getValue() const =0;
 	virtual OBJECT_TYPE getObjectType() const {return CONSTOBJ;}
@@ -425,6 +434,8 @@ public:
 	virtual void trim(){throw RuntimeException("trim method not supported");}
 	virtual void strip(){throw RuntimeException("strip method not supported");}
 	virtual long long getAllocatedMemory(INDEX size) const {return Constant::getAllocatedMemory();}
+	virtual int asof(const ConstantSP& value) const {throw RuntimeException("asof not supported.");}
+	virtual ConstantSP castTemporal(DATA_TYPE expectType){throw RuntimeException("castTemporal not supported");}
 private:
 	string name_;
 };
@@ -444,6 +455,7 @@ public:
 	virtual ConstantSP getInstance(INDEX size) const = 0;
 	virtual ConstantSP getColumn(INDEX index) const = 0;
 	virtual bool setColumn(INDEX index, const ConstantSP& value)=0;
+	virtual int asof(const ConstantSP& value) const {throw RuntimeException("asof not supported.");}
 protected:
 	int cols_;
 	int rows_;
@@ -541,6 +553,7 @@ public:
 	virtual void release() const {}
 	virtual void checkout() const {}
 	virtual long long getAllocatedMemory() const = 0;
+	virtual ConstantSP getSubTable(vector<int> indices) const = 0;
 };
 
 class DFSChunkMeta : public Constant{
@@ -611,6 +624,45 @@ protected:
 	ConstantSP obj_;
 };
 
+class Domain{
+public:
+	Domain(PARTITION_TYPE partitionType, DATA_TYPE partitionColType);
+	virtual ~Domain(){}
+	virtual vector<int> getPartitionKeys(const ConstantSP& partitionCol) const = 0;
+	virtual PARTITION_TYPE getPartitionType(){
+		return partitionType_;
+	}
+protected:
+	PARTITION_TYPE partitionType_;
+	DATA_TYPE partitionColType_;
+	DATA_CATEGORY partitionColCategory_;
+};
+
+class SymbolBase{
+public:
+	SymbolBase(int id):id_(id){}
+
+	SymbolBase(const DataInputStreamSP& in, IO_ERR& ret);
+
+	SymbolBase(int id, const DataInputStreamSP& in, IO_ERR& ret);
+
+	string getSymbol(int index){ return syms_[index];}
+
+	int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const;
+	
+	int find(const string& symbol);
+
+	int findAndInsert(const string& symbol);
+
+	int size() const {return  symMap_.size();}
+
+	const int& getID(){return id_;}
+private:
+	int id_;
+	unordered_map<string, int> symMap_;
+	vector<string> syms_;
+};
+
 class EXPORT_DECL DBConnection {
 public:
 	DBConnection(bool enableSSL = false, bool asynTask = false);
@@ -638,14 +690,14 @@ public:
 	 * the function returns a void object. If error is raised on the server, the function throws an
 	 * exception.
 	 */
-	ConstantSP run(const string& script, int priority=4, int parallelism=2, int fetchSize=0);
+	ConstantSP run(const string& script, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
 
 	/**
 	 * Run the given function on the DolphinDB server using the local objects as the arguments
 	 * for the function and return the result to the client. If nothing returns, the function
 	 * returns a void object. If error is raised on the server, the function throws an exception.
 	 */
-	ConstantSP run(const string& funcName, vector<ConstantSP>& args, int priority=4, int parallelism=2, int fetchSize=0);
+	ConstantSP run(const string& funcName, vector<ConstantSP>& args, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
 
 	/**
 	 * upload a local object to the DolphinDB server and assign the given name in the session.
@@ -667,12 +719,6 @@ public:
 	 * It is required to call initialize function below before one uses the DolphinDB API.
 	 */
 	static void initialize();
-
-	/**
-	 * It is required to call setSSL before user use connect function to create a
-	 * SSL connection.
-	 */
-	void setSSL();
 
 	void setInitScript(const string& script);
 
@@ -698,7 +744,7 @@ private:
     ConstantSP nodes_;
 };
 
-class BlockReader : public Constant{
+class EXPORT_DECL BlockReader : public Constant{
 public:
     BlockReader(const DataInputStreamSP& in );
     ConstantSP read();
@@ -715,6 +761,75 @@ private:
     int currentIndex_;
 };
 
+
+class EXPORT_DECL DBConnectionPool{
+public:
+    DBConnectionPool(const string& hostName, int port, int threadNum = 10, const string& userId = "", const string& password = "", bool loadBalance = false, bool highAvailability = false);
+	
+	void run(const string& script, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
+	
+	void run(const string& functionName, const vector<ConstantSP>& args, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
+    
+	bool isFinished(int identity);
+
+    ConstantSP getData(int identity);
+	
+    void shutDown();
+
+    bool isShutDown();
+
+	int getConnectionCount();
+private:
+	SmartPointer<DBConnectionPoolImpl> pool_;
+	friend class PartitionedTableAppender; 
+
+};
+
+class EXPORT_DECL PartitionedTableAppender {
+public:
+	PartitionedTableAppender(string dbUrl, string tableName, string partitionColName, DBConnectionPool& pool);
+
+	PartitionedTableAppender(string dbUrl, string tableName, string partitionColName, string appendFunction, DBConnectionPool& pool);
+
+	int append(TableSP table);
+
+private:
+ 	void init(string dbUrl, string tableName, string partitionColName, string appendFunction);
+
+	void checkColumnType(int col, DATA_CATEGORY category, DATA_TYPE type);
+
+private:
+	SmartPointer<DBConnectionPoolImpl> pool_;
+	string appendScript_;
+	int threadCount_;
+    DictionarySP tableInfo_;
+	int partitionColumnIdx_;
+	int cols_;
+    DomainSP domain_;
+    vector<DATA_CATEGORY> columnCategories_;
+ 	vector<DATA_TYPE> columnTypes_;
+	int identity_ = -1;
+    vector<vector<int>> chunkIndices_;
+};
+
+
+class EXPORT_DECL AutoFitTableAppender {
+public:
+	AutoFitTableAppender(string dbUrl, string tableName, DBConnection& conn);
+
+	int append(TableSP table);
+
+private:
+	void checkColumnType(int col, DATA_CATEGORY category, DATA_TYPE type);
+
+private:
+    DBConnection& conn_;
+	string appendScript_;
+	int cols_;
+    vector<DATA_CATEGORY> columnCategories_;
+ 	vector<DATA_TYPE> columnTypes_;
+	vector<string> columnNames_;
+};
 };
 
 namespace std {

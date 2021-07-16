@@ -155,6 +155,13 @@ public:
 		}
 	}
 
+	string getPartitionTypeString(PARTITION_TYPE type) const {
+		return arrPartitionTypeStr[type];
+	}
+
+	string getCategoryString(DATA_CATEGORY type) const {
+		return arrCategoryTypeStr[type];
+	} 
 private:
 	int getSegmentCount(INDEX size, int segmentSizeInBit) const {
 		return (size >> segmentSizeInBit) + (size & ((1 << segmentSizeInBit) - 1) ? 1 : 0);
@@ -180,6 +187,7 @@ private:
 	Constant* parseDouble(const string& word){return Double::parseDouble(word);}
 	Constant* parseDate(const string& word) {return Date::parseDate(word);}
 	Constant* parseDateTime(const string& word) {return DateTime::parseDateTime(word);}
+	Constant* parseDateHour(const string& word) {return DateHour::parseDateHour(word);}
 	Constant* parseMonth(const string& word) {return Month::parseMonth(word);}
 	Constant* parseTime(const string& word) {return Time::parseTime(word);}
 	Constant* parseNanoTime(const string& word) {return NanoTime::parseNanoTime(word);}
@@ -209,6 +217,7 @@ private:
 	Constant* createDouble(){return new Double();}
 	Constant* createDate() {return new Date();}
 	Constant* createDateTime() {return new DateTime();}
+	Constant* createDateHour() {return new DateHour();}
 	Constant* createMonth() {return new Month();}
 	Constant* createTime() {return new Time();}
 	Constant* createNanoTime() {return new NanoTime();}
@@ -217,6 +226,7 @@ private:
 	Constant* createMinute() {return new Minute();}
 	Constant* createSecond() {return new Second();}
 	Constant* createString(){return new String();}
+    Constant* createBlob(){return new String("", true);}
 	Constant* createFunctionDef(){return new String();}
 	Constant* createHandle(){return new String();}
 	Constant* createMetaCode(){return new String();}
@@ -320,6 +330,15 @@ private:
 		else
 			return NULL;
 	}
+	Vector* createDateHourVector(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
+        if(data == NULL && dataSegment == NULL){
+            allocate<int>(size, capacity, fastMode, segmentSizeInBit, data, dataSegment);
+        }
+        if(data != NULL)
+            return new FastDateHourVector(size, capacity, (int*)data, containNull);
+        else
+            return NULL;
+    }
 	Vector* createTimeVector(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
 		if(data == NULL && dataSegment == NULL){
 			allocate<int>(size, capacity, fastMode, segmentSizeInBit, data, dataSegment);
@@ -377,6 +396,22 @@ private:
 	Vector* createStringVector(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
 		return new StringVector(size, capacity);
 	}
+	Vector* createSymbolVector(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
+		if(data){
+			throw RuntimeException("data must be null if create a symbol vector without a symbolbase. ");
+		}
+		if(data == NULL && dataSegment == NULL){
+			allocate<int>(size, capacity, fastMode, segmentSizeInBit, data, dataSegment);
+			memset(data, 0, sizeof(int) * size);
+		}
+		if(data != NULL)
+			return new FastSymbolVector(new SymbolBase(0), size, capacity, (int*)data, containNull);
+		else
+			return NULL;
+	}
+    Vector* createBlobVector(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
+        return new StringVector(size, capacity, true);
+    }
 	Vector* createAnyVector(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
 		return new AnyVector(size);
 	}
@@ -475,6 +510,13 @@ private:
 			return new FastDateTimeMatrix(cols, rows, colCapacity, (int*)data, containNull);
 	}
 
+	Vector* createDateHourMatrix(int cols, int rows, int colCapacity, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
+        if(data == 0)
+            return new FastDateHourMatrix(cols, rows, colCapacity, new int[colCapacity * rows], false);
+        else
+            return new FastDateHourMatrix(cols, rows, colCapacity, (int*)data, containNull);
+    }
+
 	Vector* createMonthMatrix(int cols, int rows, int colCapacity, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
 		if(data == 0)
 			return new FastMonthMatrix(cols, rows, colCapacity,  new int[colCapacity * rows], false);
@@ -536,6 +578,7 @@ private:
 		arrConstParser[CONSTANT_DATE]=&ConstantFactory::parseDate;
 		arrConstParser[CONSTANT_MONTH]=&ConstantFactory::parseMonth;
 		arrConstParser[CONSTANT_DATETIME]=&ConstantFactory::parseDateTime;
+		arrConstParser[CONSTANT_DATEHOUR]=&ConstantFactory::parseDateHour;
 		arrConstParser[CONSTANT_TIME]=&ConstantFactory::parseTime;
 		arrConstParser[CONSTANT_NANOTIME]=&ConstantFactory::parseNanoTime;
 		arrConstParser[CONSTANT_TIMESTAMP]=&ConstantFactory::parseTimestamp;
@@ -559,6 +602,7 @@ private:
 		arrConstFactory[DT_DATE]=&ConstantFactory::createDate;
 		arrConstFactory[DT_MONTH]=&ConstantFactory::createMonth;
 		arrConstFactory[DT_DATETIME]=&ConstantFactory::createDateTime;
+		arrConstFactory[DT_DATEHOUR]=&ConstantFactory::createDateHour;
 		arrConstFactory[DT_TIME]=&ConstantFactory::createTime;
 		arrConstFactory[DT_NANOTIME]=&ConstantFactory::createNanoTime;
 		arrConstFactory[DT_TIMESTAMP]=&ConstantFactory::createTimestamp;
@@ -567,6 +611,7 @@ private:
 		arrConstFactory[DT_SECOND]=&ConstantFactory::createSecond;
 		arrConstFactory[DT_SYMBOL]=&ConstantFactory::createString;
 		arrConstFactory[DT_STRING]=&ConstantFactory::createString;
+        arrConstFactory[DT_BLOB]=&ConstantFactory::createBlob;
 		arrConstFactory[DT_FUNCTIONDEF]=&ConstantFactory::createFunctionDef;
 		arrConstFactory[DT_HANDLE]=&ConstantFactory::createHandle;
 		arrConstFactory[DT_CODE]=&ConstantFactory::createMetaCode;
@@ -589,6 +634,7 @@ private:
 		arrConstVectorFactory[DT_DATE]=&ConstantFactory::createDateVector;
 		arrConstVectorFactory[DT_MONTH]=&ConstantFactory::createMonthVector;
 		arrConstVectorFactory[DT_DATETIME]=&ConstantFactory::createDateTimeVector;
+		arrConstVectorFactory[DT_DATEHOUR]=&ConstantFactory::createDateHourVector;
 		arrConstVectorFactory[DT_TIME]=&ConstantFactory::createTimeVector;
 		arrConstVectorFactory[DT_NANOTIME]=&ConstantFactory::createNanoTimeVector;
 		arrConstVectorFactory[DT_TIMESTAMP]=&ConstantFactory::createTimestampVector;
@@ -596,7 +642,8 @@ private:
 		arrConstVectorFactory[DT_MINUTE]=&ConstantFactory::createMinuteVector;
 		arrConstVectorFactory[DT_SECOND]=&ConstantFactory::createSecondVector;
 		arrConstVectorFactory[DT_STRING]=&ConstantFactory::createStringVector;
-		arrConstVectorFactory[DT_SYMBOL]=&ConstantFactory::createStringVector;
+		arrConstVectorFactory[DT_SYMBOL]=&ConstantFactory::createSymbolVector;
+		arrConstVectorFactory[DT_BLOB]=&ConstantFactory::createBlobVector;
 		arrConstVectorFactory[DT_INT128]=&ConstantFactory::createInt128Vector;
 		arrConstVectorFactory[DT_UUID]=&ConstantFactory::createUuidVector;
 		arrConstVectorFactory[DT_IP]=&ConstantFactory::createIPAddrVector;
@@ -621,6 +668,7 @@ private:
 		arrConstMatrixFactory[DT_DATE]=&ConstantFactory::createDateMatrix;
 		arrConstMatrixFactory[DT_MONTH]=&ConstantFactory::createMonthMatrix;
 		arrConstMatrixFactory[DT_DATETIME]=&ConstantFactory::createDateTimeMatrix;
+		arrConstMatrixFactory[DT_DATEHOUR]=&ConstantFactory::createDateHourMatrix;
 		arrConstMatrixFactory[DT_TIME]=&ConstantFactory::createTimeMatrix;
 		arrConstMatrixFactory[DT_NANOTIME]=&ConstantFactory::createNanoTimeMatrix;
 		arrConstMatrixFactory[DT_TIMESTAMP]=&ConstantFactory::createTimestampMatrix;
@@ -642,6 +690,7 @@ private:
 		typeMap_.insert(pair<string,DATA_TYPE>("date",DT_DATE));
 		typeMap_.insert(pair<string,DATA_TYPE>("month",DT_MONTH));
 		typeMap_.insert(pair<string,DATA_TYPE>("datetime",DT_DATETIME));
+		typeMap_.insert(pair<string,DATA_TYPE>("datehour",DT_DATEHOUR));
 		typeMap_.insert(pair<string,DATA_TYPE>("time",DT_TIME));
 		typeMap_.insert(pair<string,DATA_TYPE>("nanotime",DT_NANOTIME));
 		typeMap_.insert(pair<string,DATA_TYPE>("timestamp",DT_TIMESTAMP));
@@ -677,6 +726,7 @@ private:
 		arrTypeSymbol[DT_DATE]='d';
 		arrTypeSymbol[DT_MONTH]='M';
 		arrTypeSymbol[DT_DATETIME]='D';
+		arrTypeSymbol[DT_DATEHOUR]=' ';
 		arrTypeSymbol[DT_TIME]='t';
 		arrTypeSymbol[DT_TIMESTAMP]='T';
 		arrTypeSymbol[DT_NANOTIME]='n';
@@ -706,6 +756,7 @@ private:
 		arrTypeStr[DT_DATE]="DATE";
 		arrTypeStr[DT_MONTH]="MONTH";
 		arrTypeStr[DT_DATETIME]="DATETIME";
+		arrTypeStr[DT_DATEHOUR]="DATEHOUR";
 		arrTypeStr[DT_TIME]="TIME";
 		arrTypeStr[DT_TIMESTAMP]="TIMESTAMP";
 		arrTypeStr[DT_NANOTIME]="NANOTIME";
@@ -746,6 +797,23 @@ private:
 		arrTableTypeStr[ALIASTBL] = "ALIAS";
 		arrTableTypeStr[COMPRESSTBL] = "COMPRESS";
 		arrTableTypeStr[LOGROWTBL] = "LOGROW";
+
+		arrPartitionTypeStr[SEQ] = "SEQ";
+		arrPartitionTypeStr[VALUE] = "VALUE";
+		arrPartitionTypeStr[RANGE] = "RANGE";
+		arrPartitionTypeStr[LIST] = "LIST";
+		arrPartitionTypeStr[HASH] = "HASH";
+		arrPartitionTypeStr[HIER] = "HIER";
+
+		arrCategoryTypeStr[NOTHING] = "NOTHING";
+		arrCategoryTypeStr[LOGICAL] = "LOGICAL";
+		arrCategoryTypeStr[INTEGRAL] = "INTEGRAL";
+		arrCategoryTypeStr[FLOATING] = "FLOATING";
+		arrCategoryTypeStr[TEMPORAL] = "TEMPORAL";
+		arrCategoryTypeStr[LITERAL] = "LITERAL";
+		arrCategoryTypeStr[SYSTEM] = "SYSTEM";
+		arrCategoryTypeStr[MIXED] = "MIXED";
+		arrCategoryTypeStr[BINARY] = "BINARY";
 	}
 
 	ConstantParser arrConstParser[TYPE_COUNT];
@@ -759,6 +827,8 @@ private:
 	string arrTypeStr[TYPE_COUNT];
 	string arrFormStr[9];
 	string arrTableTypeStr[10];
+	string arrPartitionTypeStr[6];
+	string arrCategoryTypeStr[9];
 };
 
 };

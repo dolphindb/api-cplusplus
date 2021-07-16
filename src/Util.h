@@ -92,7 +92,9 @@ public:
 	static Constant* createTimestamp(long long nanoseconds);
 	static Constant* createDateTime(int year, int month, int day, int hour, int minute, int second);
 	static Constant* createDateTime(int seconds);
-
+	static Constant* createDateHour(int hours);
+	static Constant* createDateHour(int year, int month, int day, int hour);
+	
 	static bool isFlatDictionary(Dictionary* dict);
 	static Table* createTable(Dictionary* dict, int size);
 	static Table* createTable(const vector<string>& colNames, const vector<DATA_TYPE>& colTypes, INDEX size, INDEX capacity);
@@ -200,6 +202,13 @@ public:
 	static int getLastErrorCode();
 	static string getLastErrorMessage();
 	static string getErrorMessage(int errCode);
+	static string getPartitionTypeString(PARTITION_TYPE type);
+	static Domain* createDomain(PARTITION_TYPE type, DATA_TYPE partitionColType, const ConstantSP& partitionSchema);
+	static Vector* createSubVector(const VectorSP& source, vector<int> indices);
+	static string getCategoryString(DATA_CATEGORY type);
+	static Vector* createSymbolVector(const SymbolBaseSP& symbolBase, INDEX size, INDEX capacity=0, bool fast=true,
+		void* data=0, void** dataSegment=0, int segmentSizeInBit=0, bool containNull=false);
+
 };
 
 };
