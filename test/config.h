@@ -1,7 +1,9 @@
 #include "../include/DolphinDB.h"
 #include "../include/Util.h"
+#include "../include/BatchTableWriter.h"
 #include "Streaming.h"
 #include <vector>
+#include <string>
 #include <climits>
 #include <thread>
 #include <atomic>
@@ -10,6 +12,7 @@
 #include <sys/time.h>
 
 using namespace dolphindb;
+using namespace std;
 using std::endl;
 using std::cout;
 using std::atomic_long;
@@ -22,3 +25,4 @@ static string alphas = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 static int pass,fail;
 DBConnection conn(false, false);
 DBConnectionPool pool(hostName, port, 10, "admin", "123456");
+static bool assertObj = true;
