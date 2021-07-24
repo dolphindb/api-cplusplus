@@ -7,32 +7,123 @@ DolphinDB C++ API支持以下开发环境：
 * Windows GNU(MinGW)
 
 本教程介绍以下内容：
-- [1. 项目编译](#1-项目编译)
-- [2. 建立DolphinDB连接](#2-建立dolphindb连接)
-- [3. 运行DolphinDB脚本](#3-运行dolphindb脚本)
-- [4. 运行DolphinDB函数](#4-运行dolphindb函数)
-- [5. 上传数据对象](#5-上传数据对象)
-- [6. 读取数据示例](#6-读取数据示例)
-- [7. 保存数据到DolphinDB数据表](#7-保存数据到dolphindb数据表)
-- [8. C++ Streaming API](#8-c-streaming-api)
-- [9. openssl 1.0.2版本源码安装](#9-openssl-1.0.2版本源码安装)
+- [1. 编译libDolphinDBAPI](#1-编译libdolphindbapi)
+- [2. 项目编译](#2-项目编译)
+- [3. 建立DolphinDB连接](#3-建立dolphindb连接)
+- [4. 运行DolphinDB脚本](#4-运行dolphindb脚本)
+- [5. 运行DolphinDB函数](#5-运行dolphindb函数)
+- [6. 上传数据对象](#6-上传数据对象)
+- [7. 读取数据示例](#7-读取数据示例)
+- [8. 保存数据到DolphinDB数据表](#8-保存数据到dolphindb数据表)
+- [9. C++ Streaming API](#9-c-streaming-api)
+- [10. openssl 1.0.2版本源码安装](#10-openssl-102版本源码安装)
 
-## 1. 项目编译
 
-### 1.1 在Linux环境下编译项目
 
-#### 1.1.1 环境配置
+## 1. 编译libDolphinDBAPI
+
+用户可以使用github或者gitee已经编译好的libDolphinDBAPI, 也可以通过如下方法自己编译libDolphinDBAPI。 
+
+### 1.1 在Linux环境下编译API
+
+#### 编译libuuid
+
+DolphinDB API会调用到libuuid,所以要先编译libuuid的静态库。编译方法如下:
+
+* 下载 [libuuid-1.0.3.tar.gz](https://sourceforge.net/projects/libuuid/files/)
+
+* 解压：tar -xvf libuuid-1.0.3.tar.gz
+
+* cd libuuid-1.0.3 && ./configure
+
+* 修改makefile： 添加 '-fPIC' 到CFLAGS和CPPFLAGS
+
+* 如果编译成功， libuuid.a 会生成在目录 '.libs'下
+
+* 将libuuid.a拷贝到目录DolphinDBAPI
+
+#### 编译libDolphinDBAPI
+
+编译命令：
+
+``` 
+cd api-cplusplus
+make clean & make -j4
+```
+
+如果编译成功，会自动生成libDolphinDBAPI.so 
+
+
+### 1.2 在Windows环境下用MinGW编译API
+
+编译命令：
+
+```
+cd api-cplusplus
+mingw32-make -f makefile.win32
+```
+
+
+### 1.3 在Windows环境下，用Visual Studio 2017编译API
+
+
+
+#### 创建项目 libDolphinDBAPI
+
+Windows Desktop->Dynamic Link Library (DLL) 
+
+#### 配置属性
+
+配置属性 -> 常规 -> 项目默认值 -> 配置类型 -> 动态库(.dll)
+
+#### 下载并将 [Openssl](https://www.npcglib.org/~stathis/blog/precompiled-openssl/)加入include和lib路径：
+
+
+1. 配置属性页->VC++ 目录 -> 包含目录 ->C:\openssl-1.0.2l-vs2017\include64;
+2. 配置属性页->VC++ 目录 -> 库目录 -> C:\openssl-1.0.2l-vs2017\lib64;
+
+#### 添加下面的宏定义
+
+C/C++ -> 预处理器 -> 预处理器定义 ->WIN32_LEAN_AND_MEAN; _WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;WINDOWS;NOMINMAX;NDEBUG;CPPAPI_EXPORTS;_WINDOWS;_USRDLL;
+
+
+
+#### 预编译选项（Precompiled header）
+C/C++ -> 预编译头 -> 预编译头-> 不使用预编译头
+
+
+#### 链接（Linker）: 
+
+连接器 -> 输入 -> 附加依赖项
+ws2_32.lib
+ssleay32MD.lib
+libeay32MD.lib
+
+#### 添加源码：
+
+移除项目中代码，并添加src目录的源码到项目中。
+
+#### 编译
+
+编译的时候选择release和x64.如果编译成功，在/username/source/repos/libDolphinDBPAI/x64/Release目录下会生成：libDolphinDBAPI.lib和libDolphinDBAPI.dll
+
+
+## 2. 项目编译
+
+### 2.1 在Linux环境下编译项目
+
+#### 2.1.1 环境配置
 
 C++ API需要使用g++ 6.2及以上版本。
 
-#### 1.1.2 下载bin文件和头文件
+#### 2.1.2 下载bin文件和头文件
 
 从本GitHub项目中下载以下文件：
 
 - [bin](./bin) (libDolphinDBAPI.so)
 - [include](./include) (DolphinDB.h, Exceptions.h, SmartPointer.h, SysIO.h, Types.h, Util.h)
 
-#### 1.1.3 编译main.cpp
+#### 2.1.3 编译main.cpp
 
 在bin和include的同级目录中创建project目录。进入project目录，并创建文件main.cpp：
 
@@ -60,7 +151,7 @@ int main(int argc, char *argv[]){
 }
 ``` 
 
-#### 1.1.4 编译
+#### 2.1.4 编译
 
 为了兼容旧的编译器，libDolphinDBAPI.so提供了2个版本，一个版本在编译时使用了-D_GLIBCXX_USE_CXX11_ABI=0的选项，放在[bin/linux_x64/ABI0](./bin/linux_x64/ABI0)目录下，另一个版本未使用-D_GLIBCXX_USE_CXX11_ABI=0，放在[bin/linux_x64/ABI1](./bin/linux_x64/ABI1)目录下。
 
@@ -78,21 +169,21 @@ g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=0 -DLOGGING_LEVEL_2 -O2
 g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=1 -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -lssl -L../bin/linux_x64/ABI1  -Wl,-rpath,.:../bin/linux_x64/ABI1 -o main
 ```
 
-#### 1.1.5 运行
+#### 2.1.5 运行
 
 编译成功后，启动DolphinDB，运行main程序并连接到DolphinDB，连接时需要指定IP地址和端口号，如以上程序中的111.222.3.44:8503。
 
-### 1.2 Windows环境下编译
+### 2.2 Windows环境下编译
 
-#### 1.2.1 环境配置
+#### 2.2.1 环境配置
 
 本教程使用了Visual Studio 2017 64位版本。
 
-#### 1.2.2 下载bin文件和头文件
+#### 2.2.2 下载bin文件和头文件
 
 将本GitHub项目下载到本地。
 
-#### 1.2.3 创建Visual Studio项目
+#### 2.2.3 创建Visual Studio项目
 
 创建windows console project，导入[include](./include)目录下头文件，创建1.1.3节中的main.cpp文件，导入libDolphinDBAPI.lib，并且配置lib目录。
 
@@ -100,13 +191,13 @@ g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=1 -DLOGGING_LEVEL_2 -O2
 > 由于VS里默认定义了min/max两个宏，会与头文件中 `min` 和 `max` 函数冲突。为了解决这个问题，在预处理宏定义中需要加入 __NOMINMAX__。
 > API源代码中用宏定义LINUX、WINDOWS等区分不同平台，因此在预处理宏定义中需要加入 WINDOWS。
 
-#### 1.2.4 编译和运行
+#### 2.2.4 编译和运行
 
 启动编译，将对应的libDolphinDBAPI.dll拷贝到可执行程序的输出目录，即可运行。
 
 Windows gnu开发环境与Linux相似，可以参考上一章的Linux编译。
 
-## 2. 建立DolphinDB连接
+## 3. 建立DolphinDB连接
 
 DolphinDB C++ API 提供的最核心的对象是DBConnection。C++应用可以通过它在DolphinDB服务器上执行脚本和函数，并在两者之间双向传递数据。DBConnection类提供如下主要方法：
 
@@ -152,7 +243,7 @@ bool ret = conn.connect("127.0.0.1", 8848, "admin", "123456");
 
 请注意，DBConnection类的所有函数都不是线程安全的，不可以并行调用，否则可能会导致程序崩溃。
 
-## 3. 运行DolphinDB脚本
+## 4. 运行DolphinDB脚本
 
 通过 `run` 方法运行DolphinDB脚本：
 
@@ -165,7 +256,7 @@ cout<<v->getString()<<endl;
 
 > ["IBM", "GOOG", "YHOO"]
 
-## 4. 运行DolphinDB函数
+## 5. 运行DolphinDB函数
 
 除了运行脚本之外，run命令还可以直接在远程DolphinDB服务器上执行DolphinDB内置或用户自定义函数。若 `run` 方法只有一个参数，则该参数为脚本；若 `run` 方法有两个参数，则第一个参数为DolphinDB中的函数名，第二个参数是该函数的参数，为ConstantSP类型的向量。
 
@@ -233,7 +324,7 @@ cout<<result->getString()<<endl;
 输出结果为：
 > [10, 10, 10]
 
-## 5. 上传数据对象
+## 6. 上传数据对象
 
 C++ API提供 `upload` 方法，将本地对象上传到DolphinDB。
 
@@ -320,7 +411,7 @@ name_5  2019.01.06 31
 ...
 ```
 
-## 6. 读取数据示例
+## 7. 读取数据示例
 
 DolphinDB C++ API 不仅支持Int, Float, String, Date, DataTime等多种数据类型，也支持向量(VectorSP)、集合(SetSP)、矩阵(MatrixSP)、字典(DictionarySP)、表(TableSP）等多种数据形式。下面介绍如何通过DBConnection对象，读取并操作DolphinDB的各种形式的对象。
 
@@ -331,7 +422,7 @@ DolphinDB C++ API 不仅支持Int, Float, String, Date, DataTime等多种数据�
 #include "Util.h"
 ``` 
 
-### 6.1 向量
+### 7.1 向量
 
 创建INT类型的向量：
 
@@ -351,7 +442,7 @@ for(int i = 0; i < size; ++i)
     cout<<v->getString(i)<<endl;
 ``` 
 
-### 6.2 集合
+### 7.2 集合
 
 创建一个集合：
 
@@ -360,7 +451,7 @@ SetSP set = conn.run("set(4 5 5 2 3 11 6)");
 cout<<set->getString()<<endl;
 ```
 
-### 6.3 矩阵
+### 7.3 矩阵
 
 创建一个矩阵：
 
@@ -369,7 +460,7 @@ ConstantSP matrix = conn.run("1..6$2:3");
 cout<<matrix->getString()<<endl; 
 ``` 
 
-### 6.4 字典
+### 7.4 字典
 
 创建一个字典：
 
@@ -380,7 +471,7 @@ cout << dict->get(Util::createInt(1))->getString()<<endl;
 
 上例通过 `Util::createInt` 创建Int类型的值，并使用 `get` 方法来获得key为1对应的值。
 
-### 6.5 表
+### 7.5 表
 
 在C++客户端中执行以下脚本创建一个表：
 
@@ -393,13 +484,13 @@ sb.append("select * from mytrades");
 TableSP table = conn.run(sb); 
 ```
 
-#### 6.5.1 `getString()`方法获取表的内容
+#### 7.5.1 `getString()`方法获取表的内容
 
 ```C++
 cout<<table->getString()<<endl; 
 ``` 
 
-#### 6.5.2 `getColumn()`方法按列获取表的内容
+#### 7.5.2 `getColumn()`方法按列获取表的内容
 
 下面的脚本中，首先定义一个VectorSP类型的动态数组columnVecs，用于存放从表中获取的列，然后依次访问columnVecs处理数据。
 
@@ -420,7 +511,7 @@ for(int i = 0; i < 200; ++i){
 }
 ``` 
 
-#### 6.5.3 `getRow()`方法按照行获取表的内容
+#### 7.5.3 `getRow()`方法按照行获取表的内容
 
 例如，打印table的第一行，返回的结果是一个字典。
 
@@ -445,7 +536,7 @@ cout<<table->getRow(0)->getMember(Util::createString("price"))->getDouble()<<end
 
 需要注意的是，按行访问table并逐一进行计算非常低效。为了达到更好的性能，建议参考[6.5.2小节](#652-getcolumn方法按列获取表的内容)的方式按列访问table并批量计算。
 
-#### 6.5.4 使用`BlockReaderSP`对象分段读取表数据
+#### 7.5.4 使用`BlockReaderSP`对象分段读取表数据
 
 对于大数据量的表，API提供了分段读取方法。(此方法仅适用于DolphinDB 1.20.5, 1.10.16及其以上版本)
 
@@ -473,7 +564,7 @@ while(reader->hasNext()){
 }
 ```
 
-### 6.6 AnyVector
+### 7.6 AnyVector
 
 AnyVector是DolphinDB中一种特殊的数据形式，与常规的向量不同，它的每个元素可以是不同的数据类型或数据形式。
 
@@ -491,7 +582,7 @@ cout<<v->getString()<<endl;
 
 结果是一个Int类型的向量[1,3,5]。
 
-## 7. 保存数据到DolphinDB数据表
+## 8. 保存数据到DolphinDB数据表
 
 DolphinDB数据表按存储方式分为三种:
 
@@ -499,7 +590,7 @@ DolphinDB数据表按存储方式分为三种:
 * 分布式表（DFS表）：数据可保存在不同的节点，亦可保存在同一节点，由分布式文件系统统一管理。路径以"dfs://"开头。
 * 本地磁盘表：数据仅保存在本地磁盘。不建议生产环境中使用。
 
-### 7.1 保存数据到DolphinDB内存表
+### 8.1 保存数据到DolphinDB内存表
 
 DolphinDB提供多种方式来保存数据到内存表：
 
@@ -517,7 +608,7 @@ share t as tglobal;
 
 上面的例子中，我们通过[`table`](http://www.dolphindb.cn/cn/help/table.html)函数来创建表，指定了表的容量和初始大小、列名和数据类型。由于内存表是会话隔离的，所以普通内存表只有当前会话可见。为了让多个客户端可以同时访问t，我们使用[`share`](http://www.dolphindb.cn/cn/help/share1.html)在会话间共享内存表。
 
-#### 7.1.1 使用insert into语句保存数据
+#### 8.1.1 使用insert into语句保存数据
 
 可以采用如下方式保存单条数据。
 
@@ -564,7 +655,7 @@ script += "insert into tglobal values(names, dates, prices); tglobal";
 TableSP table = conn.run(script); 
 ``` 
 
-#### 7.1.2 使用tableInsert函数批量保存多条数据
+#### 8.1.2 使用tableInsert函数批量保存多条数据
 
 在这个例子中，我们利用索引指定TableSP对象的多行数据，将它们批量保存到DolphinDB server上。
 
@@ -579,7 +670,7 @@ args.push_back(table->get(range));
 conn.run("tableInsert{tglobal}", args);
 ```
 
-#### 7.1.3 使用tableInsert函数保存TableSP对象
+#### 8.1.3 使用tableInsert函数保存TableSP对象
 
 ```C++
 vector<ConstantSP> args; 
@@ -597,11 +688,11 @@ args.push_back(table);
 conn.run("append!(tglobal);", args);
 ```
 
-### 7.2 保存数据到分布式表
+### 8.2 保存数据到分布式表
 
 分布式表是DolphinDB推荐在生产环境下使用的数据存储方式，它支持快照级别的事务隔离，保证数据一致性。分布式表支持多副本机制，既提供了数据容错能力，又能作为数据访问的负载均衡。下面的例子通过C++ API把数据保存至分布式表。
 
-#### 7.2.1 使用tableInsert函数保存TableSP对象
+#### 8.2.1 使用tableInsert函数保存TableSP对象
 
 在DolphinDB中使用以下脚本创建分布式表。[`database`](http://www.dolphindb.cn/cn/help/database1.html)函数用于创建数据库。分布式数据库地路径必须以"dfs://"
 开头。[`createPartitionedTable`](http://www.dolphindb.cn/cn/help/createPartitionedTable.html)函数用于创建分区表。
@@ -631,7 +722,7 @@ conn.run("loadTable('dfs://SAMPLE_TRDDB', `demoTable).append!(mt);");
 conn.run(script);
 ```
 
-#### 7.2.2 分布式表的并发写入
+#### 8.2.2 分布式表的并发写入
 
 DolphinDB的分布式表支持并发读写，下面展示如何在C++客户端中将数据并发写入DolphinDB的分布式表。
 
@@ -712,7 +803,7 @@ void *writeData(void *arg) {
 更多分布式表的并发写入案例可以参考样例[MultiThreadDFSWriting.cpp](./example/DFSWritingWithMultiThread/MultiThreadDfsWriting.cpp)。
 
 
-### 7.3 保存数据到本地磁盘表
+### 8.3 保存数据到本地磁盘表
 
 本地磁盘表通用用于静态数据集的计算分析。它不支持事务，也不持支并发读写。
 
@@ -755,13 +846,13 @@ conn.run(script);
 
 关于C++ API的更多信息，可以参考C++ API 头文件[dolphindb.h](./include/DolphinDB.h)。
 
-## 8. C++ Streaming API
+## 9. C++ Streaming API
 
 C++ API处理流数据的方式有三种：ThreadedClient, ThreadPooledClient 和 PollingClient。这三种实现方式的细节请见[test/StreamingThreadedClientTester.cpp](./test/StreamingThreadedClientTester.cpp), [test/StreamingThreadPooledClientTester.cpp](./test/StreamingThreadPooledClientTester.cpp) 和 [test/StreamingPollingClientTester.cpp](./test/StreamingPollingClientTester.cpp)。
 
-### 8.1 编译
+### 9.1 编译
 
-#### 8.1.1 Linux 64位
+#### 9.1.1 Linux 64位
 
 安装cmake：
 
@@ -779,7 +870,7 @@ make -j `nproc`
 
 编译成功后，会生成三个可执行文件。
 
-#### 8.1.2 在Windows中使用MinGW编译
+#### 9.1.2 在Windows中使用MinGW编译
 
 安装[MinGW](http://www.mingw.org/)和[cmake](https://cmake.org/):
 
@@ -795,13 +886,13 @@ mingw32-make -j `nproc`
 - 1. 编译前，需要把libDolphinDBAPI.dll复制到编译目录。
 - 2. 执行例子前，需要把libDolphinDBAPI.dll和libgcc_s_seh-1.dll复制到可执行文件的相同目录下。
 
-### 8.2 API
+### 9.2 API
 
-#### 8.2.1 ThreadedClient
+#### 9.2.1 ThreadedClient
 
 ThreadedClient 产生一个线程。每次新数据从流数据表发布时，该线程去获取和处理数据。
 
-##### 8.2.1.1 定义线程客户端
+##### 9.2.1.1 定义线程客户端
 
 ``` 
 ThreadedClient::ThreadClient(int listeningPort);
@@ -809,7 +900,7 @@ ThreadedClient::ThreadClient(int listeningPort);
 
 * listeningPort 是单线程客户端的订阅端口号。
 
-##### 8.2.1.2 调用订阅函数
+##### 9.2.1.2 调用订阅函数
 
 ``` 
 ThreadSP ThreadedClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
@@ -842,7 +933,7 @@ auto t = client.subscribe(host, port, [](Message msg) {
 t->join();
 ```
 
-##### 8.2.1.3 取消订阅
+##### 9.2.1.3 取消订阅
 
 ``` 
 void ThreadClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
@@ -858,11 +949,11 @@ void ThreadClient::unsubscribe(string host, int port, string tableName, string a
 
 该函数用于停止向发布者订阅数据。
 
-#### 8.2.2 ThreadPooledClient
+#### 9.2.2 ThreadPooledClient
 
 ThreadPooledClient 产生用户指定数量的多个线程。每次新数据从流数据表发布时，这些线程同时去获取和处理数据。当数据到达速度超过单个线程所能处理的限度时，ThreadPooledClient 比 ThreadedClient 有优势。
 
-##### 8.2.2.1 定义多线程客户端
+##### 9.2.2.1 定义多线程客户端
 
 ``` 
 ThreadPooledClient::ThreadPooledClient(int listeningPort, int threadCount);
@@ -870,13 +961,13 @@ ThreadPooledClient::ThreadPooledClient(int listeningPort, int threadCount);
 * listeningPort 是多线程客户端节点的订阅端口号。
 * threadCount 是线程池的大小。
 
-##### 8.2.2.2 调用订阅函数
+##### 9.2.2.2 调用订阅函数
 
 ``` 
 vector<ThreadSP> ThreadPooledClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
 ```
 
-参数参见8.2.1.2节。
+参数参见9.2.1.2节。
 
 返回一个指针向量，每个指针指向循环调用handler的线程。这些线程在此topic被取消订阅后会退出。
 
@@ -891,19 +982,19 @@ for(auto& t : vec) {
 }
 ```
 
-##### 8.2.2.3 取消订阅
+##### 9.2.2.3 取消订阅
 
 ``` 
 void ThreadPooledClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 ```
 
-参数参见8.2.1.3节。
+参数参见9.2.1.3节。
 
-#### 8.2.3 PollingClient
+#### 9.2.3 PollingClient
 
 订阅数据时，会返回一个消息队列。用户可以从其中获取和处理数据。
 
-##### 8.2.3.1 定义客户端
+##### 9.2.3.1 定义客户端
 
 ``` 
 PollingClient::PollingClient(int listeningPort);
@@ -911,13 +1002,13 @@ PollingClient::PollingClient(int listeningPort);
 
 * listeningPort 是客户端节点的订阅端口号。
 
-##### 8.2.3.2 订阅
+##### 9.2.3.2 订阅
 
 ``` 
 MessageQueueSP PollingClient::subscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1);
 ```
 
-参数参见8.2.1.2节。
+参数参见9.2.1.2节。
 
 该函数返回指向消息队列的指针。
 
@@ -934,17 +1025,17 @@ while(true) {
 }
 ```
 
-##### 8.2.3.3 取消订阅
+##### 9.2.3.3 取消订阅
 
 ``` 
 void PollingClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 ```
 
-参数参见8.2.1.3节。
+参数参见9.2.1.3节。
 
 注意，对于这种订阅模式，若返回一个空指针，说明已取消订阅。
 
-## 9. openssl 1.0.2版本源码安装
+## 10. openssl 1.0.2版本源码安装
 这部分主要是介绍下没有1.0.2版本openssl的，从源码编译安装的过程。已有的话忽略本节。
 
 
