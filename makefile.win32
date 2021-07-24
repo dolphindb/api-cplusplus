@@ -1,0 +1,27 @@
+SRC_DIR := src
+OBJ_DIR := obj
+# 
+SRC_FILES := $(wildcard $(SRC_DIR)/*.cpp)
+OBJ_FILES := $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SRC_FILES))
+
+
+
+# common sources
+LDFLAGS := -lDolphinDB -lssl -lcrypto -lole32 -lws2_32 -lgdi32 -lopenblas -liphlpapi -lLLVM -ltcmalloc_minimal-4 -u__tcmalloc
+CPPFLAGS := -DWINDOWS -DTCMALLOC -D__STDC_FORMAT_MACROS -DNDEBUG -DOPENBLAS -DLOGGING_LEVEL_1 -DDOLPHINDB_JIT -u__tcmalloc -ID:\Jenkins\workspace\DolphinDBExec_JIT\Include -ID:\llvm-71\include -IC:\openssl-1.0.2j\static\include -ID:\openblas\include -ID:\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\include -O3 -Wall -c -fmessage-length=0 -std=gnu++11 -msse -msse2 -msse3 -funroll-loops
+
+dolpindb.exe: $(OBJ_FILES)
+	D:\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin\g++ -LD:\Jenkins\workspace\DolphinDB_JIT -LC:\openssl-1.0.2j\static\lib -LD:\openblas\lib -L. -o dolphindb.exe $(OBJ_FILES) $(LDFLAGS)
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	D:\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin\g++ $(CPPFLAGS) -o $@ $<
+
+
+
+.PHONY: clean
+
+clean:
+	del /f/q obj\*.o 2>NUL
+	del /f/q obj\MachineLearning\*.o 2>NUL
+	del /f/q obj\JIT\*.o 2>NUL
+	del /f/q dolphindb.exe 2>NUL
