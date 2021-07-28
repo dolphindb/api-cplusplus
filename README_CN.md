@@ -60,8 +60,11 @@ make clean & make -j4
 
 将./lib/openssl-1.0.2u.zip 解压到目录c:/openssl-1.0.2u 或者指定目录。如果目录和makefile中不一致，请更改makefile。
 
+
 ```
 cd api-cplusplus
+
+mkdir obj
 mingw32-make -f makefile.win32
 ```
 
