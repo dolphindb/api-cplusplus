@@ -58,13 +58,8 @@ make clean & make -j4
 
 编译命令：
 
-将./lib/openssl-1.0.2u.zip 解压到目录c:/openssl-1.0.2u 或者指定目录。如果目录和makefile中不一致，请更改makefile。
-
-
 ```
 cd api-cplusplus
-
-mkdir obj
 mingw32-make -f makefile.win32
 ```
 
@@ -119,7 +114,7 @@ libeay32MD.lib
 
 #### 2.1.1 环境配置
 
-C++ API需要使用g++ 6.2及以上版本。
+C++ API需要使用g++ 4.8.5及以上版本。
 
 #### 2.1.2 下载bin文件和头文件
 
@@ -223,7 +218,7 @@ DBConnection conn;
 bool ret = conn.connect("127.0.0.1", 8848);
 ```
 
-声明connection变量的时候，有两个可选参数： enableSSL（支持SSL）, enableAYSN（支持一部分）.这两个参数默认值为false。 目前只支持linux, 稳定版>=1.10.17,最新版>=1.20.6。  
+声明connection变量的时候，有两个可选参数：enableSSL（支持SSL），asynTask（支持一部分）。这两个参数默认值为false。 目前只支持linux, 稳定版>=1.10.17,最新版>=1.20.6。  
 
 下面例子是，建立支持SSL而非支持异步的connection，同时服务器端应该添加参数enableHTTPS=true(单节点部署，需要添加到dolphindb.cfg;集群部署需要添加到cluster.cfg)。
 
@@ -231,7 +226,7 @@ bool ret = conn.connect("127.0.0.1", 8848);
 DBConnection conn(true,false)
 ```
 
-下面建立即不支持SSL，但支持异步的connection。异步情况下，步只能执行DolphinDB脚本和函数， 且不再有返回值，该功能适用于异步写入数据。
+下面建立不支持SSL，但支持异步的connection。异步情况下，只能执行DolphinDB脚本和函数， 且不再有返回值。该功能适用于异步写入数据。
 
 ```C++
 DBConnection conn(false,true)
@@ -253,7 +248,7 @@ bool ret = conn.connect("127.0.0.1", 8848, "admin", "123456");
 通过 `run` 方法运行DolphinDB脚本：
 
 ```C++
-ConstantSP v = conn.run(" `IBM` GOOG`YHOO");
+ConstantSP v = conn.run("`IBM`GOOG`YHOO");
 cout<<v->getString()<<endl;
 ```
 
@@ -265,7 +260,7 @@ cout<<v->getString()<<endl;
 
 除了运行脚本之外，run命令还可以直接在远程DolphinDB服务器上执行DolphinDB内置或用户自定义函数。若 `run` 方法只有一个参数，则该参数为脚本；若 `run` 方法有两个参数，则第一个参数为DolphinDB中的函数名，第二个参数是该函数的参数，为ConstantSP类型的向量。
 
-下面的示例展示C++程序通过 `run` 调用DolphinDB内置的 [`add`](http://www.dolphindb.cn/cn/help/add.html) 函数。[`add`](http://www.dolphindb.cn/cn/help/add.html) 函数有两个参数 x 和 y。参数的存储位置不同，也会导致调用方式的不同。可能有以下三种情况：
+下面的示例展示C++程序通过 `run` 调用DolphinDB内置的 [`add`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/add.html) 函数。[`add`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/add.html) 函数有两个参数 x 和 y。参数的存储位置不同，也会导致调用方式的不同。可能有以下三种情况：
 
 * 所有参数都在DolphinDB server端
 
@@ -294,7 +289,7 @@ cout<<result->getString()<<endl;
 conn.run("x = [1, 3, 5]"); 
 ``` 
 
-而参数 y 要在C++客户端生成，这时就需要使用“部分应用”方式，把参数 x 固化在 [`add`](http://www.dolphindb.cn/cn/help/add.html) 函数内。具体请参考[部分应用文档](https://www.dolphindb.cn/cn/help/PartialApplication.html)。
+而参数 y 要在C++客户端生成，这时就需要使用“部分应用”方式，把参数 x 固化在 [`add`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/add.html) 函数内。具体请参考[部分应用文档](https://www.dolphindb.cn/cn/help/Functionalprogramming/PartialApplication.html)。
 
 ```C++
 vector<ConstantSP> args;
@@ -337,7 +332,7 @@ C++ API提供 `upload` 方法，将本地对象上传到DolphinDB。
 
 ```C++
 TableSP createDemoTable(){
-    vector<string> colNames = {"name", "date"," price"};
+    vector<string> colNames = {"name", "date","price"};
     vector<DATA_TYPE> colTypes = {DT_STRING, DT_DATE, DT_DOUBLE};
     int colNum = 3, rowNum = 10000, indexCapacity=10000;
     ConstantSP table = Util::createTable(colNames, colTypes, rowNum, indexCapacity);
@@ -470,7 +465,7 @@ cout<<matrix->getString()<<endl;
 创建一个字典：
 
 ```C++
-DictionarySP dict = conn.run("dict(1 2 3, `IBM` MSFT`GOOG)");
+DictionarySP dict = conn.run("dict(1 2 3, `IBM`MSFT`GOOG)");
 cout << dict->get(Util::createInt(1))->getString()<<endl;
 ```
 
@@ -574,7 +569,7 @@ while(reader->hasNext()){
 AnyVector是DolphinDB中一种特殊的数据形式，与常规的向量不同，它的每个元素可以是不同的数据类型或数据形式。
 
 ```C++
-ConstantSP result = conn.run("{1, 2, {1,3,5}, {0.9, 0.8}}");
+ConstantSP result = conn.run("[1, 2, [1,3,5], [0.9, 0.8]]");
 cout<<result->getString()<<endl;
 ```
 
@@ -599,9 +594,9 @@ DolphinDB数据表按存储方式分为三种:
 
 DolphinDB提供多种方式来保存数据到内存表：
 
-* 通过[insert into](http://www.dolphindb.cn/cn/help/insertinto.html)语句保存单条数据
-* 通过[tableInsert](http://www.dolphindb.cn/cn/help/tableInsert.html)函数批量保存多条数据
-* 通过[tableInsert](http://www.dolphindb.cn/cn/help/tableInsert.html)函数保存数据表
+* 通过[insert into](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/i/insertInto.html)语句保存单条数据
+* 通过[tableInsert](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/t/tableInsert.html)函数批量保存多条数据
+* 通过[tableInsert](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/t/tableInsert.html)函数保存数据表
 
 下面分别介绍三种方式保存数据的实例，在例子中使用到的数据表有3列，分别是STRING, DATE, DOUBLE类型，列名分别为name, date和price。
 在DolphinDB中执行以下脚本创建内存表：
@@ -611,7 +606,7 @@ t = table(100:0, `name` date`price, [STRING, DATE, DOUBLE]);
 share t as tglobal; 
 ``` 
 
-上面的例子中，我们通过[`table`](http://www.dolphindb.cn/cn/help/table.html)函数来创建表，指定了表的容量和初始大小、列名和数据类型。由于内存表是会话隔离的，所以普通内存表只有当前会话可见。为了让多个客户端可以同时访问t，我们使用[`share`](http://www.dolphindb.cn/cn/help/share1.html)在会话间共享内存表。
+上面的例子中，我们通过[`table`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/t/table.html)函数来创建表，指定了表的容量和初始大小、列名和数据类型。由于内存表是会话隔离的，所以普通内存表只有当前会话可见。为了让多个客户端可以同时访问t，我们使用[`share`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/CommandsReferences/share.html)在会话间共享内存表。
 
 #### 8.1.1 使用insert into语句保存数据
 
@@ -623,7 +618,7 @@ sprintf(script, "insert into tglobal values(%s, date(timestamp(%ld)), %lf)", "`a
 conn.run(script);
 ```
 
-也可以使用[insert into](http://www.dolphindb.cn/cn/help/insertinto.html) 语句保存多条数据:
+也可以使用[insert into](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/i/insertInto.html) 语句保存多条数据:
 
 ```C++
 string script; 
@@ -684,7 +679,7 @@ args.push_back(table);
 conn.run("tableInsert{tglobal}", args); 
 ``` 
 
-把数据保存到内存表，还可以使用[append!](http://www.dolphindb.cn/cn/help/append1.html)函数，它可以把一张表追加到另一张表。但是，一般不建议通过[append!](http://www.dolphindb.cn/cn/help/append1.html)函数保存数据，因为[append!](http://www.dolphindb.cn/cn/help/append1.html)函数会返回一个空表，不必要地增加通信量。
+把数据保存到内存表，还可以使用[append!](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)函数，它可以把一张表追加到另一张表。但是，一般不建议通过[append!](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)函数保存数据，因为[append!](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)函数会返回一个空表，不必要地增加通信量。
 
 ```C++
 vector<ConstantSP> args;
@@ -699,8 +694,8 @@ conn.run("append!(tglobal);", args);
 
 #### 8.2.1 使用tableInsert函数保存TableSP对象
 
-在DolphinDB中使用以下脚本创建分布式表。[`database`](http://www.dolphindb.cn/cn/help/database1.html)函数用于创建数据库。分布式数据库地路径必须以"dfs://"
-开头。[`createPartitionedTable`](http://www.dolphindb.cn/cn/help/createPartitionedTable.html)函数用于创建分区表。
+在DolphinDB中使用以下脚本创建分布式表。[`database`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/d/database.html)函数用于创建数据库。分布式数据库地路径必须以"dfs://"
+开头。[`createPartitionedTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/c/createPartitionedTable.html)函数用于创建分区表。
 ``` 
 login( `admin, ` 123456)
 dbPath = "dfs://SAMPLE_TRDDB";
@@ -709,7 +704,7 @@ db = database(dbPath, VALUE, 2010.01.01..2010.01.30)
 pt=db.createPartitionedTable(table(1000000:0, `name` date `price, [STRING,DATE,DOUBLE]), tableName, ` date)
 ```
 
-使用[`loadTable`](http://www.dolphindb.cn/cn/help/loadTable.html)方法加载分布式表，通过[`tableInsert`](http://www.dolphindb.cn/cn/help/tableInsert.html)方式追加数据：
+使用[`loadTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/l/loadTable.html)方法加载分布式表，通过[`tableInsert`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/t/tableInsert.html)方式追加数据：
 
 ```C++
 TableSP table = createDemoTable(); 
@@ -718,7 +713,7 @@ args.push_back(table);
 conn.run("tableInsert{loadTable('dfs://SAMPLE_TRDDB', `demoTable)}", args); 
 ``` 
 
-[`append!`](http://www.dolphindb.cn/cn/help/append1.html)函数也能向分布式表追加数据，但是性能与[`tableInsert`](http://www.dolphindb.cn/cn/help/tableInsert.html)相比要差，建议不要轻易使用：
+[`append!`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)函数也能向分布式表追加数据，但是性能与[`tableInsert`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/t/tableInsert.html)相比要差，建议不要轻易使用：
 
 ```C++
 TableSP table = createDemoTable();
@@ -807,12 +802,51 @@ void *writeData(void *arg) {
 ```
 更多分布式表的并发写入案例可以参考样例[MultiThreadDFSWriting.cpp](./example/DFSWritingWithMultiThread/MultiThreadDfsWriting.cpp)。
 
+#### 8.2.3 利用PartitionedTableAppender并发写入分布式表
+
+上述方法较为复杂，C++ API提供了更简便地自动按分区分流数据并行写入的方法:
+
+```C++
+PartitionedTableAppender(string dbUrl, string tableName, string partitionColName, DBConnectionPool& pool);
+```
+
+- dbUrl: 分布式数据库地址，若为内存表可设为“”
+- tableName: 分布式表名
+- partitionColName: 分区字段
+- DBConnectionPool: 连接池
+
+使用最新的1.30版本及以上的server，可以使用C++ API中的 PartitionedTableAppender对象来写入分布式表。其基本原理是设计一个连接池，然后获取分布式表的分区信息，将分区分配给连接池来并行写入，一个分区在同一时间只能由一个连接写入。
+
+先在服务器端创建一个数据库 "dfs://SAMPLE_TRDDB" 以及一个分布式表 "demoTable"：
+
+```
+login( `admin, `123456)
+dbPath = "dfs://SAMPLE_TRDDB";
+tableName = `demoTable
+if(existsDatabase(dbPath)){
+	dropDatabase(dbPath)
+}
+db = database(dbPath, VALUE, 2010.01.01..2010.01.30)
+pt=db.createPartitionedTable(table(1000000:0, `name`date `price, [STRING,DATE,DOUBLE]), tableName, `date)
+```
+
+然后在C++客户端创建连接池pool并传入PartitionedTableAppender，使用append方法往分布式表并发写入本地数据:
+
+```C++
+DBConnectionPool pool("localhost", 8848, 20, "admin", "123456");
+PartitionedTableAppender appender("dfs://SAMPLE_TRDDB", "demoTable", "date", pool);
+TableSP table = createDemoTable();
+appender.append(table);
+ConstantSP result = conn.run("select * from loadTable('dfs://SAMPLE_TRDDB', `demoTable)");
+cout <<  result->getString() << endl;
+```
+
 
 ### 8.3 保存数据到本地磁盘表
 
 本地磁盘表通用用于静态数据集的计算分析。它不支持事务，也不持支并发读写。
 
-在DolphinDB中使用以下脚本创建一个本地磁盘表，使用[`database`](http://www.dolphindb.cn/cn/help/database1.html)函数创建数据库，调用[`saveTable`](http://www.dolphindb.cn/cn/help/saveTable.html)命令将内存表保存到磁盘中：
+在DolphinDB中使用以下脚本创建一个本地磁盘表，使用[`database`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/d/database.html)函数创建数据库，调用[`saveTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/CommandsReferences/saveTable.html)命令将内存表保存到磁盘中：
 
 
 ``` 
@@ -822,7 +856,7 @@ saveTable(db, t, `dt);
 share t as tDiskGlobal;
 ```
 
-使用[`tableInsert`](http://www.dolphindb.cn/cn/help/tableInsert.html)函数是向本地磁盘表追加数据最为常用的方式。这个例子中，我们使用[`tableInsert`](http://www.dolphindb.cn/cn/help/tableInsert.html)向共享的内存表tDiskGlobal中插入数据，接着调用[`saveTable`](http://www.dolphindb.cn/cn/help/saveTable.html)把插入的数据保存到磁盘上。
+使用[`tableInsert`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/t/tableInsert.html)函数是向本地磁盘表追加数据最为常用的方式。这个例子中，我们使用[`tableInsert`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/t/tableInsert.html)向共享的内存表tDiskGlobal中插入数据，接着调用[`saveTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/CommandsReferences/saveTable.html)把插入的数据保存到磁盘上。
 
 ```C++
 TableSP table = createDemoTable(); 
@@ -832,7 +866,7 @@ conn.run("tableInsert{tDiskGlobal}", args);
 conn.run("saveTable(db, tDiskGlobal, `dt); "); 
 ``` 
 
-本地磁盘表支持使用[`append!`](http://www.dolphindb.cn/cn/help/append1.html)函数把数据追加到表中：
+本地磁盘表支持使用[`append!`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)函数把数据追加到表中：
 
 ```C++
 TableSP table = createDemoTable();
@@ -846,10 +880,140 @@ conn.run(script);
 
 注意：
 
-1. 对于本地磁盘表，[`append!`](http://www.dolphindb.cn/cn/help/append1.html)函数只把数据追加到内存，如果要保存到磁盘上，必须再次执行[`saveTable`](http://www.dolphindb.cn/cn/help/saveTable.html)函数。
-2. 除了使用[`share`](http://www.dolphindb.cn/cn/help/share1.html)让表在其他会话中可见，也可以在C++ API中使用[`loadTable`](http://www.dolphindb.cn/cn/help/loadTable.html)来加载磁盘表，使用[`append!`](http://www.dolphindb.cn/cn/help/append1.html)来追加数据。但是，我们不推荐这种方法，因为[`loadTable`](http://www.dolphindb.cn/cn/help/loadTable.html)函数从磁盘加载数据，会消耗大量时间。如果有多个客户端都使用[`loadTable`](http://www.dolphindb.cn/cn/help/loadTable.html) ，内存中会有多个表的副本，造成数据不一致。
+1. 对于本地磁盘表，[`append!`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)函数只把数据追加到内存，如果要保存到磁盘上，必须再次执行[`saveTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/CommandsReferences/saveTable.html)函数。
+2. 除了使用[`share`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/CommandsReferences/share.html)让表在其他会话中可见，也可以在C++ API中使用[`loadTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/l/loadTable.html)来加载磁盘表，使用[`append!`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)来追加数据。但是，我们不推荐这种方法，因为[`loadTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/l/loadTable.html)函数从磁盘加载数据，会消耗大量时间。如果有多个客户端都使用[`loadTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/l/loadTable.html) ，内存中会有多个表的副本，造成数据不一致。
 
 关于C++ API的更多信息，可以参考C++ API 头文件[dolphindb.h](./include/DolphinDB.h)。
+
+### 8.4 批量异步写入数据
+
+在高频的，实时单行插入数据的场景下，使用API的批量异步写入可以有效提升服务器的I/O效率，同时提升客户端写入的吞吐量。DolphinDB C++ API提供batchTableWriter对象，在客户端设置一个数据缓冲队列。当服务器端忙于网络I/O时，客户端写线程仍然可以将数据持续写入缓冲队列（该队列由客户端维护）。写入队列后即可返回，避免了写线程的忙等。同时，batchTableWriter对象在客户端打开一个消费线程负责消费缓冲队列中的数据，批量打包传输给服务器端，从而提升服务器的I/O效率。目前，只支持批量写入数据到磁盘表和内存表。异步方式提交有如下几个特点：
+
+- API客户端提交任务到缓冲队列，缓冲队列接到任务后，客户端即认为任务已完成。
+- 提供getStatus等接口查看状态。
+
+**请注意：**
+
+* 消费线程消费缓冲队列中的数据具有即时性，即不存在队列占满后消费或定时消费。
+* 批量异步写入不保证数据最终成功写入数据库。如果后台线程写入过程中出现错误或者服务端异常，后台线程将退出，并在下一次写入数据时清空队列，抛出异常。但其报错不具备实时性。可以通过getUnwrittenData获取抛出异常的insert之前所有写入缓冲队列但是没有成功写入服务器的数据，返回形式是TableSP.
+
+batchTableWriter对象及主要方法介绍如下：
+
+```C++
+BatchTableWriter(const std::string& hostName, int port, const std::string& userId, const std::string& password, bool acquireLock=true)
+```
+* hostName 连接服务器的IP地址。
+* port 连接服务器的端口号。
+* userId 是字符串，表示连接服务器的用户名。
+* password 是字符串，表示连接服务器的密码。
+* acquireLock 是布尔值，表示在使用过程中，API内部是否需要加锁。默认为true, 表示需要加锁。在并发调用API的场景下，建议加锁。
+
+以下是BatchTableWriter对象包含的函数方法介绍：
+```C++
+addTable(const string& dbName, const string& tableName="", bool partitioned=true);
+```
+- dbName: 磁盘表时，需填写数据库名。内存表时填写表名。
+- tableName: 需要写入的磁盘表的表名。内存表时该值为空。
+- partitioned: 表示添加的表是否为分区表。设置为true表示是分区表。如果添加的表是磁盘未分区表，必需设置partitioned为false.
+
+**请注意:**
+
+* 如果添加的是内存表，需要share该表。
+* 表名不可重复添加，需要先移除之前添加的表，否则会抛出异常。
+
+```C++
+insert(const string& dbName, const string& tableName, Fargs)
+```
+
+- Fargs：是变长参数，代表插入的一行数据。写入的数据可以使用dolphindb的数据类型，也可以使用C++原生数据类型。数据类型和表中列的类型需要一一对应。数据类型对应关系见下表：
+
+C++ 原生数据类型与DolphinDB数据类型对应关系表
+
+| DolphinDB类型 | C++类型         |
+| ------------- | --------------- |
+| BOOL          | char            |
+| CHAR          | char            |
+| SHORT         | short           |
+| STRING        | const char*     |
+| STRING        | string          |
+| SYMBOL        | const char*     |
+| SYMBOL        | string          |
+| LONG          | long long       |
+| NANOTIME      | long long       |
+| NANOTIMESTAMP | long long       |
+| TIMESTAMP     | long long       |
+| FLOAT         | float           |
+| DOUBLE        | double          |
+| DATE          | int             |
+| MONTH         | int             |
+| TIME          | int             |
+| MINUTE        | int             |
+| DATETIME      | int             |
+| DATEHOUR      | int             |
+| UUID          | unsigned char*  |
+| UUID          | unsigned char[] |
+| IPADDR        | unsigned char*  |
+| IPADDR        | unsigned char[] |
+| INT128        | unsigned char*  |
+| INT128        | unsigned char[] |
+
+**请注意:**
+
+* 调用insert前需先调用addTable添加表，否则会抛出异常。
+* 变长参数个数和数据类型需要与insert表的列数及类型匹配。
+* 如果插入过程出现异常导致后台线程退出，再次调用insert会抛出异常，可以调用getUnwrittenData来获取之前所有写入缓冲队列但是没有成功写入服务器的数据（不包括本次insert的数据），然后再removeTable。如果需要再次插入数据，需要重新调用 `addTable`.
+* 在移除该表的过程中调用本函数，仍然能够插入成功，但这些插入的数据并不会发送到服务器。移除该表的时候调用insert算是未定义行为，不建议这样写程序。
+
+```C++
+removeTable(const string& dbName, const string& tableName="")
+```
+
+释放由addTable添加的表所占用的资源。第一次调用该函数，该函数返回即表示后台线程已退出。
+
+```C++
+getUnwrittenData(const string& dbName, const string& tableName="")
+```
+获取还未写入的数据，主要是用于的时候获取写入出现错误时，剩下未写入的数据。该函数会取出剩下未写入的数据，这些数据将不会被继续写入，如若需要重新写入，需要再次调用插入函数。
+
+```C++
+getStatus(const string& dbName, const string& tableName="")
+```
+
+返回值是由一个整型和两个布尔型组合的元组，分别表示当前写入队列的深度、当前表是否被移除（true: 表示正在被移除），以及后台写入线程是否因为出错而退出。
+
+```C++
+getAllStatus()
+```
+
+获取所有当前存在的表的信息，不包含被移除的表。
+
+返回值是一个表，共有六列，对应列的说明如下：
+
+| 列名        | 详情          |
+|:------------- |:-------------|
+|DatabaseName|数据库名称/内存表名称|
+|TableName|表名称/空字符串|
+|WriteQueueDepth|当前写入队列深度|
+|SendedRows|已成功发送到服务器的行数|
+|Removing|表是否正在被移除|
+|Finished|后台线程是否因为出错退出|
+
+示例：
+
+```C++
+#include "BatchTableWriter.h"
+using namespace dolphindb;
+using namespace std;
+int main(){
+  shared_ptr<BatchTableWriter> btw = make_shared<BatchTableWriter>(host, port, userId, password, true);
+  btw->addTable("dfs://demoDB", "demoTable");
+  for(int i = 0; i < 1000; i+=3)
+    btw->insert("dfs://demoDB", "demoTable", i,i+1,i+2);
+  btw->removeTable("dfs://demoDB", "demoTable");
+}
+```
+
+更多批量异步写入案例，请参考[BatchTableWriterDemo.cpp](./example/BatchTableWriter/BatchTableWriterDemo)。
 
 ## 9. C++ Streaming API
 
@@ -1083,5 +1247,4 @@ g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=1 -DLOGGING_LEVEL_2 -O2
 export LD_LIBRARY_PATH=/newssl/lib
 ```
 然后再运行./main就可以运行了
-
 
