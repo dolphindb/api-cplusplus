@@ -1013,7 +1013,7 @@ int main(){
 }
 ```
 
-更多批量异步写入案例，请参考[BatchTableWriterDemo.cpp](./example/BatchTableWriter/BatchTableWriterDemo)。
+更多批量异步写入案例，请参考[BatchTableWriterDemo.cpp](./example/BatchTableWriter/BatchTableWriterDemo.cpp)。
 
 ## 9. C++ Streaming API
 
