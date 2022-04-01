@@ -22,7 +22,7 @@ if(UNIX)
         include_directories(${UUID_LIBS}/include)
         set(LIBUUID "-Wl,--whole-archive ${UUID_LIBS}/lib/libuuid.a -Wl,--no-whole-archive")
     else()
-        set(LIBUUID uuid)fsa
+        set(LIBUUID uuid)
     endif()
 
     if(OPENBLAS_LIBS)
