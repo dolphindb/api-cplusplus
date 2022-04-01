@@ -19,6 +19,7 @@
 
 #include "Util.h"
 #include "ScalarImp.h"
+#include "Types.h"
 
 namespace dolphindb {
 
@@ -162,6 +163,22 @@ public:
 		return capacity_;
 	}
 
+	virtual bool isSorted(bool asc, bool strict=false) const {
+		if (size_ <= 1) {
+			return true;
+		}
+		for (int i = 1; i < size_; i++) {
+			if (asc) {
+				if (strict && data_[i] <= data_[i-1]) return false;
+				if (!strict && data_[i] < data_[i-1]) return false;
+			} else {
+				if (strict && data_[i] >= data_[i-1]) return false;
+				if (!strict && data_[i] > data_[i-1]) return false;
+			}
+		}
+		return true;
+	}
+
 	virtual ConstantSP getSubVector(INDEX start, INDEX length) const {
 		return getSubVector(start, length, std::abs(length));
 	}
@@ -174,6 +191,8 @@ public:
 		else
 			throw MemoryException();
 	}
+
+	VECTOR_TYPE getVectorType() const {return VECTOR_TYPE::ARRAY;}
 
 	IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
 		IO_ERR ret;
@@ -723,9 +742,9 @@ public:
 
 	virtual void addIndex(INDEX start, INDEX length, INDEX offset){
 		T incVal = (T)offset;
-		for(INDEX i=start; i<length; ++i)
-			if(data_[i] >= 0)
-				data_[i] += incVal;
+		for(INDEX i = 0; i < length; ++i)
+			if(data_[i + start] >= 0)
+				data_[i + start] += incVal;
 	}
 
 	virtual void neg(){
@@ -792,6 +811,18 @@ public:
 		memcpy(buf,(char*)(data_+indexStart),len * numElement);
 		return len * numElement;
 	}
+	
+	int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int cellCountToSerialize, int& numElement, int& partial) const {
+		//assume offset==0 and bufSize>=sizeof(T)
+		if(indexStart >= size_)
+			return -1;
+		int len = sizeof(T);
+		partial = 0;
+		numElement = ((std::min))(bufSize / len, cellCountToSerialize);
+		memcpy(buf,(char*)(data_+indexStart),len * numElement);
+		return len * numElement;
+	}
+	
 	virtual int asof(const ConstantSP& value) const{
 		T target;
 		try{
@@ -817,6 +848,15 @@ public:
 				end = mid - 1;
 		}
 		return end;
+	}
+
+	virtual void resize(INDEX size) {
+		if(size < 0)
+        	return;
+		if(size > capacity_){
+			checkCapacity(size - size_);
+		}
+		size_ = size;
 	}
 
 protected:
@@ -1040,11 +1080,14 @@ protected:
 	int size_;
 	int capacity_;
 	bool containNull_;
+	DATA_TYPE dataType_;
 };
 
 class FastBoolVector:public AbstractFastVector<char>{
 public:
-	FastBoolVector(int size, int capacity, char* srcData, bool containNull):AbstractFastVector(size,capacity,srcData,CHAR_MIN, containNull){}
+	FastBoolVector(int size, int capacity, char* srcData, bool containNull):AbstractFastVector(size,capacity,srcData,CHAR_MIN, containNull){
+		dataType_ = DT_BOOL;
+	}
 	virtual ~FastBoolVector(){}
 	virtual DATA_TYPE getType() const {return DT_BOOL;}
 	virtual DATA_TYPE getRawType() const { return DT_BOOL;}
@@ -1056,6 +1099,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
+	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
 	virtual bool add(INDEX start, INDEX length, long long inc) {return false;}
 	virtual bool add(INDEX start, INDEX length, double inc) {return false;}
 	virtual int compare(INDEX index, const ConstantSP& target) const;
@@ -1064,7 +1108,9 @@ public:
 
 class FastCharVector:public AbstractFastVector<char>{
 public:
-	FastCharVector(int size, int capacity, char* srcData, bool containNull):AbstractFastVector(size,capacity,srcData,CHAR_MIN,containNull){}
+	FastCharVector(int size, int capacity, char* srcData, bool containNull):AbstractFastVector(size,capacity,srcData,CHAR_MIN,containNull){
+		dataType_ = DT_CHAR;
+	}
 	virtual ~FastCharVector(){}
 	virtual DATA_TYPE getType() const {return DT_CHAR;}
 	virtual DATA_TYPE getRawType() const { return DT_CHAR;}
@@ -1076,6 +1122,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
+	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
 	virtual bool validIndex(INDEX uplimit);
 	virtual bool validIndex(INDEX start, INDEX length, INDEX uplimit);
 	virtual int compare(INDEX index, const ConstantSP& target) const;
@@ -1090,7 +1137,9 @@ public:
 
 class FastShortVector:public AbstractFastVector<short>{
 public:
-	FastShortVector(int size, int capacity, short* srcData,bool containNull):AbstractFastVector(size,capacity,srcData,SHRT_MIN,containNull){}
+	FastShortVector(int size, int capacity, short* srcData,bool containNull):AbstractFastVector(size,capacity,srcData,SHRT_MIN,containNull){
+		dataType_ = DT_SHORT;
+	}
 	virtual ~FastShortVector(){}
 	virtual DATA_TYPE getType() const {return DT_SHORT;}
 	virtual DATA_TYPE getRawType() const { return DT_SHORT;}
@@ -1102,6 +1151,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
+	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
 	virtual bool validIndex(INDEX uplimit);
 	virtual bool validIndex(INDEX start, INDEX length, INDEX uplimit);
 	virtual int compare(INDEX index, const ConstantSP& target) const;
@@ -1114,7 +1164,9 @@ public:
 
 class FastIntVector:public AbstractFastVector<int>{
 public:
-	FastIntVector(int size, int capacity, int* srcData, bool containNull):AbstractFastVector(size,capacity,srcData,INT_MIN,containNull){}
+	FastIntVector(int size, int capacity, int* srcData, bool containNull):AbstractFastVector(size,capacity,srcData,INT_MIN,containNull){
+		dataType_ = DT_INT;
+	}
 	virtual ~FastIntVector(){}
 	virtual DATA_TYPE getType() const {return DT_INT;}
 	virtual DATA_TYPE getRawType() const { return DT_INT;}
@@ -1130,6 +1182,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
+	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
 	virtual bool validIndex(INDEX uplimit);
 	virtual bool validIndex(INDEX start, INDEX length, INDEX uplimit);
 	virtual int compare(INDEX index, const ConstantSP& target) const;
@@ -1142,7 +1195,9 @@ public:
 
 class FastLongVector:public AbstractFastVector<long long>{
 public:
-	FastLongVector(int size, int capacity, long long* srcData, bool containNull):AbstractFastVector(size,capacity,srcData,LLONG_MIN,containNull){}
+	FastLongVector(int size, int capacity, long long* srcData, bool containNull):AbstractFastVector(size,capacity,srcData,LLONG_MIN,containNull){
+		dataType_ = DT_LONG;
+	}
 	virtual ~FastLongVector(){}
 	virtual DATA_TYPE getType() const {return DT_LONG;}
 	virtual DATA_TYPE getRawType() const { return DT_LONG;}
@@ -1158,6 +1213,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
+	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
 	virtual bool validIndex(INDEX uplimit);
 	virtual bool validIndex(INDEX start, INDEX length, INDEX uplimit);
 	virtual int compare(INDEX index, const ConstantSP& target) const;
@@ -1170,7 +1226,9 @@ public:
 
 class FastFloatVector:public AbstractFastVector<float>{
 public:
-	FastFloatVector(int size, int capacity, float* srcData, bool containNull):AbstractFastVector(size,capacity,srcData,FLT_NMIN,containNull){}
+	FastFloatVector(int size, int capacity, float* srcData, bool containNull):AbstractFastVector(size,capacity,srcData,FLT_NMIN,containNull){
+		dataType_ = DT_FLOAT;
+	}
 	virtual ~FastFloatVector(){}
 	virtual DATA_TYPE getType() const {return DT_FLOAT;}
 	virtual DATA_TYPE getRawType() const { return DT_FLOAT;}
@@ -1216,6 +1274,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
+	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
 	virtual int compare(INDEX index, const ConstantSP& target) const;
 
 private:
@@ -1242,7 +1301,9 @@ private:
 
 class FastDoubleVector:public AbstractFastVector<double>{
 public:
-	FastDoubleVector(int size, int capacity, double* srcData, bool containNull):AbstractFastVector(size,capacity,srcData,DBL_NMIN,containNull){}
+	FastDoubleVector(int size, int capacity, double* srcData, bool containNull):AbstractFastVector(size,capacity,srcData,DBL_NMIN,containNull){
+		dataType_ = DT_DOUBLE;
+	}
 	virtual ~FastDoubleVector(){}
 	virtual DATA_TYPE getType() const {return DT_DOUBLE;}
 	virtual DATA_TYPE getRawType() const { return DT_DOUBLE;}
@@ -1287,6 +1348,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
+	virtual bool append(const ConstantSP value, INDEX start, INDEX );
 	virtual int compare(INDEX index, const ConstantSP& target) const;
 
 private:
@@ -1319,11 +1381,152 @@ public:
 	virtual DATA_CATEGORY getCategory() const {return TEMPORAL;}
 	virtual bool isIndexArray() const { return false;}
 	virtual INDEX* getIndexArray() const { return NULL;}
+	virtual ConstantSP castTemporal(DATA_TYPE expectType) = 0;
 };
+
+class FastArrayVector: public Vector {
+public:
+	FastArrayVector(int size, int capacity, char* srcData, bool containNull, DATA_TYPE dataType, INDEX *pindex=NULL) {
+		stage_ = 0;
+		countBytes_ = 1;
+		rowCount_ = 0;
+		rowsRead_ = 1;
+
+		index_ 	     	= NULL;
+		dataType_ 		= dataType;	// e.g. DT_INT + ARRAY_TYPE_BASE
+		dataCategory 	= ARRAY;
+		baseType_ 	 	= DATA_TYPE(dataType_ - ARRAY_TYPE_BASE);	// e.g. DT_INT
+		index_ 			= Util::createVector(DT_INT, size, capacity, true, 0, pindex);
+		valueSize_      = 0;
+		value_          = Util::createVector(baseType_, 0, 0, true, 0, NULL);
+		size_           = index_->size();
+		baseUnitLength_ = value_->getUnitLength();
+	}
+
+	FastArrayVector(const VectorSP& index, const VectorSP& value) {
+		index_ = index;
+		value_ = value;
+		stage_ = 0;
+		countBytes_ = 1;
+		rowCount_ = 0;
+		rowsRead_ = 1;
+		size_ = index->size();
+		if(!index->isFastMode())
+			throw RuntimeException("The index vector for the constructor of FastArrayVector must be a regular vector.");
+		baseType_ = value_->getType();
+		baseUnitLength_ = value_->getUnitLength();
+		dataType_ = (DATA_TYPE)(baseType_ + ARRAY_TYPE_BASE);
+		size_ = index->size();
+		valueSize_ = value->size();
+		if(value->getNullFlag())
+			containNull_ = hasNull(0, size_);
+		else
+			containNull_ = false;
+		index_->setTemporary(false);
+		value_->setTemporary(false);
+	}
+
+	virtual ~FastArrayVector(){}
+	virtual DATA_TYPE 	  getType() const override {return dataType_;};
+	virtual DATA_TYPE 	  getRawType() const { return baseType_;}
+	virtual DATA_CATEGORY getCategory() const {return ARRAY;}
+	virtual VECTOR_TYPE   getVectorType() const {return VECTOR_TYPE::ARRAYVECTOR;}
+	virtual DATA_FORM     getForm() const { return DF_VECTOR;}
+	virtual INDEX		  getValueSize() const { return valueSize_; }
+	virtual void*		  getDataArray() const { return value_->getDataArray(); }
+	virtual bool		  validIndex(INDEX uplimit) { return value_->validIndex(uplimit); }
+	virtual bool		  validIndex(INDEX start, INDEX length, INDEX uplimit) { return value_->validIndex(start, length, uplimit); }
+
+	virtual void 		  fill(INDEX start, INDEX length, const ConstantSP& value){throw RuntimeException("Array Vector doesn't support method fill");}
+	// Note: Currently, the update and delete operations on arrayVector are not supported.
+	virtual bool 	      set(INDEX index, const ConstantSP& value) {throw RuntimeException("Array Vector doesn't support method set");}
+	virtual bool		  set(const ConstantSP& index, const ConstantSP& value) {throw RuntimeException("Array Vector doesn't support method set");}
+
+	virtual string 		  getString(INDEX index) const;
+	virtual string 		  getString() const;
+	// get a sub-array-vector, corresponding to `arrayVector[start, start + length]`
+	virtual ConstantSP 	  getSubVector(INDEX start, INDEX length) const { return getSubVector(start, length, length); }
+	virtual ConstantSP    getSubVector(INDEX start, INDEX length, INDEX capacity) const;
+	virtual	bool 		  isNull(INDEX index) const;
+	virtual	bool   		  isNull(INDEX start, int len, char* buf) const;
+	virtual	bool 		  isValid(INDEX start, int len, char* buf) const;
+	virtual bool  		  remove(INDEX count);
+	virtual bool 	      remove(const ConstantSP& index);
+	virtual ConstantSP    getValue() const;
+	virtual ConstantSP    getValue(INDEX capacity) const;
+	virtual INDEX 		  getCapacity() const { return index_->getCapacity(); }
+	virtual short 		  getUnitLength() const { return value_->getUnitLength(); }
+	virtual ConstantSP    getInstance(INDEX size) const;
+	virtual INDEX 		  size() const { return size_; }
+	virtual bool 		  sizeable() const {return value_->sizeable();}
+	virtual long long     count() const { return count(0, size_);}
+	virtual long long 	  count(INDEX start, INDEX length) const;
+
+#ifndef INDEX64
+	virtual bool isIndexArray() const { return true;}
+	virtual INDEX* getIndexArray() const { return index_->getIndexArray();}
+#endif
+	
+	// get the `index`th element each row, corresponding to `arrayVector[index]`
+	virtual ConstantSP 		get(INDEX index) const;
+	virtual ConstantSP 		get(INDEX column, INDEX rowStart,INDEX rowEnd) const;
+	virtual ConstantSP 		get(INDEX offset, const ConstantSP& index) const;
+	virtual ConstantSP 		get(const ConstantSP& index) const;
+	virtual void 	   		clear();
+	virtual void 			reverse();
+	virtual void 			reverse(INDEX start, INDEX length);
+	
+	virtual bool   append(const ConstantSP& value, INDEX count);
+	virtual bool   append(const ConstantSP& value);
+	virtual bool   append(const ConstantSP& value, INDEX start, INDEX len);
+	virtual bool   append(const ConstantSP& value, const ConstantSP& index);
+	virtual int    compare(INDEX index, const ConstantSP& target) const {throw RuntimeException("Array Vector doesn't support method compare");}
+	virtual void   neg() {throw RuntimeException("Array Vector doesn't support method neg");}
+	virtual void   prev(INDEX steps) {throw RuntimeException("Array Vector doesn't support method prev");}
+	virtual void   next(INDEX steps) {throw RuntimeException("Array Vector doesn't support method next");}
+	virtual bool   getHash(INDEX start, int len, int buckets, int* buf) const {throw RuntimeException("Array Vector doesn't support method getHash");}
+	virtual int    serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const;
+	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
+	virtual INDEX rows() const { return index_->rows(); }
+	virtual INDEX columns() const { return value_->rows(); }
+	void reserveValue(INDEX capacity) { value_->reserve(capacity); }
+
+private:
+	int 		serializeFixedLength(char* buf, int bufSize, INDEX indexStart, int offset, int targetNumElement, int& numElement, int& partial) const;
+	int 		serializeVariableLength(char* buf, int bufSize, INDEX indexStart, int offset, int targetNumElement, int& numElement, int& partial) const;
+	IO_ERR 	    deserializeFixedLength(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
+	IO_ERR 		deserializeVariableLength(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
+	INDEX 		lowerBoundIndex(INDEX* data, INDEX size, INDEX start, INDEX value) const;
+	ConstantSP  convertRowIndexToValueIndex(INDEX offset, const ConstantSP& rowIndexVector) const;
+	ConstantSP  sliceRows(INDEX offset, const ConstantSP& rowIndexVector) const;
+	ConstantSP  sliceColumnRange(int colStart, int colEnd, INDEX rowStart, INDEX rowEnd) const;
+	ConstantSP  sliceOneColumn(int colIndex, INDEX rowStart, INDEX rowEnd) const;
+
+private:
+
+	bool 		   containNull_;
+	DATA_TYPE 	   baseType_;
+	DATA_TYPE      dataType_;
+	DATA_CATEGORY  dataCategory;
+	int 		   baseUnitLength_;
+	INDEX 		   valueSize_;
+	INDEX		   size_;
+	VectorSP 	   index_;
+	VectorSP 	   value_;
+
+	/* Variables related to deserialization */
+	int 			rowsRead_; 	  // applicable when stage_ = 1 or 2
+	unsigned char 	stage_; 	  // 0: block header, 1: array of count, 2:array of data
+	unsigned char 	countBytes_;  // 1: unsigned char, 2: unsigned short, 4: unsigned int
+	unsigned short 	rowCount_; 	  // number of rows in this block
+};
+
 
 class FastDateVector:public FastTemporalVector{
 public:
-	FastDateVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){}
+	FastDateVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){
+		dataType_ = DT_DATE;
+	}
 	virtual ~FastDateVector(){}
 	virtual DATA_TYPE getType() const {return DT_DATE;}
 	virtual ConstantSP get(INDEX index) const {return ConstantSP(new Date(data_[index]));}
@@ -1334,7 +1537,9 @@ public:
 
 class FastDateTimeVector:public FastTemporalVector{
 public:
-	FastDateTimeVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){}
+	FastDateTimeVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){
+		dataType_ = DT_DATETIME;
+	}
 	virtual ~FastDateTimeVector(){}
 	virtual DATA_TYPE getType() const {return DT_DATETIME;}
 	virtual ConstantSP get(INDEX index) const {return ConstantSP(new DateTime(data_[index]));}
@@ -1345,7 +1550,9 @@ public:
 
 class FastDateHourVector:public FastTemporalVector{
 public:
-    FastDateHourVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){}
+    FastDateHourVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){
+		dataType_ = DT_DATEHOUR;
+	}
     virtual ~FastDateHourVector(){}
     virtual DATA_TYPE getType() const {return DT_DATEHOUR;}
     virtual ConstantSP get(INDEX index) const {return ConstantSP(new DateHour(data_[index]));}
@@ -1356,7 +1563,9 @@ public:
 
 class FastMonthVector:public FastTemporalVector{
 public:
-	FastMonthVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){}
+	FastMonthVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){
+		dataType_ = DT_MONTH;
+	}
 	virtual ~FastMonthVector(){}
 	virtual DATA_TYPE getType() const {return DT_MONTH;}
 	virtual ConstantSP get(INDEX index) const {return ConstantSP(new Month(data_[index]));}
@@ -1372,7 +1581,9 @@ public:
 
 class FastTimeVector:public FastTemporalVector{
 public:
-	FastTimeVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){}
+	FastTimeVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){
+		dataType_ = DT_TIME;
+	}
 	virtual ~FastTimeVector(){}
 	virtual DATA_TYPE getType() const {return DT_TIME;}
 	virtual ConstantSP get(INDEX index) const {return ConstantSP(new Time(data_[index]));}
@@ -1384,7 +1595,9 @@ public:
 
 class FastMinuteVector:public FastTemporalVector{
 public:
-	FastMinuteVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){}
+	FastMinuteVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){
+		dataType_ = DT_MINUTE;
+	}
 	virtual ~FastMinuteVector(){}
 	virtual DATA_TYPE getType() const {return DT_MINUTE;}
 	virtual ConstantSP get(INDEX index) const {return ConstantSP(new Minute(data_[index]));}
@@ -1396,7 +1609,9 @@ public:
 
 class FastSecondVector:public FastTemporalVector{
 public:
-	FastSecondVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){}
+	FastSecondVector(int size,int capacity,int* srcData,bool containNull):FastTemporalVector(size,capacity,srcData,containNull){
+		dataType_ = DT_SECOND;
+	}
 	virtual ~FastSecondVector(){}
 	virtual DATA_TYPE getType() const {return DT_SECOND;}
 	virtual ConstantSP get(INDEX index) const {return ConstantSP(new Second(data_[index]));}
@@ -1408,7 +1623,9 @@ public:
 
 class FastNanoTimeVector:public FastLongVector{
 public:
-	FastNanoTimeVector(int size,int capacity,long long* srcData,bool containNull):FastLongVector(size,capacity,srcData,containNull){}
+	FastNanoTimeVector(int size,int capacity,long long* srcData,bool containNull):FastLongVector(size,capacity,srcData,containNull){
+		dataType_ = DT_NANOTIME;
+	}
 	virtual ~FastNanoTimeVector(){}
 	virtual DATA_TYPE getType() const {return DT_NANOTIME;}
 	virtual DATA_CATEGORY getCategory() const {return TEMPORAL;}
@@ -1421,7 +1638,9 @@ public:
 
 class FastTimestampVector:public FastLongVector{
 public:
-	FastTimestampVector(int size,int capacity,long long* srcData,bool containNull):FastLongVector(size,capacity,srcData,containNull){}
+	FastTimestampVector(int size,int capacity,long long* srcData,bool containNull):FastLongVector(size,capacity,srcData,containNull){
+		dataType_ = DT_TIMESTAMP;
+	}
 	virtual ~FastTimestampVector(){}
 	virtual DATA_TYPE getType() const {return DT_TIMESTAMP;}
 	virtual DATA_CATEGORY getCategory() const {return TEMPORAL;}
@@ -1433,7 +1652,9 @@ public:
 
 class FastNanoTimestampVector:public FastLongVector{
 public:
-	FastNanoTimestampVector(int size,int capacity,long long* srcData,bool containNull):FastLongVector(size,capacity,srcData,containNull){}
+	FastNanoTimestampVector(int size,int capacity,long long* srcData,bool containNull):FastLongVector(size,capacity,srcData,containNull){
+		dataType_ = DT_NANOTIMESTAMP;
+	}
 	virtual ~FastNanoTimestampVector(){}
 	virtual DATA_TYPE getType() const {return DT_NANOTIMESTAMP;}
 	virtual DATA_CATEGORY getCategory() const {return TEMPORAL;}

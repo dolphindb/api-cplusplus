@@ -1,4 +1,5 @@
 #include "BatchTableWriter.h"
+#include "ScalarImp.h"
 
 namespace dolphindb{
 
@@ -27,6 +28,7 @@ BatchTableWriter::~BatchTableWriter(){
         if(i.second->destroy == false){
             dt.push_back(i.second);
             i.second->destroy = true;
+            i.second->writeNotifier.notify();
         }
     }
     for(auto& i: dt){
@@ -53,7 +55,7 @@ void BatchTableWriter::addTable(const string& dbName, const string& tableName, b
     std::string tableInsert;
     std::string saveTable;
     DictionarySP schema;
-    std::string tmpDiskGlobal("tmpDiskGlobal");
+    std::string tmpDiskGlobal;
     if(tableName.empty()){
         tableInsert = std::move(std::string("tableInsert{") + dbName + "}");
         schema = conn.run("schema(" + dbName + ")");
@@ -61,6 +63,7 @@ void BatchTableWriter::addTable(const string& dbName, const string& tableName, b
         tableInsert = std::move(std::string("tableInsert{loadTable(\"") + dbName + "\",\"" + tableName + "\")}");
         schema = conn.run(std::string("schema(loadTable(\"") + dbName + "\",\"" + tableName + "\"))");
     }else{
+        tmpDiskGlobal = "tmpDiskGlobal";
         std::string tmpDbName(dbName);
         tmpDbName.erase(std::remove(tmpDbName.begin(), tmpDbName.end(), ':'), tmpDbName.end());
         tmpDbName.erase(std::remove(tmpDbName.begin(), tmpDbName.end(), '\\'), tmpDbName.end());
@@ -90,7 +93,7 @@ void BatchTableWriter::addTable(const string& dbName, const string& tableName, b
     destTable->columnNum = colDefs->size();
     destTable->colDefsTypeInt = colDefs->getColumn("typeInt");
     destTable->destroy = false;
-
+    
     std::vector<string> colNames;
     std::vector<DATA_TYPE> colTypes;
     ConstantSP colDefsName = colDefs->getColumn("name");
@@ -101,7 +104,7 @@ void BatchTableWriter::addTable(const string& dbName, const string& tableName, b
     destTable->colNames = std::move(colNames);
     destTable->colTypes = std::move(colTypes);
 
-    if(!partitioned){
+    if(tmpDiskGlobal.empty() == false){//文件表需要创建中间表
         std::string colNames;
         std::string colTypes;
         ConstantSP colDefsTypeString = colDefs->getColumn("typeString");
@@ -114,67 +117,91 @@ void BatchTableWriter::addTable(const string& dbName, const string& tableName, b
 
     DestTable *destTableRawPtr = destTable.get();
     destTable->writeThread = new Thread(new Executor([=](){
-        bool ret;
-        std::vector<ConstantSP> args;
-        args.reserve(1);
-        while(true){
-            std::vector<ConstantSP> item;
-            ret = destTableRawPtr->writeQueue.blockingPop(item, 100);
-            if(!ret){
-                if(destTableRawPtr->destroy)
-                    break;
-                else
-                    continue;
-            }
-
-            auto size = destTableRawPtr->writeQueue.size();
-            std::vector<std::vector<ConstantSP>> items;
+        while(destTableRawPtr->destroy==false){
+            destTableRawPtr->writeMutex.lock();
+            destTableRawPtr->writeNotifier.wait(destTableRawPtr->writeMutex);
             while(true){
-                try{
-                    items.reserve(size+1);
+                if(writeTableAllData(destTable,partitioned)==false)
                     break;
-                }
-                catch(...){
-                    std::cerr << "Failed to reserve memory for std::vector." << std::endl;
-                    Util::sleep(20);
-                }
             }
-            items.push_back(std::move(item));
-            if(size > 0)
-                destTableRawPtr->writeQueue.pop(items, size);
-
-            size += 1;
-
-            destTableRawPtr->writeTable = Util::createTable(destTableRawPtr->colNames, destTableRawPtr->colTypes, 0, size);
-            INDEX insertedRows;
-            std::string errMsg;
-            for(int i = 0; i < size; i++){
-                ret = destTableRawPtr->writeTable->append(items[i], insertedRows, errMsg);
-                if(!ret){
-                    std::cerr << "Failed to insert data in background thread, with error: . Backgroud thread of table:  " << errMsg << std::endl;
-                    destTableRawPtr->finished = true;
-                    return;
-                }
-            }
-
-            try{
-                if(!partitioned)
-                    destTableRawPtr->conn->run(destTableRawPtr->createTmpSharedTable);
-                args.push_back(destTableRawPtr->writeTable);
-                destTableRawPtr->conn->run(destTableRawPtr->tableInsert, args);
-                if(!partitioned)
-                    destTableRawPtr->conn->run(destTableRawPtr->saveTable);
-                destTableRawPtr->sendedRows += size;
-            }
-            catch(std::exception& e){
-                std::cerr << "Failed to insert data in background thread, with exception: " << e.what() << std::endl;
-                destTableRawPtr->finished = true;
-                return;
-            }
-            args.clear();
         }
+        //写入尚未完成的数据
+        while(destTableRawPtr->writeQueue.size()>0&&writeTableAllData(destTable,partitioned));
     }));
     destTable->writeThread->start();
+}
+
+bool BatchTableWriter::writeTableAllData(SmartPointer<DestTable> destTable,bool partitioned){
+    DestTable *destTableRawPtr = destTable.get();
+    if(destTableRawPtr->finished)
+        return false;
+    bool ret;
+    auto size = destTableRawPtr->writeQueue.size();
+    if (size < 1)
+        return false;
+    std::vector<std::vector<ConstantSP>> items;
+    while (true)
+    {
+        try
+        {
+            items.reserve(size);
+            break;
+        }
+        catch (...)
+        {
+            std::cerr << "Failed to reserve memory for std::vector." << std::endl;
+            Util::sleep(20);
+        }
+    }
+    destTableRawPtr->writeQueue.pop(items, size);
+
+    size = items.size();
+
+    bool writedataok = true;
+    {
+        RECORDTIME("BTW::createTable");
+        destTableRawPtr->writeTable = Util::createTable(destTableRawPtr->colNames, destTableRawPtr->colTypes, 0, size);
+        INDEX insertedRows;
+        std::string errMsg;
+        for (int i = 0; i < size; i++)
+        {
+            ret = destTableRawPtr->writeTable->append(items[i], insertedRows, errMsg);
+            if (!ret)
+            {
+                std::cerr << Util::createTimestamp(Util::getEpochTime())->getString() << " Backgroud thread of table (" << destTableRawPtr->dbName << " " << destTableRawPtr->tableName << "). Failed to create table, with error: " << errMsg << std::endl;
+                writedataok = false;
+                break;
+            }
+        }
+    }
+    if (writedataok)
+    {
+        try
+        {
+            RECORDTIME("BTW::saveTable");
+            std::vector<ConstantSP> args;
+            args.reserve(1);
+            if (destTableRawPtr->createTmpSharedTable.empty() == false)
+                destTableRawPtr->conn->run(destTableRawPtr->createTmpSharedTable);
+            args.push_back(destTableRawPtr->writeTable);
+            destTableRawPtr->conn->run(destTableRawPtr->tableInsert, args);
+            if (!partitioned)
+                destTableRawPtr->conn->run(destTableRawPtr->saveTable);
+            destTableRawPtr->sendedRows += size;
+        }
+        catch (std::exception &e)
+        {
+            writedataok = false;
+            std::cerr << Util::createTimestamp(Util::getEpochTime())->getString() << " Backgroud thread of table (" << destTableRawPtr->dbName << " " << destTableRawPtr->tableName << "). Failed to send data to server, with exception: " << e.what() << std::endl;
+        }
+    }
+    if (writedataok == false)
+    {
+        destTableRawPtr->finished = true;
+        for (int i = 0; i < size; i++)
+            destTableRawPtr->saveQueue.push(items[i]);
+    }
+    return writedataok;
 }
 
 std::tuple<int,bool,bool> BatchTableWriter::getStatus(const string& dbName, const string& tableName){
@@ -211,6 +238,34 @@ TableSP BatchTableWriter::getAllStatus(){
     return table;
 }
 
+TableSP BatchTableWriter::getUnwrittenData(const string& dbName, const string& tableName){
+    RWLockGuard<RWLock> _(&rwLock, true, acquireLock_);
+    if(destTables_.find(std::make_pair(dbName, tableName)) == destTables_.end())
+        throw RuntimeException("Failed to get unwritten data. Please use addTable to add infomation of database and table first.");
+    SmartPointer<DestTable> destTable = destTables_[std::make_pair(dbName, tableName)];
+
+    int saveQueueSize = destTable->saveQueue.size();
+    int writeQueueSize = destTable->writeQueue.size();
+    int size = saveQueueSize + writeQueueSize;
+    TableSP table = Util::createTable(destTable->colNames, destTable->colTypes, 0, size);
+
+    std::vector<std::vector<ConstantSP>> items;
+    items.reserve(size);
+    destTable->saveQueue.pop(items, saveQueueSize);
+    destTable->writeQueue.pop(items, writeQueueSize);
+
+    size = items.size();
+
+    INDEX insertedRows;
+    std::string errMsg;
+    for(int i = 0; i < size; i++){
+        bool ret = table->append(items[i], insertedRows, errMsg);
+        if(!ret)
+            throw RuntimeException("Failed to create table, with error: " + errMsg);
+    }
+    return table;
+}
+
 void BatchTableWriter::removeTable(const string& dbName, const string& tableName){
     SmartPointer<DestTable> destTable;
     {
@@ -219,8 +274,10 @@ void BatchTableWriter::removeTable(const string& dbName, const string& tableName
             destTable = destTables_[std::make_pair(dbName, tableName)];
             if(destTable->destroy)
                 return;
-            else
+            else{
                 destTable->destroy = true;
+                destTable->writeNotifier.notify();
+            }
         }
     }
     if(!destTable.isNull()){
@@ -263,6 +320,13 @@ ConstantSP BatchTableWriter::createObject(int dataType, short val){
 }
 ConstantSP BatchTableWriter::createObject(int dataType, const char* val){
     switch(dataType){
+        case DATA_TYPE::DT_SYMBOL:
+            {
+                ConstantSP tmp = Util::createConstant(DATA_TYPE::DT_SYMBOL);
+                tmp->setString(val);
+                return tmp;
+            }
+            break;
         case DATA_TYPE::DT_STRING:
             return Util::createString(val);
             break;
@@ -273,6 +337,13 @@ ConstantSP BatchTableWriter::createObject(int dataType, const char* val){
 }
 ConstantSP BatchTableWriter::createObject(int dataType, std::string val){
     switch(dataType){
+        case DATA_TYPE::DT_SYMBOL:
+            {
+                ConstantSP tmp = Util::createConstant(DATA_TYPE::DT_SYMBOL);
+                tmp->setString(val);
+                return tmp;
+            }
+            break;
         case DATA_TYPE::DT_STRING:
             return Util::createString(val);
             break;
@@ -280,6 +351,37 @@ ConstantSP BatchTableWriter::createObject(int dataType, std::string val){
             throw RuntimeException("Failed to insert data, unsupported data type.");
             break;
     }
+}
+ConstantSP BatchTableWriter::createObject(int dataType, const unsigned char* val){
+    switch(dataType){
+        case DATA_TYPE::DT_INT128:
+            {
+                ConstantSP tmp = Util::createConstant(DATA_TYPE::DT_INT128);
+                tmp->setBinary(val, 16);
+                return tmp;
+            }
+            break;
+        case DATA_TYPE::DT_UUID:
+            {
+                ConstantSP tmp = Util::createConstant(DATA_TYPE::DT_UUID);
+                tmp->setBinary(val, 16);
+                return tmp;
+            }
+            break;
+        case DATA_TYPE::DT_IP:
+            {
+                ConstantSP tmp = Util::createConstant(DATA_TYPE::DT_IP);
+                tmp->setBinary(val, 16);
+                return tmp;
+            }
+            break;
+        default:
+            throw RuntimeException("Failed to insert data, unsupported data type.");
+            break;
+    }
+}
+ConstantSP BatchTableWriter::createObject(int dataType, unsigned char val[]){
+    return createObject(dataType, (const unsigned char*)val);
 }
 ConstantSP BatchTableWriter::createObject(int dataType, long long val){
     switch(dataType){
@@ -351,6 +453,5 @@ ConstantSP BatchTableWriter::createObject(int dataType, int val){
             break;
     }
 }
-
-
 };
+

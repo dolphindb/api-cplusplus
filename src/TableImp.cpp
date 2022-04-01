@@ -243,6 +243,36 @@ string AbstractTable::getString() const {
     return resultStr;
 }
 
+COMPRESS_METHOD AbstractTable::getColumnCompressMethod(INDEX index) {
+	if (index < colCompresses_.size())
+		return colCompresses_[index];
+	else
+		return COMPRESS_NONE;
+}
+
+void AbstractTable::setColumnCompressMethods(const vector<COMPRESS_METHOD> &colCompresses) {
+	if (colCompresses.size() > 0 && colCompresses.size() != colNames_->size()) {
+		throw RuntimeException("Compress type size must match column size "+std::to_string(colNames_->size())+".");
+	}
+	for (size_t i = 0; i < colCompresses.size(); i++) {
+		if (colCompresses[i] == COMPRESS_DELTA) {
+			DATA_TYPE dataType = getColumn(i)->getRawType();
+			if (dataType != DT_SHORT && dataType != DT_INT && dataType != DT_LONG) {
+				throw RuntimeException("Delta compression only supports short/int/long and temporal data at "+colNames_->at(i));
+			}
+			if (((Vector*)getColumn(i).get())->getVectorType() == VECTOR_TYPE::ARRAYVECTOR) {
+				throw RuntimeException("Delta compression doesn't support array vector at "+colNames_->at(i));
+			}
+		}
+		else if (colCompresses[i] == COMPRESS_LZ4) {
+		}
+		else {
+			throw RuntimeException("Unsupported compress method at "+colNames_->at(i));
+		}
+	}
+	colCompresses_ = colCompresses;
+}
+
 ConstantSP AbstractTable::getInternal(INDEX index) const {
 	Dictionary* dict=Util::createDictionary(DT_STRING,DT_ANY);
 	ConstantSP resultSP(dict);
@@ -497,9 +527,13 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 			return false;
 		int i=0;
 		try{
+			string msg;
 			for(;i<num;++i){
-				if(!((Vector*)cols_[i].get())->append(tbl->getColumn(i)))
+				if(!((Vector*)cols_[i].get())->append(tbl->getColumn(i))){
+					msg = "data type " + Util::getDataTypeString(tbl->getColumn(i)->getType()) + ", expect "+
+							Util::getDataTypeString(cols_[i]->getType());
 					break;
+				}
 			}
 			if(i >= num){
 				insertedRows = rows;
@@ -509,7 +543,7 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 			else{
 				for(int k=0; k<i; ++k)
 					((Vector*)cols_[k].get())->remove(rows);
-				errMsg = "Failed to append data to column '" + getColumnName(i) +"' ";
+				errMsg = "Failed to append data to column '" + getColumnName(i) +"' reason: " + msg;
 				return false;
 			}
 		}
@@ -533,10 +567,14 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 			return false;
 		int i=0;
 		try{
+			string msg;
 			for(;i<num;++i){
 				ConstantSP col = tbl->get(i);
-				if(col->size() != rows || !((Vector*)cols_[i].get())->append(col))
+				if(col->size() != rows || !((Vector*)cols_[i].get())->append(col)){
+					msg = "data type " + Util::getDataTypeString(col->getType()) + ", expect "+
+							Util::getDataTypeString(cols_[i]->getType());
 					break;
+				}
 			}
 			if(i >= num){
 				insertedRows = rows;
@@ -546,7 +584,7 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 			else{
 				for(int k=0; k<i; ++k)
 					((Vector*)cols_[k].get())->remove(rows);
-				errMsg = "Failed to append data to column '" + getColumnName(i) +"' ";
+				errMsg = "Failed to append data to column '" + getColumnName(i) +"' reason: " + msg;
 				return false;
 			}
 		}
@@ -574,9 +612,13 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 
 		int i=0;
 		try{
+			string msg;
 			for(;i<num;i++){
-				if(!((Vector*)cols_[i].get())->append(values[i]))
+				if(!((Vector*)cols_[i].get())->append(values[i])){
+					msg = "data type " + Util::getDataTypeString(values[i]->getType()) + ", expect "+
+							Util::getDataTypeString(cols_[i]->getType());
 					break;
+				}
 			}
 			if(i >= num){
 				insertedRows = rows;
@@ -587,7 +629,7 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 				for(int k=0; k<i; ++k){
 					((Vector*)cols_[k].get())->remove(rows);
 				}
-				errMsg = "Failed to append data to column '" + getColumnName(i) +"'";
+				errMsg = "Failed to append data to column '" + getColumnName(i) +"' reason: " + msg;
 				return false;
 			}
 		}
@@ -607,10 +649,14 @@ bool BasicTable::internalAppend(vector<ConstantSP>& values, string& errMsg){
 
 	int i=0;
 	try{
+		string msg;
 		int cols = values.size();
 		for(; i<cols; i++){
-			if(!((Vector*)cols_[i].get())->append(values[i]))
+			if(!((Vector*)cols_[i].get())->append(values[i])){
+				msg = "data type " + Util::getDataTypeString(values[i]->getType()) + ", expect "+
+						Util::getDataTypeString(cols_[i]->getType());
 				break;
+			}
 		}
 		if(i >= cols){
 			size_+=rows;
@@ -620,7 +666,7 @@ bool BasicTable::internalAppend(vector<ConstantSP>& values, string& errMsg){
 			for(int k=0; k<i; ++k){
 				((Vector*)cols_[k].get())->remove(rows);
 			}
-			errMsg = "Failed to append data to column '" + getColumnName(i) +"'";
+			errMsg = "Failed to append data to column '" + getColumnName(i) +"' reason: " + msg;
 			return false;
 		}
 	}

@@ -33,7 +33,10 @@
 
 namespace dolphindb {
 
-bool Socket::ENABLE_TCP_NODELAY = false;
+#define RECORD_READ(pbytes, bytelen) //Util::writeFile("/tmp/ddb_read.bin", pbytes, bytelen);
+#define RECORD_WRITE(pbytes, bytelen) //Util::writeFile("/tmp/ddb_write.bin", pbytes, bytelen);
+
+bool Socket::ENABLE_TCP_NODELAY = true;
 
 void LOG_ERR(const string& msg){
 	std::cout<<msg<<std::endl;
@@ -43,7 +46,7 @@ void LOG_INFO(const string& msg){
 	std::cout<<msg<<std::endl;
 }
 
-Socket::Socket():host_(""), port_(-1), blocking_(true), autoClose_(true), enableSSL_(false), ctx_(nullptr), ssl_(nullptr) {
+Socket::Socket():host_(""), port_(-1), blocking_(true), autoClose_(true), enableSSL_(false), ctx_(nullptr), ssl_(nullptr), keepAliveTime_(30) {
     handle_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(INVALID_SOCKET == handle_) {
     	throw IOException("Couldn't create a socket with error code " + std::to_string(getErrorCode()));
@@ -55,7 +58,7 @@ Socket::Socket():host_(""), port_(-1), blocking_(true), autoClose_(true), enable
     	setTcpNoDelay();
 }
 
-Socket::Socket(const string& host, int port, bool blocking, bool enableSSL) : host_(host), port_(port), blocking_(blocking), autoClose_(true), enableSSL_(enableSSL), ctx_(nullptr), ssl_(nullptr) {
+Socket::Socket(const string& host, int port, bool blocking, int keepAliveTime, bool enableSSL) : host_(host), port_(port), blocking_(blocking), autoClose_(true), enableSSL_(enableSSL), ctx_(nullptr), ssl_(nullptr), keepAliveTime_(keepAliveTime) {
 	if(host.empty() && port > 0){
 		//server mode
 		handle_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -76,7 +79,7 @@ Socket::Socket(const string& host, int port, bool blocking, bool enableSSL) : ho
 		handle_ = INVALID_SOCKET;
 }
 
-Socket::Socket(SOCKET handle, bool blocking) : host_(""), port_(-1), handle_(handle), blocking_(blocking), autoClose_(true), enableSSL_(false), ctx_(nullptr), ssl_(nullptr) {
+Socket::Socket(SOCKET handle, bool blocking, int keepAliveTime) : host_(""), port_(-1), handle_(handle), blocking_(blocking), autoClose_(true), enableSSL_(false), ctx_(nullptr), ssl_(nullptr), keepAliveTime_(keepAliveTime) {
 	if(INVALID_SOCKET == handle_) {
 		throw IOException("The given socket is invalid.");
 	}
@@ -97,59 +100,76 @@ bool Socket::isValid(){
 }
 
 IO_ERR Socket::read(char* buffer, size_t length, size_t& actualLength, bool msgPeek){
-#ifdef WINDOWS
-	actualLength=recv(handle_, buffer, length, msgPeek ? MSG_PEEK : 0);
-	if(actualLength == 0)
-		return DISCONNECTED;
-	else if(actualLength != (size_t)SOCKET_ERROR)
-		return OK;
-	else{
-		actualLength=0;
-		int error=WSAGetLastError();
-		if(error==WSAENOTCONN || error==WSAESHUTDOWN || error==WSAENETRESET)
-			return DISCONNECTED;
-		else if(error==WSAEWOULDBLOCK)
-			return NODATA;
-		else
-			return OTHERERR;
-	}
-#else
-	readdata:
+	//RecordTime record("Socket.read");
 	if (!enableSSL_) {
-         actualLength=recv(handle_, (void*)buffer, length, (blocking_ ? 0 : MSG_DONTWAIT) | (msgPeek ? MSG_PEEK : 0));
-                if(actualLength == (size_t)SOCKET_ERROR && errno == EINTR) goto readdata;
-                if(actualLength == 0)
-                        return DISCONNECTED;
-                else if(actualLength != (size_t)SOCKET_ERROR)
-                        return OK;
-                else if(errno==EAGAIN || errno==EWOULDBLOCK)
-                        return NODATA;
-                else{
-                        actualLength=0;
-                        return OTHERERR;
-                }
-        }else {
-                actualLength = SSL_read(ssl_, buffer, length);
-                if(actualLength <= 0){
-                int err = SSL_get_error(ssl_, actualLength);
-                if(err == SSL_ERROR_WANT_READ) goto readdata;
-                    LOG_ERR("Socket(SSL)::read err =" + std::to_string(err));
-                    return OTHERERR;
-                }
-                return OK;
+#ifdef WINDOWS
+		actualLength = recv(handle_, buffer, length, msgPeek ? MSG_PEEK : 0);
+		RECORD_READ(buffer, actualLength);
+		if (actualLength <= 0) {
+			DLogger::Error("socket read error", actualLength);
+		}
+		if (actualLength == 0)
+			return DISCONNECTED;
+		else if (actualLength != (size_t)SOCKET_ERROR)
+			return OK;
+		else {
+			actualLength = 0;
+			int error = WSAGetLastError();
+			if (error == WSAENOTCONN || error == WSAESHUTDOWN || error == WSAENETRESET)
+				return DISCONNECTED;
+			else if (error == WSAEWOULDBLOCK)
+				return NODATA;
+			else
+				return OTHERERR;
+		}
+#else //Linux
+readdata:
+		actualLength = recv(handle_, (void*)buffer, length, (blocking_ ? 0 : MSG_DONTWAIT) | (msgPeek ? MSG_PEEK : 0));
+		RECORD_READ(buffer, actualLength);
+		if (actualLength <= 0) {
+			DLogger::Error("socket read error", actualLength);
+		}
+		if (actualLength == (size_t)SOCKET_ERROR && errno == EINTR) goto readdata;
+		if (actualLength == 0)
+			return DISCONNECTED;
+		else if (actualLength != (size_t)SOCKET_ERROR)
+			return OK;
+		else if (errno == EAGAIN || errno == EWOULDBLOCK)
+			return NODATA;
+		else {
+			actualLength = 0;
+			return OTHERERR;
+		}
+#endif// end of enableSSL_=false
+	} else {
+readdata2:
+        actualLength = SSL_read(ssl_, buffer, length);
+		RECORD_READ(buffer, actualLength);
+		if (actualLength <= 0) {
+			DLogger::Error("socket read error", actualLength);
+		}
+        if(actualLength <= 0){
+        int err = SSL_get_error(ssl_, actualLength);
+        if(err == SSL_ERROR_WANT_READ) goto readdata2;
+            LOG_ERR("Socket(SSL)::read err =" + std::to_string(err));
+            return OTHERERR;
         }
-#endif
+        return OK;
+    }
 }
 
 IO_ERR Socket::write(const char* buffer, size_t length, size_t& actualLength){
+	//RecordTime record("Socket.write");
 	if(!enableSSL_){
 #ifdef WINDOWS
 		actualLength=send(handle_, buffer, length, 0);
+		RECORD_WRITE(buffer, actualLength);
 		if(actualLength != (size_t)SOCKET_ERROR)
 			return OK;
 		else{
 			actualLength=0;
 			int error=WSAGetLastError();
+			DLogger::Error("socket write error", error);
 			if(error==WSAENOTCONN || error==WSAESHUTDOWN || error==WSAENETRESET)
 				return DISCONNECTED;
 			else if(error==WSAEWOULDBLOCK || error==WSAENOBUFS)
@@ -162,11 +182,13 @@ IO_ERR Socket::write(const char* buffer, size_t length, size_t& actualLength){
 #else
 		senddata:
 		actualLength=send(handle_, (const void*)buffer, length,blocking_ ? 0: MSG_DONTWAIT|MSG_NOSIGNAL);
+		RECORD_WRITE(buffer, actualLength);
 		if(actualLength == (size_t)SOCKET_ERROR && errno == EINTR) goto senddata;
 
 		if(actualLength != (size_t)SOCKET_ERROR)
 			return OK;
 		else{
+			DLogger::Error("socket write error", errno);
 			actualLength=0;
 			if(errno==EAGAIN || errno==EWOULDBLOCK)
 				return NOSPACE;
@@ -182,9 +204,11 @@ IO_ERR Socket::write(const char* buffer, size_t length, size_t& actualLength){
 	else {
 		senddata2:
 		actualLength = SSL_write(ssl_, (const void*)buffer, length);
+		RECORD_WRITE(buffer, actualLength);
 		if (actualLength <= 0) {
 			int err = SSL_get_error(ssl_, actualLength);
 			if (err == SSL_ERROR_WANT_WRITE) goto senddata2;
+			DLogger::Error("socket write error", err);
 			LOG_ERR("Socket(SSL)::write err =" + std::to_string(err));
 			return OTHERERR;
 		}
@@ -224,11 +248,16 @@ IO_ERR Socket::listen(){
     }
 }
 
-IO_ERR Socket::connect(const string& host, int port, bool blocking, bool sslEnable){
+void Socket::enableTcpNoDelay(bool enable){
+	 ENABLE_TCP_NODELAY = enable;
+}
+
+IO_ERR Socket::connect(const string& host, int port, bool blocking, int keepAliveTime, bool sslEnable){
 	host_ = host;
 	port_ = port;
 	blocking_ = blocking;
 	enableSSL_ = sslEnable;
+	keepAliveTime_ = keepAliveTime;
 	return connect();
 }
 
@@ -264,7 +293,7 @@ IO_ERR Socket::connect(){
         if(::setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, (const char*)&enabled, sizeof(int)) != 0)
             LOG_ERR("Subscription socket failed to enable TCP_KEEPALIVE with error: " +  std::to_string(getErrorCode()));
 #else
-        int idleTime = 30;
+        int idleTime = keepAliveTime_;
         int interval = 5;
         int count = 3;
         unsigned int timeout = 30000;
@@ -356,7 +385,7 @@ Socket* Socket::accept(){
 		return NULL;
 	}
 	else
-		return new Socket(t, blocking_);
+		return new Socket(t, blocking_, keepAliveTime_);
 }
 
 SOCKET Socket::getHandle(){

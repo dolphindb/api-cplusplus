@@ -60,7 +60,8 @@ public:
 	virtual bool update(vector<ConstantSP>& values, const ConstantSP& indexSP, vector<string>& colNames, string& errMsg);
 	virtual bool remove(const ConstantSP& indexSP, string& errMsg);
 	virtual ConstantSP getSubTable(vector<int> indices) const = 0;
-
+	virtual COMPRESS_METHOD getColumnCompressMethod(INDEX index);
+	virtual void setColumnCompressMethods(const vector<COMPRESS_METHOD> &methods);
 
 protected:
 	ConstantSP getInternal(INDEX index) const;
@@ -76,6 +77,7 @@ protected:
 	SmartPointer<vector<string>> colNames_;
 	SmartPointer<unordered_map<string,int>> colMap_;
 	string name_;
+	vector<COMPRESS_METHOD> colCompresses_;
 };
 
 

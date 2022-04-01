@@ -26,6 +26,9 @@
 	typedef int SOCKET;
 	#define INVALID_SOCKET -1
 	#define SOCKET_ERROR   -1
+#else
+	#include <winsock2.h>
+	#include <windows.h>
 #endif
 #ifdef _MSC_VER
 #define EXPORT_DECL _declspec(dllexport)
@@ -52,8 +55,8 @@ typedef SmartPointer<DataStream> DataStreamSP;
 class EXPORT_DECL Socket{
 public:
 	Socket();
-	Socket(const string& host, int port, bool blocking, bool enableSSL = false);
-	Socket(SOCKET handle, bool blocking);
+	Socket(const string& host, int port, bool blocking, int keepAliveTime, bool enableSSL = false);
+	Socket(SOCKET handle, bool blocking, int keepAliveTime);
 	~Socket();
 	const string& getHost() const {return host_;}
 	int getPort() const {return port_;}
@@ -61,7 +64,7 @@ public:
 	IO_ERR write(const char* buffer, size_t length, size_t& actualLength);
 	IO_ERR bind();
 	IO_ERR listen();
-	IO_ERR connect(const string& host, int port, bool blocking, bool enableSSL = false);
+	IO_ERR connect(const string& host, int port, bool blocking, int keepAliveTime, bool enableSSL = false);
 	IO_ERR connect();
 	IO_ERR sslConnect();
 	IO_ERR close();
@@ -70,6 +73,7 @@ public:
 	bool isBlockingMode() const {return blocking_;}
 	bool isValid();
 	void setAutoClose(bool option) { autoClose_ = option;}
+	static void enableTcpNoDelay(bool enable);
 	static bool ENABLE_TCP_NODELAY;
 
 private:
@@ -90,6 +94,7 @@ private:
 	bool enableSSL_;
 	SSL_CTX* ctx_;
 	SSL* ssl_;
+	int keepAliveTime_;
 };
 
 class EXPORT_DECL UdpSocket{

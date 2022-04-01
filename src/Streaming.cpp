@@ -3,6 +3,7 @@
 #include "ConstantMarshall.h"
 #include "Exceptions.h"
 #include "Util.h"
+#include "TableImp.h"
 
 #ifdef LINUX
 #include <arpa/inet.h>
@@ -218,6 +219,17 @@ private:
     unordered_map<Key, T, Hash> mp_;
     Mutex mtx_;
 };
+
+ConstantSP convertTupleToTable(const vector<string>& colLabels, const ConstantSP& msg) {
+    int colCount = colLabels.size();
+    vector<ConstantSP> cols(colCount);
+    for(int i=0; i<colCount; ++i){
+        cols[i] = msg->get(i);
+        cols[i]->setTemporary(true);
+    }
+    return new BasicTable(cols, colLabels);
+}
+
 }  // namespace dolphindb
 
 namespace dolphindb {
@@ -246,6 +258,7 @@ class StreamingClientImpl {
               filter(filter),
               msgAsTable(msgAsTable),
               allowExists(allowExists),
+              attributes(),
               haSites(0),
               queue(new MessageQueue(std::max(DEFAULT_QUEUE_CAPACITY, batchSize), batchSize)){}
 
@@ -258,6 +271,7 @@ class StreamingClientImpl {
         VectorSP filter;
         bool msgAsTable;
         bool allowExists;
+        vector<string> attributes;
         vector<pair<string, int>> haSites;
 
         MessageQueueSP queue;
@@ -279,7 +293,7 @@ public:
         WSAStarted = true;
 #endif
         DBConnection::initialize();
-        listenerSocket_ = new Socket("", listeningPort, true);
+        listenerSocket_ = new Socket("", listeningPort, true, 30);
         if (listenerSocket_->bind() != OK) {
             throw RuntimeException("Failed to bind the socket on port " + Util::convert(listeningPort_) +
                                    ". Couldn't start the subscription daemon.");
@@ -675,7 +689,12 @@ void StreamingClientImpl::parseMessage(SocketSP socket) {
                 if (topicSubInfos_.find(t, info)) {
                     if (info.queue.isNull()) continue;
                     if (info.msgAsTable) {
-                        info.queue->push(obj);
+                        if(info.attributes.empty()){
+                            std::cerr << "table colName is empty, can not convert to table" << std::endl;
+                            info.queue->push(obj);
+                        }else{
+                            info.queue->push(convertTupleToTable(info.attributes, obj));
+                        }
                     } else {
                         if(UNLIKELY(cache.empty())) { // split once
                             cache.resize(rowSize);
@@ -704,7 +723,16 @@ void StreamingClientImpl::parseMessage(SocketSP socket) {
 }
 
 string StreamingClientImpl::subscribeInternal(DBConnection &conn, SubscribeInfo &info) {
-    auto topic = run(conn, "getSubscriptionTopic", info.tableName, info.actionName)->get(0)->getString();
+    ConstantSP result = run(conn, "getSubscriptionTopic", info.tableName, info.actionName);
+    auto topic = result->get(0)->getString();
+    ConstantSP colLabels = result->get(1);
+    if (!colLabels->isArray()) throw RuntimeException("The publisher doesn't have the table [" + info.tableName + "].");
+    int colCount = colLabels->size();
+    vector<string> colNames;
+    colNames.reserve(colCount);
+    for (int i = 0; i < colCount; ++i) colNames.push_back(colLabels->getString(i));
+    info.attributes = colNames;
+
     ConstantSP re = run(conn, "publishTable", getLocalIP(info), listeningPort_, info.tableName, info.actionName,
                         info.offset, info.filter, info.allowExists);
 

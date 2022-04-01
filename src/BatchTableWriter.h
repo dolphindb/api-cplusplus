@@ -20,6 +20,11 @@
 	#define EXPORT_DECL 
 #endif
 
+//#include "MultithreadTableWriter.h"
+#ifndef RECORDTIME
+#undef RECORDTIME
+#endif
+#define RECORDTIME(name) //RecordTime _recordTime(name)
 
 namespace dolphindb{
 
@@ -57,6 +62,8 @@ public:
      */
     TableSP getAllStatus();
 
+    TableSP getUnwrittenData(const string& dbName, const string& tableName="");
+
     /**
      * Release the resouces occupied by the specified table, including write queue and write thread. If this
      * function is called to add an in-memory table, the parameter dbName indicates the name of the in-memory
@@ -75,6 +82,7 @@ public:
      */
     template<typename... Targs>
     void insert(const string& dbName, const string& tableName, Targs... Fargs){
+        //RECORDTIME("BTW::insert");
         SmartPointer<DestTable> destTable;
         {
             RWLockGuard<RWLock> _(&rwLock, false, acquireLock_);
@@ -109,20 +117,27 @@ private:
         std::vector<DATA_TYPE> colTypes;
         std::string createTmpSharedTable;
         SynchronizedQueue<std::vector<ConstantSP>> writeQueue;
+        SynchronizedQueue<std::vector<ConstantSP>> saveQueue;
         ThreadSP writeThread;
         TableSP writeTable;
+
+        Mutex writeMutex;
+        ConditionalVariable writeNotifier;
+        
         int sendedRows = 0;
         bool destroy = false;
         bool finished = false;
     };
-
+    //写入失败或者没有数据需要写入则退出
+    bool writeTableAllData(SmartPointer<DestTable> destTable,bool partitioned);
     void insertRecursive(std::vector<ConstantSP>* row, DestTable* destTable, int colIndex){
         assert(colIndex == destTable->columnNum);
+        RWLockGuard<RWLock> _(&rwLock, false, acquireLock_);
         if(destTable->finished){
-            removeTable(destTable->dbName, destTable->tableName);
-            throw RuntimeException(std::string("Failed to insert data. Error writing data in backgroud thread. Talbe (") + destTable->dbName + " " + destTable->tableName + ") will be removed.");
+            throw RuntimeException(std::string("Failed to insert data. Error writing data in backgroud thread. Please use getUnwrittenData to get data not written to server and remove talbe (") + destTable->dbName + " " + destTable->tableName + ").");
         }
         destTable->writeQueue.push(std::move(*row));
+        destTable->writeNotifier.notify();
     }
 
     template<typename T, typename... Targs>
@@ -134,7 +149,7 @@ private:
         catch(RuntimeException &e){
             throw RuntimeException("Failed to insert data, unsupported data type at column: " + std::to_string(colIndex));
         }
-        if(int(tmp->getType()) != destTable->colDefsTypeInt->getInt(colIndex))
+        if(destTable->colDefsTypeInt->getInt(colIndex) != DT_SYMBOL && int(tmp->getType()) != destTable->colDefsTypeInt->getInt(colIndex))
             throw RuntimeException("Failed to insert data, the type of argument does not match the type of column at column: " + std::to_string(colIndex));
         row->push_back(tmp);
         colIndex++;
@@ -151,6 +166,8 @@ private:
     ConstantSP createObject(int dataType, short val);
     ConstantSP createObject(int dataType, const char* val);
     ConstantSP createObject(int dataType, std::string val);
+    ConstantSP createObject(int dataType, const unsigned char* val);
+    ConstantSP createObject(int dataType, unsigned char val[]);
     ConstantSP createObject(int dataType, long long val);
     ConstantSP createObject(int dataType, float val);
     ConstantSP createObject(int dataType, double val);

@@ -25,7 +25,11 @@
 #include "SysIO.h"
 
 #ifdef _MSC_VER
-	#define EXPORT_DECL _declspec(dllexport)
+	#ifdef _USRDLL	
+		#define EXPORT_DECL _declspec(dllexport)
+	#else
+		#define EXPORT_DECL __declspec(dllimport)
+	#endif
 #else
 	#define EXPORT_DECL 
 #endif
@@ -62,6 +66,7 @@ class Domain;
 class DBConnectionPoolImpl;
 class PartitionedTableAppender;
 class SymbolBase;
+class Mutex;
 
 typedef SmartPointer<Constant> ConstantSP;
 typedef SmartPointer<Vector> VectorSP;
@@ -160,7 +165,7 @@ struct GuidHash {
 	uint64_t operator()(const Guid& guid) const;
 };
 
-class Constant {
+class EXPORT_DECL Constant {
 public:
 	static string EMPTY;
 	static string NULL_STR;
@@ -295,8 +300,9 @@ public:
 	virtual unsigned char* getBinaryBuffer(INDEX start, int len, int unitLength, unsigned char* buf) const {return buf;}
 	virtual void* getDataBuffer(INDEX start, int len, void* buf) const {return buf;}
 
-    virtual int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const {throw RuntimeException("serialize method not supported");}
-    virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement) {throw RuntimeException("deserialize method not supported");}
+	virtual int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int cellCountToSerialize, int& numElement, int& partial) const;
+    virtual int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const;
+    virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
 
 	virtual void nullFill(const ConstantSP& val){}
 	virtual void setBool(INDEX index,bool val){setBool(val);}
@@ -376,6 +382,7 @@ public:
 	virtual int getSegmentSize() const { return 1;}
 	virtual int getSegmentSizeInBit() const { return 0;}
 	virtual bool containNotMarshallableObject() const {return false;}
+	virtual ConstantSP castTemporal(DATA_TYPE expectType) { throw IncompatibleTypeException(getType(), expectType); }
 private:
 	unsigned short flag_;
 };
@@ -392,12 +399,15 @@ public:
 	virtual void initialize(){}
 	virtual INDEX getCapacity() const = 0;
 	virtual	INDEX reserve(INDEX capacity) {throw RuntimeException("Vector::reserve method not supported");}
+	virtual	void resize(INDEX size) {throw RuntimeException("Vector::resize method not supported");}
+	virtual INDEX getValueSize() const {throw RuntimeException("Vector::getValueSize method not supported"); return 0;}
 	virtual short getUnitLength() const = 0;
 	virtual void clear()=0;
 	virtual bool remove(INDEX count){return false;}
 	virtual bool remove(const ConstantSP& index){return false;}
 	virtual bool append(const ConstantSP& value){return append(value, value->size());}
 	virtual bool append(const ConstantSP& value, INDEX count){return false;}
+	virtual bool append(const ConstantSP index, INDEX start, INDEX length){return false;}
 	virtual bool appendBool(char* buf, int len){return false;}
 	virtual bool appendChar(char* buf, int len){return false;}
 	virtual bool appendShort(short* buf, int len){return false;}
@@ -411,6 +421,8 @@ public:
 	virtual string getString() const;
 	virtual string getScript() const;
 	virtual string getString(INDEX index) const = 0;
+	virtual VECTOR_TYPE getVectorType() const{return VECTOR_TYPE::ARRAY;}
+	virtual bool isSorted(bool asc, bool strict = false) const {throw RuntimeException("Vector::isSorted method not supported"); return false;}
 	virtual ConstantSP getInstance() const {return getInstance(size());}
 	virtual ConstantSP getInstance(INDEX size) const = 0;
 	virtual ConstantSP getValue(INDEX capacity) const {throw RuntimeException("Vector::getValue method not supported");}
@@ -554,6 +566,8 @@ public:
 	virtual void checkout() const {}
 	virtual long long getAllocatedMemory() const = 0;
 	virtual ConstantSP getSubTable(vector<int> indices) const = 0;
+	virtual COMPRESS_METHOD getColumnCompressMethod(INDEX index) = 0;
+	virtual void setColumnCompressMethods(const vector<COMPRESS_METHOD> &methods) = 0;
 };
 
 class DFSChunkMeta : public Constant{
@@ -607,8 +621,8 @@ private:
 class ConstantMarshall {
 public:
 	virtual ~ConstantMarshall(){}
-	virtual bool start(const ConstantSP& target, bool blocking, IO_ERR& ret)=0;
-	virtual bool start(const char* requestHeader, size_t headerSize, const ConstantSP& target, bool blocking, IO_ERR& ret)=0;
+	virtual bool start(const ConstantSP& target, bool blocking, bool compress, IO_ERR& ret)=0;
+	virtual bool start(const char* requestHeader, size_t headerSize, const ConstantSP& target, bool blocking, bool compress, IO_ERR& ret)=0;
 	virtual void reset() = 0;
 	virtual IO_ERR flush() = 0;
 };
@@ -665,7 +679,7 @@ private:
 
 class EXPORT_DECL DBConnection {
 public:
-	DBConnection(bool enableSSL = false, bool asynTask = false);
+	DBConnection(bool enableSSL = false, bool asynTask = false, int keepAliveTime = 7200, bool compress = false);
 	~DBConnection();
 	DBConnection(DBConnection&& oth);
 	DBConnection& operator=(DBConnection&& oth);
@@ -675,7 +689,7 @@ public:
 	 * will be performed along with connecting. If one would send userId and password in encrypted mode,
 	 * please use the login function for authentication separately.
 	 */
-	bool connect(const string& hostName, int port, const string& userId = "", const string& password = "", const string& initialScript = "", bool highAvailability = false, const vector<string>& highAvailabilitySites = vector<string>());
+	bool connect(const string& hostName, int port, const string& userId = "", const string& password = "", const string& initialScript = "", bool highAvailability = false, const vector<string>& highAvailabilitySites = vector<string>(), int keepAliveTime=7200);
 
 	/**
 	 * Log onto the DolphinDB server using the given userId and password. If the parameter enableEncryption
@@ -742,11 +756,13 @@ private:
     bool asynTask_;
     static const int maxRerunCnt_ = 30;
     ConstantSP nodes_;
+	bool compress_;
 };
 
-class BlockReader : public Constant{
+class EXPORT_DECL BlockReader : public Constant{
 public:
     BlockReader(const DataInputStreamSP& in );
+	virtual ~BlockReader();
     ConstantSP read();
     void skipAll();
     bool hasNext() const {return currentIndex_ < total_;}
@@ -764,7 +780,7 @@ private:
 
 class EXPORT_DECL DBConnectionPool{
 public:
-    DBConnectionPool(const string& hostName, int port, int threadNum = 10, const string& userId = "", const string& password = "", bool loadBalance = false, bool highAvailability = false);
+    DBConnectionPool(const string& hostName, int port, int threadNum = 10, const string& userId = "", const string& password = "", bool loadBalance = false, bool highAvailability = false, bool compress = false);
 	
 	void run(const string& script, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
 	
@@ -829,6 +845,141 @@ private:
     vector<DATA_CATEGORY> columnCategories_;
  	vector<DATA_TYPE> columnTypes_;
 	vector<string> columnNames_;
+};
+
+class EXPORT_DECL ErrorCodeInfo {
+public:
+	enum ErrorCode {
+		EC_None = 0,
+		EC_InvalidObject=1,
+		EC_InvalidParameter=2,
+		EC_InvalidTable=3,
+		EC_InvalidColumnType=4,
+		EC_Server=5,
+		EC_UserBreak=6,
+		EC_DestroyedObject=7,
+		EC_Exception=8,
+	};
+	ErrorCodeInfo() {
+		errorCode = 0;
+	}
+	void set(int code, const string &info);
+	void set(const ErrorCodeInfo &src);
+	int errorCode;
+	string errorInfo;
+};
+
+
+class EXPORT_DECL RecordTime {
+public:
+	RecordTime(const string &name);
+	~RecordTime();
+	static std::string printAllTime();
+private:
+	const string name_;
+	long recordOrder_;
+	long long startTime_;
+	struct Node {
+		string name;
+		long minOrder;
+		std::vector<float> costTime;//ms
+	};
+	static long lastRecordOrder_;
+	static Mutex mapMutex_;
+	static std::unordered_map<std::string, SmartPointer<RecordTime::Node>> codeMap_;
+};
+
+class EXPORT_DECL DLogger {
+	enum Level {
+		LevelDebug,
+		LevelInfo,
+		LevelWarn,
+		LevelError,
+		LevelCount,
+	};
+public:
+	template<typename... TArgs>
+	static void Info(TArgs... args) {
+		std::string text;
+		Write(text, LevelInfo, 0, args...);
+	}
+	template<typename... TArgs>
+	static void Debug(TArgs... args) {
+		std::string text;
+		Write(text, LevelDebug, 0, args...);
+	}
+	template<typename... TArgs>
+	static void Warn(TArgs... args) {
+		std::string text;
+		Write(text, LevelWarn, 0, args...);
+	}
+	template<typename... TArgs>
+	static void Error(TArgs... args) {
+		std::string text;
+		Write(text, LevelError, 0, args...);
+	}
+	static void SetLogFilePath(const std::string &filepath){ logFilePath_=filepath; }
+	static void SetMinLevel(Level level);
+private:
+	static Level minLevel_;
+	static std::string logFilePath_;
+	static std::string levelText_[LevelCount];
+	static bool FormatFirst(std::string &text, Level level);
+	static void WriteLog(std::string &text);
+	template<typename TA, typename... TArgs>
+	static void Write(std::string &text, Level level, int deepth, TA first, TArgs... args) {
+		if (deepth == 0) {
+			if (FormatFirst(text, level) == false)
+				return;
+		}
+		text += " " + Create(first);
+		Write(text, level, deepth + 1, args...);
+	}
+	template<typename TA>
+	static void Write(std::string &text, Level level, int deepth, TA first) {
+		text += " " + Create(first);
+		WriteLog(text);
+	}
+	static std::string Create(const char *value) {
+		std::string str(value);
+		return str;
+	}
+	static std::string Create(const void *value) {
+		return Create((unsigned long long)value);
+	}
+	static std::string Create(std::string str) {
+		return str;
+	}
+	static std::string Create(int value) {
+		return std::to_string(value);
+	}
+	static std::string Create(char value) {
+		return std::string(&value, 1);
+	}
+	static std::string Create(unsigned value) {
+		return std::to_string(value);
+	}
+	static std::string Create(long value) {
+		return std::to_string(value);
+	}
+	static std::string Create(unsigned long value) {
+		return std::to_string(value);
+	}
+	static std::string Create(long long value) {
+		return std::to_string(value);
+	}
+	static std::string Create(unsigned long long value) {
+		return std::to_string(value);
+	}
+	static std::string Create(float value) {
+		return std::to_string(value);
+	}
+	static std::string Create(double value) {
+		return std::to_string(value);
+	}
+	static std::string Create(long double value) {
+		return std::to_string(value);
+	}
 };
 };
 

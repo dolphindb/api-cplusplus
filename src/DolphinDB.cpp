@@ -36,7 +36,9 @@ int min(INDEX a, int b) {
 }    // namespace std
 #endif
 
-#define APIMinVersionRequirement 100
+#define DLOG //DLogger::Info
+//#define APIMinVersionRequirement 100
+#define APIMinVersionRequirement 210
 
 #define SYMBOLBASE_MAX_SIZE 1<<21
 
@@ -89,9 +91,9 @@ namespace dolphindb {
 
 class EXPORT_DECL DBConnectionImpl {
 public:
-    DBConnectionImpl(bool sslEnable = false, bool asynTask = false);
+    DBConnectionImpl(bool sslEnable = false, bool asynTask = false, int keepAliveTime = 7200, bool compress = false);
     ~DBConnectionImpl();
-    bool connect(const string& hostName, int port, const string& userId = "", const string& password = "",bool sslEnable = false, bool asynTask = false);
+    bool connect(const string& hostName, int port, const string& userId = "", const string& password = "",bool sslEnable = false, bool asynTask = false, int keepAliveTime = -1, bool compress= false);
     void login(const string& userId, const string& password, bool enableEncryption);
     ConstantSP run(const string& script, int priority = 4, int parallelism = 2, int fetchSize = 0, bool clearMemory = false);
     ConstantSP run(const string& funcName, vector<ConstantSP>& args, int priority = 4, int parallelism = 2, int fetchSize = 0, bool clearMemory = false);
@@ -117,6 +119,8 @@ private:
     bool littleEndian_;
     bool sslEnable_;
     bool asynTask_;
+    int keepAliveTime_;
+	bool compress_;
     static bool initialized_;
 };
 
@@ -153,13 +157,16 @@ public:
 		bool isFunc = false;
     };
     
-    DBConnectionPoolImpl(const string& hostName, int port, int threadNum = 10, const string& userId = "", const string& password = "", bool loadBalance = true, bool reConnectFlag = true);
+    DBConnectionPoolImpl(const string& hostName, int port, int threadNum = 10, const string& userId = "", const string& password = "", bool loadBalance = true, bool reConnectFlag = true, bool compress = false);
     
     ~DBConnectionPoolImpl(){
         shutDown();
-        // for(auto& work : workers_){
-        //     work->join();
-        // }
+		Task emptyTask;
+		for (int i = 0; i < workers_.size(); i++)
+			queue_->push(emptyTask);
+		for (auto& work : workers_) {
+			work->join();
+		}
     }
     void run(const string& script, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false){
         queue_->push(Task(script, identity, priority, parallelism, clearMemory));
@@ -274,6 +281,18 @@ string Guid::getString(const unsigned char* uuid) {
 
 uint64_t GuidHash::operator()(const Guid& guid) const {
    return murmur32_16b(guid.bytes());
+}
+
+int Constant::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int cellCountToSerialize, int& numElement, int& partial) const {
+    throw RuntimeException(Util::getDataFormString(getForm())+"_"+Util::getDataTypeString(getType())+" serialize cell method not supported");
+}
+
+int Constant::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const {
+    throw RuntimeException(Util::getDataFormString(getForm())+"_"+Util::getDataTypeString(getType())+" serialize method not supported");
+}
+
+IO_ERR Constant::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement) {
+    throw RuntimeException(Util::getDataFormString(getForm())+"_"+Util::getDataTypeString(getType())+" deserialize method not supported");
 }
 
 ConstantSP Constant::getRowLabel() const {
@@ -720,7 +739,9 @@ void DBConnectionImpl::initialize() {
     initFormatters();
 }
 
-DBConnectionImpl::DBConnectionImpl(bool sslEnable, bool asynTask): port_(0), encrypted_(false), isConnected_(false), littleEndian_(Util::isLittleEndian()), sslEnable_(sslEnable),asynTask_(asynTask) {
+DBConnectionImpl::DBConnectionImpl(bool sslEnable, bool asynTask, int keepAliveTime, bool compress)
+	: port_(0), encrypted_(false), isConnected_(false), littleEndian_(Util::isLittleEndian()), 
+	sslEnable_(sslEnable),asynTask_(asynTask), keepAliveTime_(keepAliveTime), compress_(compress){
     if (!initialized_)
         initialize();
 }
@@ -739,7 +760,8 @@ void DBConnectionImpl::close() {
     isConnected_ = false;
 }
 
-bool DBConnectionImpl::connect(const string& hostName, int port, const string& userId, const string& password, bool sslEnable,bool asynTask) {
+bool DBConnectionImpl::connect(const string& hostName, int port, const string& userId,
+		const string& password, bool sslEnable,bool asynTask, int keepAliveTime, bool compress) {
     hostName_ = hostName;
     port_ = port;
     userId_ = userId;
@@ -747,6 +769,10 @@ bool DBConnectionImpl::connect(const string& hostName, int port, const string& u
     encrypted_ = false;
     sslEnable_ = sslEnable;
     asynTask_ = asynTask;
+    if(keepAliveTime > 0){
+        keepAliveTime_ = keepAliveTime;
+    }
+	compress_ = compress;
     return connect();
 }
 
@@ -757,7 +783,7 @@ bool DBConnectionImpl::connect() {
     }
     isConnected_ = false;
 
-    SocketSP conn = new Socket(hostName_, port_, true, sslEnable_);
+    SocketSP conn = new Socket(hostName_, port_, true, keepAliveTime_, sslEnable_);
     IO_ERR ret = conn->connect();
     if (ret != OK) {
         return false;
@@ -794,7 +820,7 @@ bool DBConnectionImpl::connect() {
     if ((ret = in->readLine(line)) != OK)
         throw IOException("Failed to read response message from the socket with IO error type " + std::to_string(ret));
     if (line != "OK")
-        throw IOException(line);
+		throw IOException("Server connection response: '" + line);
 
     if (numObject == 1) {
         short flag;
@@ -912,7 +938,8 @@ void DBConnectionImpl::upload(vector<string>& names, vector<ConstantSP>& objs) {
     run(varNames, "variable", objs);
 }
 
-ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType, vector<ConstantSP>& args, int priority, int parallelism, int fetchSize, bool clearMemory) {
+ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType, vector<ConstantSP>& args,
+			int priority, int parallelism, int fetchSize, bool clearMemory) {
     if (!isConnected_)
         throw IOException("Couldn't send script/function to the remote host because the connection has been closed");
 
@@ -935,6 +962,8 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
         flag += 4;
     if(clearMemory)
         flag += 16;
+	if (compress_)
+		flag += 64;
     out.append(" / " + std::to_string(flag) + "_1_" + std::to_string(priority) + "_" + std::to_string(parallelism));
     if(fetchSize > 0)
         out.append("__" + std::to_string(fetchSize));
@@ -953,9 +982,9 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
         for (int i = 0; i < argCount; ++i) {
             ConstantMarshall* marshall = marshallFactory.getConstantMarshall(args[i]->getForm());
             if (i == 0)
-                marshall->start(out.c_str(), out.size(), args[i], true, ret);
+                marshall->start(out.c_str(), out.size(), args[i], true, compress_, ret);
             else
-                marshall->start(args[i], true, ret);
+                marshall->start(args[i], true, compress_, ret);
             marshall->reset();
             if (ret != OK) {
                 isConnected_ = false;
@@ -981,7 +1010,7 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
 
     if(asynTask_)
         return nullptr;
-    DataInputStreamSP in = new DataInputStream(conn_);
+	DataInputStreamSP in = new DataInputStream(conn_);
     if (littleEndian_ != (char)Util::isLittleEndian())
         in->enableReverseIntegerByteOrder();
 
@@ -1009,7 +1038,7 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
     }
 
     if (line != "OK") {
-        throw IOException(line);
+        throw IOException("Server response: '" + line + "' script: '" + script + "'");
     }
 
     if (numObject == 0) {
@@ -1041,14 +1070,18 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
     return result;
 }
 
-DBConnection::DBConnection(bool enableSSL, bool asynTask) : conn_(new DBConnectionImpl(enableSSL)), uid_(""), pwd_(""), ha_(false), enableSSL_(enableSSL),asynTask_(asynTask), nodes_(nullptr) {
+DBConnection::DBConnection(bool enableSSL, bool asynTask, int keepAliveTime, bool compress) : 
+	conn_(new DBConnectionImpl(enableSSL, asynTask, keepAliveTime, compress)), uid_(""), pwd_(""), ha_(false), 
+		enableSSL_(enableSSL), asynTask_(asynTask), compress_(compress), nodes_(nullptr) {
     DBConnection::initialize();
 }
 
-DBConnection::DBConnection(dolphindb::DBConnection&& oth) : conn_(move(oth.conn_)), uid_(move(oth.uid_)), pwd_(move(oth.pwd_)),
-		initialScript_(move(oth.initialScript_)), ha_(oth.ha_), enableSSL_(oth.enableSSL_),asynTask_(oth.asynTask_), nodes_(oth.nodes_) {}
+DBConnection::DBConnection(DBConnection&& oth) :
+		conn_(move(oth.conn_)), uid_(move(oth.uid_)), pwd_(move(oth.pwd_)),
+		initialScript_(move(oth.initialScript_)), ha_(oth.ha_), enableSSL_(oth.enableSSL_),
+		asynTask_(oth.asynTask_),compress_(oth.compress_),nodes_(oth.nodes_) {}
 
-DBConnection& DBConnection::operator=(dolphindb::DBConnection&& oth) {
+DBConnection& DBConnection::operator=(DBConnection&& oth) {
     if (this == &oth) { return *this; }
     conn_ = move(oth.conn_);
     uid_ = move(oth.uid_);
@@ -1059,6 +1092,7 @@ DBConnection& DBConnection::operator=(dolphindb::DBConnection&& oth) {
     oth.nodes_.clear();
     enableSSL_ = oth.enableSSL_;
     asynTask_ = oth.asynTask_;
+	compress_ = oth.compress_;
     return *this;
 }
 
@@ -1067,56 +1101,58 @@ DBConnection::~DBConnection() {
 }
 
 bool DBConnection::connect(const string& hostName, int port, const string& userId, const string& password, const string& startup,
-		bool ha, const vector<string>& highAvailabilitySites) {
+                           bool ha, const vector<string>& highAvailabilitySites, int keepAliveTime) {
     ha_ = ha;
     initialScript_ = startup;
     if (ha_) {
-        while (true) {
-            if (conn_->connect(hostName, port, userId, password, enableSSL_, asynTask_)) {
-                uid_ = userId;
-                pwd_ = password;
-                break;
-            }
-            std::cerr << "Connect Failed, retry in one second." << std::endl;
-            Thread::sleep(1000);
-        }
-        if(highAvailabilitySites.empty()) {
-            while (true) {
-                try {
-                    nodes_ = conn_->run("getDataNodes(false)");
-                    break;
-                } catch (exception& e) {
-                    std::cerr << "ERROR getting other dataNodes, exception: " << e.what() << std::endl;
-                    Thread::sleep(1000);
-                }
-            }
-        } else {
-            nodes_ = Util::createVector(DT_STRING, highAvailabilitySites.size());
-            for (size_t i = 0, e = highAvailabilitySites.size(); i != e; ++i) {
-                // check legitimacy
-                auto is_number = [](const std::string& s) {
-                    return !s.empty() &&
-                           std::find_if(s.begin(), s.end(), [](char c) { return !isdigit(c); }) == s.end();
-                };
-                auto v = Util::split(highAvailabilitySites[i], ':');
-                if (v.size() != 2 || !is_number(v[1])) {
-                    throw RuntimeException("The format of highAvailabilitySite " + highAvailabilitySites[i] +
-                                           " is incorrect, should be host:port, e.g. 192.168.1.1:8848");
-                }
-                int port = std::stoi(v[1]);
-                if (port <= 0 || port > 65535) {
-                    throw RuntimeException("The format of highAvailabilitySite " + highAvailabilitySites[i] +
-                                           " is incorrect, port should be a positive integer less or equal to 65535");
-                }
-                nodes_->setString(i, highAvailabilitySites[i]);
-            }
-        }
-        if (!initialScript_.empty()) {
-            run(initialScript_);
-        }
-        return true;
+		while (true) {
+			if (conn_->connect(hostName, port, userId, password, enableSSL_, asynTask_, keepAliveTime, compress_)) {
+				uid_ = userId;
+				pwd_ = password;
+				break;
+			}
+			std::cerr << "Connect Failed, retry in one second." << std::endl;
+			Thread::sleep(1000);
+		}
+		if (highAvailabilitySites.empty()) {
+			while (true) {
+				try {
+					nodes_ = conn_->run("getDataNodes(false)");
+					break;
+				}
+				catch (exception& e) {
+					std::cerr << "ERROR getting other dataNodes, exception: " << e.what() << std::endl;
+					Thread::sleep(1000);
+				}
+			}
+		}
+		else {
+			nodes_ = Util::createVector(DT_STRING, highAvailabilitySites.size());
+			for (size_t i = 0, e = highAvailabilitySites.size(); i != e; ++i) {
+				// check legitimacy
+				auto is_number = [](const std::string& s) {
+					return !s.empty() &&
+						std::find_if(s.begin(), s.end(), [](char c) { return !isdigit(c); }) == s.end();
+				};
+				auto v = Util::split(highAvailabilitySites[i], ':');
+				if (v.size() != 2 || !is_number(v[1])) {
+					throw RuntimeException("The format of highAvailabilitySite " + highAvailabilitySites[i] +
+						" is incorrect, should be host:port, e.g. 192.168.1.1:8848");
+				}
+				int port = std::stoi(v[1]);
+				if (port <= 0 || port > 65535) {
+					throw RuntimeException("The format of highAvailabilitySite " + highAvailabilitySites[i] +
+						" is incorrect, port should be a positive integer less or equal to 65535");
+				}
+				nodes_->setString(i, highAvailabilitySites[i]);
+			}
+		}
+		if (!initialScript_.empty()) {
+			run(initialScript_);
+		}
+		return true;
     } else {
-        bool ok = conn_->connect(hostName, port, userId, password, enableSSL_, asynTask_);
+        bool ok = conn_->connect(hostName, port, userId, password, enableSSL_, asynTask_, keepAliveTime, compress_);
         if (ok && !initialScript_.empty()) {
             run(initialScript_);
         }
@@ -1135,8 +1171,9 @@ bool DBConnection::connected() {
 
 bool getNewLeader(const string& s, string& host, int& port) {
     string msg{s};
-    if (msg.substr(0, 11) == "<NotLeader>") {
-        msg = msg.substr(11);
+	int index=msg.find("<NotLeader>");
+    if (index!=string::npos) {
+        msg = msg.substr(index+11);
         auto v = Util::split(msg, ':');
         host = v[0];
         port = std::stoi(v[1]);
@@ -1325,51 +1362,64 @@ void DBConnection::setInitScript(const std::string & script) {
 }
 
 BlockReader::BlockReader(const DataInputStreamSP& in ) : in_(in), total_(0), currentIndex_(0){
+    DLOG("BlockReader ",this,".");
     int rows, cols;
     if(in->readInt(rows) != OK)
         throw IOException("Failed to read rows for data block.");
     if(in->readInt(cols) != OK)
         throw IOException("Faield to read col for data block.");
-    total_ = rows * cols;
+    total_ = (long long)rows * (long long)cols;
+    DLOG("BlockReader ",this," size ",total_,".");
+}
+
+BlockReader::~BlockReader(){
+    DLOG("~BlockReader ",this,".");
 }
 
 ConstantSP BlockReader::read(){
+    DLOG("r1 ",this," ",currentIndex_,"/",total_,".");
     if(currentIndex_>=total_)
-        return new Void();
+        return NULL;
     IO_ERR ret;
     short flag;
+    DLOG("r2.");
     if ((ret = in_->readShort(flag)) != OK)
         throw IOException("Failed to read object flag from the socket with IO error type " + std::to_string(ret));
+    DLOG("r3.");
 
     DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
     ConstantUnmarshallFactory factory(in_);
     ConstantUnmarshall* unmarshall = factory.getConstantUnmarshall(form);
     if (!unmarshall->start(flag, true, ret)) {
+        DLOG("r4.");
         unmarshall->reset();
         throw IOException("Failed to parse the incoming object with IO error type " + std::to_string(ret));
     }
+    DLOG("r5.");
     ConstantSP result = unmarshall->getConstant();
+    DLOG("r6.");
     unmarshall->reset();
+    DLOG("r7.");
     currentIndex_ ++;
     return result;
 }
 
 void BlockReader::skipAll(){
-    for(int i = currentIndex_; i < total_; i++)
-        read();
+    while(read().isNull()==false);
 }
+
 
 Domain::Domain(PARTITION_TYPE partitionType, DATA_TYPE partitionColType) : partitionType_(partitionType), partitionColType_(partitionColType){
 	partitionColCategory_ = Util::getCategory(partitionColType_);
 }
 
-DBConnectionPoolImpl::DBConnectionPoolImpl(const string& hostName, int port, int threadNum, const string& userId, const string& password, bool loadBalance, bool highAvailability) :shutDownFlag_(
+DBConnectionPoolImpl::DBConnectionPoolImpl(const string& hostName, int port, int threadNum, const string& userId, const string& password, bool loadBalance, bool highAvailability, bool compress) :shutDownFlag_(
         false), queue_(new SynchronizedQueue<Task>){
     DBConnection::initialize();
     latch_ = new CountDownLatch(threadNum);
     if(!loadBalance){
         for(int i = 0 ;i < threadNum; i++){
-            SmartPointer<DBConnection> conn = new DBConnection(false, false);
+            SmartPointer<DBConnection> conn = new DBConnection(false, false, 7200, compress);
             bool ret = conn->connect(hostName, port, userId, password, "", highAvailability);
             if(!ret)
                 throw RuntimeException("Failed to connect to " + hostName + ":" + std::to_string(port));
@@ -1378,7 +1428,7 @@ DBConnectionPoolImpl::DBConnectionPoolImpl(const string& hostName, int port, int
         }
     }
     else{
-        SmartPointer<DBConnection> entryPoint = new DBConnection(false, false);
+        SmartPointer<DBConnection> entryPoint = new DBConnection(false, false, 7200, compress);
         bool ret = entryPoint->connect(hostName, port, userId, password);
         if(!ret)
            throw RuntimeException("Failed to connect to " + hostName + ":" + std::to_string(port));
@@ -1419,6 +1469,8 @@ void AsynWorker::run() {
         bool errorFlag = false;
         if (!queue_->blockingPop(task, 1000))
             continue;
+		if (task.script.empty())
+			continue;
         while(true) {
             try {
                 if(task.isFunc){
@@ -1480,8 +1532,8 @@ ConstantSP TaskStatusMgmt::getData(int identity){
     return re;
 }
 
-DBConnectionPool::DBConnectionPool(const string& hostName, int port, int threadNum, const string& userId, const string& password, bool loadBalance, bool highAvailability){
-    pool_ = new DBConnectionPoolImpl(hostName, port, threadNum, userId, password, loadBalance, highAvailability);
+DBConnectionPool::DBConnectionPool(const string& hostName, int port, int threadNum, const string& userId, const string& password, bool loadBalance, bool highAvailability, bool compress){
+    pool_ = new DBConnectionPoolImpl(hostName, port, threadNum, userId, password, loadBalance, highAvailability, compress);
 }
 
 void DBConnectionPool::run(const string& script, int identity, int priority, int parallelism, int fetchSize, bool clearMemory){
@@ -1607,6 +1659,10 @@ int PartitionedTableAppender::append(TableSP table){
     for(int i=0; i<cols_; ++i){
         VectorSP curCol = table->getColumn(i);
         checkColumnType(i, curCol->getCategory(), curCol->getType());
+		if (columnCategories_[i] == TEMPORAL && curCol->getType() != columnTypes_[i]) {
+			curCol = curCol->castTemporal(columnTypes_[i]);
+			table->setColumn(i, curCol);
+		}
     }
     
     for(int i=0; i<threadCount_; ++i)
@@ -1645,13 +1701,14 @@ int PartitionedTableAppender::append(TableSP table){
 }
 
 void PartitionedTableAppender::checkColumnType(int col, DATA_CATEGORY category, DATA_TYPE type) {
-    DATA_CATEGORY expectCategory = columnCategories_[col];
-    DATA_TYPE expectType = columnTypes_[col];
-    if (category != expectCategory) {
-        throw  RuntimeException("column " + std::to_string(col) + ", expect category " + Util::getCategoryString(expectCategory) + ", got category " + Util::getCategoryString(category));
-    } else if (category == TEMPORAL && type != expectType) {
-        throw  RuntimeException("column " + std::to_string(col) + ", temporal column must have exactly the same type, expect " + Util::getDataTypeString(expectType) + ", got " + Util::getDataTypeString(type));
-    }
+	DATA_CATEGORY expectCategory = columnCategories_[col];
+	//Add conversion
+	//DATA_TYPE expectType = columnTypes_[col];
+	if (category != expectCategory) {
+		throw  RuntimeException("column " + std::to_string(col) + ", expect category " + Util::getCategoryString(expectCategory) + ", got category " + Util::getCategoryString(category));
+	}// else if (category == TEMPORAL && type != expectType) {
+	 //    throw  RuntimeException("column " + std::to_string(col) + ", temporal column must have exactly the same type, expect " + Util::getDataTypeString(expectType) + ", got " + Util::getDataTypeString(type));
+	 //}
 }
 
 AutoFitTableAppender::AutoFitTableAppender(string dbUrl, string tableName, DBConnection& conn) : conn_(conn){
@@ -1823,6 +1880,105 @@ int SymbolBase::findAndInsert(const string& symbol){
         index = it->second;
     }
     return index;
+}
+
+DLogger::Level DLogger::minLevel_ = DLogger::LevelDebug;
+std::string DLogger::levelText_[] = { "Debug","Info","Warn","Error" };
+//std::string DLogger::logFilePath_="/tmp/ddb_python_api.log";
+std::string DLogger::logFilePath_;
+void DLogger::SetMinLevel(Level level) {
+	minLevel_ = level;
+}
+
+void DLogger::WriteLog(std::string &text){
+    puts(text.data());
+    if(logFilePath_.empty()==false){
+        text+="\n";
+        Util::writeFile(logFilePath_.data(),text.data(),text.length());
+    }
+}
+
+bool DLogger::FormatFirst(std::string &text, Level level) {
+	if (level < minLevel_) {
+		return false;
+	}
+	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+	text = text + Util::toMicroTimestampStr(now, true) + ": [" +
+		std::to_string(Util::getCurThreadId()) + "] " + levelText_[level] + ":";
+	return true;
+}
+
+std::unordered_map<std::string, SmartPointer<RecordTime::Node>> RecordTime::codeMap_;
+Mutex RecordTime::mapMutex_;
+long RecordTime::lastRecordOrder_ = 0;
+RecordTime::RecordTime(const string &name) :
+	name_(name) {
+	startTime_ = Util::getNanoEpochTime();
+	LockGuard<Mutex> LockGuard(&mapMutex_);
+	lastRecordOrder_++;
+	recordOrder_ = lastRecordOrder_;
+	//std::cout<<Util::getEpochTime()<<" "<<name_<<recordOrder_<<" start..."<<std::endl;
+}
+RecordTime::~RecordTime() {
+	long long diff = Util::getNanoEpochTime() - startTime_;
+	LockGuard<Mutex> LockGuard(&mapMutex_);
+	std::unordered_map<std::string, SmartPointer<RecordTime::Node>>::iterator iter = codeMap_.find(name_);
+	SmartPointer<RecordTime::Node> pnode;
+	if (iter != codeMap_.end()) {
+		pnode = iter->second;
+	}
+	else {
+		pnode = new Node();
+		pnode->minOrder = recordOrder_;
+		pnode->name = name_;
+		codeMap_[name_] = pnode;
+	}
+	if (pnode->minOrder > recordOrder_) {
+		pnode->minOrder = recordOrder_;
+	}
+	pnode->costTime.push_back(diff/1000.0f);
+	//std::cout<<Util::getEpochTime()<<" "<<name_<<recordOrder_<<" end "<<pnode->costTime.size()<<" times cost "<<diff/1000000.0<<std::endl;
+}
+std::string RecordTime::printAllTime() {
+	std::string output;
+	LockGuard<Mutex> LockGuard(&mapMutex_);
+	std::vector<SmartPointer<RecordTime::Node>> nodes;
+	nodes.reserve(codeMap_.size());
+	for (std::unordered_map<std::string, SmartPointer<RecordTime::Node>>::iterator iter = codeMap_.begin(); iter != codeMap_.end(); iter++) {
+		nodes.push_back(iter->second);
+	}
+	std::sort(nodes.begin(), nodes.end(), [](SmartPointer<RecordTime::Node> a, SmartPointer<RecordTime::Node> b) {
+		return a->minOrder < b->minOrder;
+	});
+	for (SmartPointer<RecordTime::Node> node : nodes) {
+		double sum = 0.0;//s
+		double max = 0.0, min = 0.0;
+		double second;
+		for (float one : node->costTime) {
+			second = one / 1000.0;//s
+			sum += second;
+			if (max < second) {
+				max = second;
+			}
+			if (min == 0 || min > second) {
+				min = second;
+			}
+		}
+		output = output + node->name + ": sum=" + std::to_string(sum) + " count=" + std::to_string(node->costTime.size()) +
+			" avg=" + std::to_string(sum / node->costTime.size()) +
+			" min=" + std::to_string(min) + " max=" + std::to_string(max) + "\n";
+	}
+	codeMap_.clear();
+	return output;
+}
+
+void ErrorCodeInfo::set(int code, const string &info) {
+	errorCode = code;
+	errorInfo = info;
+}
+
+void ErrorCodeInfo::set(const ErrorCodeInfo &src) {
+	set(src.errorCode, src.errorInfo);
 }
 
 };    // namespace dolphindb
