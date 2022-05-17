@@ -10,10 +10,14 @@
 
 #include <atomic>
 #ifdef _MSC_VER
-#define EXPORT_DECL _declspec(dllexport)
+	#ifdef _USRDLL	
+		#define EXPORT_DECL _declspec(dllexport)
+	#else
+		#define EXPORT_DECL __declspec(dllimport)
+	#endif
 #else
-#define EXPORT_DECL 
-#endif 
+	#define EXPORT_DECL 
+#endif
 namespace dolphindb {
 class EXPORT_DECL Counter {
 public:

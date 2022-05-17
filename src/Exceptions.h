@@ -12,10 +12,14 @@
 #include <string>
 #include "Types.h"
 #ifdef _MSC_VER
-#define EXPORT_DECL _declspec(dllexport)
+	#ifdef _USRDLL	
+		#define EXPORT_DECL _declspec(dllexport)
+	#else
+		#define EXPORT_DECL __declspec(dllimport)
+	#endif
 #else
-#define EXPORT_DECL 
-#endif 
+	#define EXPORT_DECL 
+#endif
 using std::exception;
 using std::string;
 

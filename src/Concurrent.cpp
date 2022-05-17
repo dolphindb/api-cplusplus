@@ -94,23 +94,33 @@ RWLock::~RWLock(){
 #endif
 }
 
-void RWLock::acquireRead(){
+void RWLock::acquireRead() {
 #ifdef WINDOWS
 	AcquireSRWLockShared(&lock_);
 #else
-	int rc = pthread_rwlock_rdlock(&lock_);
-	if(rc != 0)
+	int rc;
+lockagain:
+	rc = pthread_rwlock_rdlock(&lock_);
+	if (rc != 0) {
+		if (rc == EAGAIN)
+			goto lockagain;
 		throw RuntimeException("Failed to acquire shared lock with errCode " + std::to_string(rc));
+	}
 #endif
 }
 
-void RWLock::acquireWrite(){
+void RWLock::acquireWrite() {
 #ifdef WINDOWS
 	AcquireSRWLockExclusive(&lock_);
 #else
-	int rc = pthread_rwlock_wrlock(&lock_);
-	if(rc != 0)
+	int rc;
+lockagain:
+	rc = pthread_rwlock_wrlock(&lock_);
+	if (rc != 0) {
+		if (rc == EAGAIN)
+			goto lockagain;
 		throw RuntimeException("Failed to acquire exclusive lock with errCode " + std::to_string(rc));
+	}
 #endif
 }
 
@@ -250,11 +260,22 @@ int CountDownLatch::getCount() const{
 }
 
 Semaphore::Semaphore(int resources){
-	if(resources < 1)
-		throw RuntimeException("Semaphore resource number must be positive.");
+	//if(resources < 1)
+	//	throw RuntimeException("Semaphore resource number must be positive.");
 
 #ifdef WINDOWS
-	sem_ = CreateSemaphore(NULL, 0, resources, NULL);
+	if (resources == 0) {
+		sem_ = CreateSemaphore(NULL, 0, LONG_MAX, NULL);
+	}
+	else {
+#ifdef UNICODE
+		std::wstring text = std::to_wstring(resources) + L"_DDB_SEM";
+		sem_ = CreateSemaphore(NULL, 0, LONG_MAX, text.data());
+#else
+		std::string text = std::to_string(resources) + "DDB_SEM_";
+		sem_ = CreateSemaphore(NULL, 0, LONG_MAX, text.data());
+#endif
+	}
 	if(sem_ == NULL)
 		throw RuntimeException("Failed to create semaphore with error code " + std::to_string(GetLastError()));
 #else
@@ -288,11 +309,20 @@ void Semaphore::acquire(){
 #endif
 }
 
-bool Semaphore::tryAcquire(){
+bool Semaphore::tryAcquire(int waitMilliSeconds){
 #ifdef WINDOWS
-	return WaitForSingleObject(sem_, 0) == WAIT_OBJECT_0;
+	return WaitForSingleObject(sem_, waitMilliSeconds) == WAIT_OBJECT_0;
 #else
-	return sem_trywait(&sem_) == 0;
+	if(waitMilliSeconds > 0){
+		struct timespec curTime;
+		clock_gettime(CLOCK_REALTIME, &curTime);
+		long long ns = curTime.tv_nsec + (long long)waitMilliSeconds * 1000000ll;
+		curTime.tv_sec += ns / 1000000000;
+		curTime.tv_nsec = ns % 1000000000;
+		return sem_timedwait(&sem_, &curTime) == 0;
+	}else{
+		return sem_trywait(&sem_) == 0;
+	}
 #endif
 }
 

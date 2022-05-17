@@ -25,9 +25,13 @@
 #include "SmartPointer.h"
 
 #ifdef _MSC_VER
-#define EXPORT_DECL _declspec(dllexport)
+	#ifdef _USRDLL	
+		#define EXPORT_DECL _declspec(dllexport)
+	#else
+		#define EXPORT_DECL __declspec(dllimport)
+	#endif
 #else
-#define EXPORT_DECL 
+	#define EXPORT_DECL 
 #endif
 namespace dolphindb {
 
@@ -267,10 +271,10 @@ private:
 
 class EXPORT_DECL Semaphore{
 public:
-	Semaphore(int resources);
+	Semaphore(int resources = 0);
 	~Semaphore();
 	void acquire();
-	bool tryAcquire();
+	bool tryAcquire(int waitMilliSeconds = 0);
 	void release();
 
 private:
@@ -285,8 +289,14 @@ class EXPORT_DECL ConditionalNotifier {
 public:
 	ConditionalNotifier() {}
 	~ConditionalNotifier() {}
-	void wait() { cv_.wait(mtx_); }
-	bool wait(int milliSeconds) { return cv_.wait(mtx_, milliSeconds); }
+	void wait() {
+		LockGuard<Mutex> guard(&mtx_);
+		cv_.wait(mtx_);
+	}
+	bool wait(int milliSeconds) {
+		LockGuard<Mutex> guard(&mtx_);
+		return cv_.wait(mtx_, milliSeconds);
+	}
 	void notify() { cv_.notify(); }
 	void notifyAll() { cv_.notifyAll(); }
 private:
@@ -458,6 +468,79 @@ private:
 	pthread_t thread_;
 	pthread_attr_t attr_;
 #endif
+};
+
+class EXPORT_DECL SemLock{
+public:
+	SemLock(Semaphore &sem, bool acquired = false)
+		: sem_(sem)
+		, acquired_(acquired){
+	}
+	~SemLock(){
+		release();
+	}
+	bool tryAcquire(int waitMs){
+		if(!sem_.tryAcquire(waitMs)){
+			return false;
+		}
+		acquired_ = true;
+		return true;
+	}
+	void acquire(){
+		sem_.acquire();
+		acquired_ = true;
+	}
+	void release(){
+		if(acquired_){
+			acquired_=false;
+			sem_.release();
+		}
+	}
+private:
+	Semaphore &sem_;
+	bool acquired_;
+};
+
+class EXPORT_DECL Signal{
+public:
+	Signal(bool signaled = false, bool resetAfterWait = false):signaled_(signaled), resetAfterWait_(resetAfterWait){};
+	void set(){
+		LockGuard<Mutex> lock(&mutex_);
+		if(signaled_)
+			return;
+		signaled_ = true;
+		notifier_.notifyAll();
+	}
+	void reset(){
+		LockGuard<Mutex> lock(&mutex_);
+		signaled_ = false;
+	}
+	bool isSignaled(){
+		LockGuard<Mutex> lock(&mutex_);
+		return signaled_;
+	}
+	bool tryWait(int ms){
+		LockGuard<Mutex> lock(&mutex_);
+		if (signaled_ == false) {
+			notifier_.wait(mutex_, ms);
+		}
+		bool result = signaled_;
+		if (resetAfterWait_)
+			signaled_ = false;
+		return result;
+	}
+	void wait(){
+		LockGuard<Mutex> lock(&mutex_);
+		if (signaled_ == false) {
+			notifier_.wait(mutex_);
+		}
+		if (resetAfterWait_)
+			signaled_ = false;
+	}
+private:
+	bool signaled_, resetAfterWait_;
+	Mutex mutex_;
+	ConditionalVariable notifier_;
 };
 
 };

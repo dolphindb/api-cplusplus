@@ -7,9 +7,13 @@
 #include "DolphinDB.h"
 #include "Util.h"
 #ifdef _MSC_VER
-#define EXPORT_DECL _declspec(dllexport)
+	#ifdef _USRDLL	
+		#define EXPORT_DECL _declspec(dllexport)
+	#else
+		#define EXPORT_DECL __declspec(dllimport)
+	#endif
 #else
-#define EXPORT_DECL 
+	#define EXPORT_DECL 
 #endif
 namespace dolphindb {
 
@@ -65,7 +69,7 @@ public:
         buf_[head_] = T();
         head_ = (head_ + 1) % capacity_;
         --size_;
-        if (size_ == capacity_ - 1) full_.notifyAll();
+        full_.notifyAll();
         return true;
     }
     void pop(T &item) {
@@ -75,7 +79,7 @@ public:
         buf_[head_] = T();
         head_ = (head_ + 1) % capacity_;
         --size_;
-        if (size_ == capacity_ - 1) full_.notifyAll();
+        full_.notifyAll();
         lock_.unlock();
     }
 
@@ -93,7 +97,7 @@ public:
             buf_[head_] = T();
             head_ = (head_ + 1) % capacity_;
         }
-        if (n == capacity_) full_.notifyAll();
+        full_.notifyAll();
         size_ -= n;
         return true;
     }

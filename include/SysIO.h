@@ -8,8 +8,6 @@
 #ifndef SYSIO_H_
 #define SYSIO_H_
 
-#include <openssl/err.h>
-#include <openssl/ssl.h>
 #include <iostream>
 #include <string>
 
@@ -26,12 +24,23 @@
 	typedef int SOCKET;
 	#define INVALID_SOCKET -1
 	#define SOCKET_ERROR   -1
-#endif
-#ifdef _MSC_VER
-#define EXPORT_DECL _declspec(dllexport)
 #else
-#define EXPORT_DECL 
-#endif 
+	#include <winsock2.h>
+	#include <windows.h>
+#endif
+
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+
+#ifdef _MSC_VER
+	#ifdef _USRDLL	
+		#define EXPORT_DECL _declspec(dllexport)
+	#else
+		#define EXPORT_DECL __declspec(dllimport)
+	#endif
+#else
+	#define EXPORT_DECL 
+#endif
 
 using std::string;
 
@@ -52,8 +61,8 @@ typedef SmartPointer<DataStream> DataStreamSP;
 class EXPORT_DECL Socket{
 public:
 	Socket();
-	Socket(const string& host, int port, bool blocking, bool enableSSL = false);
-	Socket(SOCKET handle, bool blocking);
+	Socket(const string& host, int port, bool blocking, int keepAliveTime, bool enableSSL = false);
+	Socket(SOCKET handle, bool blocking, int keepAliveTime);
 	~Socket();
 	const string& getHost() const {return host_;}
 	int getPort() const {return port_;}
@@ -61,7 +70,7 @@ public:
 	IO_ERR write(const char* buffer, size_t length, size_t& actualLength);
 	IO_ERR bind();
 	IO_ERR listen();
-	IO_ERR connect(const string& host, int port, bool blocking, bool enableSSL = false);
+	IO_ERR connect(const string& host, int port, bool blocking, int keepAliveTime, bool enableSSL = false);
 	IO_ERR connect();
 	IO_ERR sslConnect();
 	IO_ERR close();
@@ -70,6 +79,7 @@ public:
 	bool isBlockingMode() const {return blocking_;}
 	bool isValid();
 	void setAutoClose(bool option) { autoClose_ = option;}
+	static void enableTcpNoDelay(bool enable);
 	static bool ENABLE_TCP_NODELAY;
 
 private:
@@ -90,6 +100,7 @@ private:
 	bool enableSSL_;
 	SSL_CTX* ctx_;
 	SSL* ssl_;
+	int keepAliveTime_;
 };
 
 class EXPORT_DECL UdpSocket{
