@@ -1,5 +1,20 @@
-#include "config.h"
-void pubTables(const vector<string> tables){
+class Count_MultiThread{
+public:
+	Count_MultiThread(int x = 0): c(0){};
+	~Count_MultiThread(){
+		cout<<"destructing the Count"<<endl;
+	}
+	void increase(int x){
+		m.lock();
+		c += x;
+		m.unlock();
+	}
+private:
+	Mutex m;
+	int c;
+};
+
+void pubTables1(const vector<string> tables){
 	for(unsigned int i = 0 ;i < tables.size(); i++){
 		string t = tables[i];
 		string script =
@@ -18,37 +33,7 @@ void pubTables(const vector<string> tables){
 		conn.run(script);
 	}
 }
-
-int getStreamingOffset(DBConnection * conn, const string& tableName){
-	string script = "getStreamingStat().pubTables";
-	TableSP t = conn->run(script);
-	if(t->size() <= 0)
-		return -1;
-	VectorSP names = t->getColumn("tableName");
-	VectorSP offset = t->getColumn("msgOffset");
-
-	for( int i = 0 ;i < names->size(); i++){
-		if(names->getString(i) == tableName)
-			return offset->getLong(i);
-	}
-	return -1;
-}
-class Count{
-public:
-	Count(int x = 0): c(0){};
-	~Count(){
-		cout<<"destructing the Count"<<endl;
-	}
-	void increase(int x){
-		m.lock();
-		c += x;
-		m.unlock();
-	}
-private:
-	Mutex m;
-	int c;
-};
-int subScriteTableTest(const string& host, int port, int listenPort, const vector<string>& tables) {
+int subScriteTableTest2(const string& host, int port, int listenPort, const vector<string>& tables) {
 	DBConnection connSelf;
     bool ret = connSelf.connect(host,port);
     if(!ret){
@@ -56,7 +41,7 @@ int subScriteTableTest(const string& host, int port, int listenPort, const vecto
 		return 0;
 	}
 
-    Count total;
+    Count_MultiThread total;
     auto handler = [&](Message msg) {
     	int size = msg->get(0)->getInt();
         total.increase(size);
@@ -86,21 +71,16 @@ int subScriteTableTest(const string& host, int port, int listenPort, const vecto
     return 0;
 }
 
-int main(){
-    DBConnection::initialize();
-    bool ret = conn.connect(hostName,port);
-    if(!ret){
-		cout<<"Failed to connect to the server"<<endl;
-		return 0;
-	}
+
+TEST(streamingMulThreadMoreTables,test_streamingMulThreadMoreTables){
     vector<string> tables = {"s1","s2","s3","s4","s5","s6","s7","s8","s9","s10"};
-    pubTables(tables);
+    pubTables1(tables);
     vector<std::thread> ts;
     for(unsigned int i = 0; i < tables.size(); i++){
-    	ts.push_back(std::thread(subScriteTableTest,hostName, port, listenPorts[i], tables));
+    	ts.push_back(std::thread(subScriteTableTest2,hostName, port, listenPorts[i], tables));
     }
 
     for(auto &t : ts)
     	t.join();
-    return 0;
 }
+

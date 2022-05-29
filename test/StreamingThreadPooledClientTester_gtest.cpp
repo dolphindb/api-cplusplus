@@ -1,19 +1,9 @@
 #include <unistd.h>
-#include <atomic>
 #include <chrono>
 #include <iostream>
-#include <thread>
-#include "Streaming.h"
-#include "config.h"
-using namespace std;
-using namespace dolphindb;
-using namespace std::chrono;
 
-#ifdef WINDOWS
-#define sleep(x) Sleep(x)
-#endif
 
-int main() {
+TEST(StreamingThreadPooledClientTester,test_StreamingThreadPooledClientTester){
     atomic_int cnt;
     cnt = 0;
     atomic<unsigned long long> total;

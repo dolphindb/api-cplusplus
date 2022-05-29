@@ -1,6 +1,4 @@
-#include "config.h"
-
-void pubTables(const vector<string> tables){
+void pubTables2(const vector<string> tables){
 	for(unsigned int i = 0 ;i < tables.size(); i++){
 		string t = tables[i];
 		string script =
@@ -21,7 +19,7 @@ void pubTables(const vector<string> tables){
 }
 
 int getStreamingOffset(DBConnection * conn, const string& tableName){
-	string script = "getStreamingStat().pubTables";
+	string script = "getStreamingStat().pubTables2";
 	TableSP t = conn->run(script);
 	if(t->size() <= 0)
 		return -1;
@@ -35,7 +33,8 @@ int getStreamingOffset(DBConnection * conn, const string& tableName){
 	return -1;
 }
 
-int subScriteTableTest(const string& host, int port, int listenPort, const string& tableName) {
+
+int subScriteTableTest3(const string& host, int port, int listenPort, const string& tableName) {
 	DBConnection connSelf;
     bool ret = connSelf.connect(host,port);
     if(!ret){
@@ -61,21 +60,15 @@ int subScriteTableTest(const string& host, int port, int listenPort, const strin
     return 0;
 }
 
-int main(){
-    DBConnection::initialize();
-    bool ret = conn.connect(hostName,port);
-    if(!ret){
-		cout<<"Failed to connect to the server"<<endl;
-		return 0;
-	}
+
+TEST(streamingMultithreadSubUnsub,test_streamingMultithreadSubUnsub){
     vector<string> tables = {"s1","s2","s3","s4","s5","s6","s7","s8","s9","s10"};
-    pubTables(tables);
+    pubTables2(tables);
     vector<std::thread> ts;
     for(unsigned int i = 0; i < tables.size(); i++){
-    	ts.push_back(std::thread(subScriteTableTest,hostName, port, listenPorts[i],  tables[i]));
+    	ts.push_back(std::thread(subScriteTableTest3,hostName, port, listenPorts[i],  tables[i]));
     }
 
     for(auto &t : ts)
     	t.join();
-    return 0;
 }

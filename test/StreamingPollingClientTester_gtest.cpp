@@ -1,16 +1,21 @@
-#include <iostream>
-#include "config.h"
-#include "Streaming.h"
-using namespace std;
-using namespace dolphindb;
-using namespace std::chrono;
-#ifdef WINDOWS
-#define sleep(x) Sleep(x)
-#endif
+static void createTableTrades(){
+    string script;
+	script += "dbName=\"dfs://test_StreamingPollingClientTester\"\n";
+	script += "tableName=\"pt\"\n";
+	script += "login(\"admin\",\"123456\")\n";
+	script += "if(existsDatabase(dbName)){\n";
+    script += "dropDatabase(dbName)\n";
+    script += "}\n";
+	script += "n=1000000;";
+    script += "t=table(rand(`IBM`MS`APPL`AMZN,n) as symbol, rand(10.0, n) as value);";
+    script += "db = database(\"dfs://test_StreamingPollingClientTester\", RANGE, `A`F`M`S`ZZZZ);";
+    script += "trades = db.createPartitionedTable(table=t, tableName=\"trades\", partitionColumns=\"symbol\");";
+	conn.connect(hostName, port, "admin", "123456");
+	conn.run(script);
+}
 
-
-
-int main() {
+TEST(StreamingPollingClientTester,test_StreamingPollingClientTester){
+    createTableTrades();
     int cnt = 0;
     int n = 10;
     unsigned long long total = 0;
@@ -63,5 +68,4 @@ int main() {
         printf("wakeup!\n");
         client.unsubscribe(hostName, port, table,DEFAULT_ACTION_NAME);*/
     }
-
 }

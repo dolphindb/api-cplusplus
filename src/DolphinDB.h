@@ -755,6 +755,7 @@ private:
     bool enableSSL_;
     bool asynTask_;
     static const int maxRerunCnt_ = 30;
+	int lastNodeIndex_;
     ConstantSP nodes_;
 	bool compress_;
 };

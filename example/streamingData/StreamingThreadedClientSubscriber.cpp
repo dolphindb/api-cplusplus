@@ -60,7 +60,7 @@ int main() {
     };
 
     auto t1 = client.subscribe(host, serverport, handler, "st1",
-                               "threadedClientSub", 0, true);
+                               "threadedClientSub", 0, true, nullptr,true);
     t1->join();
   }));
   t->start();

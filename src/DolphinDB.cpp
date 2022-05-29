@@ -1104,6 +1104,7 @@ bool DBConnection::connect(const string& hostName, int port, const string& userI
                            bool ha, const vector<string>& highAvailabilitySites, int keepAliveTime) {
     ha_ = ha;
     initialScript_ = startup;
+	lastNodeIndex_ = 0;
     if (ha_) {
 		while (true) {
 			if (conn_->connect(hostName, port, userId, password, enableSSL_, asynTask_, keepAliveTime, compress_)) {
@@ -1179,7 +1180,19 @@ bool getNewLeader(const string& s, string& host, int& port) {
         port = std::stoi(v[1]);
         return true;
     } else {
-        return false;
+		static string ignoreMsgs[] = {"<ChunkInTransaction>","<ChunkInRecovery>","<DataNodeNotAvail>","<DataNodeNotReady>","DFS is not enabled","DFS_CLIENT is null"};
+		static int ignoreMsgSize = sizeof(ignoreMsgs) / sizeof(string);
+		for (int i = 0; i < ignoreMsgSize; i++) {
+			index = msg.find(ignoreMsgs[i]);
+			if (index != string::npos) {
+				if (i <= 1) {//ChunkInTransaction and ChunkInRecovery should sleep a while before chunk is ready
+					Util::sleep(10000);
+				}
+				host.clear();
+				return true;
+			}
+		}
+		return false;
     }
 }
 
@@ -1190,6 +1203,8 @@ void DBConnection::switchDataNode(const string& err) {
     string host;
     int port;
     if (getNewLeader(err, host, port)) {
+		if (host.empty())
+			goto switchnode;
         int attempt = 0;
         while (true) {
             std::cerr << "Got new leader exception, new leader is " << host << ":" << port << " #attempt=" << attempt++
@@ -1203,22 +1218,25 @@ void DBConnection::switchDataNode(const string& err) {
                     break;
                 }
                 else{
-                    if (attempt >= 10)
-                        throw IOException("Failed to connect to host = " + host + ", port = " + std::to_string(port));
+                    //if (attempt >= 10)
+                    //    throw IOException("Failed to connect to host = " + host + ", port = " + std::to_string(port));
                 }
             } catch (IOException& ex) {
                 std::cerr << "Connect to node " << host << ":" << port << " came across a exception: " << ex.what()
                           << std::endl;
-                if (attempt >= 10)
-                    throw ex;
+                //if (attempt >= 10)
+                //    throw ex;
 
                 getNewLeader(ex.what(), host, port);
+				if(host.empty())
+					goto switchnode;
             }
             Util::sleep(100);
         }
     } else {
-        for (int i = 0;; ++i, i %= nodes_->size()) {
-            string str = nodes_->get(i)->getString();
+switchnode:
+        for (lastNodeIndex_ = (lastNodeIndex_+1)% nodes_->size();; ++lastNodeIndex_, lastNodeIndex_ %= nodes_->size()) {
+            string str = nodes_->get(lastNodeIndex_)->getString();
             vector<string> v = Util::split(str, ':');
             std::cerr << "Trying node: " << str << std::endl;
             try {

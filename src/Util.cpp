@@ -44,8 +44,8 @@ namespace dolphindb{
 const bool Util::LITTLE_ENDIAN_ORDER = isLittleEndian();
 SmartPointer<ConstantFactory> Util::constFactory_(new ConstantFactory());
 string Util::VER = "1.30.17.1";
-int Util::VERNUM = 101;
-string Util::BUILD = "2022.03.28";
+int Util::VERNUM = 102;
+string Util::BUILD = "2022.05.20";
 #ifndef _MSC_VER
 const int Util::BUF_SIZE = 1024;
 #endif
