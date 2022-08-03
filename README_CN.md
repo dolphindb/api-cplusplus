@@ -883,7 +883,7 @@ ConstantSP result = conn.run("select * from loadTable('dfs://SAMPLE_TRDDB', `dem
 cout <<  result->getString() << endl;
 ```
 
-
+<!-- 不再保存本地磁盘表的例子
 ### 8.3 保存数据到本地磁盘表
 
 本地磁盘表通用用于静态数据集的计算分析。它不支持事务，也不持支并发读写。
@@ -926,8 +926,8 @@ conn.run(script);
 2. 除了使用[`share`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/CommandsReferences/share.html)让表在其他会话中可见，也可以在C++ API中使用[`loadTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/l/loadTable.html)来加载磁盘表，使用[`append!`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)来追加数据。但是，我们不推荐这种方法，因为[`loadTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/l/loadTable.html)函数从磁盘加载数据，会消耗大量时间。如果有多个客户端都使用[`loadTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/l/loadTable.html) ，内存中会有多个表的副本，造成数据不一致。
 
 关于C++ API的更多信息，可以参考C++ API 头文件[dolphindb.h](./include/DolphinDB.h)。
-
-### 8.4 批量异步写入数据
+-->
+### 8.3 批量异步写入数据
 
 针对单条数据批量写入的场景，DolphinDB C++ API 提供 `BatchTableWrite`, `MultithreadedTableWriter` 类对象用于批量异步追加数据，并在客户端维护了一个数据缓冲队列。当服务器端忙于网络 I/O 时，客户端写线程仍然可以将数据持续写入缓冲队列（该队列由客户端维护）。写入队列后即可返回，从而避免了写线程的忙等。目前，`BatchTableWrite` 支持批量写入数据到内存表、分区表；而 `MultithreadedTableWriter` 支持批量写入数据到内存表、分区表和维度表。
 
@@ -936,7 +936,7 @@ conn.run(script);
 * API 客户端提交任务到缓冲队列，缓冲队列接到任务后，客户端即认为任务已完成。
 * 提供 `getStatus` 等接口查看状态。
 
-#### 8.4.1 BatchTableWriter
+#### 8.3.1 BatchTableWriter
 
 `BatchTableWriter` 对象及主要方法介绍如下：
 
@@ -1056,7 +1056,7 @@ int main(){
 
 更多批量异步写入案例，请参考[BatchTableWriterDemo.cpp](./example/BatchTableWriter/BatchTableWriterDemo.cpp)。
 
-#### 8.4.2 MultithreadedTableWriter
+#### 8.3.2 MultithreadedTableWriter
 
 `MultithreadedTableWriter` 是对 `BatchTableWriter` 的升级，它的默认功能和 `BatchTableWriter` 一致，但 `MultithreadedTableWriter` 支持多线程的并发写入。
 
