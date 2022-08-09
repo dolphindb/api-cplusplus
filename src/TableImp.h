@@ -92,7 +92,7 @@ public:
 	virtual DATA_TYPE getColumnType(const int index) const { return cols_[index]->getType();}
 	virtual void setColumnName(int index, const string& name);
 	virtual INDEX size() const {return size_;}
-	virtual bool sizeable() const {return !readOnly_;}
+	virtual bool sizeable() const {return isReadOnly()==false;}
 	virtual bool set(INDEX index, const ConstantSP& value);
 	virtual ConstantSP get(INDEX index) const;
 	virtual ConstantSP get(const ConstantSP& index) const;
@@ -122,7 +122,7 @@ private:
 
 private:
 	vector<ConstantSP> cols_;
-	bool readOnly_;
+	//bool readOnly_;
 	INDEX size_;
 	INDEX capacity_;
 };

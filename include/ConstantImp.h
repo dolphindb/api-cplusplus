@@ -884,7 +884,7 @@ protected:
 		else{
 			if(targetType == DT_BOOL){
 				for(int i=0;i<len;++i)
-					buf[i] = (bool)data_[start+i];
+					buf[i] = data_[start+i] != 0;
 			}
 			else{
 				for(int i=0;i<len;++i)
@@ -1387,6 +1387,9 @@ public:
 class FastArrayVector: public Vector {
 public:
 	FastArrayVector(int size, int capacity, char* srcData, bool containNull, DATA_TYPE dataType, INDEX *pindex=NULL) {
+#if defined(DDB_VERSION) && DDB_VERSION < 200
+		throw RuntimeException("Array vector is not supported by the current version. Please upgrade to 2.00 or higher.");
+#endif
 		stage_ = 0;
 		countBytes_ = 1;
 		rowCount_ = 0;
@@ -1397,6 +1400,8 @@ public:
 		dataCategory 	= ARRAY;
 		baseType_ 	 	= DATA_TYPE(dataType_ - ARRAY_TYPE_BASE);	// e.g. DT_INT
 		index_ 			= Util::createVector(DT_INT, size, capacity, true, 0, pindex);
+		if(pindex == NULL)
+			index_->initialize();
 		valueSize_      = 0;
 		value_          = Util::createVector(baseType_, 0, 0, true, 0, NULL);
 		size_           = index_->size();
@@ -1404,6 +1409,9 @@ public:
 	}
 
 	FastArrayVector(const VectorSP& index, const VectorSP& value) {
+#if defined(DDB_VERSION) && DDB_VERSION < 200
+		throw RuntimeException("Array vector is not supported by the current version. Please upgrade to 2.00 or higher.");
+#endif
 		index_ = index;
 		value_ = value;
 		stage_ = 0;
@@ -1437,10 +1445,9 @@ public:
 	virtual bool		  validIndex(INDEX uplimit) { return value_->validIndex(uplimit); }
 	virtual bool		  validIndex(INDEX start, INDEX length, INDEX uplimit) { return value_->validIndex(start, length, uplimit); }
 
-	virtual void 		  fill(INDEX start, INDEX length, const ConstantSP& value){throw RuntimeException("Array Vector doesn't support method fill");}
-	// Note: Currently, the update and delete operations on arrayVector are not supported.
-	virtual bool 	      set(INDEX index, const ConstantSP& value) {throw RuntimeException("Array Vector doesn't support method set");}
-	virtual bool		  set(const ConstantSP& index, const ConstantSP& value) {throw RuntimeException("Array Vector doesn't support method set");}
+	virtual void 		  fill(INDEX start, INDEX length, const ConstantSP& value);
+	virtual bool 	      set(INDEX index, const ConstantSP& value);
+	virtual bool		  set(const ConstantSP& index, const ConstantSP& value);
 
 	virtual string 		  getString(INDEX index) const;
 	virtual string 		  getString() const;
@@ -1461,6 +1468,8 @@ public:
 	virtual bool 		  sizeable() const {return value_->sizeable();}
 	virtual long long     count() const { return count(0, size_);}
 	virtual long long 	  count(INDEX start, INDEX length) const;
+	ConstantSP			  getSourceValue() { return value_; }
+	ConstantSP			  getSourceIndex() { return index_; }
 
 #ifndef INDEX64
 	virtual bool isIndexArray() const { return true;}
@@ -1492,6 +1501,7 @@ public:
 	INDEX		  checkVectorSize();//<0: The vectors in the array vector are of different size. >=0: The vectors are of the same size {x}.
 	VectorSP	  getFlatValueArray(){ return value_; }
 	void reserveValue(INDEX capacity) { value_->reserve(capacity); }
+	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 
 private:
 	int 		serializeFixedLength(char* buf, int bufSize, INDEX indexStart, int offset, int targetNumElement, int& numElement, int& partial) const;
@@ -2330,6 +2340,7 @@ public:
 	virtual INDEX getCapacity() const {return capacity_;}
 	virtual INDEX size() const {return size_;}
 	virtual	INDEX reserve(INDEX capacity);
+	virtual	void resize(INDEX size);
 	virtual bool isFastMode() const {return true;}
 	virtual short getUnitLength() const {return fixedLength_;}
 	virtual void clear();
@@ -2349,6 +2360,7 @@ public:
 	virtual ConstantSP getInstance(INDEX size) const;
 	virtual ConstantSP getValue() const;
 	virtual ConstantSP getValue(INDEX capacity) const;
+	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
 	virtual bool remove(INDEX count);
 	virtual bool remove(const ConstantSP& index);
@@ -2357,6 +2369,7 @@ public:
 	virtual long long getAllocatedMemory() const;
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
 	virtual int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const;
+	virtual int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int cellCountToSerialize, int& numElement, int& partial) const;
 	virtual void reverse(){reverse(0, size_);}
 	virtual void reverse(INDEX start, INDEX length);
 	virtual bool getNullFlag() const {return containNull_;}
@@ -2490,6 +2503,54 @@ public:
 	virtual DATA_TYPE getRawType() const { return DT_INT128;}
 	virtual const Guid getInt128() const;
 	virtual string getString(INDEX index) const { return Int128::toString(data_ + index*fixedLength_);}
+	virtual void setString(INDEX index, const string& val) {
+		unsigned char buf[16];
+		if(Int128::parseInt128(val.data(), val.length(),buf)==false){
+			throw RuntimeException("setString method doesn't support string format.");
+		}
+		setBinary(index, fixedLength_, buf);
+	}
+	virtual bool appendString(string* strarray, int len) {
+		if (!checkCapacity(len))
+			return false;
+		bool hasNull = false;
+		unsigned char *pdata = data_ + size_ * fixedLength_;
+		for (int i = 0; i < len; i++, strarray++, pdata += fixedLength_) {
+			if (strarray->length() == 0) {
+				hasNull = true;
+				memset(pdata, 0, fixedLength_);
+			}
+			else if (strarray->length() != 32 || Util::fromHex(strarray->data(), strarray->length(), Util::LITTLE_ENDIAN_ORDER, pdata) == false) {
+				return false;
+			}
+		}
+		size_ += len;
+		if (hasNull) {
+			containNull_ = true;
+		}
+		return true;
+	}
+	virtual bool appendString(char** buf, int len) {
+		if (!checkCapacity(len))
+			return false;
+		bool hasNull = false;
+		unsigned char *pdata = data_ + size_ * fixedLength_;
+		for (int i = 0; i < len; i++, pdata += fixedLength_) {
+			int buflen = strlen(buf[i]);
+			if (buflen == 0) {
+				hasNull = true;
+				memset(pdata, 0, fixedLength_);
+			}
+			else if (buflen != 32 || Util::fromHex(buf[i], buflen, Util::LITTLE_ENDIAN_ORDER, pdata) == false) {
+				return false;
+			}
+		}
+		size_ += len;
+		if (hasNull) {
+			containNull_ = true;
+		}
+		return true;
+	}
 	virtual bool getHash(INDEX start, int len, int buckets, int* buf) const {
 		for(int i=0; i<len; ++i)
 			buf[i] = murmur32_16b(data_ + (start + i)*16) % buckets;
@@ -2503,6 +2564,54 @@ public:
 	FastUuidVector(int size, int capacity, unsigned char* srcData, bool containNull);
 	virtual ~FastUuidVector(){}
 	virtual string getString(INDEX index) const { return Guid::getString(data_ + index * fixedLength_);}
+	virtual void setString(INDEX index, const string& val) {
+		unsigned char buf[16];
+		if (Util::fromGuid(val.data(), buf) == false) {
+			throw RuntimeException("setString method doesn't support string format.");
+		}
+		setBinary(index, fixedLength_, buf);
+	}
+	virtual bool appendString(string* strarray, int len) {
+		if (!checkCapacity(len))
+			return false;
+		bool hasNull = false;
+		unsigned char *pdata = data_ + size_ * fixedLength_;
+		for (int i = 0; i < len; i++, strarray++, pdata += fixedLength_) {
+			if (strarray->length() == 0) {
+				hasNull = true;
+				memset(pdata, 0, fixedLength_);
+			}
+			else if (strarray->length() != 36 || Util::fromGuid(strarray->data(), pdata) == false) {
+				return false;
+			}
+		}
+		size_ += len;
+		if (hasNull) {
+			containNull_ = true;
+		}
+		return true;
+	}
+	virtual bool appendString(char** buf, int len) {
+		if (!checkCapacity(len))
+			return false;
+		bool hasNull = false;
+		unsigned char *pdata = data_ + size_ * fixedLength_;
+		for (int i = 0; i < len; i++, pdata += fixedLength_) {
+			int buflen = strlen(buf[i]);
+			if (buflen == 0) {
+				hasNull = true;
+				memset(pdata, 0, fixedLength_);
+			}
+			else if (buflen != 36 || Util::fromGuid(buf[i], pdata) == false) {
+				return false;
+			}
+		}
+		size_ += len;
+		if (hasNull) {
+			containNull_ = true;
+		}
+		return true;
+	}
 };
 
 class FastIPAddrVector : public FastInt128Vector {
@@ -2510,6 +2619,54 @@ public:
 	FastIPAddrVector(int size, int capacity, unsigned char* srcData, bool containNull);
 	virtual ~FastIPAddrVector(){}
 	virtual string getString(INDEX index) const { return IPAddr::toString(data_ + index * fixedLength_);}
+	virtual void setString(INDEX index, const string& val) {
+		unsigned char buf[16];
+		if (IPAddr::parseIPAddr(val.data(), val.length(), buf) == false) {
+			throw RuntimeException("setString method doesn't support string format.");
+		}
+		setBinary(index, fixedLength_, buf);
+	}
+	virtual bool appendString(string* strarray, int len) {
+		if (!checkCapacity(len))
+			return false;
+		bool hasNull = false;
+		unsigned char *pdata = data_ + size_ * fixedLength_;
+		for (int i = 0; i < len; i++, strarray++, pdata += fixedLength_) {
+			if (strarray->length() == 0) {
+				hasNull = true;
+				memset(pdata, 0, fixedLength_);
+			}
+			else if (IPAddr::parseIPAddr(strarray->data(), strarray->length(), pdata) == false) {
+				return false;
+			}
+		}
+		size_ += len;
+		if (hasNull) {
+			containNull_ = true;
+		}
+		return true;
+	}
+	virtual bool appendString(char** buf, int len) {
+		if (!checkCapacity(len))
+			return false;
+		bool hasNull = false;
+		unsigned char *pdata = data_ + size_ * fixedLength_;
+		for (int i = 0; i < len; i++, pdata += fixedLength_) {
+			int buflen = strlen(buf[i]);
+			if (buflen == 0) {
+				hasNull = true;
+				memset(pdata, 0, fixedLength_);
+			}
+			else if (IPAddr::parseIPAddr(buf[i], buflen, pdata) == false) {
+				return false;
+			}
+		}
+		size_ += len;
+		if (hasNull) {
+			containNull_ = true;
+		}
+		return true;
+	}
 };
 
 class FastSymbolVector : public AbstractFastVector<int> {
@@ -2557,7 +2714,7 @@ public:
 	virtual ConstantSP getValue(INDEX capacity) const {
 		capacity = (std::max)(capacity, (INDEX)size_);
 		int* data = new int[capacity];
-		memcpy(data, data_, size_);
+		memcpy(data, data_, size_*sizeof(int));
 		return ConstantSP(new FastSymbolVector(base_, size_, capacity, data, false));
 	}
 	virtual bool append(const ConstantSP& value, INDEX appendSize){

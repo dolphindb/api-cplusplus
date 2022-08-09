@@ -18,6 +18,7 @@
 #include <memory>
 #include <chrono>
 #include <cstring>
+#include <functional>
 
 #include "Types.h"
 #include "SmartPointer.h"
@@ -633,7 +634,7 @@ public:
 	virtual bool start(short flag, bool blocking, IO_ERR& ret)=0;
 	virtual void reset() = 0;
 	ConstantSP getConstant(){return obj_;}
-
+	
 protected:
 	ConstantSP obj_;
 };
@@ -679,7 +680,7 @@ private:
 
 class EXPORT_DECL DBConnection {
 public:
-	DBConnection(bool enableSSL = false, bool asynTask = false, int keepAliveTime = 7200, bool compress = false);
+	DBConnection(bool enableSSL = false, bool asyncTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false);
 	~DBConnection();
 	DBConnection(DBConnection&& oth);
 	DBConnection& operator=(DBConnection&& oth);
@@ -689,7 +690,8 @@ public:
 	 * will be performed along with connecting. If one would send userId and password in encrypted mode,
 	 * please use the login function for authentication separately.
 	 */
-	bool connect(const string& hostName, int port, const string& userId = "", const string& password = "", const string& initialScript = "", bool highAvailability = false, const vector<string>& highAvailabilitySites = vector<string>(), int keepAliveTime=7200);
+	bool connect(const string& hostName, int port, const string& userId = "", const string& password = "", const string& initialScript = "",
+		bool highAvailability = false, const vector<string>& highAvailabilitySites = vector<string>(), int keepAliveTime=7200, bool reconnect = false);
 
 	/**
 	 * Log onto the DolphinDB server using the given userId and password. If the parameter enableEncryption
@@ -716,13 +718,13 @@ public:
 	/**
 	 * upload a local object to the DolphinDB server and assign the given name in the session.
 	 */
-	void upload(const string& name, const ConstantSP& obj);
+	ConstantSP upload(const string& name, const ConstantSP& obj);
 
 	/**
 	 * upload multiple local objects to the DolphinDB server and assign each object the given
 	 * name in the session.
 	 */
-	void upload(vector<string>& names, vector<ConstantSP>& objs);
+	ConstantSP upload(vector<string>& names, vector<ConstantSP>& objs);
 
 	/**
 	 * Close the current session and release all resources.
@@ -732,7 +734,7 @@ public:
 	/**
 	 * It is required to call initialize function below before one uses the DolphinDB API.
 	 */
-	static void initialize();
+	static void initialize(){}
 
 	void setInitScript(const string& script);
 
@@ -743,21 +745,49 @@ private:
     DBConnection& operator=(DBConnection& oth); // = delete
 
 private:
-    void switchDataNode(const string& err);
+	enum ExceptionType {
+		ET_IGNORE = 0,
+		ET_UNKNOW = 1,
+		ET_NEWLEADER = 2,
+		ET_NODENOTAVAIL = 3,
+	};
+    void switchDataNode(const string &host = "", int port = -1);
+	bool connectNode(string hostName, int port, int keepAliveTime = -1);
     bool connected();
+	//0 - ignored exception, eg : other data node not avail;
+	//1 - throw exception;
+	//2 - new leader, host&port is valid
+	//3 - this data node not avail
+	ExceptionType parseException(const string &msg, string &host, int &port);
 
 private:
+	struct Node{
+		string hostName;
+		int port;
+		double load;//DBL_MAX : unknow
+
+		bool isEqual(const Node &node) {
+			return hostName.compare(node.hostName) == 0 && port == node.port;
+		}
+		Node(){}
+		Node(const string &hostName, int port, double load = DBL_MAX): hostName(hostName), port(port), load(load){}
+		Node(const string &ipport, double loadValue = DBL_MAX);
+	};
+	static void parseIpPort(const string &ipport, string &ip, int &port);
+
     std::unique_ptr<DBConnectionImpl> conn_;
     string uid_;
     string pwd_;
     string initialScript_;
     bool ha_;
-    bool enableSSL_;
+	bool enableSSL_;
     bool asynTask_;
     static const int maxRerunCnt_ = 30;
-	int lastNodeIndex_;
-    ConstantSP nodes_;
+    vector<Node> nodes_;
+	int lastConnNodeIndex_;
 	bool compress_;
+	bool enablePickle_, python_;
+	bool reconnect_, closed_;
 };
 
 class EXPORT_DECL BlockReader : public Constant{
@@ -781,7 +811,8 @@ private:
 
 class EXPORT_DECL DBConnectionPool{
 public:
-    DBConnectionPool(const string& hostName, int port, int threadNum = 10, const string& userId = "", const string& password = "", bool loadBalance = false, bool highAvailability = false, bool compress = false);
+    DBConnectionPool(const string& hostName, int port, int threadNum = 10, const string& userId = "", const string& password = "",
+		bool loadBalance = false, bool highAvailability = false, bool compress = false, bool reConnect = false, bool python = false);
 	
 	void run(const string& script, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
 	
@@ -842,6 +873,25 @@ private:
 private:
     DBConnection& conn_;
 	string appendScript_;
+	int cols_;
+    vector<DATA_CATEGORY> columnCategories_;
+ 	vector<DATA_TYPE> columnTypes_;
+	vector<string> columnNames_;
+};
+
+class EXPORT_DECL AutoFitTableUpsert {
+public:
+	AutoFitTableUpsert(string dbUrl, string tableName, DBConnection& conn,bool ignoreNull=false,
+                                        vector<string> *pkeyColNames=nullptr,vector<string> *psortColumns=nullptr);
+
+	int upsert(TableSP table);
+
+private:
+	void checkColumnType(int col, DATA_CATEGORY category, DATA_TYPE type);
+
+private:
+    DBConnection& conn_;
+	string upsertScript_;
 	int cols_;
     vector<DATA_CATEGORY> columnCategories_;
  	vector<DATA_TYPE> columnTypes_;

@@ -519,6 +519,17 @@ Int128* Int128::parseInt128(const char* str, int len){
 		return nullptr;
 }
 
+bool Int128::parseInt128(const char* str, int len, unsigned char *buf) {
+	if (len == 0) {
+		memset(buf, 0, 16);
+		return true;
+	}
+	else if (len == 32 && Util::fromHex(str, len, Util::LITTLE_ENDIAN_ORDER, buf))
+		return true;
+	else
+		return false;
+}
+
 int Int128::compare(INDEX index, const ConstantSP& target) const {
 	return ((Guid*)uuid_)->compare(target->getInt128());
 }

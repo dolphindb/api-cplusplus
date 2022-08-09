@@ -19,6 +19,7 @@
 	#define EXPORT_DECL 
 #endif
 namespace dolphindb {
+
 class Counter {
 public:
 	Counter(void* p): p_(p), count_(0){}

@@ -1,6 +1,23 @@
 class ArrayVectorTest:public testing::Test
 {
 protected:
+    //Suite
+    static void SetUpTestCase() {
+        //DBConnection conn;
+		conn.initialize();
+        bool ret = conn.connect(hostName, port, "admin", "123456");
+        if (!ret) {
+            cout << "Failed to connect to the server" << endl;
+        }
+        else {
+            cout << "connect to " + hostName + ":" + std::to_string(port)<< endl;
+        }
+    }
+    static void TearDownTestCase(){
+        conn.close();
+    }
+
+    //Case
     virtual void SetUp()
     {
         cout<<"check connect...";
@@ -11,6 +28,7 @@ protected:
 		else
 		{
 			cout<<"ok"<<endl;
+			
 		}
     }
     virtual void TearDown()
@@ -19,6 +37,641 @@ protected:
     }
 };
 
+
+TEST_F(ArrayVectorTest,test_BoolArrayVector){
+	vector<char> testValues{ 1,-1,12,0,-12};
+	VectorSP v1=Util::createVector(DT_BOOL,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setBool(i,testValues[i]);
+	}
+	v1->setNull(5);
+
+	VectorSP av1=Util::createArrayVector(DT_BOOL_ARRAY,0,1);
+	VectorSP av2=Util::createArrayVector(DT_BOOL_ARRAY,1,1);
+	VectorSP av3=Util::createArrayVector(DT_BOOL_ARRAY,1,1);
+	VectorSP av4=Util::createArrayVector(DT_BOOL_ARRAY,0,1);
+	av1->append(v1);
+	av2->fill(0,1,v1);
+	av3->set(0,v1);
+	av4->append(Util::createVector(DT_BOOL,6,6));
+	av4->set(Util::createConstant(DT_INT),v1);
+
+	conn.upload("av1", { av1 });
+	string script = "value = bool[1,-1,12,0,-12,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+    EXPECT_EQ(av1->getRawType(),DT_BOOL);
+    EXPECT_EQ(av1->getForm(),DF_VECTOR);
+    EXPECT_FALSE(av1->validIndex(2));
+    EXPECT_FALSE(av1->validIndex(0,1,2));
+    EXPECT_EQ(av1->getUnitLength(),1);
+    EXPECT_TRUE(av1->sizeable());
+    // cout<<av1->count()<<endl;
+    // cout<<av1->getSourceValue()->getString()<<endl;
+    // cout<<av1->getSourceIndex()->getString()<<endl;
+    EXPECT_TRUE(av1->isIndexArray());
+
+    EXPECT_ANY_THROW(av1->compare(0,Util::createInt(1)));
+    EXPECT_ANY_THROW(av1->neg());
+    EXPECT_ANY_THROW(av1->prev(0));
+    EXPECT_ANY_THROW(av1->next(0));
+    int* buf = new int[1];
+    EXPECT_ANY_THROW(av1->getHash(0,1,1,buf));
+}
+
+TEST_F(ArrayVectorTest,test_CharArrayVector){
+	vector<char> testValues{ 1,-1,12,0,-12};
+	VectorSP v1=Util::createVector(DT_CHAR,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setChar(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_CHAR_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = char[1,-1,12,0,-12,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+
+TEST_F(ArrayVectorTest,test_ShortArrayVector){
+	vector<short> testValues{ 1,-1,12,0,-12};
+	VectorSP v1=Util::createVector(DT_SHORT,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setShort(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_SHORT_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = short[1,-1,12,0,-12,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_IntArrayVector){
+	vector<int> testValues{ 1,-1,12,0,-12};
+	VectorSP v1=Util::createVector(DT_INT,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setInt(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_INT_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = int[1,-1,12,0,-12,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_LongArrayVector){
+	vector<long> testValues{ 1,-1,12,0,-12};
+	VectorSP v1=Util::createVector(DT_LONG,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setLong(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_LONG_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = long[1,-1,12,0,-12,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_DateArrayVector){
+	vector<int> testValues{ 1,-1,12,0,-12};
+	VectorSP v1=Util::createVector(DT_DATE,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setInt(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_DATE_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = date[1,-1,12,0,-12,NULL];index = [6];b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_MonthArrayVector){
+	vector<int> testValues{ 1,-1,12,0,-12};
+	VectorSP v1=Util::createVector(DT_MONTH,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setInt(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_MONTH_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = month[1,-1,12,0,-12,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_TimeArrayVector){
+	vector<int> testValues{ 1,123123,12,0,111};
+	VectorSP v1=Util::createVector(DT_TIME,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setInt(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_TIME_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = time[1,123123,12,0,111,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_MinuteArrayVector){
+	vector<int> testValues{ 1,120,12,0,111};
+	VectorSP v1=Util::createVector(DT_MINUTE,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setInt(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_MINUTE_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = minute[1,120,12,0,111,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_SecondArrayVector){
+	vector<int> testValues{ 1,123,12,0,86399};
+	VectorSP v1=Util::createVector(DT_SECOND,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setInt(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_SECOND_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = second[1,123,12,0,86399,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_DatetimeArrayVector){
+	vector<int> testValues{ 1,-1,12,0,-12};
+	VectorSP v1=Util::createVector(DT_DATETIME,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setInt(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_DATETIME_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = datetime[1,-1,12,0,-12,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+
+TEST_F(ArrayVectorTest,test_TimestampArrayVector){
+	vector<int> testValues{ 1,-1,12,0,-12};
+	VectorSP v1=Util::createVector(DT_TIMESTAMP,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setInt(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_TIMESTAMP_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = timestamp[1,-1,12,0,-12,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+
+TEST_F(ArrayVectorTest,test_NanotimeArrayVector){
+	vector<long long> testValues{ 1,123,12,0,10000000000000};
+	VectorSP v1=Util::createVector(DT_NANOTIME,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setLong(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_NANOTIME_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = nanotime[1,123,12,0,10000000000000,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_NanotimestampArrayVector){
+	vector<long long> testValues{ 1,-1,-12,0,100000000000000000};
+	VectorSP v1=Util::createVector(DT_NANOTIMESTAMP,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setLong(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_NANOTIMESTAMP_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = nanotimestamp[1,-1,-12,0,100000000000000000,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_FloatArrayVector){
+	vector<float> testValues{ 1.522222f,-1.5f,-12.0f,0,100000000000000000.1f};
+	VectorSP v1=Util::createVector(DT_FLOAT,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setFloat(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_FLOAT_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = float[1.522222,-1.5,-12.0,0,100000000000000000.1,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_DoubleArrayVector){
+	vector<double> testValues{ 1.533333333333,-1.5,-12.0,0,100000000000000000.1};
+	VectorSP v1=Util::createVector(DT_DOUBLE,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setDouble(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_DOUBLE_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = double[1.533333333333,-1.5,-12.0,0,100000000000000000.1,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_SymbolArrayVector){
+	vector<string> testValues{ "a123","智臾科技a","你好！a","~`!@#$%^&*()/*-a","~·！@#￥%……&*（）+——a"};
+	VectorSP v1=Util::createVector(DT_SYMBOL,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setString(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	EXPECT_ANY_THROW(VectorSP av1=Util::createArrayVector(DT_SYMBOL_ARRAY,0,1));
+
+}
+
+TEST_F(ArrayVectorTest,test_StringArrayVector){
+	vector<string> testValues{ "a123","智臾科技a","你好！a","~`!@#$%^&*()/*-a","~·！@#￥%……&*（）+——a"};
+	VectorSP v1=Util::createVector(DT_STRING,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setString(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	EXPECT_ANY_THROW(VectorSP av1=Util::createArrayVector(DT_STRING_ARRAY,0,1));
+
+}
+
+TEST_F(ArrayVectorTest,test_UuidArrayVector){
+	vector<string> testValues{ "5d212a78-cc48-e3b1-4235-b4d91473ee87","5d212a78-cc48-e3b1-4235-b4d91473ee88",\
+								"5d212a78-cc48-e3b1-4235-b4d91473ee89","5d212a78-cc48-e3b1-4235-b4d91473ee90","5d212a78-cc48-e3b1-4235-b4d91473ee91"};
+	VectorSP v1=Util::createVector(DT_UUID,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setString(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_UUID_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = uuid[\"5d212a78-cc48-e3b1-4235-b4d91473ee87\",\"5d212a78-cc48-e3b1-4235-b4d91473ee88\",\
+								\"5d212a78-cc48-e3b1-4235-b4d91473ee89\",\"5d212a78-cc48-e3b1-4235-b4d91473ee90\",\"5d212a78-cc48-e3b1-4235-b4d91473ee91\",NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_AnyArrayVector){
+	VectorSP v1=Util::createVector(DT_ANY,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	v1->setInt(0,5);
+	v1->setDouble(1,1.326586);
+	v1->setString(2,"abc");
+	v1->setBool(3,1);
+	v1->setShort(4,5);
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	EXPECT_ANY_THROW(VectorSP av1=Util::createArrayVector(DT_ANY_ARRAY,0,1));
+
+}
+
+TEST_F(ArrayVectorTest,test_BlobArrayVector){
+	vector<string> testValues{ "a123","智臾科技a","你好！a","~`!@#$%^&*()/*-a","~·！@#￥%……&*（）+——a"};
+	VectorSP v1=Util::createVector(DT_BLOB,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setString(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	EXPECT_ANY_THROW(VectorSP av1=Util::createArrayVector(DT_BLOB_ARRAY,0,1));
+
+}
+
+TEST_F(ArrayVectorTest,test_CompressArrayVector){
+	vector<int> testValues{ 1,-1,12,0,-12};
+	EXPECT_ANY_THROW(VectorSP v1=Util::createVector(DT_COMPRESS,6,6));
+}
+
+
+TEST_F(ArrayVectorTest,test_DatehourArrayVector){
+	vector<int> testValues{ 1,-1,12,0,-12};
+	VectorSP v1=Util::createVector(DT_DATEHOUR,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setInt(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_DATEHOUR_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = datehour[1,-1,12,0,-12,NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_IpaddrArrayVector){
+	vector<string> testValues{ "192.168.1.13","192.168.1.14",\
+								"192.168.1.15","192.168.1.16","192.168.1.17"};
+	VectorSP v1=Util::createVector(DT_IP,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setString(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_IP_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = ipaddr[\"192.168.1.13\",\"192.168.1.14\",\
+								\"192.168.1.15\",\"192.168.1.16\",\"192.168.1.17\",NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
+
+TEST_F(ArrayVectorTest,test_Int128ArrayVector){
+	vector<string> testValues{ "e1671797c52e15f763380b45e841ec32","e1671797c52e15f763380b45e841ec33",\
+								"e1671797c52e15f763380b45e841ec34","e1671797c52e15f763380b45e841ec35","e1671797c52e15f763380b45e841ec36"};
+	VectorSP v1=Util::createVector(DT_INT128,6,6);
+	VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+
+	for (unsigned i=0;i<testValues.size();i++){
+		v1->setString(i,testValues[i]);
+	}
+	v1->setNull(5);
+	anyv1->set(0, v1);
+
+	VectorSP av1=Util::createArrayVector(DT_INT128_ARRAY,0,1);
+	av1->append(anyv1);
+	conn.upload("av1", { av1 });
+	string script = "value = int128[\"e1671797c52e15f763380b45e841ec32\",\"e1671797c52e15f763380b45e841ec33\",\
+								\"e1671797c52e15f763380b45e841ec34\",\"e1671797c52e15f763380b45e841ec35\",\"e1671797c52e15f763380b45e841ec36\",NULL]\n\
+					index = [6]\n\
+					b=arrayVector(index, value);b";
+	TableSP ex_av1 = conn.run(script);
+	ConstantSP res = conn.run("eqObj(av1,b)");
+
+
+	EXPECT_TRUE(res->getBool());
+	EXPECT_EQ(av1->getString(),ex_av1->getString());
+	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+}
 
 TEST_F(ArrayVectorTest,testUploadDatetimeArrayVector){
     //
@@ -199,21 +852,28 @@ TEST_F(ArrayVectorTest,testUploadIntArrayVector){
     VectorSP index;
     VectorSP data;
     VectorSP res;
+    VectorSP nonFastindex = Util::createVector(DT_INT,4,10,false);
+    VectorSP nullValue = Util::createVector(DT_INT,10,20);
     index = Util::createVector(DT_INT,4,10);
     value = Util::createVector(DT_INT,10,20);
     for(int i=0;i<10;++i){
         value->set(i,Util::createInt(i+1));
+        nullValue->setNull(i);
     }
     index->set(0,Util::createInt(2));
     index->set(1,Util::createInt(5));
     index->set(2,Util::createInt(8));
     index->set(3,Util::createInt(10));
+
+    VectorSP nullData = Util::createArrayVector(index,nullValue);
     data = Util::createArrayVector(index,value);
     vector<ConstantSP> datas = {data};
     vector<string> dataname = { "datas" };
     conn.upload(dataname,datas);
     VectorSP expection = conn.run("a = take(1..10,10);res = arrayVector([2,5,8,10],a);re2=res+1;re2;");
     res= conn.run("re1=datas+1;re1;");
+    EXPECT_ANY_THROW(data=Util::createArrayVector(nonFastindex,value));
+    EXPECT_EQ(nullData->getString(),"[[,],[,,],[,,],[,]]");
     EXPECT_EQ(res->getString(),expection->getString());
 }
 
@@ -2024,4 +2684,1646 @@ TEST_F(ArrayVectorTest,testErrorIndexArrayVector){
     //small
     index->set(3,Util::createInt(8));
     EXPECT_ANY_THROW(Util::createArrayVector(index,value));
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatetimeToDatetime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATETIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATETIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateTime(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_DATETIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[datetime(0), datetime(1),datetime(0), datetime(1),datetime(0), datetime(1),datetime(0), datetime(1),datetime(0), datetime(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATETIME);
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalDatetimeToDatehour){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATETIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATETIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateTime(j * 3600));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_DATEHOUR_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[datehour(0), datehour(1),datehour(0), datehour(1),datehour(0), datehour(1),datehour(0), datehour(1),datehour(0), datehour(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATEHOUR);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatetimeToNanotime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATETIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATETIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateTime(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotime(0), nanotime(1000000000),nanotime(0), nanotime(1000000000),nanotime(0), nanotime(1000000000),nanotime(0), nanotime(1000000000),nanotime(0), nanotime(1000000000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIME);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatetimeToNanotimestamp){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATETIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATETIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateTime(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIMESTAMP_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotimestamp(0), nanotimestamp(1000000000),nanotimestamp(0), nanotimestamp(1000000000),nanotimestamp(0), nanotimestamp(1000000000),nanotimestamp(0), nanotimestamp(1000000000),nanotimestamp(0), nanotimestamp(1000000000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIMESTAMP);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatetimeToDate){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATETIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATETIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateTime(j * 100000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_DATE_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[date(0), date(1),date(0), date(1),date(0), date(1),date(0), date(1),date(0), date(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATE);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatetimeToMonth){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATETIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATETIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateTime(j * 3000000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_MONTH_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[month(23640), month(23641),month(23640), month(23641),month(23640), month(23641),month(23640), month(23641),month(23640), month(23641)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_MONTH);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatetimeToSecond){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATETIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATETIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateTime(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_SECOND_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[second(0), second(1),second(0), second(1),second(0), second(1),second(0), second(1),second(0), second(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_SECOND);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatetimeToInt){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATETIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATETIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateTime(j * 100000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_INT_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalDatetimeToString){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATETIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATETIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateTime(j * 100000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_STRING_ARRAY));
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatehourToDatehour){
+    VectorSP av1;
+    VectorSP datehour_av1 = Util::createArrayVector(DT_DATEHOUR_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATEHOUR, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateHour(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        datehour_av1->append(anyv1);
+    }
+    av1 = datehour_av1->castTemporal(DT_DATEHOUR_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[datehour(0), datehour(1),datehour(0), datehour(1),datehour(0), datehour(1),datehour(0), datehour(1),datehour(0), datehour(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATEHOUR);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatehourToDate){
+    VectorSP av1;
+    VectorSP datehour_av1 = Util::createArrayVector(DT_DATEHOUR_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATEHOUR, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateHour(j * 24));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        datehour_av1->append(anyv1);
+    }
+    av1 = datehour_av1->castTemporal(DT_DATE_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[date(0), date(1),date(0), date(1),date(0), date(1),date(0), date(1),date(0), date(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATE);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatehourToDatetime){
+    VectorSP av1;
+    VectorSP datehour_av1 = Util::createArrayVector(DT_DATEHOUR_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATEHOUR, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateHour(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        datehour_av1->append(anyv1);
+    }
+    av1 = datehour_av1->castTemporal(DT_DATETIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[datetime(0), datetime(3600),datetime(0), datetime(3600),datetime(0), datetime(3600),datetime(0), datetime(3600),datetime(0), datetime(3600)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATETIME);
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalDatehourToNanotime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATEHOUR_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATEHOUR, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateHour(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotime(0), nanotime(3600000000000),nanotime(0), nanotime(3600000000000),nanotime(0), \
+                    nanotime(3600000000000),nanotime(0), nanotime(3600000000000),nanotime(0), nanotime(3600000000000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIME);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatehourToNanotimestamp){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATEHOUR_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATEHOUR, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateHour(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIMESTAMP_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotimestamp(0), nanotimestamp(3600000000000),nanotimestamp(0), nanotimestamp(3600000000000),\
+                    nanotimestamp(0), nanotimestamp(3600000000000),nanotimestamp(0), nanotimestamp(3600000000000),nanotimestamp(0), nanotimestamp(3600000000000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIMESTAMP);
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalDatehourToMonth){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATEHOUR_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATEHOUR, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateHour(j * 800));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_MONTH_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[month(23640), month(23641),month(23640), month(23641),month(23640), \
+                    month(23641),month(23640), month(23641),month(23640), month(23641)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_MONTH);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatehourToSecond){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATEHOUR_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATEHOUR, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateHour(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_SECOND_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[second(0), second(3600),second(0), second(3600),second(0), second(3600),second(0), second(3600),second(0), second(3600)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_SECOND);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDatehourToInt){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATEHOUR_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATEHOUR, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateHour(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_INT_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalDatehourToString){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATEHOUR_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATEHOUR, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDateHour(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_STRING_ARRAY));
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDateToDate){
+    VectorSP av0;
+    VectorSP av1 = Util::createArrayVector(DT_DATE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDate(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av1->append(anyv1);
+    }
+    av0 = av1->castTemporal(DT_DATE_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[date(0), date(1),date(0), date(1),date(0), date(1),date(0), date(1),date(0), date(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av0->getString(), av1_ex->getString());
+    EXPECT_EQ(av0->getType(), av1_ex->getType());
+    EXPECT_EQ(av0->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av0->get(0)->get(0)->getType(), DT_DATE);
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalDateToDatehour){
+    VectorSP av1;
+    VectorSP datehour_av1 = Util::createArrayVector(DT_DATE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDate(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        datehour_av1->append(anyv1);
+    }
+    av1 = datehour_av1->castTemporal(DT_DATEHOUR_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[datehour(0), datehour(24),datehour(0), datehour(24),datehour(0), datehour(24),datehour(0), datehour(24),datehour(0), datehour(24)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATEHOUR);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDateToDatetime){
+    VectorSP av1;
+    VectorSP datehour_av1 = Util::createArrayVector(DT_DATE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDate(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        datehour_av1->append(anyv1);
+    }
+    av1 = datehour_av1->castTemporal(DT_DATETIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[datetime(0), datetime(86400),datetime(0), datetime(86400),datetime(0), datetime(86400),datetime(0), datetime(86400),datetime(0), datetime(86400)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATETIME);
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalDateToNanotime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDate(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_NANOTIME_ARRAY));
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDateToTimestamp){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDate(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_TIMESTAMP_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[timestamp(0), timestamp(86400000),timestamp(0), timestamp(86400000),\
+                    timestamp(0), timestamp(86400000),timestamp(0), timestamp(86400000),timestamp(0), timestamp(86400000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_TIMESTAMP);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDateToNanotimestamp){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDate(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIMESTAMP_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotimestamp(0), nanotimestamp(86400000000000),nanotimestamp(0), nanotimestamp(86400000000000),\
+                    nanotimestamp(0), nanotimestamp(86400000000000),nanotimestamp(0), nanotimestamp(86400000000000),nanotimestamp(0), nanotimestamp(86400000000000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIMESTAMP);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDateToSecond){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDate(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_SECOND_ARRAY));
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalDateToInt){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDate(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_INT_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalDateToString){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_DATE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_DATE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createDate(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_STRING_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalTimeToTime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTime(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_TIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[time(0), time(1),time(0), time(1),time(0), time(1),time(0), time(1),time(0), time(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_TIME);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalTimeToDatetime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTime(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_DATETIME_ARRAY));
+
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalTimeToNanotime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTime(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotime(0), nanotime(1000000),nanotime(0), nanotime(1000000),nanotime(0), nanotime(1000000),nanotime(0), nanotime(1000000),nanotime(0), nanotime(1000000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIME);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalTimeToSecond){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTime(j * 1000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_SECOND_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[second(0), second(1),second(0), second(1),second(0), second(1),second(0), second(1),second(0), second(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_SECOND);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalTimeToMinute){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTime(j * 60000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_MINUTE_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[minute(0), minute(1),minute(0), minute(1),minute(0), minute(1),minute(0), minute(1),minute(0), minute(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_MINUTE);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalTimeToInt){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTime(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_INT_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalTimeToString){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTime(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_STRING_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalMinuteToTime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_MINUTE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_MINUTE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createMinute(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_TIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[time(0), time(60000),time(0), time(60000),time(0), time(60000),time(0), time(60000),time(0), time(60000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_TIME);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalMinuteToDatetime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_MINUTE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_MINUTE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createMinute(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_DATETIME_ARRAY));
+
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalMinuteToNanotime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_MINUTE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_MINUTE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createMinute(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotime(0), nanotime(60000000000),nanotime(0), nanotime(60000000000),\
+                    nanotime(0), nanotime(60000000000),nanotime(0), nanotime(60000000000),nanotime(0), nanotime(60000000000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIME);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalMinuteToSecond){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_MINUTE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_MINUTE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createMinute(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_SECOND_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[second(0), second(60),second(0), second(60),second(0), second(60),second(0), second(60),second(0), second(60)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_SECOND);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalMinuteToMinute){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_MINUTE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_MINUTE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createMinute(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_MINUTE_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[minute(0), minute(1),minute(0), minute(1),minute(0), minute(1),minute(0), minute(1),minute(0), minute(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_MINUTE);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalMinuteToInt){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_MINUTE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_MINUTE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createMinute(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_INT_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalMinuteToString){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_MINUTE_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_MINUTE, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createMinute(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_STRING_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalSecondToTime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_SECOND_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_SECOND, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createSecond(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_TIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[time(0), time(1000),time(0), time(1000),time(0), time(1000),time(0), time(1000),time(0), time(1000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_TIME);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalSecondToDatetime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_SECOND_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_SECOND, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createSecond(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_DATETIME_ARRAY));
+
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalSecondToNanotime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_SECOND_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_SECOND, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createSecond(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotime(0), nanotime(1000000000),nanotime(0), nanotime(1000000000),\
+                    nanotime(0), nanotime(1000000000),nanotime(0), nanotime(1000000000),nanotime(0), nanotime(1000000000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIME);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalSecondToSecond){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_SECOND_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_SECOND, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createSecond(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_SECOND_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[second(0), second(1),second(0), second(1),second(0), second(1),second(0), second(1),second(0), second(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_SECOND);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalSecondToMinute){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_SECOND_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_SECOND, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createSecond(j * 60));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_MINUTE_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[minute(0), minute(1),minute(0), minute(1),minute(0), minute(1),minute(0), minute(1),minute(0), minute(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_MINUTE);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalSecondToInt){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_SECOND_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_SECOND, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createSecond(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_INT_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalSecondToString){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_SECOND_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_SECOND, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createSecond(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_STRING_ARRAY));
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimeToNanotime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createSecond(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotime(0), nanotime(1),nanotime(0), nanotime(1),nanotime(0), nanotime(1),nanotime(0), nanotime(1),nanotime(0), nanotime(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIME);
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimeToTime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTime(j * 1000000000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_TIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[time(0), time(1000),time(0), time(1000),time(0), time(1000),time(0), time(1000),time(0), time(1000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_TIME);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimeToDatetime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTime(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_DATETIME_ARRAY));
+
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimeToSecond){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTime(j * 1000000000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_SECOND_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[second(0), second(1),second(0), second(1),second(0), second(1),second(0), second(1),second(0), second(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_SECOND);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimeToMinute){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTime(j * (long)60000000000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_MINUTE_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[minute(0), minute(1),minute(0), minute(1),minute(0), minute(1),minute(0), minute(1),minute(0), minute(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_MINUTE);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimeToInt){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTime(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_INT_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimeToString){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIME_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIME, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTime(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_STRING_ARRAY));
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalTimestampToTime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTimestamp(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_TIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[time(0), time(1),time(0), time(1),time(0), time(1),time(0), time(1),time(0), time(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_TIME);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalTimestampToDatetime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTimestamp(j * 1000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_DATETIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[datetime(0), datetime(1),datetime(0), datetime(1),datetime(0), datetime(1),datetime(0), datetime(1),datetime(0), datetime(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATETIME);
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalTimestampToDatehour){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTimestamp(j * 3600000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_DATEHOUR_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[datehour(0), datehour(1),datehour(0), datehour(1),datehour(0), datehour(1),datehour(0), datehour(1),datehour(0), datehour(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATEHOUR);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalTimestampToNanotime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTimestamp(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotime(0), nanotime(1000000),nanotime(0), nanotime(1000000),nanotime(0), nanotime(1000000),nanotime(0), nanotime(1000000),nanotime(0), nanotime(1000000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIME);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalTimestampToNanotimestamp){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTimestamp(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIMESTAMP_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotimestamp(0), nanotimestamp(1000000),nanotimestamp(0), nanotimestamp(1000000),\
+                    nanotimestamp(0), nanotimestamp(1000000),nanotimestamp(0), nanotimestamp(1000000),nanotimestamp(0), nanotimestamp(1000000)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIMESTAMP);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalTimestampToDate){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTimestamp(j * 86400000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_DATE_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[date(0), date(1),date(0), date(1),date(0), date(1),date(0), date(1),date(0), date(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATE);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalTimestampToMonth){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTimestamp(j * 3000000000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_MONTH_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[month(23640), month(23641),month(23640), month(23641),month(23640), month(23641),month(23640), month(23641),month(23640), month(23641)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_MONTH);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalTimestampToSecond){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTimestamp(j * 1000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_SECOND_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[second(0), second(1),second(0), second(1),second(0), second(1),second(0), second(1),second(0), second(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_SECOND);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalTimestampToInt){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTimestamp(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_INT_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalTimestampToString){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_TIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_TIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createTimestamp(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_STRING_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimestampToDatetime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTimestamp(j * 1000000000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_DATETIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[datetime(0), datetime(1),datetime(0), datetime(1),datetime(0), datetime(1),datetime(0), datetime(1),datetime(0), datetime(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATETIME);
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimestampToDatehour){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTimestamp(j * 3600000000000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_DATEHOUR_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[datehour(0), datehour(1),datehour(0), datehour(1),datehour(0), datehour(1),datehour(0), datehour(1),datehour(0), datehour(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATEHOUR);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimestampToNanotime){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTimestamp(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIME_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotime(0), nanotime(1),nanotime(0), nanotime(1),nanotime(0), nanotime(1),nanotime(0), nanotime(1),nanotime(0), nanotime(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIME);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimestampToNanotimestamp){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTimestamp(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_NANOTIMESTAMP_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[nanotimestamp(0), nanotimestamp(1),nanotimestamp(0), nanotimestamp(1),\
+                    nanotimestamp(0), nanotimestamp(1),nanotimestamp(0), nanotimestamp(1),nanotimestamp(0), nanotimestamp(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_NANOTIMESTAMP);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimestampToDate){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTimestamp(j * (long)86400000000000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_DATE_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[date(0), date(1),date(0), date(1),date(0), date(1),date(0), date(1),date(0), date(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_DATE);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimestampToMonth){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTimestamp(j * (long long)3000000000000000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_MONTH_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[month(23640), month(23641),month(23640), month(23641),month(23640), month(23641),month(23640), month(23641),month(23640), month(23641)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_MONTH);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimestampToSecond){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTimestamp(j * 1000000000));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    av1 = av0->castTemporal(DT_SECOND_ARRAY);
+
+    string script1 = "index=2 4 6 8 10;\
+                    v=[second(0), second(1),second(0), second(1),second(0), second(1),second(0), second(1),second(0), second(1)];\
+                    arrayVector(index,v)";
+    VectorSP av1_ex = conn.run(script1);
+    EXPECT_EQ(av1->getString(), av1_ex->getString());
+    EXPECT_EQ(av1->getType(), av1_ex->getType());
+    EXPECT_EQ(av1->get(0)->getForm(), DF_VECTOR);
+    EXPECT_EQ(av1->get(0)->get(0)->getType(), DT_SECOND);
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimestampToInt){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTimestamp(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_INT_ARRAY));
+}
+
+
+TEST_F(ArrayVectorTest,testCastTemporalNanotimestampToString){
+    VectorSP av1;
+    VectorSP av0 = Util::createArrayVector(DT_NANOTIMESTAMP_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_NANOTIMESTAMP, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createNanoTimestamp(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av0->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_STRING_ARRAY));
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalMonthToDate){
+    VectorSP av0;
+    VectorSP av1 = Util::createArrayVector(DT_MONTH_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_MONTH, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createMonth(j / 30));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av1->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av0 = av1->castTemporal(DT_DATE_ARRAY));
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalIntToDate){
+    VectorSP av0;
+    VectorSP av1 = Util::createArrayVector(DT_INT_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_INT, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createInt(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av1->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av0 = av1->castTemporal(DT_DATE_ARRAY));
+}
+
+TEST_F(ArrayVectorTest,testCastTemporalSecondToDate){
+    VectorSP av0;
+    VectorSP av1 = Util::createArrayVector(DT_SECOND_ARRAY, 0, 10);
+    for (int i = 0; i < 5; i++) {
+        VectorSP time = Util::createVector(DT_SECOND, 2);
+        for (int j = 0; j < 2; j++) {
+            time->set(j, Util::createSecond(j * 1));
+        }
+        VectorSP anyv1 = Util::createVector(DT_ANY, 1);
+        anyv1->set(0, time);
+        av1->append(anyv1);
+    }
+    EXPECT_ANY_THROW(av0 = av1->castTemporal(DT_DATE_ARRAY));
 }

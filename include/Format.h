@@ -43,7 +43,7 @@ private:
     int segmentCount_;
     FormatSegment segments_[12];
 
-    static const vector<pair<int, int> > formatMap;  // first:timeUnitIndex_ second:timeUnit max length
+    static vector<pair<int, int> > formatMap;  // first:timeUnitIndex_ second:timeUnit max length
     static const string pmString;
     static const string amString;
     static const char* monthName[12];

@@ -35,6 +35,10 @@ namespace dolphindb{
 class PytoDdbRowPool;
 class EXPORT_DECL  MultithreadedTableWriter {
 public:
+    enum Mode{
+        M_Append,
+        M_Upsert,
+    };
     struct ThreadStatus{
         long threadId;
         long sentRows,unsentRows,sendFailedRows;
@@ -59,7 +63,8 @@ public:
     MultithreadedTableWriter(const std::string& host, int port, const std::string& userId, const std::string& password,
                             const string& dbPath, const string& tableName, bool useSSL, bool enableHighAvailability = false, const vector<string> *pHighAvailabilitySites = nullptr,
 							int batchSize = 1, float throttle = 0.01f,int threadCount = 1, const string& partitionCol ="",
-							const vector<COMPRESS_METHOD> *pCompressMethods = nullptr);
+							const vector<COMPRESS_METHOD> *pCompressMethods = nullptr, Mode mode = M_Append,
+                            vector<string> *pModeOption = nullptr);
 
     ~MultithreadedTableWriter();
 
@@ -105,6 +110,7 @@ public:
 private:
 	bool insert(std::vector<ConstantSP> **records, int recordCount, ErrorCodeInfo &errorInfo);
 	void setError(int code, const string &info);
+    void setError(const ErrorCodeInfo &errorInfo);
     DATA_TYPE getColDataType(int colIndex) {
 		DATA_TYPE dataType = colTypes_[colIndex];
 		if (dataType >= ARRAY_TYPE_BASE)
@@ -153,7 +159,7 @@ private:
     std::vector<string> colNames_,colTypeString_;
     std::vector<DATA_TYPE> colTypes_;
 	std::vector<COMPRESS_METHOD> compressMethods_;
-	//Following parameters only valid in multithread mode
+    //Following parameters only valid in multithread mode
     SmartPointer<Domain> partitionDomain_;
     int partitionColumnIdx_;
     int threadByColIndexForNonPartion_;
@@ -166,6 +172,7 @@ private:
 	SynchronizedQueue<std::vector<ConstantSP>*> unusedQueue_;
     friend class PytoDdbRowPool;
     PytoDdbRowPool *pytoDdb_;
+    Mode mode_;
 public:
     PytoDdbRowPool * getPytoDdb(){ return pytoDdb_;}
 };

@@ -488,7 +488,7 @@ ConstantSP IntSet::getSubVector(INDEX start, INDEX length) const {
 
 void LongSet::contain(const ConstantSP& target, const ConstantSP& resultSP) const {
 	if(target->isScalar()){
-		resultSP->setBool(data_.find(target->getInt()) != data_.end());
+		resultSP->setBool(data_.find(target->getLong()) != data_.end());
 	}
 	else{
 		ConstantSP source = (target->isSet() ? target->keys() : target);

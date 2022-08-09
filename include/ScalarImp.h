@@ -254,6 +254,7 @@ public:
 	virtual int getHash(int buckets) const { return murmur32_16b(uuid_) % buckets;}
 	static string toString(const unsigned char* data);
 	static Int128* parseInt128(const char* str, int len);
+	static bool parseInt128(const char* str, int len, unsigned char *buf);
 
 protected:
 	mutable unsigned char uuid_[16];

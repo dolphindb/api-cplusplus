@@ -11,7 +11,8 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
 										const string& dbName, const string& tableName, bool useSSL,
 										bool enableHighAvailability, const vector<string> *pHighAvailabilitySites,
 										int batchSize, float throttle, int threadCount, const string& partitionCol,
-										const vector<COMPRESS_METHOD> *pCompressMethods):
+										const vector<COMPRESS_METHOD> *pCompressMethods, MultithreadedTableWriter::Mode mode,
+                                        vector<string> *pModeOption):
                         dbName_(dbName),
                         tableName_(tableName),
                         batchSize_(batchSize),
@@ -19,6 +20,7 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
 						hasError_(false),
 						exited_(false)
                         //,pytoDdb_(new PytoDdbRowPool(*this))
+                        ,mode_(mode)
                         {
     if(threadCount < 1){
         throw RuntimeException("The parameter threadCount must be greater than or equal to 1");
@@ -54,8 +56,8 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
     }
 
     DictionarySP schema;
-    if(tableName.empty()){
-        schema = pConn->run("schema(" + dbName + ")");
+    if(dbName.empty()){
+        schema = pConn->run("schema(" + tableName + ")");
     }else{
         schema = pConn->run(std::string("schema(loadTable(\"") + dbName + "\",\"" + tableName + "\"))");
     }
@@ -63,7 +65,7 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
     if(partColNames->isNull()==false){//partitioned table
         isPartionedTable_ = true;
     }else{//Not partitioned table
-        if (tableName.empty() == false) {//Single partitioned table
+        if (dbName.empty() == false) {//Single partitioned table
 			if (threadCount > 1) {
 				throw RuntimeException("The parameter threadCount must be 1 for a dimension table");
 			}
@@ -143,36 +145,31 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
 			}
 		}
 	}
-    {
-        if(tableName_.empty()){//memory table
-            scriptTableInsert_ = std::move(std::string("tableInsert{\"") + dbName_ + "\"}");
+    if(mode == M_Append){
+        if(dbName_.empty()){//memory table
+            scriptTableInsert_ = std::move(std::string("tableInsert{") + tableName_ + "}");
         }else if(isPartionedTable_){//partitioned table
             scriptTableInsert_ = std::move(std::string("tableInsert{loadTable(\"") + dbName_ + "\",\"" + tableName_ + "\")}");
         }else{//single partitioned table
             scriptTableInsert_ = std::move(std::string("tableInsert{loadTable(\"") + dbName_ + "\",\"" + tableName_ + "\")}");
-            //Remove support for disk table
-            /*{
-                std::string tempTableName = "tmp" +  tableWriter_.tableName_;
-                std::string colNames;
-                std::string colTypes;
-                for(unsigned int i = 0; i < tableWriter_.colNames_.size(); i++){
-                    colNames += "`" + tableWriter_.colNames_[i];
-                    colTypes += "`" + tableWriter_.colTypeString_[i];
-                }
-                std::string scriptCreateTmpTable = std::move(std::string("tempTable = table(") + "1000:0," + colNames + "," + colTypes + ")");
-                try{
-                    writeThread_.conn->run(scriptCreateTmpTable);
-                }catch(std::exception &e){
-                    DLogger::Error("threadid=", writeThread_.threadId, " Init table error: ", e.what()," script:", scriptCreateTmpTable);
-                    tableWriter_.setDestroyed(ErrorCodeInfo::EC_Server,std::string("Init table error: ")+e.what()+" script: "+scriptCreateTmpTable);
-                    //std::cerr << Util::createTimestamp(Util::getEpochTime())->getString() << " Backgroud thread of table (" << tableWriter_.dbName_ << " " << tableWriter_.tableName_ << "). Failed to init data to server, with exception: " << e.what() << std::endl;
-                    return false;
-                }
-            }
-            writeThread_.scriptTableInsert = std::move(std::string("tableInsert{tempTable}"));
-            writeThread_.scriptSaveTable = std::move(std::string("saveTable(database(\"") + tableWriter_.dbName_ + "\")" + ",tempTable,\"" + tableWriter_.tableName_ + "\", 1);tempTable.clear!();");
-            */
         }
+    }else if(mode == M_Upsert){
+        //upsert!(obj, newData, [ignoreNull=false], [keyColNames], [sortColumns])
+        if(dbName_.empty()){//memory table
+            scriptTableInsert_ = std::move(std::string("upsert!{") + tableName_);
+        }else if(isPartionedTable_){//partitioned table
+            scriptTableInsert_ = std::move(std::string("upsert!{loadTable(\"") + dbName_ + "\",\"" + tableName_ + "\")");
+        }else{//single partitioned table
+            scriptTableInsert_ = std::move(std::string("upsert!{loadTable(\"") + dbName_ + "\",\"" + tableName_ + "\")");
+        }
+        //ignore newData
+        scriptTableInsert_+=",";
+        if(pModeOption!=nullptr && pModeOption->empty()==false){
+            for(auto &one : *pModeOption){
+                scriptTableInsert_+=","+one;
+            }
+        }
+        scriptTableInsert_+="}";
     }
     // init done, start thread now.
     threads_.resize(threadCount);
@@ -228,19 +225,25 @@ void MultithreadedTableWriter::waitForThreadCompletion() {
 	for(auto &thread : threads_){
 		thread.writeThread->join();
     }
-    for(auto &thread : threads_){
-        thread.conn->close();
-    }
+	for (auto &thread : threads_) {
+		thread.conn->close();
+	}
     //pytoDdb_->endExit();
 	setError(0, "");
 	exited_ = true;
     //DLogger::Info(RecordTime::printAllTime());
 }
 
-void MultithreadedTableWriter::setError(int code, const string &info){
+void MultithreadedTableWriter::setError(const ErrorCodeInfo &errorInfo){
     if(hasError_.exchange(true))
         return;
-	errorInfo_.set(code, info);
+	errorInfo_.set(errorInfo);
+}
+
+void MultithreadedTableWriter::setError(int code, const string &info){
+    ErrorCodeInfo errorInfo;
+    errorInfo.set(code,info);
+    setError(errorInfo);
 }
 
 bool MultithreadedTableWriter::SendExecutor::init(){
@@ -251,7 +254,8 @@ bool MultithreadedTableWriter::SendExecutor::init(){
 bool MultithreadedTableWriter::insert(std::vector<ConstantSP> **records, int recordCount, ErrorCodeInfo &errorInfo){
     RECORDTIME("MTW:insert");
 	if (hasError_.load()) {
-		throw RuntimeException("Thread is exiting.");
+		errorInfo.set(ErrorCodeInfo::EC_DestroyedObject, "Thread is exiting.");
+        return false;
 	}
 	//To speed up, ignore check
 	/*
@@ -273,16 +277,16 @@ bool MultithreadedTableWriter::insert(std::vector<ConstantSP> **records, int rec
 	}
 	*/
     if(threads_.size() > 1){
-        if(isPartionedTable_){
+		if (isPartionedTable_) {
 			VectorSP pvector = Util::createVector(getColDataType(partitionColumnIdx_), recordCount, 0);
-            for(int i=0; i < recordCount; i++){
-                pvector->set(i, records[i]->at(partitionColumnIdx_));
-            }
-            vector<int> threadindexes = partitionDomain_->getPartitionKeys(pvector);
-            for(unsigned int row = 0; row < threadindexes.size(); row++){
-                insertThreadWrite(threadindexes[row], records[row]);
-            }
-        }else{
+			for (int i = 0; i < recordCount; i++) {
+				pvector->set(i, records[i]->at(partitionColumnIdx_));
+			}
+			vector<int> threadindexes = partitionDomain_->getPartitionKeys(pvector);
+			for (unsigned int row = 0; row < threadindexes.size(); row++) {
+				insertThreadWrite(threadindexes[row], records[row]);
+			}
+		}else{
             int threadindex;
             for(int i=0; i < recordCount; i++){
                 threadindex = records[i]->at(threadByColIndexForNonPartion_)->getHash(threads_.size());
@@ -419,18 +423,23 @@ bool MultithreadedTableWriter::SendExecutor::writeAllData(){
         }
 		if(writeOK && addRowCount > 0){//save table
             RECORDTIME("MTW:saveTable");
-            std::vector<ConstantSP> args;
-            args.reserve(1);
-            args.push_back(writeTable);
+            std::vector<ConstantSP> args(1);
+            args[0] = writeTable;
             runscript = tableWriter_.scriptTableInsert_;
             ConstantSP constsp = writeThread_.conn->run(runscript, args);
-			int addresult = constsp->getInt();
-			if (addresult != addRowCount) {
-				std::cout << "Write complete size " << addresult << " mismatch insert size "<< addRowCount;
-			}
+            runscript.clear();
+            if(constsp->getType() == DT_INT && constsp->getForm() == DF_SCALAR){
+                int addresult = constsp->getInt();
+                if (addresult != addRowCount) {
+                    std::cout << "Rows changed: " << addresult << " / "<< addRowCount<< std::endl;
+                }
+            }else{
+                std::cout << "None row changed of "<< addRowCount<< std::endl;
+            }
             if (tableWriter_.scriptSaveTable_.empty() == false){
                 runscript = tableWriter_.scriptSaveTable_;
                 writeThread_.conn->run(runscript);
+                runscript.clear();
             }
             {
                 writeThread_.sentRows += addRowCount;
@@ -449,8 +458,12 @@ bool MultithreadedTableWriter::SendExecutor::writeAllData(){
 			}
         }
     }catch (std::exception &e){
-        DLogger::Error("threadid", writeThread_.threadId, "Failed to save the inserted data: ", e.what()," script:", runscript);
-        tableWriter_.setError(ErrorCodeInfo::EC_Server,std::string("Failed to save the inserted data: ")+e.what()+" script: "+runscript);
+        string errmsg=e.what();
+        if(runscript.empty()==false && errmsg.find(" script:")==string::npos){
+            errmsg+=" script: "+runscript;
+        }
+        DLogger::Error("threadid", writeThread_.threadId, "Failed to save the inserted data: ", errmsg);
+        tableWriter_.setError(ErrorCodeInfo::EC_Server,std::string("Failed to save the inserted data: ")+errmsg);
 		writeOK = false;
     }
     if (writeOK == false){

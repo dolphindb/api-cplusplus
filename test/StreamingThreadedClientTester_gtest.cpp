@@ -1,127 +1,837 @@
-#include <assert.h>
 #include <iostream>
 
 class StreamingThreadedClientTester:public testing::Test
 {
 protected:
-    static void SetUpTestCase()
-    {
-        conn.connect(hostName,port);
-        cout << "run script...";    
-        string script="n=2000;\
-        share streamTable(n:0,`time`sym`qty`price`exch`index,[TIMESTAMP,SYMBOL,INT,DOUBLE,SYMBOL,LONG]) as trades;\
-        rows = 1;\
-        timev = take(now(), rows);\
-        symv = take(`MKFT, rows);\
-        qtyv = take(112, rows);\
-        pricev = take(53.75, rows);\
-        exchv = take(`N, rows);\
-        for (x in 0:2000) {\
-            insert into trades values(timev, symv, qtyv, pricev, exchv,x);\
-        }";
-        conn.run(script);
-        cout << "OK" << endl;   
+    //Suite
+    static void SetUpTestCase() {
+        //DBConnection conn;
+
+		conn.initialize();
+        bool ret = conn.connect(hostName, port, "admin", "123456");
+        if (!ret) {
+            cout << "Failed to connect to the server" << endl;
+        }
+        else {
+            cout << "connect to " + hostName + ":" + std::to_string(port)<<endl;
+        }
     }
-    static void TearDownTestCase()
+    static void TearDownTestCase(){
+        usedPorts.clear();
+        conn.close();
+    }
+
+    //Case
+    virtual void SetUp()
+    {
+        cout<<"check connect...";
+		ConstantSP res = conn.run("1+1");
+		if(!(res->getBool())){
+			cout<<"Server not responed, please check."<<endl;
+		}
+		else
+		{
+			cout<<"ok"<<endl;
+            string del_streamtable="login(\"admin\",\"123456\");\n\
+                                    try{ dropStreamTable(`outTables);dropStreamTable(`st1) }\
+                                    catch(ex){}";
+            conn.run(del_streamtable);
+		}
+    }
+    virtual void TearDown()
     {
         pass;
     }
-    // Some expensive resource shared by all tests.
 };
 
-// class Executor : public dolphindb::Runnable {
-//     using Func = std::function<void()>;
+void createSharedTableAndReplay() {
+	string script = "login(\"admin\",\"123456\")\n\
+            st1 = streamTable(100:0, `datetimev`timestampv`sym`price1`price2,[DATETIME,TIMESTAMP,SYMBOL,DOUBLE,DOUBLE])\n\
+            enableTableShareAndPersistence(table=st1, tableName=`outTables, asynWrite=true, compress=true, cacheSize=200000, retentionMinutes=180, preCache = 0)\n\
+            go\n\
+            setStreamTableFilterColumn(outTables, `sym)";
+	conn.run(script);
 
-// public:
-//     explicit Executor(Func f) : func_(std::move(f)){};
-//     void run() override { func_(); };
+	string replayScript = "n = 1000;table1_STCT = table(100:0, `datetimev`timestampv`sym`price1`price2, [DATETIME, TIMESTAMP, SYMBOL, DOUBLE, DOUBLE]);\
+            tableInsert(table1_STCT, 2012.01.01T01:21:23 + 1..n, 2018.12.01T01:21:23.000 + 1..n, take(`a`b`c,n), rand(100,n)+rand(1.0, n), rand(100,n)+rand(1.0, n));\
+            replay(inputTables=table1_STCT, outputTables=`outTables, dateColumn=`timestampv, timeColumn=`timestampv)";
+	conn.run(replayScript);
+}
 
-// private:
-//     Func func_;
-// };
 
-TEST_F(StreamingThreadedClientTester,test_basic){
-    int count=0;
-    auto handler =[&](Message msg){
-        ConstantSP res = msg->get(5);
-        size_t len = res->size();
-        for (int i=0; i<len; i++){
-            ConstantSP row = res->getRow(i);
-            long long value = row->getLong();
-            count++;
-            cout<< "Index:"+to_string(value)<<";";
-        }
+TEST_F(StreamingThreadedClientTester,test_subscribe_onehandler){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto onehandler = [&](Message msg) {
+		msg_total += 1;
+		// cout << msg->getString() << endl;
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, onehandler, "outTables", "mutiSchemaOne", 0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "mutiSchemaOne");
+    usedPorts.push_back(listenport);
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,1000);
+}
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_batchhandler){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto batchhandler = [&](vector<Message> msgs) {
+		for (auto &msg : msgs) {
+			msg_total += 1;
+			// cout  << msg->getString() << endl;
+		}
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
     };
 
-    srand(time(0));
-    int listenport = rand() % 1000 + 50000;
-    ThreadedClient client(listenport);
-    auto t = client.subscribe(hostName, port, handler, table, DEFAULT_ACTION_NAME,0);
-    // auto t1 = client.subscribe(hostName, port, handler, table, DEFAULT_ACTION_NAME, 0);//重复订阅没报错但test程序无法自动结束
-    Util::sleep(1);
-    client.unsubscribe(hostName, port, table);//取消订阅成功
-    t->join();
-    // auto t1 = client.subscribe(hostName, port, handler, "Not exsit", DEFAULT_ACTION_NAME, 0); // host不存在或者table不存在成功，会显示不存在这个表或无法连接到这个服务器。
-    // client.unsubscribe(hostName, port, table);
-    // t1->join();
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, batchhandler, "outTables", "mutiSchemaBatch", 0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "mutiSchemaBatch");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,1000);
+}
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_onehandler_tableNameNull){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto onehandler = [&](Message msg) {
+		msg_total += 1;
+		cout << msg->getString() << endl;
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    usedPorts.push_back(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, onehandler, "");
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "mutiSchemaOne");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,0);
+}
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_batchhandler_tableNameNull){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto batchhandler = [&](vector<Message> msgs) {
+		for (auto &msg : msgs) {
+			msg_total += 1;
+			// cout  << msg->getString() << endl;
+		}
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    usedPorts.push_back(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, batchhandler, "");
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "mutiSchemaOne");
+    usedPorts.push_back(listenport);
     
-    assert(count==2000);
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,0);
 }
 
-TEST_F(StreamingThreadedClientTester,test_batchSize){
-    MessageBatchHandler handler =[&](vector<Message> msg){
+TEST_F(StreamingThreadedClientTester,test_subscribe_onehandler_offsetNegative){
+    createSharedTableAndReplay();
+	int msg_total = 0;
 
-        for (int j=0;j<msg.size();++j){
-            
-            ConstantSP res = msg[j]->get(5);
-            size_t len = res->size();
-            for (int i=0; i<len; i++){
-                ConstantSP row = res->getRow(i);
-                long long value = row->getLong();
-                
-            }
-            
-        }
-        
-        assert(msg.size()==50);//确定每一次处理数量为50
+	auto onehandler = [&](Message msg) {
+		msg_total += 1;
+		// cout << msg->getString() << endl;
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
     };
 
-    srand(time(0));
-    int listenport = rand() % 1000 + 50000;
-    ThreadedClient client(listenport);
-    auto t = client.subscribe(hostName, port, handler, table, DEFAULT_ACTION_NAME, 0, true, nullptr, false,50, 5);
-    Util::sleep(10);
-    client.unsubscribe(hostName, port, table);
-    t->join();
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, onehandler, "outTables", "actionTest", -1);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,0);
 }
 
-TEST_F(StreamingThreadedClientTester,test_throttle){
-    auto Time0 = time(NULL);
+TEST_F(StreamingThreadedClientTester,test_subscribe_batchhandler_offsetNegative){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto batchhandler = [&](vector<Message> msgs) {
+		for (auto &msg : msgs) {
+			msg_total += 1;
+			// cout  << msg->getString() << endl;
+		}
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, batchhandler, "outTables", "actionTest", -1);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,0);
+}
+
+// TEST_F(StreamingThreadedClientTester,test_subscribe_onehandler_offsetMoreThanRows){
+//     createSharedTableAndReplay();
+// 	int msg_total = 0;
+
+// 	auto onehandler = [&](Message msg) {
+// 		msg_total += 1;
+// 		// cout << msg->getString() << endl;
+// 	};
+
+// 	srand(time(0));
+
+    // int listenport = rand() % 13000 + 2000;
+    // if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+    //     listenport = rand() % 13000 + 2000;
+    // };
+
+//     ThreadedClient threadedClient(listenport);
+//     auto thread = threadedClient.subscribe(hostName, port, onehandler, "outTables", "actionTest", 2001);
+//     Util::sleep(2000);
+//     cout << "total size: " << msg_total << endl;
+//     threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+    // usedPorts.push_back(listenport);
+//     EXPECT_EQ(msg_total,0);
+// }
+
+// TEST_F(StreamingThreadedClientTester,test_subscribe_batchhandler_offsetMoreThanRows){
+//     createSharedTableAndReplay();
+// 	int msg_total = 0;
+
+	// auto batchhandler = [&](vector<Message> msgs) {
+	// 	for (auto &msg : msgs) {
+	// 		msg_total += 1;
+	// 		// cout  << msg->getString() << endl;
+	// 	}
+	// };
+
+// 	srand(time(0));
+
+    // int listenport = rand() % 13000 + 2000;
+    // if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+    //     listenport = rand() % 13000 + 2000;
+    // };
+
+//     ThreadedClient threadedClient(listenport);
+//     auto thread = threadedClient.subscribe(hostName, port, batchhandler, "outTables", "actionTest", 2001);
+//     Util::sleep(2000);
+//     cout << "total size: " << msg_total << endl;
+//     threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+    // usedPorts.push_back(listenport);
+//     EXPECT_EQ(msg_total,0);
+// }
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_onehandler_filter){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto onehandler = [&](Message msg) {
+		msg_total += 1;
+		// cout << msg->getString() << endl;
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    VectorSP filter=Util::createVector(DT_SYMBOL,1,1);
+    filter->setString(0,"b");
+    auto thread = threadedClient.subscribe(hostName, port, onehandler, "outTables", "actionTest", 0, true, filter);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");    
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total>0,true);
+}
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_batchhandler_filter){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto batchhandler = [&](vector<Message> msgs) {
+		for (auto &msg : msgs) {
+			msg_total += 1;
+			// cout  << msg->getString() << endl;
+		}
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    VectorSP filter=Util::createVector(DT_SYMBOL,1,1);
+    filter->setString(0,"b");
+    auto thread = threadedClient.subscribe(hostName, port, batchhandler, "outTables", "actionTest", 0, true, filter);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");    
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total>0,true);
+}
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_onehandler_msgAsTable){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto onehandler = [&](Message msg) {
+        TableSP t = (TableSP)msg;
+        msg_total += t->rows();
+        EXPECT_EQ(msg->getForm(),6);
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, onehandler, "outTables", "actionTest", 0, true, nullptr,true);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,1000);
+}
+
+// TEST_F(StreamingThreadedClientTester,test_subscribe_batchhandler_msgAsTable){
+//     createSharedTableAndReplay();
+// 	int msg_total = 0;
+
+// 	auto batchhandler = [&](vector<Message> msgs) {
+// 		for (auto &msg : msgs) {
+//             TableSP t = (TableSP)msg;
+//             msg_total += t->rows();
+//             EXPECT_EQ(msg->getForm(),6);
+// 		}
+// 	};
+
+// 	srand(time(0));
+
+    // int listenport = rand() % 13000 + 2000;
+    // if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+    //     listenport = rand() % 13000 + 2000;
+    // };
+
+//     ThreadedClient threadedClient(listenport);
+//     auto thread = threadedClient.subscribe(hostName, port, batchhandler, "outTables", "actionTest", 0, true, nullptr,true);
+//     Util::sleep(2000);
+//     cout << "total size: " << msg_total << endl;
+//     threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+//     usedPorts.push_back(listenport);
+//     EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    // EXPECT_EQ(msg_total,1000);
+// }
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_onehandler_allowExists){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto onehandler = [&](Message msg) {
+		msg_total += 1;
+		// cout << msg->getString() << endl;
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, onehandler, "outTables", "actionTest", 0, true, nullptr,false,true);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,1000);
+}
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_batchhandler_allowExists){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto batchhandler = [&](vector<Message> msgs) {
+		for (auto &msg : msgs) {
+			msg_total += 1;
+			// cout  << msg->getString() << endl;
+		}
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, batchhandler, "outTables", "actionTest", 0, true, nullptr,false,true);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,1000);
+}
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_batchhandler_batchSize){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto batchhandler = [&](vector<Message> msgs) {
+		for (auto &msg : msgs) {
+			msg_total += 1;
+			// cout  << msg->getString() << endl;
+		}
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, batchhandler, "outTables", "actionTest",0,true,nullptr,false,1000);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,1000);
+}
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_batchhandler_throttle){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto batchhandler = [&](vector<Message> msgs) {
+		for (auto &msg : msgs) {
+			msg_total += 1;
+			// cout  << msg->getString() << endl;
+		}
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, batchhandler, "outTables", "actionTest",0,true,nullptr,false,1000,1.0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,1000);
+}
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_onehandler_hostNull){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto onehandler = [&](Message msg) {
+		msg_total += 1;
+		// cout << msg->getString() << endl;
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    usedPorts.push_back(listenport);
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe("", port, onehandler, "outTables", "actionTest", 0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,0);
+
+}
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_batchhandler_hostNull){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto batchhandler = [&](vector<Message> msgs) {
+		for (auto &msg : msgs) {
+			msg_total += 1;
+			// cout  << msg->getString() << endl;
+		}
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    usedPorts.push_back(listenport);
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe("", port, batchhandler, "outTables", "actionTest", 0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,0);
+
+}
+
+// TEST_F(StreamingThreadedClientTester,test_subscribe_onehandler_portNull){
+//     createSharedTableAndReplay();
+// 	int msg_total = 0;
+
+// 	auto onehandler = [&](Message msg) {
+// 		msg_total += 1;
+// 		// cout << msg->getString() << endl;
+// 	};
+
+// 	srand(time(0));
+
+    // int listenport = rand() % 13000 + 2000;
+    // if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+    //     listenport = rand() % 13000 + 2000;
+    // };
+//     usedPorts.push_back(listenport);
+//     ThreadedClient threadedClient(listenport);
+//     EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, NULL, onehandler, "outTables", "actionTest", 0));
+
+// }
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_onehandler_actionNameNull){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto onehandler = [&](Message msg) {
+		msg_total += 1;
+		// cout << msg->getString() << endl;
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    usedPorts.push_back(listenport);
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, onehandler, "outTables", "", 0);
+    Util::sleep(2000);
+    TableSP stat = conn.run("getStreamingStat().pubTables");
+
+    EXPECT_EQ(stat->getColumn(0)->getRow(0)->getString(),"outTables");
+    EXPECT_EQ(stat->getColumn(2)->getRow(0)->getInt(),1000);
+    EXPECT_EQ(stat->getColumn(3)->getRow(0)->getString(),"");
+
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,1000);
+
+}
+
+TEST_F(StreamingThreadedClientTester,test_subscribe_batchhandler_actionNameNull){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto batchhandler = [&](vector<Message> msgs) {
+		for (auto &msg : msgs) {
+			msg_total += 1;
+			// cout  << msg->getString() << endl;
+		}
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    usedPorts.push_back(listenport);
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, batchhandler, "outTables", "", 0);
+    Util::sleep(2000);
+    TableSP stat = conn.run("getStreamingStat().pubTables");
+
+    EXPECT_EQ(stat->getColumn(0)->getRow(0)->getString(),"outTables");
+    EXPECT_EQ(stat->getColumn(2)->getRow(0)->getInt(),1000);
+    EXPECT_EQ(stat->getColumn(3)->getRow(0)->getString(),"");
+
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread),0);
+    EXPECT_EQ(msg_total,1000);
+
+}
+
+TEST_F(StreamingThreadedClientTester,test_unsubscribe_onehandler_hostNull){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto onehandler = [&](Message msg) {
+		msg_total += 1;
+		// cout << msg->getString() << endl;
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, onehandler, "outTables", "actionTest", 0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
     
-    MessageBatchHandler handler =[&](vector<Message> msg){
+    usedPorts.push_back(listenport);
+    EXPECT_ANY_THROW(threadedClient.unsubscribe("", port, "outTables", "actionTest"));
 
-        assert((time(NULL)-Time0)==5);//因为batchsize大于总msg数，确定需要等throttle的5秒之后再进行处理
-
-        for (int j=0;j<msg.size();++j){
-            
-            ConstantSP res = msg[j]->get(5);
-            size_t len = res->size();
-            for (int i=0; i<len; i++){
-                ConstantSP row = res->getRow(i);
-                long long value = row->getLong();
-                
-            }
-        }
-       
-    };
-
-    srand(time(0));
-    int listenport = rand() % 1000 + 50000;
-    ThreadedClient client(listenport);
-   
-    auto t = client.subscribe(hostName, port, handler, table, DEFAULT_ACTION_NAME, 0, true, nullptr, false,5000, 5);
-    Util::sleep(10);
-    client.unsubscribe(hostName, port, table);
-    t->join();
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
 }
 
+TEST_F(StreamingThreadedClientTester,test_unsubscribe_portNull){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto onehandler = [&](Message msg) {
+		msg_total += 1;
+		// cout << msg->getString() << endl;
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, onehandler, "outTables", "actionTest", 0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    
+    usedPorts.push_back(listenport);
+    EXPECT_ANY_THROW(threadedClient.unsubscribe(hostName, NULL, "outTables", "actionTest"));
+
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+}
+
+TEST_F(StreamingThreadedClientTester,test_unsubscribe_tableNameNull){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto onehandler = [&](Message msg) {
+		msg_total += 1;
+		// cout << msg->getString() << endl;
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, onehandler, "outTables", "actionTest", 0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    
+    usedPorts.push_back(listenport);
+    EXPECT_ANY_THROW(threadedClient.unsubscribe(hostName, port, "", "actionTest"));
+
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+}
+
+TEST_F(StreamingThreadedClientTester,test_unsubscribe_actionNameNull){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto onehandler = [&](Message msg) {
+		msg_total += 1;
+		// cout << msg->getString() << endl;
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    auto thread = threadedClient.subscribe(hostName, port, onehandler, "outTables", "actionTest", 0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    
+    usedPorts.push_back(listenport);
+    threadedClient.unsubscribe(hostName, port, "outTables", "");
+    TableSP stat = conn.run("getStreamingStat().pubTables");
+
+    EXPECT_EQ(stat->getColumn(0)->getRow(0)->getString(),"outTables");
+    EXPECT_EQ(stat->getColumn(2)->getRow(0)->getInt(),1000);
+    EXPECT_EQ(stat->getColumn(3)->getRow(0)->getString(),"actionTest");
+
+    threadedClient.unsubscribe(hostName, port, "outTables", "actionTest");
+}
+
+TEST_F(StreamingThreadedClientTester,tes_onehandlert_subscribe_twice){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto onehandler = [&](Message msg) {
+		msg_total += 1;
+		// cout << msg->getString() << endl;
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+    ThreadedClient threadedClient(listenport);
+    auto thread1 = threadedClient.subscribe(hostName, port, onehandler, "outTables", "mutiSchemaOne", 0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    auto thread2 = threadedClient.subscribe(hostName, port, onehandler, "outTables", "mutiSchemaOne", 0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "mutiSchemaOne");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread1),0);
+    EXPECT_EQ(msg_total, 1000);
+}
+
+TEST_F(StreamingThreadedClientTester,test_batchhandler_subscribe_twice){
+    createSharedTableAndReplay();
+	int msg_total = 0;
+
+	auto batchhandler = [&](vector<Message> msgs) {
+		for (auto &msg : msgs) {
+			msg_total += 1;
+			// cout  << msg->getString() << endl;
+		}
+	};
+
+	srand(time(0));
+
+    int listenport = rand() % 13000 + 2000;
+    if (find(usedPorts.begin(),usedPorts.end(),listenport) != usedPorts.end()){
+        listenport = rand() % 13000 + 2000;
+    };
+
+    ThreadedClient threadedClient(listenport);
+    auto thread1 = threadedClient.subscribe(hostName, port, batchhandler, "outTables", "mutiSchemaBatch", 0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    auto thread2 = threadedClient.subscribe(hostName, port, batchhandler, "outTables", "mutiSchemaBatch", 0);
+    Util::sleep(2000);
+    cout << "total size: " << msg_total << endl;
+    threadedClient.unsubscribe(hostName, port, "outTables", "mutiSchemaBatch");
+    usedPorts.push_back(listenport);
+
+    EXPECT_EQ(threadedClient.getQueueDepth(thread1),0);
+    EXPECT_EQ(msg_total, 1000);
+}

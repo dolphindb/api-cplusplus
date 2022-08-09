@@ -1,16 +1,33 @@
 class CompressTest:public testing::Test
 {
 protected:
+    //Suite
+    static void SetUpTestCase() {
+        //DBConnection conn;
+        bool ret = conn_compress.connect(hostName, port, "admin", "123456");
+        if (!ret) {
+            cout << "Failed to connect to the server" << endl;
+        }
+        else {
+            cout << "connect to " + hostName + ":" + std::to_string(port)<< endl;
+        }
+    }
+    static void TearDownTestCase(){
+        conn.close();
+    }
+
+    //Case
     virtual void SetUp()
     {
         cout<<"check connect...";
-		ConstantSP res = conn.run("1+1");
+		ConstantSP res = conn_compress.run("1+1");
 		if(!(res->getBool())){
 			cout<<"Server not responed, please check."<<endl;
 		}
 		else
 		{
 			cout<<"ok"<<endl;
+            
 		}
     }
     virtual void TearDown()
@@ -357,7 +374,7 @@ TEST_F(CompressTest,CompressVectorWithDiffType){
     vector<ConstantSP> colVector {timeVector,valueVector};
     TableSP table  = Util::createTable(colName,colVector);
     vector<COMPRESS_METHOD> typeVec{COMPRESS_DELTA,COMPRESS_LZ4};
-    //table->setColumnCompressTypes(typeVec);
+    table->setColumnCompressMethods(typeVec);
     vector<ConstantSP> args{table};
     conn_compress.run("share streamTable(1:0, `time`value,[DATE,LONG]) as table1");
     int success = conn_compress.run("tableInsert{table1}",args)->getInt();
@@ -372,8 +389,8 @@ TEST_F(CompressTest,CompressWithDiffIndfsTable){
                      "\tdropDatabase(dbName)\t\n"
                      "}\n"
                      "db = database(dbName,VALUE,`A`B`C)\n"
-                     "t1 = table(1:0,`id`name`value,[INT,SYMBOL,LONG])\n"
-                     "pt = db.createPartitionedTable(t1,`pt,`name,{\"id\":\"lz4\",\"value\":\"delta\"});";
+                     "t_CWDT = table(1:0,`id`name`value,[INT,SYMBOL,LONG])\n"
+                     "pt = db.createPartitionedTable(t_CWDT,`pt,`name,{\"id\":\"lz4\",\"value\":\"delta\"});";
     conn_compress.run(stricpt);
     const int count = 600000;
     vector<string> colName={"id","name","value"};

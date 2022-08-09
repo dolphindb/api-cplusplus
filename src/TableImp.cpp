@@ -385,11 +385,11 @@ bool AbstractTable::remove(const ConstantSP& indexSP, string& errMsg) {
 	return false;
 }
 
-BasicTable::BasicTable(const vector<ConstantSP>& cols, const vector<string>& colNames) : AbstractTable(new vector<string>(colNames)), readOnly_(false){
+BasicTable::BasicTable(const vector<ConstantSP>& cols, const vector<string>& colNames) : AbstractTable(new vector<string>(colNames)){
 	initData(cols, colNames);
 }
 
-BasicTable::BasicTable(const vector<ConstantSP>& cols, const vector<string>& colNames, const vector<int>& keys) : AbstractTable(new vector<string>(colNames)), readOnly_(false){
+BasicTable::BasicTable(const vector<ConstantSP>& cols, const vector<string>& colNames, const vector<int>& keys) : AbstractTable(new vector<string>(colNames)){
 	initData(cols, colNames);
 }
 
@@ -507,7 +507,7 @@ ConstantSP BasicTable::getInstance(int size) const {
 }
 
 bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string& errMsg){
-	if(readOnly_){
+	if(isReadOnly()){
 		errMsg = "Can't modify read only table.";
 		return false;
 	}
@@ -679,7 +679,7 @@ bool BasicTable::internalAppend(vector<ConstantSP>& values, string& errMsg){
 }
 
 bool BasicTable::update(vector<ConstantSP>& values, const ConstantSP& indexSP, vector<string>& colNames, string& errMsg){
-	if(readOnly_){
+	if(isReadOnly()){
 		errMsg = "Can't modify read only table.";
 		return false;
 	}
@@ -751,7 +751,7 @@ bool BasicTable::internalUpdate(vector<ConstantSP>& values, const ConstantSP& in
 
 
 bool BasicTable::remove(const ConstantSP& indexSP, string& errMsg){
-	if(readOnly_){
+	if(isReadOnly()){
 		errMsg = "Can't remove rows from a read only in-memory table.";
 		return false;
 	}
@@ -764,17 +764,20 @@ bool BasicTable::internalRemove(const ConstantSP& indexSP, string& errMsg){
 
 	for(int i=0; i<colCount; ++i){
 		VectorSP curCol(cols_[i]);
-		if(noIndex)
+		if (noIndex)
 			curCol->clear();
 		else
-			curCol->remove(indexSP);
+			if (!curCol->remove(indexSP)) {
+				//FIXME If we need restor vector?
+				throw RuntimeException("Invalid index array.");
+			}
 	}
 	size_ = cols_[0]->size();
 	return true;
 }
 
 void BasicTable::drop(vector<int>& columns){
-	if(readOnly_)
+	if(isReadOnly())
 		throw RuntimeException("Can't drop columns of a read only in-memory table.");
 	internalDrop(columns);
 }
@@ -800,7 +803,7 @@ void BasicTable::internalDrop(vector<int>& columns){
 }
 
 bool BasicTable::join(vector<ConstantSP>& columns){
-	if(readOnly_)
+	if(isReadOnly())
 		return false;
 
 	int num = columns.size();
@@ -822,7 +825,7 @@ bool BasicTable::join(vector<ConstantSP>& columns){
 }
 
 bool BasicTable::clear(){
-	if(readOnly_)
+	if(isReadOnly())
 		return false;
 	int num = columns();
 	for(int i=0; i<num; ++i)
@@ -840,7 +843,7 @@ long long BasicTable::getAllocatedMemory() const {
 }
 
 void BasicTable::updateSize() {
-	if(readOnly_)
+	if(isReadOnly())
 		return;
 
 	/* All columns are updated outside the table. So we need to update the size internally. */

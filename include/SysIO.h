@@ -17,16 +17,16 @@
 #define MAX_CAPACITY 65536
 #define MAX_PACKET_SIZE 1400
 
-#ifdef LINUX
+#ifdef WINDOWS
+	#include <winsock2.h>
+	#include <windows.h>
+#else
 	#include <netinet/in.h>
     #include <netinet/tcp.h>
     #include <sys/socket.h>
 	typedef int SOCKET;
 	#define INVALID_SOCKET -1
 	#define SOCKET_ERROR   -1
-#else
-	#include <winsock2.h>
-	#include <windows.h>
 #endif
 
 #include <openssl/err.h>
@@ -81,9 +81,13 @@ public:
 	void setAutoClose(bool option) { autoClose_ = option;}
 	static void enableTcpNoDelay(bool enable);
 	static bool ENABLE_TCP_NODELAY;
+	bool skipAll();
 
 private:
+	void getTimeout(int &timeoutMs);
+	void setTimeout(int timeoutMs);
 	bool setNonBlocking();
+	bool setBlocking();
 	bool setTcpNoDelay();
 	int getErrorCode();
 
@@ -197,7 +201,6 @@ public:
 	 * Reset the size of an external buffer. The cursor moves to the beginning of the buffer.
 	 */
 	bool reset(int size);
-
 protected:
 	/**
 	 * Read up to number of bytes specified by the length. If the underlying device doesn't have even one byte

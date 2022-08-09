@@ -14,6 +14,8 @@
 #include <ctime>
 #ifdef _MSC_VER
 
+#elif defined MAC
+	#include <random>
 #else
 	#include <tr1/random>
 #endif
@@ -112,7 +114,12 @@ public:
 	static Vector* createMatrix(DATA_TYPE type, int cols, int rows, int colCapacity,int extraParam=0, void* data=0, bool containNull = false);
 	static Vector* createDoubleMatrix(int cols, int rows);
 	static Vector* createPair(DATA_TYPE type){
+		if (type == DT_ANY) {
+			return NULL;
+		}
 		Vector* pair=createVector(type,2);
+		if (pair == NULL)
+			return NULL;
 		pair->setForm(DF_PAIR);
 		return pair;
 	}
@@ -196,7 +203,7 @@ public:
 	static long long toLocalTimestamp(long long epochTime);
 	static long long* toLocalTimestamp(long long* epochTimes, int n);
 	static long long toLocalNanoTimestamp(long long epochNanoTime);
-	static long long* toLocalNaoTimestamp(long long* epochNanoTimes, int n);
+	static long long* toLocalNanoTimestamp(long long* epochNanoTimes, int n);
 	static string toMicroTimestampStr(std::chrono::system_clock::time_point& tp, bool printDate = false);
 
 	static char* allocateMemory(INDEX size, bool throwIfFail = true);

@@ -12,6 +12,7 @@
 #include <queue>
 #include <cassert>
 #include <algorithm>
+#include <memory>
 
 #ifdef WINDOWS
 	#include <winsock2.h>
@@ -126,7 +127,7 @@ private:
 
 
 template<class T>
-class EXPORT_DECL LockGuard{
+class LockGuard{
 public:
 	LockGuard(T* res, bool acquireLock = true):res_(res){
 		if(acquireLock)
@@ -149,7 +150,7 @@ private:
 };
 
 template<class T>
-class EXPORT_DECL TryLockGuard{
+class TryLockGuard{
 public:
 	TryLockGuard(T* res, bool acquireLock = true):res_(res), locked_(false){
 		if(acquireLock)
@@ -168,7 +169,7 @@ private:
 };
 
 template<class T>
-class EXPORT_DECL RWLockGuard{
+class RWLockGuard{
 public:
 	RWLockGuard(T* res, bool exclusive, bool acquireLock = true):res_(res), exclusive_(exclusive){
 		if(res != NULL && acquireLock){
@@ -205,7 +206,7 @@ private:
 };
 
 template<class T>
-class EXPORT_DECL TryRWLockGuard{
+class TryRWLockGuard{
 public:
 	TryRWLockGuard(T* res, bool exclusive, bool acquireLock = true):res_(res), exclusive_(exclusive), locked_(false){
 		if(acquireLock){
@@ -247,7 +248,7 @@ private:
 
 
 template<class T>
-class EXPORT_DECL Future {
+class Future {
 public:
 	Future(): latch_(1) {}
 	//Wait till the result is ready or the specified milliseconds timeout. Return whether the result is ready.
@@ -280,6 +281,11 @@ public:
 private:
 #ifdef WINDOWS
 	HANDLE sem_;
+#elif defined MAC
+	sem_t *sem_;
+	// static std::atomic<long long> sem_id_;
+	long long sem_id_;
+	static Mutex globalIdMutex_;
 #else
 	sem_t sem_;
 #endif
@@ -305,7 +311,7 @@ private:
 };
 
 template<class T>
-class EXPORT_DECL BoundedBlockingQueue{
+class BoundedBlockingQueue{
 public:
 	BoundedBlockingQueue(size_t maxItems) : capacity_(maxItems), size_(0), head_(0), tail_(0){
 		buf_ = new T[maxItems];
@@ -354,7 +360,7 @@ private:
 };
 
 template<class T>
-class EXPORT_DECL SynchronizedQueue{
+class SynchronizedQueue{
 public:
 	SynchronizedQueue(){}
 	void push(const T& item){
@@ -451,6 +457,7 @@ public:
 	bool isRunning(){return run_.isNull() ? false : run_->isRunning();}
 	bool isComplete() {return run_.isNull()? false : run_->isComplete();}
 	bool isStarted() {return run_.isNull()? false : run_->isStarted();}
+	void setAffinity(int id);
 	static void sleep(int milliSeconds);
 	static int getID();
 
@@ -541,6 +548,97 @@ private:
 	bool signaled_, resetAfterWait_;
 	Mutex mutex_;
 	ConditionalVariable notifier_;
+};
+
+template <typename T>
+class BlockingQueue {
+public:
+    explicit BlockingQueue(size_t maxItems)
+        : buf_(new T[maxItems]), capacity_(maxItems), batchSize_(1), size_(0), head_(0), tail_(0) {}
+    explicit BlockingQueue(size_t maxItems, size_t batchSize)
+        : buf_(new T[maxItems]), capacity_(maxItems), batchSize_(batchSize), size_(0), head_(0), tail_(0) {}
+	int size(){
+		LockGuard<Mutex> guard(&lock_);
+		return size_;
+	}
+    void push(const T &item) {
+        lock_.lock();
+        while (size_ >= capacity_) full_.wait(lock_);
+        buf_[tail_] = item;
+        tail_ = (tail_ + 1) % capacity_;
+        ++size_;
+
+        if (size_ == 1) empty_.notifyAll();
+        if (size_ == batchSize_) batch_.notifyAll();
+        lock_.unlock();
+    }
+    void emplace(T &&item) {
+        lock_.lock();
+        while (size_ >= capacity_) full_.wait(lock_);
+        buf_[tail_] = std::move(item);
+        tail_ = (tail_ + 1) % capacity_;
+        ++size_;
+        if (size_ == 1) empty_.notifyAll();
+        if (size_ == batchSize_) batch_.notifyAll();
+        lock_.unlock();
+    }
+    bool poll(T &item, int milliSeconds) {
+        if (milliSeconds < 0) {
+            pop(item);
+            return true;
+        }
+        LockGuard<Mutex> guard(&lock_);
+        while (size_ == 0) {
+            if (!empty_.wait(lock_, milliSeconds)) return false;
+        }
+        item = std::move(buf_[head_]);
+        buf_[head_] = T();
+        head_ = (head_ + 1) % capacity_;
+        --size_;
+        full_.notifyAll();
+        return true;
+    }
+    void pop(T &item) {
+        lock_.lock();
+        while (size_ == 0) empty_.wait(lock_);
+        item = std::move(buf_[head_]);
+        buf_[head_] = T();
+        head_ = (head_ + 1) % capacity_;
+        --size_;
+        full_.notifyAll();
+        lock_.unlock();
+    }
+
+    bool pop(std::vector<T> &items, int milliSeconds) {
+        LockGuard<Mutex> guard(&lock_);
+        if (size_ < batchSize_){
+            batch_.wait(lock_, milliSeconds);
+        }
+        if(size_ == 0)
+            return false;
+        int n = std::min(batchSize_, size_);
+        items.resize(n);
+        for(int i = 0; i < n; i++){
+            items[i] = std::move(buf_[head_]);
+            buf_[head_] = T();
+            head_ = (head_ + 1) % capacity_;
+        }
+        full_.notifyAll();
+        size_ -= n;
+        return true;
+    }
+private:
+    std::unique_ptr<T[]> buf_;
+    size_t capacity_;
+    size_t batchSize_;
+    size_t size_;
+    size_t head_;
+    size_t tail_;
+    Mutex lock_;
+    ConditionalVariable full_;
+    ConditionalVariable empty_;
+    ConditionalVariable batch_;
+    
 };
 
 };

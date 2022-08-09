@@ -39,13 +39,17 @@
 #include "TableImp.h"
 #include "DomainImp.h"
 
+#ifdef MAC
+#include <sys/syscall.h>
+#endif
+
 namespace dolphindb{
 
 const bool Util::LITTLE_ENDIAN_ORDER = isLittleEndian();
 SmartPointer<ConstantFactory> Util::constFactory_(new ConstantFactory());
-string Util::VER = "1.30.17.1";
-int Util::VERNUM = 102;
-string Util::BUILD = "2022.05.20";
+string Util::VER = "1.30.19.1";
+int Util::VERNUM = 111;
+string Util::BUILD = "2022.05.23";
 #ifndef _MSC_VER
 const int Util::BUF_SIZE = 1024;
 #endif
@@ -392,7 +396,10 @@ Set* Util::createSet(DATA_TYPE keyType, INDEX capacity){
 }
 
 Vector* Util::createVector(DATA_TYPE type, INDEX size, INDEX capacity, bool fast, int extraParam, void* data, bool containNull){
-	return constFactory_->createConstantVector(type,size,capacity,true,extraParam, data, 0, 0, containNull);
+	if (type < ARRAY_TYPE_BASE)
+		return constFactory_->createConstantVector(type, size, capacity, true, extraParam, data, 0, 0, containNull);
+	else
+		return createArrayVector(type, size, capacity, fast, extraParam);
 }
 
 Vector* Util::createArrayVector(DATA_TYPE type, INDEX size, INDEX capacity, bool fast, int extraParam, void* data, INDEX *pindex, bool containNull){
@@ -414,8 +421,7 @@ Vector* Util::createMatrix(DATA_TYPE type, int cols, int rows, int colCapacity,i
 }
 
 Vector* Util::createDoubleMatrix(int cols, int rows){
-	double* data = new double[cols * rows];
-	return new FastDoubleMatrix(cols, rows, cols, data, false);
+	return constFactory_->createConstantMatrix(DT_DOUBLE, cols, rows, 0, 0, NULL, 0, 0, false);
 }
 
 Vector* Util::createIndexVector(INDEX start, INDEX length){
@@ -670,6 +676,8 @@ DATA_CATEGORY Util::getCategory(DATA_TYPE type){
 		return MIXED;
 	else if(type==DT_VOID)
 		return NOTHING;
+	else if(type >= ARRAY_TYPE_BASE)
+		return ARRAY;
 	else
 		return SYSTEM;
 }
@@ -964,7 +972,7 @@ long long Util::toLocalNanoTimestamp(long long epochNanoTime){
     return days == INT_MIN ? LLONG_MIN : days * 86400000000000ll + ((lt.tm_hour * 60 + lt.tm_min)* 60 + lt.tm_sec) * 1000000000ll + (epochNanoTime % 1000000000);
 }
 
-long long* Util::toLocalNaoTimestamp(long long* epochNanoTimes, int n){
+long long* Util::toLocalNanoTimestamp(long long* epochNanoTimes, int n){
 	struct tm lt;
 	for(int i=0; i<n; ++i){
 		if(epochNanoTimes[i] == LLONG_MIN)
@@ -1209,9 +1217,9 @@ string Util::getLastErrorMessage(){
 	return string(buf);
 #endif
 #else
-	char buf[256];
-	const char* tmp = strerror_r(errno, buf, 256);
-	return string(tmp);
+	char buf[256]={0};
+	strerror_r(errno, buf, 256);
+	return string(buf);
 #endif
 }
 
@@ -1242,9 +1250,9 @@ string Util::getErrorMessage(int errCode){
 #endif
 
 #else
-	char buf[256];
-	const char* tmp = strerror_r(errCode, buf, 256);
-	return string(tmp);
+	char buf[256]={0};
+	strerror_r(errno, buf, 256);
+	return string(buf);
 #endif
 }
 
@@ -1375,7 +1383,59 @@ ConstantSP Util::createObject(DATA_TYPE dataType, short val, ErrorCodeInfo *erro
 	return createValue(dataType,(long long)val,"short", errorCodeInfo);
 }
 ConstantSP Util::createObject(DATA_TYPE dataType, const char* val, ErrorCodeInfo *errorCodeInfo) {
-	return createObject(dataType, (const void *)val, errorCodeInfo);
+	if (val != (const void*)0) {
+		switch (dataType) {
+		case DATA_TYPE::DT_INT128:
+		{
+			Int128 *pint128 = Int128::parseInt128(val, strlen(val));
+			if (pint128 == nullptr) {
+				SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert string to " + getDataTypeString(dataType));
+			}
+			return pint128;
+		}
+		break;
+		case DATA_TYPE::DT_UUID:
+		{
+			Uuid *puuid = Uuid::parseUuid(val, strlen(val));
+			if (puuid == nullptr) {
+				SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert string to " + getDataTypeString(dataType));
+			}
+			return puuid;
+		}
+		break;
+		case DATA_TYPE::DT_IP:
+		{
+			IPAddr *pip=IPAddr::parseIPAddr(val, strlen(val));
+			if (pip == nullptr) {
+				SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert string to " + getDataTypeString(dataType));
+			}
+			return pip;
+		}
+		break;
+		case DATA_TYPE::DT_SYMBOL:
+		{
+			ConstantSP tmp = createConstant(DATA_TYPE::DT_SYMBOL);
+			tmp->setString((const char*)val);
+			return tmp;
+		}
+		break;
+		case DATA_TYPE::DT_STRING:
+			return createString((const char*)val);
+		case DATA_TYPE::DT_BLOB:
+		{
+			ConstantSP tmp = createConstant(DATA_TYPE::DT_BLOB);
+			tmp->setString((const char*)val);
+			return tmp;
+		}
+		default:
+			SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert pointer to " + getDataTypeString(dataType));
+			break;
+		}
+	}
+	else {
+		return createNullConstant((DATA_TYPE)dataType);
+	}
+	return NULL;
 }
 ConstantSP Util::createObject(DATA_TYPE dataType, const void* val, ErrorCodeInfo *errorCodeInfo) {
 	if (val != (const void*)0) {
@@ -1427,7 +1487,7 @@ ConstantSP Util::createObject(DATA_TYPE dataType, const void* val, ErrorCodeInfo
 	return NULL;
 }
 ConstantSP Util::createObject(DATA_TYPE dataType, std::string val, ErrorCodeInfo *errorCodeInfo) {
-	return createObject(dataType, (const void *)val.data(), errorCodeInfo);
+	return createObject(dataType, (const char *)val.data(), errorCodeInfo);
 }
 ConstantSP Util::createObject(DATA_TYPE dataType, const unsigned char* val, ErrorCodeInfo *errorCodeInfo) {
 	return createObject(dataType, (const void *)val, errorCodeInfo);
@@ -1634,6 +1694,8 @@ bool Util::checkColDataType(DATA_TYPE colDataType, bool isColTemporal,ConstantSP
 unsigned long Util::getCurThreadId() {
 #ifdef WINDOWS
 	return GetCurrentThreadId();
+#elif defined MAC
+	return syscall(SYS_thread_selfid);
 #else
 	return pthread_self();
 #endif

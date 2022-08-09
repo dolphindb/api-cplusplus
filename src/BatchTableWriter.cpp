@@ -33,9 +33,7 @@ BatchTableWriter::~BatchTableWriter(){
     }
     for(auto& i: dt){
         i->writeThread->join();
-    }
-    for(auto& i: dt){
-        i->conn->close();
+		i->conn->close();
     }
 }
 
@@ -104,7 +102,7 @@ void BatchTableWriter::addTable(const string& dbName, const string& tableName, b
     destTable->colNames = std::move(colNames);
     destTable->colTypes = std::move(colTypes);
 
-    if(tmpDiskGlobal.empty() == false){//文件表需要创建中间表
+    if(tmpDiskGlobal.empty() == false){//update need temp table
         std::string colNames;
         std::string colTypes;
         ConstantSP colDefsTypeString = colDefs->getColumn("typeString");
@@ -118,14 +116,14 @@ void BatchTableWriter::addTable(const string& dbName, const string& tableName, b
     DestTable *destTableRawPtr = destTable.get();
     destTable->writeThread = new Thread(new Executor([=](){
         while(destTableRawPtr->destroy==false){
-            destTableRawPtr->writeMutex.lock();
-            destTableRawPtr->writeNotifier.wait(destTableRawPtr->writeMutex);
             while(true){
                 if(writeTableAllData(destTable,partitioned)==false)
                     break;
             }
+			destTableRawPtr->writeMutex.lock();
+			destTableRawPtr->writeNotifier.wait(destTableRawPtr->writeMutex);
         }
-        //写入尚未完成的数据
+        //write incomplete data
         while(destTableRawPtr->writeQueue.size()>0&&writeTableAllData(destTable,partitioned));
     }));
     destTable->writeThread->start();

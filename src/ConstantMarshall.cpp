@@ -83,7 +83,7 @@ bool ScalarMarshall::start(const char* requestHeader, size_t headerSize, const C
 		target_.clear();
 		partial_ = 0;
 	}
-
+	
 	complete_ = (ret == OK);
 	return complete_;
 }
