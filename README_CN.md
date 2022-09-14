@@ -22,13 +22,13 @@ DolphinDB C++ API支持以下开发环境：
 
 ## 1. 编译libDolphinDBAPI
 
-用户可以使用github或者gitee已经编译好的libDolphinDBAPI, 也可以通过如下方法自己编译libDolphinDBAPI。 
+用户可以使用github或者gitee已经编译好的libDolphinDBAPI，也可以通过如下方法自己编译libDolphinDBAPI。 
 
 ### 1.1 在Linux环境下编译API
 
 #### 编译libuuid
 
-DolphinDB API会调用到libuuid,所以要先编译libuuid的静态库。编译方法如下:
+DolphinDB API会调用到libuuid，所以要先编译libuuid的静态库。编译方法如下:
 
 * 下载 [libuuid-1.0.3.tar.gz](https://sourceforge.net/projects/libuuid/files/)
 
@@ -157,7 +157,7 @@ int main(int argc, char *argv[]){
 
 另外由于DolphinDB添加了(Linux64 稳定版>=1.10.17,最新版>=1.20.6) SSL的支持， 所以编译前需要安装openssl。
 
->注：当前需要openssl版本为1.0.2，高版本的1.1版本会报错。如果系统自带的openssl版本不是1.0.2的话，可以参考[openssl源码安装](#9-openssl-1.0.2版本源码安装)，或者使用已有的二进制包安装。
+>注：当前需要openssl版本为1.0.2，高版本的1.1版本会报错。如果系统自带的openssl版本不是1.0.2的话，可以参考[openssl源码安装](#10-openssl-102版本源码安装)，或者使用已有的二进制包安装。查看openssl版本的命令为：```openssl version```
 
 以下是使用第一个动态库版本的g++编译命令：
 ```
@@ -329,7 +329,9 @@ cout<<result->getString()<<endl;
 
 C++ API提供 `upload` 方法，将本地对象上传到DolphinDB。
 
-下面的例子在C++定义了一个 `createDemoTable` 函数，该函数创建了一个本地的表对象。
+### 6.1 上传表对象
+
+下面的例子在 C++ 端定义了一个 `createDemoTable` 函数，该函数创建了一个本地的表对象。
 
 ```cpp
 TableSP createDemoTable(){
@@ -350,7 +352,7 @@ TableSP createDemoTable(){
 }
 ```
 
-需要注意的是，上述例子中采用的 `set` 方法作为一个虚函数，会产生较大的开销，调用 `set` 方法对表的列向量逐个赋值，在数据量很大的情况下会导致效率低下。此外， `createString`, `createDate` 与 `createDouble` 等构造方法要求操作系统分配内存，反复调用同样会产生很大的开销。
+需要注意的是，上述例子中采用的 `set` 方法作为一个虚函数，会产生较大的开销。调用 `set` 方法对表的列向量逐个赋值，在数据量很大的情况下会导致效率低下。此外，`createString`, `createDate` 与 `createDouble` 等构造方法要求操作系统为其分配内存，反复调用同样会产生很大的内存开销。
 
 相对合理的做法是定义一个相应类型的数组，通过诸如 setInt(INDEX start, int len, const int* buf) 的方式一次或者多次地将数据批量传给列向量。
 
@@ -388,9 +390,9 @@ TableSP createDemoTable(){
     return table;
 }
 ```
-上述例子采用的诸如 `getIntBuffer` 等方法能够直接获取一个可读写的缓冲区，写完后使用 `setInt` 将缓冲区写回数组，这类函数会检查给定的缓冲区地址和变量底层储存的地址是否一致，如果一致就不会发生数据拷贝。在多数情况下，用 `getIntBuffer` 获得的缓冲区就是变量实际的存储区域，这样能减少数据拷贝，提高性能。
+上述例子采用的诸如 `getIntBuffer` 等方法能够直接获取一个可读写的缓冲区，写完后使用 `setInt` 将缓冲区写回数组。这类函数会检查给定的缓冲区地址和变量底层储存的地址是否一致，如果一致就不会发生数据拷贝。在多数情况下，用 `getIntBuffer` 获得的缓冲区就是变量实际的存储区域，这样能减少数据拷贝，提高性能。
 
-以下利用自定义的 `createDemoTable` 函数创建表对象之后，通过 `upload` 方法把它上传到DolphinDB，再从DolphinDB获取这个表的数据，保存到本地对象result并打印。
+利用上例中自定义的 `createDemoTable` 函数创建一个表对象。通过 `upload` 方法将它上传到DolphinDB，再从DolphinDB获取这个表的数据，保存到本地对象result并打印。
 ```cpp
 TableSP table = createDemoTable();
 conn.upload("myTable", table);
@@ -411,7 +413,46 @@ name_4  2019.01.05 5
 name_5  2019.01.06 31
 ...
 ```
+### 6.1 上传压缩后的表对象
+自 1.30.19 版本开始，C++ API 支持通过 `setColumnCompressMethods` 方法，对表数据压缩后上传，以减少网络传输的开销。`setColumnCompressMethods` 方法可以灵活的为表中每列数据分别指定不同的压缩方式。目前支持 lz4 和 delta 两种压缩算法，但 delta 算法仅可用于 SHORT, INT, LONG 与时间或日期类型数据。   
+在网络速度较慢的情况下，推荐对表数据进行压缩。使用方法如下：
+1. 创建 DBConnection 对象时，需指定 compress=true 以开启压缩下载功能。
+2. 上传数据前，通过 `setColumnCompressMethods` 指定 Table 中每一列的压缩方式。
 
+以下为范例代码：
+
+```cpp
+//第四个参数指定为 true 表示开启下载压缩
+DBConnection conn_compress(false, false, 7200, true);
+//连接服务器
+conn_compress.connect(hostName, port);
+//创建一个共享流表，包含 DATE 和 LONG 两种类型的列
+conn_compress.run("share streamTable(1:0, `time`value,[DATE,LONG]) as table1");
+//构造上传的数据，约600000条
+const int count = 600000;
+vector<int> time(count);
+vector<long long>value(count);
+int basetime = Util::countDays(2012, 1, 1);
+for (int i = 0; i<count; i++) {
+    time[i] = basetime + (i % 15);
+    value[i] = i;
+}
+VectorSP timeVector = Util::createVector(DT_DATE, count, count);
+VectorSP valueVector = Util::createVector(DT_LONG, count, count);
+timeVector->setInt(0, count, time.data());
+valueVector->setLong(0, count, value.data());
+vector<ConstantSP> colVector{ timeVector,valueVector };
+//创建Table
+vector<string> colName = { "time","value" };
+TableSP table = Util::createTable(colName, colVector);
+//指定每一列的压缩方式
+vector<COMPRESS_METHOD> typeVec{ COMPRESS_DELTA,COMPRESS_LZ4 };
+table->setColumnCompressMethods(typeVec);
+//压缩上传Table到服务器的流表（table1）
+vector<ConstantSP> args{ table };
+int insertCount = conn_compress.run("tableInsert{table1}", args)->getInt();
+std::cout << insertCount << std::endl;
+```
 ## 7. 读取数据示例
 
 DolphinDB C++ API 不仅支持Int, Float, String, Date, DataTime等多种数据类型，也支持向量(VectorSP)、集合(SetSP)、矩阵(MatrixSP)、字典(DictionarySP)、表(TableSP）等多种数据形式。下面介绍如何通过DBConnection对象，读取并操作DolphinDB的各种形式的对象。
@@ -583,54 +624,12 @@ cout<<v->getString()<<endl;
 
 结果是一个Int类型的向量[1,3,5]。
 
-### 7.7 ArrayVector
-
-数组向量（array vector）是 DolphinDB 一种特殊的数据形式。与常规的向量不同，它的每个元素是一个数组，具有相同的数据类型，但长度可以不同。目前支持的数据类型为 Logical, Integral（不包括 INT128, COMPRESS 类型）, Floating, Temporal。 
-
-```cpp
-//创建可容纳2个元素的arrayVector，初始大小为0。
-VectorSP arrayVector=Util::createArrayVector((DATA_TYPE)(DT_INT+ ARRAY_TYPE_BASE), 0, 2);
-//创建第一个元素
-VectorSP value = Util::createVector(DT_INT, 3);
-value->setInt(0, 1);
-value->setInt(1, 2);
-value->setInt(2, 3);
-//封装到AnyVector中
-VectorSP tuple = Util::createVector(DT_ANY, 1);
-tuple->set(0, value);
-//添加第一个元素
-arrayVector->append(tuple);
-//创建第二个元素
-value = Util::createVector(DT_INT, 3);
-value->setInt(0, 4);
-value->setInt(1, 5);
-value->setInt(2, 6);
-//封装到AnyVector中
-tuple = Util::createVector(DT_ANY, 1);
-tuple->set(0, value);
-//添加第二个元素
-arrayVector->append(tuple);
-std::cout << arrayVector->getString() << std::endl;
-```
-
-结果是[[1,2,3],[4,5,6]]。
-
-使用 `get` 方法获取第二个元素：
-
-```cpp
-VectorSP v = result->get(1); 
-cout<<v->getString()<<endl; 
-```
-
-结果是一个Int类型的向量[4,5,6]。
-
 ## 8. 保存数据到DolphinDB数据表
 
-DolphinDB数据表按存储方式分为三种:
+DolphinDB数据表按存储方式分为两种:
 
 * 内存表: 数据仅保存在内存中，存取速度最快，但是节点关闭后数据就不存在了。
 * 分布式表（DFS表）：数据可保存在不同的节点，亦可保存在同一节点，由分布式文件系统统一管理。路径以"dfs://"开头。
-* 本地磁盘表：数据仅保存在本地磁盘。不建议生产环境中使用。
 
 ### 8.1 保存数据到DolphinDB内存表
 
@@ -1066,7 +1065,8 @@ int main(){
 MultithreadedTableWriter(const std::string& host, int port, const std::string& userId, const std::string& password,
                             const string& dbPath, const string& tableName, bool useSSL, bool enableHighAvailability = false, const vector<string> *pHighAvailabilitySites = nullptr,
 							int batchSize = 1, float throttle = 0.01f,int threadCount = 1, const string& partitionCol ="",
-							const vector<COMPRESS_METHOD> *pCompressMethods = nullptr);
+							const vector<COMPRESS_METHOD> *pCompressMethods = nullptr, Mode mode = M_Append,
+                            vector<string> *pModeOption = nullptr);
 ```
 
 参数说明：
@@ -1074,8 +1074,8 @@ MultithreadedTableWriter(const std::string& host, int port, const std::string& u
 * **host** 字符串，表示所连接的服务器的地址
 * **port** 整数，表示服务器端口。 
 * **userId** / **password**: 字符串，登录时的用户名和密码。
-* **dbPath** 字符串，表示分布式数据库地址或内存表的表名。
-* **tableName** 字符串，表示分布式表名。内存表无需指定该参数。
+* **dbPath** 字符串，表示分布式数据库地址。内存表时该参数为空。请注意，1.30.17及以下版本 API，向内存表写入数据时，该参数需填写内存表表名。
+* **tableName** 字符串，表示分布式表或内存表的表名。请注意，1.30.17及以下版本 API，向内存表写入数据时，该参数需为空。
 * **useSSL** 布尔值，默认值为 False。表示是否启用加密通讯。
 * **enableHighAvailability** 布尔值，默认为 False。若要开启 API 高可用，则需要指定 *enableHighAvailability* 参数为 True。
 * **pHighAvailabilitySites** 列表类型，表示所有可用节点的 ip:port 构成的 list。
@@ -1086,6 +1086,8 @@ MultithreadedTableWriter(const std::string& host, int port, const std::string& u
 * **pCompressMethods** 列表类型，用于指定每一列采用的压缩传输方式，为空表示不压缩。每一列可选的压缩方式包括：
   * COMPRESS_LZ4: LZ4 压缩
   * COMPRESS_DELTA: DELTAOFDELTA 压缩
+* **mode** 表示数据写入的方式，可选值为：M_Append 或 M_Upsert。M_Upsert 表示以 [upsert!](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/u/upsert!.html) 方式追加或更新表数据；M_Append 表示以 [append!](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html) 方式追加表数据。
+* **modeOption** 字符串数组，表示不同模式下的扩展选项，目前，仅当 *mode* 指定为 M_Upsert 时有效，表示由 [upsert!](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/u/upsert!.html) 可选参数组成的字符串数组。
 
 以下是 `MultithreadedTableWriter` 对象包含的函数方法介绍：
 
@@ -1358,24 +1360,24 @@ ThreadedClient::ThreadClient(int listeningPort);
 ##### 9.2.1.2 调用订阅函数
 
 ``` 
-ThreadSP ThreadedClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
+ThreadSP ThreadedClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr, bool msgAsTable = false, bool allowExists = false, int batchSize = 1, double throttle = 1, string userName="", string password="", const StreamDeserializerSP blobDeserializer = nullptr);
 ```
 
 * host是发布端节点的主机名。
-
 * port是发布端节点的端口号。
-
 * handler是用户自定义的回调函数，用于处理每次流入的消息。函数的参数是流入的消息，每条消息就是流数据表的一行。函数的结果必须是void。
-
 * tableName是字符串，表示发布端上共享流数据表的名称。
-
 * actionName是字符串，表示订阅任务的名称。它可以包含字母、数字和下划线。
-
 * offset是整数，表示订阅任务开始后的第一条消息所在的位置。消息是流数据表中的行。如果没有指定offset，或它为负数或超过了流数据表的记录行数，订阅将会从流数据表的当前行开始。offset与流数据表创建时的第一行对应。如果某些行因为内存限制被删除，在决定订阅开始的位置时，这些行仍然考虑在内。
-
 * resub是布尔值，表示订阅中断后，是否会自动重订阅。
-
 * filter是一个向量，表示过滤条件。流数据表过滤列在filter中的数据才会发布到订阅端，不在filter中的数据不会发布。
+* msgAsTable是布尔值。只有设置了 *batchSize* 参数，才会生效。设置为 True，订阅的数据会转换为 table。设置为 False，订阅的数据会转换成 vector。
+* allowExists是布尔值。若设置为 True，则支持对同一个订阅流表使用多个 handler 处理数据。设置为 False，则不支持同一个订阅流表使用多个 handler 处理数据。
+* batchSize 是一个整数，表示批处理的消息的数量。如果它是正数，直到消息的数量达到 *batchSize* 时，*handler* 才会处理进来的消息。如果它没有指定或者是非正数，消息到达之后，*handler* 就会马上处理消息。
+* throttle是一个整数，表示 *handler* 处理到达的消息之前等待的时间，以秒为单位。默认值为 1。如果没有指定 *batchSize*，*throttle* 将不会起作用。
+* userName是一个字符串，表示 API 所连接服务器的登录用户名。
+* password是一个字符串，表示 API 所连接服务器的登录密码。
+* blobDeserializer是订阅的异构流表对应的反序列化器。
 
 ThreadSP 指向循环调用handler的线程的指针。该线程在此topic被取消订阅后会退出。
 
@@ -1490,6 +1492,95 @@ void PollingClient::unsubscribe(string host, int port, string tableName, string 
 
 注意，对于这种订阅模式，若返回一个空指针，说明已取消订阅。
 
+#### 9.2.4 异构流表反序列化器
+DolphinDB server 自 1.30.17 及 2.00.5 版本开始，支持通过 [replay](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/r/replay.html) 函数将多个结构不同的流数据表，回放（序列化）到一个流表里，这个流表被称为异构流表。C++ API 自 1.30.19 版本开始，新增 `StreamDeserializer` 类，用于构造异构流表反序列化器，以实现对异构流表的订阅和反序列化操作。
+
+C++ API 支持通过两种方式构造异构流表反序列化器：
+
+通过 key->schema 的映射表创建
+```cpp
+StreamDeserializerSP StreamDeserializer(sym2schema)
+```
+通过 key->table 的映射表创建
+```cpp
+StreamDeserializerSP StreamDeserializer(sym2schema, [conn])
+```
+* sym2table 是一个字典对象，其结构与 replay 回放到异构流表的输入表结构保持一致。`StreamDeserializer` 将根据 *sym2table* 指定的结构对注入的数据进行反序列化。
+* conn 是已经连接 DolphinDB server 的 DBConnection 对象。若不指定该参数，则 sym2table 中的指定的表必须是 dfs 表或者共享内存表。
+
+##### 9.2.4.1 订阅异构流表
+
+订阅示例：
+
+```cpp
+//假设异构流表回放时inputTables如下：
+//d = dict(['msg1', 'msg2'], [table1, table2]); \
+//replay(inputTables = d, outputTables = `outTables, dateColumn = `timestampv, timeColumn = `timestampv)";
+//异构流表解析器的创建方法如下：
+StreamDeserializerSP sdsp;
+{//使用key->schema的映射表创建
+    unordered_map<string, DictionarySP> sym2schema;
+    DictionarySP t1s = conn.run("schema(table1)");
+    DictionarySP t2s = conn.run("schema(table2)");
+    sym2schema["msg1"] = t1s;
+    sym2schema["msg2"] = t2s;
+    sdsp = new StreamDeserializer(sym2schema);
+}
+{//使用key->table的映射表创建
+    unordered_map<string, pair<string, string>> sym2table;
+    //因为是内存表，第一个参数dbpath指定为空，第二个参数指定为表名
+    sym2table["msg1"] = std::make_pair("", "table1");
+    sym2table["msg2"] = std::make_pair("", "table2");
+    //传入map和conn，&conn是可选参数，如果不传入，sym2table中的表必须是dfs表或者共享内存表。
+    sdsp = new StreamDeserializer(sym2table, &conn);
+}
+//sdsp可以作为订阅时的一个参数传入，譬如：
+//ThreadedClient threadedClient(listenport);
+//auto thread1 = threadedClient.subscribe(hostName, port, onehandler, "outTables", "mutiSchemaOne", 0, true, nullptr, false, false, "admin", "123456", sdsp);
+```
+#### 9.2.5 订阅跨进程共享内存表
+DolphinDB server 自2.00.7/1.30.19版本开始支持创建跨进程共享内存表（[createIPCInMemoryTable](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/c/createIPCInMemoryTable.html)）。C++ API 提供订阅函数 `subscribe` 以实现订阅跨进程共享内存表的功能，来满足对订阅数据时延性要求较高的场景需求。通过订阅跨进程共享内存表，API 端可以直接通过共享内存获取由 server 端发布的流数据，极大地减少了网络传输的延时。因为进程间会访问同一个共享内存，所以要求发布端和订阅端必须位于同一台服务器。本节主要介绍如何通过 C++ API 提供的 `IPCInMemoryStreamClient` 类实现订阅共享内存表的功能。
+
+
+示例：
+1. server 端通过 GUI 创建一个跨进程内存表，并向该表实时写入数据
+```cpp
+//创建流表
+share streamTable(10000:0,`timestamp`temperature, [TIMESTAMP,DOUBLE]) as pubTable;
+//创建跨进程共享内存表
+share createIPCInMemoryTable(1000000, "pubTable", `timestamp`temperature, [TIMESTAMP, DOUBLE]) as shm_test;
+//自定义订阅处理函数
+def shm_append(msg) {
+    shm_test.append!(msg)
+}
+//订阅流表pubTable的数据写入跨进程内存表
+topic2 = subscribeTable(tableName="pubTable", actionName="act3", offset=0, handler=shm_append, msgAsTable=true)
+```
+2. C++ API 端
+```cpp
+string tableName = "pubTable";
+//构造对象
+IPCInMemoryStreamClient memTable;
+
+//创建一个存储数据的 table，要求和 createIPCInMemoryTable 中列的类型和名称一一对应
+vector<string> colNames = {"timestamp", "temperature"};
+vector<DATA_TYPE> colTypes = {DT_TIMESTAMP, DT_DOUBLE};
+int rowNum = 0, indexCapacity=10000;
+TableSP outputTable = Util::createTable(colNames, colTypes, rowNum, indexCapacity); // 创建一个和共享内存表结构相同的表
+
+//overwrite 是否覆盖前面旧的数据
+bool overwrite = true;
+ThreadSP thread = memTable.subscribe(tableName, print, outputTable, overwrite);
+
+//传入 subscribe 中处理数据的回调函数
+void print(TableSP table) {
+    //处理收到的数据
+}
+
+//最后取消订阅，结束回调
+memTable.unsubscribe(tableName);
+```
+
 ## 10. openssl 1.0.2版本源码安装
 这部分主要是介绍下没有1.0.2版本openssl的，从源码编译安装的过程。已有的话忽略本节。
 
@@ -1534,3 +1625,9 @@ export LD_LIBRARY_PATH=/newssl/lib
 ```
 然后再运行./main就可以运行了
 
+## 11. 常见问题及解决办法
+
+1. 编译时出现报错 "undefined reference to 'uuid_generate'"。
+   
+   **原因：** 未安装libuuid-devel库或者未添加```-luuid```参数。  
+   **解决办法：** 通过命令 ```yum install libuuid-devel``` 安装libuuid-devel库，或者在引用它的模块后添加 ```-luuid```参数。
