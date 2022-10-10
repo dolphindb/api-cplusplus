@@ -34,9 +34,7 @@ DolphinDB API会用到libuuid，所以要先编译libuuid的静态库。编译�
 
 * 解压：tar -xvf libuuid-1.0.3.tar.gz
 
-* cd libuuid-1.0.3 && ./configure
-
-* 修改makefile： 添加 '-fPIC' 到CFLAGS和CPPFLAGS
+* cd libuuid-1.0.3 && ./configure CFLAGS="-fPIC" CPPFLAGS="-fPIC" && make
 
 * 如果编译成功， libuuid.a 会生成在目录 '.libs'下
 
@@ -48,7 +46,8 @@ DolphinDB API会用到libuuid，所以要先编译libuuid的静态库。编译�
 
 ``` 
 cd api-cplusplus
-make clean & make -j4
+mkdir build && cd build
+cmake .. && make
 ```
 
 如果编译成功，会自动生成libDolphinDBAPI.so 
@@ -162,12 +161,12 @@ int main(int argc, char *argv[]){
 
 以下是使用第一个动态库版本的g++编译命令：
 ```
-g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=0 -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -lssl -L../bin/linux_x64/ABI0  -Wl,-rpath,.:../bin/linux_x64/ABI0 -o main
+g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=0 -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -lssl -lrt -L../bin/linux_x64/ABI0  -Wl,-rpath,.:../bin/linux_x64/ABI0 -o main
 ```
 
 以下是使用另一个动态库版本的g++编译命令：
 ```
-g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=1 -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -lssl -L../bin/linux_x64/ABI1  -Wl,-rpath,.:../bin/linux_x64/ABI1 -o main
+g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=1 -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -lssl -lrt -L../bin/linux_x64/ABI1  -Wl,-rpath,.:../bin/linux_x64/ABI1 -o main@
 ```
 
 #### 2.1.5 运行
