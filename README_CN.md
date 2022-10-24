@@ -992,11 +992,8 @@ C++ 原生数据类型与DolphinDB数据类型对应关系表
 | DATETIME      | int             |
 | DATEHOUR      | int             |
 | UUID          | unsigned char*  |
-| UUID          | unsigned char[] |
 | IPADDR        | unsigned char*  |
-| IPADDR        | unsigned char[] |
 | INT128        | unsigned char*  |
-| INT128        | unsigned char[] |
 
 **请注意:**
 
