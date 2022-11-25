@@ -211,7 +211,7 @@ DolphinDB C++ API 提供的最核心的对象是DBConnection。C++应用可以�
 |run(functionName,args)|调用DolphinDB服务器上的函数|
 |upload(variableObjectMap)|将本地数据对象上传到DolphinDB服务器|
 |initialize()|初始化连接信息|
-|close()|关闭当前会话|
+|close()|关闭当前会话。若当前会话不再使用，会自动被释放，但存在释放延时，可以调用 `close()` 立即关闭会话。否则可能出现因连接数过多，导致其它会话无法连接服务器的问题。|
 
 C++ API通过TCP/IP协议连接到DolphinDB。使用 `connect` 方法创建连接时，需要提供DolphinDB server的IP和端口。
 
@@ -881,6 +881,12 @@ TableSP table = createDemoTable();
 appender.append(table);
 ConstantSP result = conn.run("select * from loadTable('dfs://SAMPLE_TRDDB', `demoTable)");
 cout <<  result->getString() << endl;
+```
+
+若当前连接池不再使用，会自动被释放，但存在释放延时，可以通过调用 `shutDown()` 等待线程任务执行结束后立即释放连接。
+
+```cpp
+pool.shutDown()
 ```
 
 <!-- 不再保存本地磁盘表的例子
