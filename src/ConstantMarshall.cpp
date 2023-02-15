@@ -14,7 +14,7 @@
 
 namespace dolphindb {
 
-#define DLOG //DLogger::Info
+#define DLOG true?DLogger::GetMinLevel() : DLogger::Info
 
 short ConstantMarshallImp::encodeFlag(const ConstantSP& target, bool compress){
 	short flag = target->getForm() << 8;
@@ -53,6 +53,13 @@ bool ScalarMarshall::start(const char* requestHeader, size_t headerSize, const C
 	short flag = encodeFlag(target);
 	memcpy(buf_ + headerSize, (char*)&flag, 2);
 	headerSize += sizeof(short);
+
+	DATA_CATEGORY category = target->getCategory();
+	if (category == DENARY) {
+		int scale = target->getExtraParamForType();
+		memcpy(buf_ + headerSize, &scale, 4);
+		headerSize += 4;
+	}
 
 	target_.clear();
 	partial_ = 0;
@@ -115,13 +122,17 @@ bool VectorMarshall::writeMetaValues(BufferWriter<DataOutputStreamSP> &output, c
 		offset += sizeof(int);
 		memcpy(buf_ + offset, (char*)&cols, sizeof(int));
 		offset += sizeof(int);
+
+		if (target->getRawType() == DT_DECIMAL32 || target->getRawType() == DT_DECIMAL64) {
+			int scale = target->getExtraParamForType();
+			memcpy(buf_ + offset, &scale, 4);
+			offset += 4;
+		}
 	}
 
 	int numElement = 0;
 	INDEX size = target->size();
 	VectorSP vec = target;
-	if (vec->isView())
-		vec = target->getValue();
 
 	INDEX actualSize = 0;
 	if (size>0 && vec->getType() != DT_ANY && vec->getType() != DT_SYMBOL) {
@@ -189,10 +200,9 @@ bool VectorMarshall::start(const char* requestHeader, size_t headerSize, const C
 		return writeMetaValues(out_, target, true, offset, blocking, ret);
 	}
 	//flag
-	if (offset > 0) {
-		out_.start(buf_, offset);
-		offset = 0;
-	}
+	out_.start(buf_, offset);
+	offset = 0;
+
 	int unitLen = Util::getDataTypeSize(target->getType());
 	CompressionFactory::Header header;
 	header.colCount = 1;
@@ -205,8 +215,8 @@ bool VectorMarshall::start(const char* requestHeader, size_t headerSize, const C
 	header.compressedType = type;
 	header.dataType = (char)target->getType();
 	header.unitLength = unitLen;
-	header.reserved = 0;
-	header.extra = -1;
+	header.reserved = target->getExtraParamForType();
+	header.extra = target->getExtraParamForType();
 	header.elementCount = target->rows();
 	header.checkSum = -1;
 	ret = CompressionFactory::encodeContent(target, out_.getDataOutputStream(), header, false);
@@ -319,10 +329,20 @@ bool TableMarshall::sendMeta(const char* requestHeader, size_t headerSize, const
 			++columnNamesSent_;
 		}
 		else{
-			ret = out_.start(buf_, headerSize);
-			if(ret != OK)
-				return false;
-			headerSize = 0;
+			size_t totalLen = headerSize + strLen;
+			int nameIndex = 0;
+			while(totalLen > 0){	
+				int nameLen = std::min(MARSHALL_BUFFER_SIZE - headerSize, totalLen);
+				memcpy(buf_ + headerSize, name.c_str() + nameIndex, nameLen);
+				headerSize += nameLen;
+				ret = out_.start(buf_, headerSize);
+				if(ret != OK)
+					return false;
+				totalLen -= headerSize;
+				headerSize = 0;
+				nameIndex += nameLen;
+			}
+			++columnNamesSent_;
 		}
 	}
 
@@ -500,8 +520,8 @@ bool ChunkMarshall::start(const char* requestHeader, size_t headerSize, const Co
 
 	//set bytearray size
 	int count = buffer.size();
-	short byteArraySize = count - 4;
-	memcpy(buf_ + 2, &byteArraySize, 2);
+	short byteArraySize = count - 4 - headerSize;
+	memcpy(buf_ + headerSize + 2, &byteArraySize, 2);
 
 	complete_ = ((ret = out_.start(buf_, count)) == OK);
 	return complete_;
@@ -569,7 +589,21 @@ bool ScalarUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 	}
 	else{
 		isCodeObject_ = false;
-		obj_ = Util::createConstant(type);
+		if (Util::getCategory(type) == DENARY) {
+			scale_ = -1;
+			ret = in_->readInt(scale_);
+			if (ret != OK) {
+				return false;
+			}
+			if (scale_ < 0) {
+				ret = INVALIDDATA;
+				return false;
+			}
+			obj_ = Util::createConstant(type, scale_);
+		}
+		else {
+			obj_ = Util::createConstant(type);
+		}
 		if(obj_.isNull()){
 			ret = INVALIDDATA;
 			return false;
@@ -625,18 +659,24 @@ bool VectorUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 	DATA_FORM form;
 	DATA_TYPE type;
 	decodeFlag(flag, form, type);
+	
+	DataQueueSP queue = new BlockingQueue<DataBlock>(1024);
 	DataInputStreamSP input = in_;
-	DataOutputStreamSP decompressOutput = new DataOutputStream();
+	DataOutputStreamSP decompressOutput = new DataOutputStream(queue);
+	ThreadSP decodeThread;
 	CompressionFactory::Header compressHeader;
 	int valueSize = -1;
 	if (type == DT_COMPRESS) {
-		ret = CompressionFactory::decode(input, decompressOutput, compressHeader);
-		if (ret != OK)
-			return false;
-		input = new DataInputStream(decompressOutput->getBuffer(), decompressOutput->size(), false);
+		input->read((char*)&compressHeader, sizeof(compressHeader));
+		decodeThread = new Thread(new Executor([&](){
+			CompressionFactory::decode(in_, decompressOutput, compressHeader);
+		}));
+		decodeThread->start();
+		input = new DataInputStream(queue);
 		type = (DATA_TYPE)compressHeader.dataType;
 		valueSize = compressHeader.extra;
 	}
+	//If fllowing part modified, remember to modify Compress.writeVectorMetaValue function
 	rows_ = -1;
 	columns_ = -1;
 	if((ret = input->readInt(rows_)) != OK)
@@ -663,15 +703,26 @@ bool VectorUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 	else if(actualType == DT_SYMBOL){
 		actualType = DT_STRING;
 	}
+	if (Util::getCategory(actualType) == DENARY || actualType == DT_DECIMAL32_ARRAY || actualType == DT_DECIMAL64_ARRAY) {
+		ret = input->readInt(scale_);
+		if (ret != OK) {
+			return false;
+		}
+		if (scale_ < 0) {
+			ret = INVALIDDATA;
+			return false;
+		}
+	}
+	//If above part modified, remember to modify Compress.writeVectorMetaValue function
 	if(form == DF_PAIR)
-		obj_ = Util::createPair(actualType);
+		obj_ = Util::createPair(actualType, scale_);
 	else if(form == DF_VECTOR){
 		if (actualType == 128 + DT_SYMBOL)
 			obj_ = Util::createSymbolVector(sym, rows_);
 		else if (actualType <= 64)
-			obj_ = Util::createVector(actualType, rows_);
+			obj_ = Util::createVector(actualType, rows_, rows_, true, scale_);
 		else {
-			obj_ = Util::createArrayVector(actualType, rows_);
+			obj_ = Util::createArrayVector(actualType, rows_, rows_, true, scale_);
 			if(valueSize > 0)
 				((FastArrayVector*)obj_.get())->reserveValue(compressHeader.extra);
 			else if(columns_ > 0)
@@ -716,9 +767,27 @@ bool VectorUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 		}
 	}
 	else{
+#if 0
 		INDEX numElements = 0;
 		ret = obj_->deserialize(input.get(), 0, obj_->size(), numElements);
 		nextStart_ = numElements;
+#else
+		INDEX numElements = 0;
+		INDEX leftSize = obj_->size() - nextStart_;
+		while(leftSize > 0){
+			ret = obj_->deserialize(input.get(), nextStart_, std::min(leftSize, 8192), numElements);
+			if(ret != OK)
+				return false;
+			leftSize -= numElements;
+			nextStart_ += numElements;
+			if ((bool)notify_) {
+				notify_(obj_, nextStart_);
+			}
+		}
+#endif
+	}
+	if(!decodeThread.isNull()){
+		decodeThread->join();
 	}
 	return ret == OK;
 }
@@ -938,12 +1007,12 @@ bool ChunkUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 		return false;
 	}
 
-	vector<char> buf;
+	vector<char> buf(size_);
 	ret = in_->read(buf.data(), size_);
 	if(ret != OK)
 		return ret;
 
-	return parsing(buf.data());
+	return parsing(buf.data()) == OK;
 }
 
 IO_ERR  ChunkUnmarshall::parsing(const char* buf){

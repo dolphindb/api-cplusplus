@@ -7,9 +7,6 @@ namespace dolphindb {
 
 
 TableSP SharedMemStream::readData(TableSP& copy, const bool& overwrite, size_t& readRows, int& microCost) {
-    int writeTimeSeconds = 0;
-    int writeTimeMicroSeconds = 0;
-
     if (!shmpHeader_) {
         std::string errMsg;
         if(!openSharedMem(errMsg)) {
@@ -52,8 +49,8 @@ TableSP SharedMemStream::readData(TableSP& copy, const bool& overwrite, size_t& 
         dataHeader = (DataHeader*)(dataStartBuf);
     }
 
-    writeTimeSeconds = dataHeader->timestampSeconds_;
-    writeTimeMicroSeconds = dataHeader->timestampMicro_;
+    //int writeTimeSeconds = dataHeader->timestampSeconds_;
+    //int writeTimeMicroSeconds = dataHeader->timestampMicro_;
 
     dataStartBuf += DATA_HEADER_BASE_LENGTH + dataHeader->tablenameLen_;
     std::string tableName(dataHeader->tablename_, dataHeader->tablenameLen_);

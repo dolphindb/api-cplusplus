@@ -43,7 +43,7 @@ protected:
         }
     }
     static void TearDownTestCase(){
-        conn.run("undef(`test_run_tab);undef(`mytrades)");
+        conn.run("undef all;");
         conn.close();
     }
 
@@ -52,101 +52,14 @@ protected:
     {
         cout<<"check connect...";
 		ConstantSP res = conn.run("1+1");
-		if(!(res->getBool())){
-			cout<<"Server not responed, please check."<<endl;
-		}
-		else
-		{
-			cout<<"ok"<<endl;
-			
-		}
+		
+        cout<<"ok"<<endl;
     }
     virtual void TearDown()
     {
         pass;
     }
 };
-
-TEST_F(FunctionTest,test_function_run_getInmemoryTable){
-    int64_t tm1, tm2, tm3=0;
-    long total_size=10000000;
-    string script;
-    script.append("n="+to_string(total_size)+"\n"); 
-    script.append("syms= `IBM`C`MS`MSFT`JPM`ORCL`BIDU`SOHU`GE`EBAY`GOOG`FORD`GS`PEP`USO`GLD`GDX`EEM`FXI`SLV`SINA`BAC`AAPL`PALL`YHOO`KOH`TSLA`CS`CISO`SUN\n"); 
-    script.append("mytrades=table(09:30:00+rand(18000, n) as timestamp, rand(syms, n) as sym, 10*(1+rand(100, n)) as qty, 5.0+rand(100.0, n) as price); \n"); 
-    conn.run(script);
-
-    string sb = "select * from mytrades";
-    int fetchSize = 100000;
-    
-    tm1 = Util::getEpochTime();
-    TableSP mytrades = conn.run(sb);
-    tm2 = Util::getEpochTime();
-    BlockReaderSP reader = conn.run(sb,4,2,fetchSize);
-    tm3 = Util::getEpochTime();
-    vector<TableSP> fetchTableVec;
-    long long total = 0;
-    while(reader->hasNext()){
-        for(int i=0;i<total_size/fetchSize;i++){
-            TableSP fetchTable=reader->read();
-            fetchTableVec.emplace_back(fetchTable);
-            total += fetchTable->size();
-            cout<<fetchTable->size()<<".";
-        }
-
-    }
-    cout<<"total get: "+to_string(total)<<endl;
-    // for(int j=0;j<4;j++){
-    //     for(int i=0;i<fetchSize;i++){
-    //         EXPECT_EQ(mytrades->getColumn(j)->get(i)->getString(),fetchTableVec[0]->getColumn(j)->get(i)->getString());
-    //     }
-    // }
-    // for(int j=0;j<4;j++){
-    //     for(int i=fetchSize;i<total_size;i++){
-    //         EXPECT_EQ(mytrades->getColumn(j)->get(i)->getString(),fetchTableVec[1]->getColumn(j)->get(i-fetchSize)->getString());
-    //     }
-    // }
-    cout<<"without fetchSize,time spend: "<<(double)(tm2-tm1)/(double)1000<<endl;
-    cout<<"with fetchSize,time spend: "<<(double)(tm3-tm2)/(double)1000<<endl;
-}
-
-TEST_F(FunctionTest,test_function_run_getPartitionedTable){
-    int64_t tm1, tm2, tm3=0;
-    long total_size=10000000;
-    string script;
-    script = "n="+to_string(total_size)+"\n\
-            syms=`IBM`C`MS`MSFT`JPM`ORCL`BIDU`SOHU`GE`EBAY`GOOG`FORD`GS`PEP`USO`GLD`GDX`EEM`FXI`SLV`SINA`BAC`AAPL`PALL`YHOO`KOH`TSLA`CS`CISO`SUN\n\
-            t=table(09:30:00+rand(18000, n) as timestamp, rand(syms, n) as sym, 10*(1+rand(100, n)) as qty, 5.0+rand(100.0, n) as price);\n\
-            if(existsDatabase(\"dfs://test_run\")){dropDatabase(\"dfs://test_run\")};\n\
-            db = database(\"dfs://test_run\", VALUE, syms)\n\
-            test_run_tab = db.createPartitionedTable(table=t, tableName=\"test_run_tab\", partitionColumns=\"sym\");\n\
-            test_run_tab.append!(t)";
-    conn.run(script);
-
-    string sb = "select * from test_run_tab";
-    int fetchSize = 100000;
-    
-    tm1 = Util::getEpochTime();
-    TableSP mytrades = conn.run(sb);
-    tm2 = Util::getEpochTime();
-    BlockReaderSP reader = conn.run(sb,4,2,fetchSize);
-    tm3 = Util::getEpochTime();
-    vector<TableSP> fetchTableVec;
-    long long total = 0;
-    while(reader->hasNext()){
-        for(int i=0;i<total_size/fetchSize;i++){
-            TableSP fetchTable=reader->read();
-            fetchTableVec.emplace_back(fetchTable);
-            total += fetchTable->size();
-            cout<<fetchTable->size()<<".";
-        }
-
-    }
-    cout<<"total get: "+to_string(total)<<endl;
-
-    cout<<"without fetchSize,time spend: "<<(double)(tm2-tm1)/(double)1000<<endl;
-    cout<<"with fetchSize,time spend: "<<(double)(tm3-tm2)/(double)1000<<endl;
-}
 
 
 TEST_F(FunctionTest,test_function_get){
@@ -336,6 +249,7 @@ TEST_F(FunctionTest,test_function_is){
     DictionarySP dict1=conn.run("y");
     ConstantSP voidval=conn.run("d");
     ConstantSP uuidval=conn.run("s");
+    VectorSP matrixval=conn.run("x");
     EXPECT_FALSE(tab1->isDatabase());
     EXPECT_FALSE(intval->isDatabase());
     EXPECT_TRUE(intval->isNumber());
@@ -352,7 +266,10 @@ TEST_F(FunctionTest,test_function_is){
 
     EXPECT_FALSE(uuidval->isIndexArray());
     EXPECT_FALSE(uuidval->isHugeIndexArray());
+    EXPECT_TRUE(matrixval->isLargeConstant());
+    EXPECT_FALSE(vec1->isLargeConstant());
 }
+
 TEST_F(FunctionTest,test_function_set){
     VectorSP vec1= conn.run("vec");
     ConstantSP uuidval=conn.run("s");
@@ -422,32 +339,40 @@ TEST_F(FunctionTest,test_function_set){
     cout<<tab1->getString();
 
 }
+
 TEST_F(FunctionTest,test_function_has){}
 
 TEST_F(FunctionTest,test_function_append){
     TableSP tab1=conn.run("u");
-
-    vector<string> colNames = { "col1", "col2" };
-    vector<ConstantSP> cols4={Util::createInt(4),Util::createString("d")};
-    TableSP tab4 = Util::createTable(colNames,cols4);
-    vector<ConstantSP> errtype_cols4={Util::createString("4"),Util::createString("d")};
-    TableSP tab3 = Util::createTable(colNames,errtype_cols4);
-    vector<ConstantSP> err_colnum_values={Util::createInt(4)};
     string errMsg1;
     INDEX insertedRows=1;
+    vector<ConstantSP> cols4={Util::createInt(4),Util::createString("d")};
 
     tab1->setReadOnly(true);
     EXPECT_FALSE(tab1->append(cols4,insertedRows,errMsg1));
     EXPECT_EQ(errMsg1,"Can't modify read only table.");
-    cout<<tab1->getString()<<endl;
     tab1->setReadOnly(false);
 
+    //append constant
+    vector<string> colNames = { "col1", "col2" };
+    vector<ConstantSP> err_colnum_values={Util::createInt(4)};
     EXPECT_FALSE(tab1->append(err_colnum_values,insertedRows,errMsg1));
-    vector<ConstantSP> table_values={tab4};
-	EXPECT_TRUE(tab1->append(table_values,insertedRows,errMsg1));
-	vector<ConstantSP> err_coltype_values={tab3};
-	EXPECT_FALSE(tab1->append(err_coltype_values,insertedRows,errMsg1));
+    EXPECT_EQ(errMsg1, "The number of table columns doesn't match the number of columns to append.");
 
+    errMsg1.clear();
+    VectorSP tempVec=Util::createVector(DT_STRING,2,2);
+    vector<ConstantSP> err_colsize_values={Util::createInt(4),tempVec};
+    EXPECT_FALSE(tab1->append(err_colsize_values,insertedRows,errMsg1));
+    EXPECT_EQ(errMsg1, "Inconsistent length of values to insert.");
+
+    errMsg1.clear();
+    vector<ConstantSP> err_coltype_values={Util::createString("2"),Util::createString("d")};
+    EXPECT_FALSE(tab1->append(err_coltype_values,insertedRows,errMsg1));
+    EXPECT_EQ(errMsg1, "Failed to append data to column 'col1' with error: Incompatible type. Expected: INT, Actual: STRING");
+
+
+    //append tuple
+    errMsg1.clear();
     VectorSP tuple_value=Util::createVector(DT_ANY,2,2);
     tuple_value->set(0,Util::createInt(4));
     tuple_value->set(1,Util::createString("d"));
@@ -463,39 +388,77 @@ TEST_F(FunctionTest,test_function_append){
 	EXPECT_FALSE(tab1->append(tuple_values1,insertedRows,errMsg1));
     vector<ConstantSP> tuple_values2={err_coltype_tuple};
 	EXPECT_FALSE(tab1->append(tuple_values2,insertedRows,errMsg1));
-    
+
+    //append table
+    cout<<tab1->getString();
+    errMsg1.clear();
+    vector<ConstantSP> tabVec={};
+  
+    vector<ConstantSP> errSizeCols={Util::createInt(4),Util::createString("d"),Util::createInt(0)};
+    vector<string> errSizecolNames = { "col1", "col2", "col3"};
+    TableSP tab_3_cols=Util::createTable(errSizecolNames, errSizeCols);
+    tabVec.emplace_back(tab_3_cols);
+    EXPECT_FALSE(tab1->append(tabVec,insertedRows,errMsg1));
+    EXPECT_EQ(errMsg1,"Number of columns for the original table and the table to insert are different.");
+
+    errMsg1.clear();
+    tabVec.clear();
+    vector<ConstantSP> errTypeCols={Util::createString("2"),Util::createString("d")};
+    TableSP tab_errType_cols=Util::createTable(colNames, errTypeCols);
+    tabVec.emplace_back(tab_errType_cols);
+    EXPECT_FALSE(tab1->append(tabVec,insertedRows,errMsg1));
+    EXPECT_EQ(errMsg1,"Failed to append data to column 'col1' with error: Incompatible type. Expected: INT, Actual: STRING");
 
 }
+
 TEST_F(FunctionTest,test_function_update){
     TableSP tab1=conn.run("u");
-
     vector<string> colNames = { "col1", "col2" };
-    vector<ConstantSP> cols4={Util::createInt(4),Util::createString("d")};
-    TableSP tab4 = Util::createTable(colNames,cols4);
-    vector<ConstantSP> errtype_cols4={Util::createString("4"),Util::createString("d")};
-    TableSP tab3 = Util::createTable(colNames,errtype_cols4);
+    VectorSP indexs = Util::createIndexVector(0,1);
+
+    VectorSP val1 = Util::createVector(DT_INT,1,1);
+    val1->set(0,Util::createInt(5));
+    VectorSP val2 = Util::createVector(DT_STRING,1,1);
+    val2->set(0,Util::createString("f"));
+    vector<ConstantSP> vector_cols={val1,val2};
+    vector<ConstantSP> row={Util::createInt(4),Util::createString("d")};
+    vector<ConstantSP> errtype_cols={Util::createString("4"),Util::createString("d")};
     vector<ConstantSP> err_colnum_values={Util::createVector(DT_INT,2,2)};
     string errMsg1;
     INDEX insertedRows=1;
 
     tab1->setReadOnly(true);
-    EXPECT_FALSE(tab1->update(cols4,Util::createInt(0),colNames,errMsg1));
+    EXPECT_FALSE(tab1->update(row,Util::createInt(0),colNames,errMsg1));
     EXPECT_EQ(errMsg1,"Can't modify read only table.");
     errMsg1.clear();
     tab1->setReadOnly(false); 
 
-    EXPECT_TRUE(tab1->update(cols4,Util::createInt(2),colNames,errMsg1));
-    // EXPECT_ANY_THROW(tab1->update(cols4,Util::createInt(3),colNames,errMsg1));
-    tab1->update(errtype_cols4,Util::createInt(2),colNames,errMsg1);
-    cout<<errMsg1<<endl;
+    EXPECT_TRUE(tab1->update(row,Util::createInt(2),colNames,errMsg1));
+    // EXPECT_ANY_THROW(tab1->update(row,Util::createInt(3),colNames,errMsg1));
+    tab1->update(errtype_cols,Util::createInt(2),colNames,errMsg1);
+    EXPECT_EQ(errMsg1,"The category of the value to update does not match the column col1");
+
     errMsg1.clear();
     vector<string> err_colname={"col3","col2"};
-    tab1->update(cols4,Util::createInt(2),err_colname,errMsg1);
-    cout<<errMsg1<<endl;
+    tab1->update(row,Util::createInt(2),err_colname,errMsg1);
+    EXPECT_EQ(errMsg1,"The column col3 does not exist. To add a new column, the table shouldn't be shared and the value size must match the table.");
+
     errMsg1.clear();
     tab1->update(err_colnum_values,Util::createInt(2),colNames,errMsg1);
-    cout<<errMsg1<<endl;
+    EXPECT_EQ(errMsg1,"Inconsistent length of values to update.");
+
     errMsg1.clear();
+    cout<<tab1->getString()<<endl;
+    EXPECT_TRUE(tab1->update(row,indexs,colNames,errMsg1));
+    cout<<tab1->getString()<<endl;
+    EXPECT_EQ(tab1->getRow(0)->getMember(Util::createString("col1"))->getInt(),4);
+    EXPECT_EQ(tab1->getRow(0)->getMember(Util::createString("col2"))->getString(),"d");
+
+    errMsg1.clear();
+    tab1->update(vector_cols,indexs,colNames,errMsg1);
+    EXPECT_EQ(tab1->getRow(0)->getMember(Util::createString("col1"))->getInt(),5);
+    EXPECT_EQ(tab1->getRow(0)->getMember(Util::createString("col2"))->getString(),"f");
+
 }
 
 TEST_F(FunctionTest,test_function_remove){
@@ -601,6 +564,7 @@ TEST_F(FunctionTest,test_Util_functions){
     EXPECT_EQ(Util::getDataType('N'),DT_NANOTIMESTAMP);
     EXPECT_EQ(Util::getDataType('S'),DT_SYMBOL);
     EXPECT_EQ(Util::getDataType('W'),DT_STRING);
+    EXPECT_EQ(Util::getDataType('l'),DT_LONG);
 
     VectorSP matrixval = Util::createDoubleMatrix(1,1);
     string ex_martval=conn.run("matrix(DOUBLE,1,1)")->getString();
@@ -1031,6 +995,8 @@ TEST_F(FunctionTest,test_Util_functions){
 
     }
 
+
+    cout<<"-----------test Util::parseConstant()--------------"<<endl;
     EXPECT_EQ(Util::parseYear(365),1971);
     EXPECT_EQ(Util::parseYear(0),1970);
     int year,month,day;
@@ -1096,3 +1062,527 @@ TEST_F(FunctionTest,test_Util_functions){
     EXPECT_TRUE(conn.run("eqObj(int128val,int128('e1671797c52e15f763380b45e841ec32'))")->getBool());
     cout<<"--------------All cases passed----------------"<<endl;
 }
+#ifndef WINDOWS
+TEST_F(FunctionTest,test_FastVector_get){
+    // todo: when will the variable `index` not IndexArray
+    auto base = new SymbolBase(0);
+    base->findAndInsert("test1");
+    base->findAndInsert("test2");
+    int *test1 = new int[2];
+    test1[0] = 1;
+    test1[1] = 2;
+    double *test2 = new double[2];
+    test2[0] = 1.1;
+    test2[1] = 1.2;
+    auto fastSymbolVec = new FastSymbolVector(base, 2, 6, test1, true);
+    auto indexVec1 = Util::createIndexVector(0, 2);
+    auto indexVec2 = new FastDoubleVector(2, 2, test2, true);
+    EXPECT_EQ(indexVec1->isIndexArray(), true);
+    EXPECT_EQ(indexVec2->isIndexArray(), false);
+    EXPECT_EQ(indexVec1->size(), 2);
+    EXPECT_EQ(indexVec2->size(), 2);
+
+    std::cout << fastSymbolVec->get(indexVec1)->getString() << std::endl;
+    std::cout << fastSymbolVec->get(indexVec2)->getString() << std::endl;
+}
+
+TEST_F(FunctionTest,test_FastVector_fill){
+    auto base = new SymbolBase(0);
+    int *test1 = new int[2];
+    test1[0] = 1;
+    test1[1] = 2;
+    auto fastSymbolVec = new FastSymbolVector(base, 2, 6, test1, true);
+    auto val1 = ConstantSP(new String("test"));
+    fastSymbolVec->fill(0, 1, val1);
+
+    vector<string> test2 = {"test1", "test2"};
+    auto val2 = ConstantSP(new StringVector(test2, test2.size(), true));
+    fastSymbolVec->fill(0, 3, val2);
+    fastSymbolVec->fill(0, 2, val2);
+
+    // todo: getCategory() != LITERAL
+    double *test3 = new double[2];
+    test3[0] = 1.1;
+    test3[1] = 1.2;
+    auto val3 = ConstantSP(new FastDoubleVector(2, 2, test3, true));
+    EXPECT_ANY_THROW(fastSymbolVec->fill(0, 2, val3));
+    // EXPECT_NE(val3->getCategory(), LITERAL);
+    // EXPECT_EQ(val3->getCategory(), DT_DOUBLE);
+
+}
+
+
+TEST_F(FunctionTest,Guid){
+    Guid uuid(1, 0);
+    EXPECT_FALSE(uuid.isZero());
+    GuidHash hash;
+    std::cout << hash(uuid) << std::endl;
+    VectorSP con = Util::createVector(DT_INT, 0, 1);
+    int num = 0, partial = 0;
+    EXPECT_ANY_THROW(con->Constant::serialize(nullptr, 0, 0, 0, num, partial));
+    EXPECT_ANY_THROW(con->Constant::serialize(nullptr, 0, 0, 0, 0, num, partial));
+    EXPECT_ANY_THROW(con->Constant::deserialize(nullptr, 0, 0, num));
+    EXPECT_EQ("", con->Constant::getRowLabel()->getString());
+    EXPECT_EQ("", con->Constant::getColumnLabel()->getString());
+    EXPECT_EQ("", con->Vector::getColumnLabel()->getString());
+
+    VectorSP matrix = Util::createMatrix(DT_INT, 3, 3, 9);
+    matrix->setName("123");
+    EXPECT_EQ("123", matrix->getScript());
+    int* data = new int[3]{1, 2, 3};
+    VectorSP vec = Util::createVector(DT_INT, 3, 3, true, 0, data);
+    EXPECT_EQ("[1,2,3]", vec->getScript());
+    VectorSP vec2 = Util::createIndexVector(0,200);
+    EXPECT_EQ("array()", vec2->getScript());
+    vec2->setName("234");
+    EXPECT_EQ("234", vec2->getScript());
+    VectorSP vec3 = Util::createVector(DT_INT, 0, 3);
+    EXPECT_EQ("[]", vec3->getScript());
+}
+
+TEST_F(FunctionTest,Matrix_reshape){
+    int* data = new int[16]{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8};
+    VectorSP matrix = Util::createMatrix(DT_INT, 4, 4, 16, 0, data);
+    std::vector<std::string> rowLabels{"row1", "row2", "row3", "row4"};
+    std::vector<std::string> columnLabels{"col1", "col2", "col3", "col4"};
+    VectorSP rowVec = Util::createVector(DT_STRING, 0, 4);
+    rowVec->appendString(rowLabels.data(), rowLabels.size());
+    rowVec->setTemporary(false);
+    VectorSP colVec = Util::createVector(DT_STRING, 0, 4);
+    colVec->appendString(columnLabels.data(), columnLabels.size());
+    colVec->setTemporary(false);
+    matrix->setRowLabel(rowVec);
+    matrix->setColumnLabel(colVec);
+    matrix->getString();
+    EXPECT_TRUE(matrix->reshape(4, 4));
+    EXPECT_TRUE(matrix->reshape(3, 4));
+    EXPECT_TRUE(matrix->reshape(2, 6));
+    EXPECT_FALSE(matrix->reshape(2, 5));
+}
+
+TEST_F(FunctionTest,Matrix_getString){
+    int* data = new int[48]{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8};
+    VectorSP matrix = Util::createMatrix(DT_INT, 1, 48, 48, 0, data);
+    matrix->getString();
+    matrix->getString(0);
+    EXPECT_TRUE(matrix->reshape(48, 1));
+    matrix->getString();
+}
+
+
+TEST_F(FunctionTest,Matrix_get){
+    int* data = new int[16]{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8};
+    VectorSP matrix = Util::createMatrix(DT_INT, 4, 4, 16, 0, data);
+    ConstantSP index = Util::createInt(1);
+    EXPECT_EQ("[5,6,7,8]", dynamic_cast<FastIntMatrix*>(matrix.get())->get(index)->getString());
+    ConstantSP index1 = Util::createInt(-1);
+    ConstantSP index2 = Util::createInt(10);
+    EXPECT_ANY_THROW(dynamic_cast<FastIntMatrix*>(matrix.get())->get(index1));
+    EXPECT_ANY_THROW(dynamic_cast<FastIntMatrix*>(matrix.get())->get(index2));
+
+    ConstantSP index3 = Util::createPair(DT_INT);
+    index3->setInt(0, 0);
+    index3->setInt(1, 1);
+    dynamic_cast<FastIntMatrix*>(matrix.get())->get(index3)->getString();
+    index3->setInt(0, INT_MIN);
+    index3->setInt(1, INT_MIN);
+    dynamic_cast<FastIntMatrix*>(matrix.get())->get(index3)->getString();
+    index3->setInt(0, 1);
+    index3->setInt(1, 0);
+    dynamic_cast<FastIntMatrix*>(matrix.get())->get(index3)->getString();
+
+    ConstantSP index4 = Util::createVector(DT_INT, 2, 2);
+    index4->setInt(0, -1);
+    index4->setInt(1, 0);
+    EXPECT_ANY_THROW(dynamic_cast<FastIntMatrix*>(matrix.get())->get(index4));
+    index4->setInt(0, 6);
+    index4->setInt(1, 0);
+    EXPECT_ANY_THROW(dynamic_cast<FastIntMatrix*>(matrix.get())->get(index4));
+}
+
+
+TEST_F(FunctionTest,Matrix_set){
+    int* data = new int[16]{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8};
+    VectorSP matrix = Util::createMatrix(DT_INT, 4, 4, 16, 0, data);
+    
+    ConstantSP index = Util::createIndexVector(0, 3);
+    ConstantSP value = Util::createInt(9);
+    EXPECT_TRUE(matrix->set(index, value));
+    ConstantSP index1 = Util::createIndexVector(0, 6);
+    EXPECT_ANY_THROW(matrix->set(index1, value));
+    ConstantSP index2 = Util::createIndexVector(-1, 6);
+    EXPECT_ANY_THROW(matrix->set(index2, value));
+}
+
+TEST_F(FunctionTest, DFSChunkMeta_Constructor){
+    IO_ERR ret;
+    short flag = 0, size = 0;
+    vector<string> sites1 = {"192.168.0.16:9002:datanode1", "192.168.0.16:9003:datanode2", "192.168.0.16:9004:datanode3", "192.168.0.16:9005:datanode4"};
+    vector<string> sites2;
+    Guid id("314");
+    DFSChunkMetaSP chunk = new DFSChunkMeta("/home/appadmin/data", id, 3, 1, SPLIT_TABLET_CHUNK, sites2, 315);
+    chunk->getString();
+    chunk = new DFSChunkMeta("/home/appadmin/data", id, 3, 1, TABLET_CHUNK, sites1, 315);
+    chunk->getString();
+    std::cout << chunk->getAllocatedMemory() << std::endl;
+    chunk = new DFSChunkMeta("/home/appadmin/data", id, 3, 1, FILE_CHUNK, sites1.data(), 0, 315);
+
+    DataOutputStreamSP outStream1 = new DataOutputStream(1024);
+    ConstantMarshallSP marshall1 = ConstantMarshallFactory::getInstance(DF_CHUNK, outStream1);
+    EXPECT_TRUE(marshall1->start(chunk, false, false, ret));
+    DataInputStreamSP inStream1 = new DataInputStream(outStream1->getBuffer(), outStream1->size());
+    inStream1->readShort(flag);
+    inStream1->readShort(size);
+    DFSChunkMetaSP chunk1 = new DFSChunkMeta(inStream1);
+    EXPECT_ANY_THROW(new DFSChunkMeta(inStream1));
+
+    chunk = new DFSChunkMeta("/home/appadmin/data", id, 3, 1, FILE_CHUNK, sites1.data(), 4, 315);
+    DataOutputStreamSP outStream2 = new DataOutputStream(1024);
+    ConstantMarshallSP marshall2 = ConstantMarshallFactory::getInstance(DF_CHUNK, outStream2);
+    EXPECT_TRUE(marshall2->start(chunk, false, false, ret));
+    DataInputStreamSP inStream2 = new DataInputStream(outStream2->getBuffer(), outStream2->size());
+    inStream2->readShort(flag);
+    inStream2->readShort(size);
+    DFSChunkMetaSP chunk2 = new DFSChunkMeta(inStream2);
+}
+
+TEST_F(FunctionTest, DFSChunkMeta_getMember){
+    vector<string> sites1 = {"192.168.0.16:9002:datanode1", "192.168.0.16:9003:datanode2", "192.168.0.16:9004:datanode3", "192.168.0.16:9005:datanode4"};
+    Guid id("314");
+    DFSChunkMetaSP chunk = new DFSChunkMeta("/home/appadmin/data", id, 3, 1, FILE_CHUNK, sites1, 315);
+    
+    ConstantSP key1 = Util::createInt(1);
+    EXPECT_ANY_THROW(chunk->getMember(key1));
+    ConstantSP key2 = Util::createString("path");
+    EXPECT_EQ("/home/appadmin/data", chunk->getMember(key2)->getString());
+    ConstantSP key3 = Util::createPair(DT_STRING);
+    EXPECT_ANY_THROW(chunk->getMember(key3));
+    VectorSP key4 = Util::createVector(DT_STRING, 0, 8);
+    std::vector<std::string> vec{"id", "cid", "version", "sites", "size", "isTablet", "splittable", "none"};
+    key4->appendString(vec.data(), vec.size());
+    chunk->getMember(key4);
+    chunk->keys();
+    chunk->values();
+}
+
+TEST_F(FunctionTest, DBConnection_upload){
+    ConstantSP value = Util::createInt(1);
+    EXPECT_ANY_THROW(conn.upload("0123", value));
+    std::vector<ConstantSP> obj{value};
+    std::vector<std::string> names{"123"};
+    EXPECT_ANY_THROW(conn.upload(names, obj));
+    names.push_back("234");
+    EXPECT_ANY_THROW(conn.upload(names, obj));
+    obj.clear();
+    names.clear();
+    conn.upload(names, obj);
+    EXPECT_ANY_THROW(conn.run("1+1", 4, 2, 100));
+    DBConnection dc;
+    DBConnection dd;
+    EXPECT_ANY_THROW(dc.run("1+1"));
+    dc = std::move(dc);
+    dd = std::move(dc);
+}
+
+
+TEST_F(FunctionTest, DLogger){
+    {
+        RecordTime t("name");
+        Util::sleep(200);
+    }
+    char workDir[256]{};
+    getcwd(workDir, sizeof(workDir));
+    std::string file = std::string(workDir).append("/tempFile123");
+    DLogger::SetLogFilePath(file);
+    auto level = DLogger::GetMinLevel();
+    DLogger::Info("123", "345");
+    DLogger::SetLogFilePath("");
+    DLogger::SetMinLevel(DLogger::Level::LevelWarn);
+    DLogger::Info("123", "345");
+    DLogger::Error("123", "345");
+    remove(file.c_str());
+
+    {
+        RecordTime t("name");
+        Util::sleep(100);
+    }
+    {
+        RecordTime t("name2");
+        Util::sleep(100);
+    }
+    {
+        RecordTime t("name2");
+        Util::sleep(200);
+    }
+    RecordTime::printAllTime();
+}
+
+
+BasicTableSP createTable(){
+    int* data1 = new int[2]{1, 2};
+    int* data2 = new int[2]{3, 4};
+    std::vector<ConstantSP> cols ={Util::createVector(DT_INT, 2, 2, true, 0, data1), Util::createVector(DT_INT, 2, 2, true, 0, data2)};
+    vector<string> colNames = { "col1", "col2"};
+    return new BasicTable(cols, colNames);
+}
+
+TEST_F(FunctionTest, Table_Constuctor){
+    BasicTableSP t = createTable();
+    ConstantSP value = new Int(1);
+    EXPECT_ANY_THROW(t->AbstractTable::set(1, value));
+    EXPECT_ANY_THROW(t->AbstractTable::setColumnName(1, "123"));
+    ConstantSP emptyFilter;
+    EXPECT_EQ("[3,4]", t->AbstractTable::getColumn(std::string("col2"), emptyFilter)->getString());
+    EXPECT_EQ("4", t->AbstractTable::get(1, 1)->getString());
+    t->setName("Harry");
+    EXPECT_FALSE(t->contain("Tom", "col1"));
+    EXPECT_FALSE(t->contain("Tom", "col3"));
+
+    vector<string> colNames2 = { "col1", "col2", "col3", "col4", "col5", "col6", "col7", "col8", "col9", "col0", "col1", "col2", "col3"};
+    std::vector<ConstantSP> cols2;
+    for(int i = 0; i < 13; ++i){
+        VectorSP v = Util::createVector(DT_STRING, 0, 1);
+        std::string content = "12345678901234567890";
+        v->appendString(&content, 1);
+        cols2.push_back(v);
+    }
+    BasicTableSP t1 = new BasicTable(cols2, colNames2);
+    t1->getString(0);
+    t1->getString();
+    EXPECT_EQ(COMPRESS_NONE, t1->getColumnCompressMethod(2));
+}
+
+TEST_F(FunctionTest, Table_setColumnCompressMethods){
+    BasicTableSP t = createTable();
+    std::vector<COMPRESS_METHOD> methods{COMPRESS_DELTA, COMPRESS_NONE};
+    EXPECT_ANY_THROW(t->setColumnCompressMethods(methods));
+}
+
+TEST_F(FunctionTest, Table_getInternal){
+    int* data1 = new int[2]{1, 2};
+    int* data2 = new int[2]{3, 4};
+    std::vector<ConstantSP> cols ={Util::createVector(DT_INT, 2, 2, true, 0, data1), Util::createVector(DT_INT, 2, 2, true, 0, data2)};
+    vector<string> colNames = { "col1", "col2"};
+    BasicTableSP t = new BasicTable(cols, colNames);
+
+    ConstantSP index = Util::createPair(DT_INT);
+    index->setInt(0, INT_MIN);
+    index->setInt(1, INT_MIN);
+    t->get(index);
+    index->setInt(0, 1);
+    index->setInt(1, 0);
+    t->get(index);
+    t->getWindow(1, 1, 1, 1);
+    EXPECT_ANY_THROW(t->AbstractTable::getInstance(1));
+    EXPECT_ANY_THROW(t->AbstractTable::getValue());
+    EXPECT_ANY_THROW(t->AbstractTable::getValue(1));
+    std::string errMsg;
+    INDEX rows = 0;
+    std::vector<ConstantSP> values;
+    EXPECT_FALSE(t->AbstractTable::append(values, rows, errMsg));
+    EXPECT_FALSE(t->AbstractTable::update(values, index, colNames, errMsg));
+    EXPECT_FALSE(t->AbstractTable::remove(index, errMsg));
+}
+
+TEST_F(FunctionTest, BasicTable_init){
+    int* data1 = new int[2]{1, 2};
+    int* data2 = new int[2]{3, 4};
+    std::vector<ConstantSP> cols(2);
+    vector<string> colNames = { "col1", "col2"};
+    EXPECT_ANY_THROW(new BasicTable(cols, colNames));
+    cols[0] = Util::createVector(DT_INT, 2, 2, true, 0, data1);
+    cols[1] = Util::createVector(DT_INT, 2, 2, true, 0, data2);
+    BasicTableSP t = new BasicTable(cols, colNames);
+    ConstantSP value = Util::createDictionary(DT_INT, DT_INT);
+    EXPECT_FALSE(t->set(0, value));
+}
+
+TEST_F(FunctionTest, BasicTable_appendTable){
+    int* data1 = new int[2]{1, 2};
+    int* data2 = new int[2]{3, 4};
+    std::vector<ConstantSP> cols ={Util::createVector(DT_INT, 2, 2, true, 0, data1), Util::createVector(DT_INT, 2, 2, true, 0, data2)};
+    vector<string> colNames = { "col1", "col2"};
+    BasicTableSP t = new BasicTable(cols, colNames);
+
+    std::vector<std::string> data3{"123", "456"};
+    int* data4 = new int[2]{3, 4};
+    std::vector<ConstantSP> cols2(2);
+    VectorSP vec = Util::createVector(DT_STRING, 0, 2);
+    vec->appendString(data3.data(), data3.size());
+    cols2[1] = vec;
+    cols2[0] = Util::createVector(DT_INT, 2, 2, true, 0, data4);
+    vector<string> colNames2 = { "col1", "col2"};
+    BasicTableSP t2 = new BasicTable(cols2, colNames2);
+
+    std::vector<ConstantSP> values{t2};
+    std::string errMsg;
+    INDEX rows = 0;
+    EXPECT_FALSE(t->append(values, rows, errMsg));
+    
+    t2 = t->getValue();
+    values[0] = t2;
+    EXPECT_TRUE(t->append(values, rows, errMsg));
+}
+
+TEST_F(FunctionTest, BasicTable_appendTuple){
+    std::string errMsg;
+    INDEX rows = 0;
+    BasicTableSP t = createTable();
+    
+    VectorSP vec = Util::createVector(DT_ANY, 0, 2);
+    vec->append(Util::createVector(DT_INT, 2, 2));
+    vec->append(Util::createString("123"));
+    std::vector<ConstantSP> values{vec};
+    EXPECT_FALSE(t->append(values, rows, errMsg));
+    
+    VectorSP vec1 = Util::createVector(DT_ANY, 0, 2);
+    vec1->append(Util::createInt(2));
+    vec1->append(Util::createString("123"));
+    values[0] = vec1;
+    EXPECT_FALSE(t->append(values, rows, errMsg));
+
+    VectorSP vec2 = Util::createVector(DT_ANY, 0, 2);
+    vec2->append(Util::createInt(2));
+    vec2->append(Util::createInt(2));
+    values[0] = vec2;
+    EXPECT_TRUE(t->append(values, rows, errMsg));
+
+    VectorSP vec3 = Util::createVector(DT_ANY, 0, 2);
+    vec3->append(Util::createVector(DT_INT, 2, 2));
+    vec3->append(Util::createVector(DT_STRING, 2, 2));
+    values[0] = vec3;
+    EXPECT_FALSE(t->append(values, rows, errMsg));
+}
+
+TEST_F(FunctionTest, BasicTable_appendNormal){
+    std::string errMsg;
+    INDEX rows = 0;
+    BasicTableSP t = createTable();
+    
+    std::vector<ConstantSP> values;
+    values.push_back(Util::createVector(DT_INT, 2, 2));
+    values.push_back(Util::createString("123"));
+    EXPECT_FALSE(t->append(values, rows, errMsg));
+    
+    values[0] = Util::createInt(2);
+    values[1] = Util::createString("123");
+    EXPECT_FALSE(t->append(values, rows, errMsg));
+
+    values[0] = Util::createInt(2);
+    values[1] = Util::createInt(2);
+    EXPECT_TRUE(t->append(values, rows, errMsg));
+
+    values[0] = Util::createVector(DT_INT, 2, 2);
+    std::vector<std::string> columnLabels{"col1", "col2"};
+    VectorSP rowVec = Util::createVector(DT_STRING, 0, 4);
+    rowVec->appendString(columnLabels.data(), columnLabels.size());
+    values[1] = rowVec;
+    EXPECT_FALSE(t->append(values, rows, errMsg));
+}
+
+TEST_F(FunctionTest, BasicTable_update){
+    BasicTableSP t = createTable();
+
+    ConstantSP index = Util::createIndexVector(0, 1);
+    index->setNothing(true);
+    std::vector<ConstantSP> values{Util::createVector(DT_INT, 3, 3)};
+    std::vector<std::string> colName{"col3"};
+    std::string errMsg;
+    EXPECT_FALSE(t->update(values, index, colName, errMsg));
+    values[0] = Util::createInt(1);
+    EXPECT_TRUE(t->update(values, index, colName, errMsg));
+    colName[0] = "col4";
+    values[0] = Util::createIndexVector(0, 2);
+    EXPECT_TRUE(t->update(values, index, colName, errMsg));
+    colName[0] = "col5";
+    values[0] = Util::createIndexVector(0, 2);
+    values[0]->setTemporary(false);
+    EXPECT_TRUE(t->update(values, index, colName, errMsg));
+
+    colName[0] = "col1";
+    values[0] = Util::createIndexVector(0, 2);
+    EXPECT_TRUE(t->update(values, index, colName, errMsg));
+
+    values[0] = Util::createPair(DT_STRING);
+    EXPECT_FALSE(t->update(values, index, colName, errMsg));
+}
+
+TEST_F(FunctionTest, BasicTable_updateVector){
+    int* data1 = new int[2]{1, 2};
+    std::vector<std::string> columnLabels{"col1", "col2"};
+    VectorSP rowVec = Util::createVector(DT_STRING, 0, 2);
+    rowVec->appendString(columnLabels.data(), columnLabels.size());
+    std::vector<ConstantSP> cols ={Util::createVector(DT_INT, 2, 2, true, 0, data1), rowVec};
+    vector<string> colNames = { "col1", "col2"};
+    BasicTableSP t = new BasicTable(cols, colNames);
+    
+    std::vector<ConstantSP> values;
+    values.push_back(Util::createIndexVector(0, 2));
+    ConstantSP index = Util::createIndexVector(0, 1);
+    std::string errMsg;
+    std::vector<std::string> colName{"col2"};
+    EXPECT_FALSE(t->update(values, index, colName, errMsg));
+
+    colName[0] = "col1";
+    values[0] = new Void();
+    EXPECT_TRUE(t->update(values, index, colName, errMsg));
+ 
+    values[0] = Util::createVector(DT_FLOAT, 2, 2);
+    EXPECT_FALSE(t->update(values, index, colName, errMsg));
+    values[0] = Util::createInt(1);
+    index->setNothing(true);
+    EXPECT_TRUE(t->update(values, index, colName, errMsg));
+}
+
+TEST_F(FunctionTest, BasicTable_remove){
+    BasicTableSP t = createTable();
+
+    std::string errMsg;
+    ConstantSP index = Util::createIndexVector(0, 1);
+    index->setNothing(true);
+    EXPECT_TRUE(t->remove(index, errMsg));
+}
+
+TEST_F(FunctionTest, BasicTable_join){
+    BasicTableSP t = createTable();
+    t->setReadOnly(true);
+
+    std::vector<ConstantSP> columns;
+    EXPECT_FALSE(t->join(columns));
+    t->updateSize();
+    EXPECT_FALSE(t->clear());
+    columns.push_back(Util::createPair(DT_INT));
+    t->setReadOnly(false);
+    EXPECT_FALSE(t->join(columns));
+    columns[0] = Util::createIndexVector(0, 3);
+    EXPECT_FALSE(t->join(columns));
+    columns[0] = Util::createIndexVector(0, 2);
+    EXPECT_FALSE(t->join(columns));
+    dynamic_cast<Vector*>(columns[0].get())->setName("col1");
+    EXPECT_FALSE(t->join(columns));
+    dynamic_cast<Vector*>(columns[0].get())->setName("col3");
+    EXPECT_TRUE(t->join(columns));
+    ((Vector*)t->getColumn(0).get())->append(Util::createIndexVector(0, 2));
+    EXPECT_ANY_THROW(t->updateSize());
+}
+
+TEST_F(FunctionTest,test_FastFixedLengthVector_getDataArray){
+    unsigned char data[5] = "abcd";
+    auto fastIntVec = new FastInt128Vector(DT_INT, 2, 4, data, false);
+    auto fastIntVec1 = new FastInt128Vector(DT_INT, 2, 4, data, true);
+    bool hasNull = false;
+    auto idx1 = Util::createIndexVector(1, 2);
+    fastIntVec->get(idx1);
+    double *vec1 = new double[2];
+    vec1[0] = 0.1;
+    vec1[1] = 1.2;
+    double *vec2 = new double[2];
+    vec2[0] = 3.1;
+    vec2[1] = 3.2;
+    auto idx2 = new FastDoubleVector(2, 2, vec1, true);
+    auto idx3 = new FastDoubleVector(2, 2, vec2, true);
+    fastIntVec1->get(idx2);
+    fastIntVec1->get(idx3);
+}
+
+#endif

@@ -41,7 +41,10 @@ int min(INDEX a, int b) {
 #define SYMBOLBASE_MAX_SIZE 1<<21
 
 #define RECORDTIME(name) //RecordTime _recordTime(name)
-#define DLOG //DLogger::Info
+#ifdef DLOG
+    #undef DLOG
+#endif
+#define DLOG true?DLogger::GetMinLevel() : DLogger::Info
 
 static inline uint32_t murmur32_16b (const unsigned char* key){
 	const uint32_t m = 0x5bd1e995;
@@ -104,7 +107,7 @@ public:
 };
 class EXPORT_DECL DBConnectionImpl {
 public:
-    DBConnectionImpl(bool sslEnable = false, bool asynTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false);
+    DBConnectionImpl(bool sslEnable = false, bool asynTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false, bool isReverseStreaming = false);
     ~DBConnectionImpl();
     bool connect(const string& hostName, int port, const string& userId = "", const string& password = "",bool sslEnable = false, bool asynTask = false, int keepAliveTime = -1, bool compress= false, bool python = false);
     void login(const string& userId, const string& password, bool enableEncryption);
@@ -115,7 +118,7 @@ public:
     void close();
     bool isConnected() { return isConnected_; }
 	void getHostPort(string &host, int &port) { host = hostName_; port = port_; }
-	
+	SocketSP getSocket(){return conn_;}
 private:
 	long generateRequestFlag(bool clearSessionMemory = false, bool disablepickle = false, bool pickleTableToList = false);
     ConstantSP run(const string& script, const string& scriptType, vector<ConstantSP>& args, int priority = 4, int parallelism = 2,int fetchSize = 0, bool clearMemory = false);
@@ -138,6 +141,7 @@ private:
 	bool compress_;
 	bool enablePickle_, python_;
     static DdbInit ddbInit_;
+    bool isReverseStreaming_;
 };
 
 class TaskStatusMgmt{
@@ -180,7 +184,7 @@ public:
     ~DBConnectionPoolImpl(){
         shutDown();
 		Task emptyTask;
-		for (int i = 0; i < workers_.size(); i++)
+		for (size_t i = 0; i < workers_.size(); i++)
 			queue_->push(emptyTask);
 		for (auto& work : workers_) {
 			work->join();
@@ -390,20 +394,30 @@ Matrix::Matrix(int cols, int rows) : cols_(cols), rows_(rows), rowLabel_(Constan
 void Matrix::setRowLabel(const ConstantSP& label) {
     if (label->getType() == DT_VOID)
         rowLabel_ = label;
-    else if (label->isTemporary())
-        rowLabel_ = label;
-    else
-        rowLabel_ = label->getValue();
+	else {
+		if (label->getForm() != DF_VECTOR) {
+			throw RuntimeException("Matrix's label must be a vector.");
+		}
+		if (label->isTemporary())
+			rowLabel_ = label;
+		else
+			rowLabel_ = label->getValue();
+	}
     rowLabel_->setTemporary(false);
 }
 
 void Matrix::setColumnLabel(const ConstantSP& label) {
     if (label->getType() == DT_VOID)
         colLabel_ = label;
-    else if (label->isTemporary())
-        colLabel_ = label;
-    else
-        colLabel_ = label->getValue();
+	else {
+		if (label->getForm() != DF_VECTOR) {
+			throw RuntimeException("Matrix's label must be a vector.");
+		}
+		if (label->isTemporary())
+			colLabel_ = label;
+		else
+			colLabel_ = label->getValue();
+	}
     colLabel_->setTemporary(false);
 }
 
@@ -743,10 +757,10 @@ ConstantSP DFSChunkMeta::values() const {
 }
 
 DdbInit DBConnectionImpl::ddbInit_;
-DBConnectionImpl::DBConnectionImpl(bool sslEnable, bool asynTask, int keepAliveTime, bool compress, bool python)
+DBConnectionImpl::DBConnectionImpl(bool sslEnable, bool asynTask, int keepAliveTime, bool compress, bool python, bool isReverseStreaming)
 		: port_(0), encrypted_(false), isConnected_(false), littleEndian_(Util::isLittleEndian()), 
 		sslEnable_(sslEnable),asynTask_(asynTask), keepAliveTime_(keepAliveTime), compress_(compress),
-		enablePickle_(false), python_(python){
+		enablePickle_(false), python_(python), isReverseStreaming_(isReverseStreaming){
 }
 
 DBConnectionImpl::~DBConnectionImpl() {
@@ -942,27 +956,26 @@ ConstantSP DBConnectionImpl::upload(vector<string>& names, vector<ConstantSP>& o
 long DBConnectionImpl::generateRequestFlag(bool clearSessionMemory, bool disablepickle, bool pickleTableToList) {
 	long flag = 32; //32 API client
 	if (asynTask_){
-        DLOG("async");
-		flag += 4;
+        flag += 4;
     }
 	if (clearSessionMemory){
-        DLOG("clearMem");
-		flag += 16;
+        flag += 16;
     }
 	if (enablePickle_ == false || disablepickle) {
 		if (compress_)
 			flag += 64;
 	}
 	else {//enable pickle
-        DLOG("pickle",pickleTableToList?"toList":"");
-		flag += 8;
+        flag += 8;
 		if (pickleTableToList) {
 			flag += (1 << 15);
 		}
 	}
 	if (python_){
-        DLOG("python");
-		flag += 2048;
+        flag += 2048;
+    }
+    if(isReverseStreaming_){
+        flag += 131072;
     }
 	return flag;
 }
@@ -1087,15 +1100,12 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
     ConstantUnmarshallFactory factory(in);
     ConstantUnmarshall* unmarshall = factory.getConstantUnmarshall(form);
     if(unmarshall == NULL){
-        DLOG("run1",script,"invalid form",form);
-        //FIXME ignore it now until server fix this bug.
-        //DLogger::Error("Unknow incoming object form",form,"of type",type);
+        DLogger::Error("Unknow incoming object form",form,"of type",type);
         in->reset(0);
         conn_->skipAll();
         return Constant::void_;
     }
-    DLOG("run1",script,"start unmarshall");
-    if (!unmarshall->start(flag, true, ret)) {
+	if (!unmarshall->start(flag, true, ret)) {
         unmarshall->reset();
 		close();
         throw IOException("Failed to parse the incoming object with IO error type " + std::to_string(ret));
@@ -1107,10 +1117,10 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
     return result;
 }
 
-DBConnection::DBConnection(bool enableSSL, bool asyncTask, int keepAliveTime, bool compress, bool python) :
-	conn_(new DBConnectionImpl(enableSSL, asyncTask, keepAliveTime, compress, python)), uid_(""), pwd_(""), ha_(false),
-		enableSSL_(enableSSL), asynTask_(asyncTask), compress_(compress), python_(python), nodes_(NULL),
-		lastConnNodeIndex_(0), reconnect_(false), closed_(true){
+DBConnection::DBConnection(bool enableSSL, bool asyncTask, int keepAliveTime, bool compress, bool python, bool isReverseStreaming) :
+	conn_(new DBConnectionImpl(enableSSL, asyncTask, keepAliveTime, compress, python, isReverseStreaming)), uid_(""), pwd_(""), ha_(false),
+		enableSSL_(enableSSL), asynTask_(asyncTask), compress_(compress), nodes_({}),
+		lastConnNodeIndex_(0), python_(python), reconnect_(false), closed_(true){
 }
 
 DBConnection::DBConnection(DBConnection&& oth) :
@@ -1283,7 +1293,7 @@ bool DBConnection::connected() {
 
 bool DBConnection::connectNode(string hostName, int port, int keepAliveTime) {
 	DLOG("Connect to",hostName ,":",port,".");
-	int attempt = 0;
+	//int attempt = 0;
 	while (closed_ == false) {
 		try {
 			return conn_->connect(hostName, port, uid_, pwd_, enableSSL_, asynTask_, keepAliveTime, compress_,python_);
@@ -1313,13 +1323,12 @@ bool DBConnection::connectNode(string hostName, int port, int keepAliveTime) {
 }
 
 DBConnection::ExceptionType DBConnection::parseException(const string &msg, string &host, int &port) {
-	int index = msg.find("<NotLeader>");
+	size_t index = msg.find("<NotLeader>");
 	if (index != string::npos) {
 		index = msg.find(">");
 		string ipport = msg.substr(index + 1);
 		parseIpPort(ipport,host,port);
-		//std::cerr << "Got new leader exception, new leader is " << host << ":" << port << std::endl;
-		DLogger::Info("New leader is",host,":",port,".");
+		DLogger::Info("Got NotLeaderException, switch to leader node [",host,":",port,"] to run script");
 		return ET_NEWLEADER;
 	}
 	else {
@@ -1509,6 +1518,10 @@ void DBConnection::close() {
 const std::string& DBConnection::getInitScript() const {
     return initialScript_;
 }
+SocketSP DBConnection::getSocket()
+{
+    return conn_->getSocket();
+}
 
 void DBConnection::setInitScript(const std::string & script) {
     initialScript_ = script;
@@ -1683,7 +1696,7 @@ DBConnectionPool::DBConnectionPool(const string& hostName, int port, int threadN
 				bool loadBalance, bool highAvailability, bool compress, bool reConnect, bool python){
     pool_ = new DBConnectionPoolImpl(hostName, port, threadNum, userId, password, loadBalance, highAvailability, compress,reConnect,python);
 }
-
+DBConnectionPool::~DBConnectionPool(){}
 void DBConnectionPool::run(const string& script, int identity, int priority, int parallelism, int fetchSize, bool clearMemory){
     if(identity < 0)
         throw RuntimeException("Invalid identity: " + std::to_string(identity) + ". Identity must be a non-negative integer.");
@@ -1725,7 +1738,7 @@ PartitionedTableAppender::PartitionedTableAppender(string dbUrl, string tableNam
     pool_ = pool.pool_;
     init(dbUrl, tableName, partitionColName, appendFunction);
 }
-
+PartitionedTableAppender::~PartitionedTableAppender(){}
 void PartitionedTableAppender::init(string dbUrl, string tableName, string partitionColName, string appendFunction){
     threadCount_ = pool_->getConnectionCount();
     chunkIndices_.resize(threadCount_);
@@ -2150,12 +2163,13 @@ void DLogger::SetMinLevel(Level level) {
 	minLevel_ = level;
 }
 
-void DLogger::WriteLog(std::string &text){
+bool DLogger::WriteLog(std::string &text){
     puts(text.data());
     if(logFilePath_.empty()==false){
         text+="\n";
         Util::writeFile(logFilePath_.data(),text.data(),text.length());
     }
+    return true;
 }
 
 bool DLogger::FormatFirst(std::string &text, Level level) {
@@ -2227,11 +2241,20 @@ std::string RecordTime::printAllTime() {
 				minNs = one;
 			}
 		}
+        size_t timeCount = node->costTime.size();
 		double sum = sumNsOverflow * (LLONG_MAX / ns2s) + sumNs / ns2s;
+        double avg = sum / timeCount;
 		double min = minNs / ns2s;
 		double max = maxNs / ns2s;
+        double stdDev = 0.0;
+        double diff;
+        for (long long one : node->costTime) {
+            diff = one/ ns2s - avg;
+            stdDev += (diff * diff) / timeCount;
+        }
+        stdDev = sqrt(stdDev);
 		output = output + node->name + ": sum = " + std::to_string(sum) + " count = " + std::to_string(node->costTime.size()) +
-			" avg = " + std::to_string(sum / node->costTime.size()) +
+			" avg = " + std::to_string(avg) + " stdDev = " + std::to_string(stdDev) +
 			" min = " + std::to_string(min) + " max = " + std::to_string(max) + "\n";
 		delete node;
 	}

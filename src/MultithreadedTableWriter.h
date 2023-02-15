@@ -16,7 +16,7 @@
 #include <unordered_map>
 
 #ifdef _MSC_VER
-	#ifdef _USRDLL	
+	#ifdef _DDBAPIDLL	
 		#define EXPORT_DECL _declspec(dllexport)
 	#else
 		#define EXPORT_DECL __declspec(dllimport)
@@ -24,11 +24,6 @@
 #else
 	#define EXPORT_DECL 
 #endif
-
-#ifndef RECORDTIME
-#undef RECORDTIME
-#endif
-#define RECORDTIME //RecordTime _recordTime
 
 namespace dolphindb{
 
@@ -64,13 +59,13 @@ public:
                             const string& dbPath, const string& tableName, bool useSSL, bool enableHighAvailability = false, const vector<string> *pHighAvailabilitySites = nullptr,
 							int batchSize = 1, float throttle = 0.01f,int threadCount = 1, const string& partitionCol ="",
 							const vector<COMPRESS_METHOD> *pCompressMethods = nullptr, Mode mode = M_Append,
-                            vector<string> *pModeOption = nullptr);
+                            vector<string> *pModeOption = nullptr, const std::function<void(ConstantSP)> &callbackFunc = nullptr);
 
     ~MultithreadedTableWriter();
 
 	template<typename... TArgs>
 	bool insert(ErrorCodeInfo &errorInfo, TArgs... args) {
-		RECORDTIME("MTW:insertValue");
+        RWLockGuard<RWLock> guard(&insertRWLock_, false);
 		if (hasError_.load()) {
 			throw RuntimeException("Thread is exiting.");
 		}
@@ -83,16 +78,16 @@ public:
 		}
 		{
 			errorInfo.clearError();
-			int colIndex = 0;
-			ConstantSP result[] = { Util::createObject(getColDataType(colIndex++), args, &errorInfo)... };
+			int colIndex1 = 0, colIndex2 = 0;
+			ConstantSP result[] = { Util::createObject(getColDataType(colIndex1++), args, &errorInfo, colExtras_[colIndex2++])... };
 			if (errorInfo.hasError())
 				return false;
 			std::vector<ConstantSP>* prow;
 			if (!unusedQueue_.pop(prow)) {
 				prow = new std::vector<ConstantSP>;
 			}
-			prow->resize(colIndex);
-			for (int i = 0; i < colIndex; i++) {
+			prow->resize(colIndex1);
+			for (int i = 0; i < colIndex1; i++) {
 				prow->at(i) = result[i];
 			}
 			return insert(&prow, 1, errorInfo);
@@ -118,17 +113,18 @@ private:
 		return dataType;
 	}
 	void insertThreadWrite(int threadhashkey, std::vector<ConstantSP> *prow);
+    static void callBack(std::function<void(ConstantSP)> callbackFunc, bool result, vector<vector<ConstantSP>*>& queue1);
 
     struct WriterThread {
 		WriterThread() : nonemptySignal(false,true){}
 		SmartPointer<DBConnection> conn;
         
-        SynchronizedQueue<std::vector<ConstantSP>*> writeQueue;
-        SynchronizedQueue<std::vector<ConstantSP>*> failedQueue;
+        vector<vector<ConstantSP>*> writeQueue;
+        vector<vector<ConstantSP>*> failedQueue;
         ThreadSP writeThread;
         Signal nonemptySignal;
 
-        Semaphore idleSem;
+        Mutex mutex_, writeQueueMutex_;
         unsigned int threadId;
         long sentRows, sendingRows;
 		bool exit;
@@ -140,6 +136,7 @@ private:
                         writeThread_(writeThread){};
         virtual void run();
     private:
+        void callBack();
 		bool isExit() { return tableWriter_.hasError_.load() || writeThread_.exit; }
         bool init();
         bool writeAllData();
@@ -156,23 +153,30 @@ private:
     const int throttleMilsecond_;
     bool isPartionedTable_, exited_;
 	std::atomic_bool hasError_;
+    //all column include callback id
     std::vector<string> colNames_,colTypeString_;
     std::vector<DATA_TYPE> colTypes_;
-	std::vector<COMPRESS_METHOD> compressMethods_;
+	std::vector<int> colExtras_;
+    //columns except callback id which no need to save.
+    std::vector<string> saveColNames_;
+    std::vector<DATA_TYPE> saveColTypes_;
+    std::vector<int> saveColExtras_;
+	std::vector<COMPRESS_METHOD> saveCompressMethods_;
     //Following parameters only valid in multithread mode
     SmartPointer<Domain> partitionDomain_;
     int partitionColumnIdx_;
     int threadByColIndexForNonPartion_;
 	//End of following parameters only valid in multithread mode
     std::vector<WriterThread> threads_;
-	Mutex exitMutex_;
-    ErrorCodeInfo errorInfo_;
+	ErrorCodeInfo errorInfo_;
     std::string scriptTableInsert_;
     std::string scriptSaveTable_;
 	SynchronizedQueue<std::vector<ConstantSP>*> unusedQueue_;
     friend class PytoDdbRowPool;
     PytoDdbRowPool *pytoDdb_;
     Mode mode_;
+    std::function<void(ConstantSP)> callbackFunc_;
+    RWLock insertRWLock_;
 public:
     PytoDdbRowPool * getPytoDdb(){ return pytoDdb_;}
 };

@@ -22,18 +22,12 @@ protected:
     {
         cout<<"check connect...";
 		ConstantSP res = conn.run("1+1");
-		if(!(res->getBool())){
-			cout<<"Server not responed, please check."<<endl;
-		}
-		else
-		{
-			cout<<"ok"<<endl;
-			
-		}
+		
+        cout<<"ok"<<endl;
     }
     virtual void TearDown()
     {
-        pass;
+        conn.run("undef all;");
     }
 };
 
@@ -485,6 +479,69 @@ TEST_F(DataformPairTest,testtimenullPair){
 	conn.upload("v1",{v1});
 	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(),true);
 	EXPECT_EQ(v1->getString(), res_v->getString());
+	EXPECT_EQ(v1->getType(), res_v->getType());
+    EXPECT_EQ(conn.run("v1")->isPair(),true);
+}
+
+TEST_F(DataformPairTest,testDecimal32Pair){
+	srand((int)time(NULL));
+	int scale = rand()%9;
+	VectorSP v1 = Util::createPair(DT_DECIMAL32, scale);
+    v1->set(0, Util::createDecimal32(scale,2.33));
+    v1->set(1, Util::createDecimal32(scale,3.502));
+	string script = "a=pair(decimal32(2.33,"+to_string(scale)+"),decimal32(3.502,"+to_string(scale)+"));a";
+	VectorSP res_v = conn.run(script);
+	conn.upload("v1",{v1});
+	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(),true);
+	EXPECT_EQ(v1->getScript(), res_v->getScript());
+	EXPECT_EQ(v1->getType(), res_v->getType());
+    EXPECT_EQ(conn.run("v1")->isPair(),true);
+}
+
+TEST_F(DataformPairTest,testDecimal32NullPair){
+	srand((int)time(NULL));
+	int scale = rand()%9;
+	VectorSP v1 = Util::createPair(DT_DECIMAL32, scale);
+    v1->setNull(0);
+    v1->setNull(1);
+	string script = "a=pair(decimal32(NULL,"+to_string(scale)+"),decimal32(NULL,"+to_string(scale)+"));a";
+	VectorSP res_v = conn.run(script);
+	conn.upload("v1",{v1});
+	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(),true);
+	EXPECT_EQ(v1->getScript(), res_v->getScript());
+	EXPECT_EQ(v1->getType(), res_v->getType());
+    EXPECT_EQ(conn.run("v1")->isPair(),true);
+}
+
+TEST_F(DataformPairTest,testDecimal64Pair){
+	srand((int)time(NULL));
+	int scale = rand()%18;
+	VectorSP v1 = Util::createPair(DT_DECIMAL64, scale);
+    v1->set(0, Util::createDecimal64(scale,2.33));
+    v1->set(1, Util::createDecimal64(scale,3.502));
+	string script = "a=pair(decimal64(2.33,"+to_string(scale)+"),decimal64(3.502,"+to_string(scale)+"));a";
+	VectorSP res_v = conn.run(script);
+	conn.upload("v1",{v1});
+
+	cout<<conn.run("v1")->getString()<<endl;
+	cout<<conn.run("a")->getString()<<endl;
+	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(),true);
+	EXPECT_EQ(v1->getScript(), res_v->getScript());
+	EXPECT_EQ(v1->getType(), res_v->getType());
+    EXPECT_EQ(conn.run("v1")->isPair(),true);
+}
+
+TEST_F(DataformPairTest,testDecimal64NullPair){
+	srand((int)time(NULL));
+	int scale = rand()%9;
+	VectorSP v1 = Util::createPair(DT_DECIMAL64, scale);
+    v1->setNull(0);
+    v1->setNull(1);
+	string script = "a=pair(decimal64(NULL,"+to_string(scale)+"),decimal64(NULL,"+to_string(scale)+"));a";
+	VectorSP res_v = conn.run(script);
+	conn.upload("v1",{v1});
+	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(),true);
+	EXPECT_EQ(v1->getScript(), res_v->getScript());
 	EXPECT_EQ(v1->getType(), res_v->getType());
     EXPECT_EQ(conn.run("v1")->isPair(),true);
 }

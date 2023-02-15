@@ -9,7 +9,7 @@
 #include "SharedMem.h"
 
 #ifdef _MSC_VER
-	#ifdef _USRDLL	
+	#ifdef _DDBAPIDLL	
 		#define EXPORT_DECL _declspec(dllexport)
 	#else
 		#define EXPORT_DECL __declspec(dllimport)
@@ -19,7 +19,7 @@
 #endif
 namespace dolphindb {
 
-#define DLOG //DLogger::Info
+#define DLOG true?DLogger::GetMinLevel() : DLogger::Info
 
 class EXPORT_DECL Message : public ConstantSP {
 public:
@@ -60,8 +60,8 @@ public:
 	StreamDeserializer(const unordered_map<string, pair<string, string>> &sym2tableName, DBConnection *pconn = nullptr);
 	StreamDeserializer(const unordered_map<string, DictionarySP> &sym2schema);
 	StreamDeserializer(const unordered_map<string, vector<DATA_TYPE>> &symbol2col);
-private:
 	bool parseBlob(const ConstantSP &src, vector<VectorSP> &rows, vector<string> &symbols, ErrorCodeInfo &errorInfo);
+private:
 	void create(DBConnection &conn);
 	void parseSchema(const unordered_map<string, DictionarySP> &sym2schema);
 	unordered_map<string, pair<string, string>> sym2tableName_;
@@ -151,7 +151,7 @@ class EXPORT_DECL IPCInMemoryStreamClient {
 public:
 	IPCInMemoryStreamClient() = default;
 	~IPCInMemoryStreamClient();
-	ThreadSP subscribe(const string& tableName, const IPCInMemoryTableReadHandler& handler, TableSP outputTable = nullptr, bool overwrite = false);
+	ThreadSP subscribe(const string& tableName, const IPCInMemoryTableReadHandler& handler, TableSP outputTable = nullptr, bool overwrite = true);
 	void unsubscribe(const string& tableName);
 private:
 	struct ThreadWrapper {

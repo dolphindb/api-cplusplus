@@ -263,8 +263,7 @@ IO_ERR String::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNu
         val_.clear();
         val_.append(buf.get(), len);
     } else {
-        // numElement < 0 indicate read line from input stream
-        ret = numElement >= 0 ? in->readString(val_) : in->readLine(val_);
+        ret = in->readString(val_);
         if (ret == OK)
             numElement = 1;
     }
@@ -531,7 +530,7 @@ bool Int128::parseInt128(const char* str, int len, unsigned char *buf) {
 }
 
 int Int128::compare(INDEX index, const ConstantSP& target) const {
-	return ((Guid*)uuid_)->compare(target->getInt128());
+	return guid_.compare(target->getInt128());
 }
 
 Uuid::Uuid(bool newUuid){
@@ -1071,7 +1070,8 @@ Time* Time::parseTime(const string& str){
 		p->setNull();
 		return p;
 	}
-
+	else if(str.size() != 12)
+		return p;
 	int hour,minute,second,milliSecond=0;
 	hour=atoi(str.substr(0,2).c_str());
 	if(hour>=24 || str[2]!=':')
@@ -1205,6 +1205,10 @@ Timestamp* Timestamp::parseTimestamp(const string& str){
 		return p;
 	}
 
+	int len = str.size();
+	if(len < 19)
+		return p;
+
 	int year,month,day,hour,minute,second,millisecond=0;
 	year=atoi(str.substr(0,4).c_str());
 	if(year==0 ||str[4]!='.')
@@ -1225,8 +1229,12 @@ Timestamp* Timestamp::parseTimestamp(const string& str){
 	second=atoi(str.substr(17,2).c_str());
 	if(second>=60)
 		return p;
-	if(str[19]=='.')
-		millisecond=atoi(str.substr(20,str.length()-20).c_str());
+	if(len > 19 && str[19]=='.'){
+		if(len > 22)
+			millisecond=atoi(str.substr(20, 3).c_str());
+		else
+			return p;
+	}
 	p=new Timestamp(year,month,day,hour,minute,second,millisecond);
 	return p;
 }
@@ -1589,7 +1597,7 @@ ConstantSP Timestamp::castTemporal(DATA_TYPE expectType) {
 	if (expectType == DT_DATEHOUR) {
 		int result;
 
-		int tail = (val_ < 0) && (val_ % 3600);
+		int tail = (val_ < 0) && (val_ % 3600000);
 		val_ == LLONG_MIN ? result = INT_MIN : result = val_ / 3600000LL - tail;
 		return Util::createObject(expectType, result);
 	}

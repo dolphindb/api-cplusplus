@@ -20,6 +20,9 @@
 #include "Util.h"
 #include "ScalarImp.h"
 #include "Types.h"
+#include <sstream>
+#include <iomanip>
+#include <map>
 
 namespace dolphindb {
 
@@ -195,7 +198,7 @@ public:
 	VECTOR_TYPE getVectorType() const {return VECTOR_TYPE::ARRAY;}
 
 	IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
-		IO_ERR ret;
+		IO_ERR ret=OK;
 		INDEX end = indexStart + targetNumElement;
 		if(end > capacity_ && !checkCapacity(end - size_))
 			return NOSPACE;
@@ -400,11 +403,6 @@ public:
 		int segCount = 1;
 		if(index->isIndexArray())
 			dataSeg[0] = index->getIndexArray();
-		else if(index->isHugeIndexArray()){
-			dataSeg = index->getHugeIndexArray();
-			segmentSize = index->getSegmentSize();
-			segCount = (size >> index->getSegmentSizeInBit()) + (size & (segmentSize - 1) ? 1 : 0);
-		}
 		else
 			return false;
 		INDEX prevIndex = dataSeg[0][0];
@@ -1386,7 +1384,7 @@ public:
 
 class FastArrayVector: public Vector {
 public:
-	FastArrayVector(int size, int capacity, char* srcData, bool containNull, DATA_TYPE dataType, INDEX *pindex=NULL) {
+	FastArrayVector(int size, int capacity, char* srcData, bool containNull, DATA_TYPE dataType, INDEX *pindex=NULL, int extraParam = 0) {
 #if defined(DDB_VERSION) && DDB_VERSION < 200
 		throw RuntimeException("Array vector is not supported by the current version. Please upgrade to 2.00 or higher.");
 #endif
@@ -1400,10 +1398,15 @@ public:
 		dataCategory 	= ARRAY;
 		baseType_ 	 	= DATA_TYPE(dataType_ - ARRAY_TYPE_BASE);	// e.g. DT_INT
 		index_ 			= Util::createVector(DT_INT, size, capacity, true, 0, pindex);
+		valueSize_ = 0;
 		if(pindex == NULL)
 			index_->initialize();
-		valueSize_      = 0;
-		value_          = Util::createVector(baseType_, 0, 0, true, 0, NULL);
+		else {
+			if (size > 0) {
+				valueSize_ = pindex[size - 1];
+			}
+		}
+		value_          = Util::createVector(baseType_, valueSize_, valueSize_, true, extraParam, srcData);
 		size_           = index_->size();
 		baseUnitLength_ = value_->getUnitLength();
 	}
@@ -1444,6 +1447,7 @@ public:
 	virtual void*		  getDataArray() const { return value_->getDataArray(); }
 	virtual bool		  validIndex(INDEX uplimit) { return value_->validIndex(uplimit); }
 	virtual bool		  validIndex(INDEX start, INDEX length, INDEX uplimit) { return value_->validIndex(start, length, uplimit); }
+	virtual int 		  getExtraParamForType() const override { return value_->getExtraParamForType(); }
 
 	virtual void 		  fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool 	      set(INDEX index, const ConstantSP& value);
@@ -2681,7 +2685,8 @@ public:
 	virtual DATA_CATEGORY getCategory() const {return LITERAL;}
 	virtual DATA_TYPE getRawType() const {return DT_INT;};
 	virtual int compare(INDEX index, const ConstantSP& target) const {return base_->getSymbol(data_[index]).compare(target->getString());}
-	virtual string getString(INDEX index) const {return base_->getSymbol(data_[index]);}
+	virtual string getString(INDEX index) const override {return base_->getSymbol(data_[index]);}
+	virtual const string& getStringRef() const override { return base_->getSymbol(data_[0]); }
 	virtual bool set(INDEX index, const ConstantSP& value);
 	virtual bool set(const ConstantSP& index, const ConstantSP& value);
 	virtual ConstantSP get(INDEX index) const;
@@ -2752,9 +2757,15 @@ public:
 		size_+=len;
 		return true;
 	}
-	virtual bool getString(INDEX start, int len, char** buf) const{
-		for(int i=0;i<len;++i)
-			buf[i]=(char*)getString(i).c_str();
+	//Can't set buf[i] for temp variable in getString
+	//virtual bool getString(INDEX start, int len, char** buf) const override{
+	//	for(int i=0;i<len;++i)
+	//		buf[i]=(char*)getString(i).c_str();
+	//	return true;
+	//}
+	virtual bool getString(INDEX start, int len, string* buf) const override {
+		for (int i = 0; i<len; ++i)
+			buf[i] = getString(i);
 		return true;
 	}
 	virtual void setString(const string& val){data_[0] = base_->findAndInsert(val);}
@@ -2773,6 +2784,8 @@ public:
 		}
 		return true;
 	}
+	virtual string** getStringConst(INDEX start, int len, string** buf) const;
+	virtual char** getStringConst(INDEX start, int len, char** buf) const;
 	bool has(const string& val) const {
 		int id = base_->find(val);
 		if(id == -1){
@@ -2855,8 +2868,1017 @@ public:
 	virtual SymbolBaseSP getSymbolBase() const {return base_;}
 private:
 	SymbolBaseSP base_;
-
 };
+
+namespace decimal_util {
+	template <typename T>
+	struct MinPrecision { static constexpr int value = 1; };
+
+	template <typename T>
+	struct MaxPrecision { static constexpr int value = 0; };
+
+	template <> struct MaxPrecision<int32_t> { static constexpr int value = 9; };
+	template <> struct MaxPrecision<int64_t> { static constexpr int value = 18; };
+
+	template <typename T, typename U, typename R = typename std::conditional<sizeof(T) >= sizeof(U), T, U>::type>
+	inline bool mulOverflow(T a, U b, R &result) {
+		result = a * b;
+		if (a == 0 || b == 0) {
+			return false;
+		}
+
+		if ((a < 0) != (b < 0)) { // different sign
+			if (a == std::numeric_limits<R>::min()) {
+				return b > 1;
+			}
+			else if (b == std::numeric_limits<R>::min()) {
+				return a > 1;
+			}
+			if (a < 0) {
+				return (-a) > std::numeric_limits<R>::max() / b;
+			}
+			if (b < 0) {
+				return a > std::numeric_limits<R>::max() / (-b);
+			}
+		}
+		else if (a < 0 && b < 0) {
+			if (a == std::numeric_limits<R>::min()) {
+				return b <= -1;
+			}
+			else if (b == std::numeric_limits<R>::min()) {
+				return a <= -1;
+			}
+			return (-a) > std::numeric_limits<R>::max() / (-b);
+		}
+
+		return a > std::numeric_limits<R>::max() / b;
+	}
+
+	inline int exp10_i32(int x) {
+		constexpr int values[] = {
+			1,
+			10,
+			100,
+			1000,
+			10000,
+			100000,
+			1000000,
+			10000000,
+			100000000,
+			1000000000
+		};
+		return values[x];
+	}
+
+	inline int64_t exp10_i64(int x) {
+		constexpr int64_t values[] = {
+			1LL,
+			10LL,
+			100LL,
+			1000LL,
+			10000LL,
+			100000LL,
+			1000000LL,
+			10000000LL,
+			100000000LL,
+			1000000000LL,
+			10000000000LL,
+			100000000000LL,
+			1000000000000LL,
+			10000000000000LL,
+			100000000000000LL,
+			1000000000000000LL,
+			10000000000000000LL,
+			100000000000000000LL,
+			1000000000000000000LL
+		};
+		return values[x];
+	}
+
+	template <typename T>
+	inline T scaleMultiplier(int scale);
+
+	template <>
+	inline int32_t scaleMultiplier<int32_t>(int scale) {
+		return exp10_i32(scale);
+	}
+
+	template <>
+	inline int64_t scaleMultiplier<int64_t>(int scale) {
+		return exp10_i64(scale);
+	}
+
+
+	template <typename T>
+	inline std::string toString(int scale, T rawData) {
+		std::stringstream ss;
+
+		if (scale == 0) {
+			ss << rawData;
+		}
+		else {
+			auto multiplier = scaleMultiplier<T>(scale);
+
+			ss << rawData / multiplier;
+
+			int sign = rawData < 0 ? -1 : 1;
+			auto frac = rawData % multiplier * sign;
+			ss << "." << std::setw(scale) << std::setfill('0') << std::right << frac;
+		}
+
+		return ss.str();
+	}
+	template <typename T>
+	inline bool parseString(const char *str, int len, T &rawData, int scale, string &errMsg) {
+		const char dec_point = '.';
+
+		enum StateEnum { IN_SIGN, IN_BEFORE_FIRST_DIG, IN_BEFORE_DEC, IN_AFTER_DEC, IN_END } state = IN_SIGN;
+		enum ErrorCodes {
+			ERR_WRONG_CHAR = -1,
+			ERR_NO_DIGITS = -2,
+			ERR_WRONG_STATE = -3,
+			ERR_SCALE_ERROR = -4,
+			ERR_OVERFLOW = -5,
+		};
+		static std::map<int, std::string> msg = {
+			{ ERR_WRONG_STATE, " not illegal format " },
+			{ ERR_NO_DIGITS, " no digits " },
+			{ ERR_WRONG_CHAR, " not illegal format " },
+			{ ERR_SCALE_ERROR, " input number contains more than scale" },
+			{ ERR_OVERFLOW, " Decimal math overflow" },
+		};
+
+		T rawDataTemp = 0;
+		int sign = 1;
+		int error = 0;
+		int digitsCount = 0;
+		int afterDigitCount = 0;
+		char c;
+		int i = 0;
+		if (len < 1) {
+			error = ERR_NO_DIGITS;
+			state = IN_END;
+		}
+		while ((i < len) && (state != IN_END))  // loop while extraction from file is possible
+		{
+			c = str[i++];
+
+			switch (state) {
+			case IN_SIGN:
+				if (c == '-') {
+					sign = -1;
+					state = IN_BEFORE_FIRST_DIG;
+				}
+				else if (c == '+') {
+					state = IN_BEFORE_FIRST_DIG;
+				}
+				else if ((c >= '0') && (c <= '9')) {
+					state = IN_BEFORE_DEC;
+					rawDataTemp = static_cast<int>(c - '0');
+					digitsCount++;
+				}
+				else if (c == dec_point) {
+					state = IN_AFTER_DEC;
+				}
+				else {
+					error = ERR_WRONG_CHAR;
+					state = IN_END;
+				}
+				// else ignore char
+				break;
+			case IN_BEFORE_FIRST_DIG:
+				if ((c >= '0') && (c <= '9')) {
+					digitsCount++;
+					if (digitsCount > decimal_util::MaxPrecision<T>::value) {
+						error = ERR_OVERFLOW;
+						state = IN_END;
+						break;
+					}
+					rawDataTemp = 10 * rawDataTemp + static_cast<int>(c - '0');
+					state = IN_BEFORE_DEC;
+				}
+				else if (c == dec_point) {
+					state = IN_AFTER_DEC;
+				}
+				else {
+					state = IN_END;
+					error = ERR_WRONG_CHAR;
+				}
+				break;
+			case IN_BEFORE_DEC:
+				if ((c >= '0') && (c <= '9')) {
+					digitsCount++;
+					if (digitsCount > decimal_util::MaxPrecision<T>::value) {
+						error = ERR_OVERFLOW;
+						state = IN_END;
+						break;
+					}
+					rawDataTemp = 10 * rawDataTemp + static_cast<int>(c - '0');
+				}
+				else if (c == dec_point) {
+					state = IN_AFTER_DEC;
+				}
+				else {
+					error = ERR_WRONG_CHAR;
+					state = IN_END;
+				}
+				break;
+			case IN_AFTER_DEC:
+				if ((c >= '0') && (c <= '9')) {
+					digitsCount++;
+					if (digitsCount > decimal_util::MaxPrecision<T>::value) {
+						error = ERR_OVERFLOW;
+						state = IN_END;
+						break;
+					}
+					afterDigitCount++;
+					if (afterDigitCount > scale) {
+						// error = ERR_SCALE_ERROR;
+						state = IN_END;
+						break;
+					}
+					rawDataTemp = 10 * rawDataTemp + static_cast<int>(c - '0');
+				}
+				else {
+					error = ERR_WRONG_CHAR;
+					state = IN_END;
+				}
+				break;
+			default:
+				error = ERR_WRONG_STATE;
+				state = IN_END;
+				break;
+			}  // switch state
+		}
+		if (error >= 0) {
+			if (scale > afterDigitCount) {
+				if (digitsCount + scale - afterDigitCount > decimal_util::MaxPrecision<T>::value) {
+					errMsg = msg[ERR_OVERFLOW];
+					return false;
+				}
+				else {
+					rawDataTemp = rawDataTemp * decimal_util::scaleMultiplier<T>(scale - afterDigitCount);
+				}
+			};
+			if (sign < 0) {
+				rawDataTemp = -rawDataTemp;
+			}
+		}
+		else {
+			rawDataTemp = 0;
+			errMsg = msg[error];
+		}
+		if (error == 0) {
+			rawData = rawDataTemp;
+		}
+		return (error >= 0);
+	}
+
+	// For example, Decimal32(4) can contain numbers from -99999.9999 to 99999.9999 with 0.0001 step.
+	template <typename T>
+	inline void ToDecimal(const string &str, int scale, T& rawData) {
+		if (scale < 0 || scale > decimal_util::MaxPrecision<T>::value) {
+			throw RuntimeException("Scale out of bound");
+		}
+		std::string errMsg;
+		if (!parseString(str.c_str(), str.length(), rawData, scale, errMsg)) {
+			throw RuntimeException("ToDecimal illegal: " + errMsg);
+		}
+	}
+	template <typename V,typename T>
+	inline V decimalToValue(T rowData, int scale) {
+		return static_cast<V>(rowData) / decimal_util::scaleMultiplier<T>(scale);
+	}
+	template <typename V, typename T>
+	void decimalToValue(const T *data, int scale, INDEX start, int len, V *buf) {
+		for (auto i = 0, index = start; i < len; i++, index++) {
+			buf[i] = decimal_util::decimalToValue<V, T>(data[index], scale);
+		}
+	}
+	template <typename V, typename T>
+	inline T valueToDecimalraw(V value, int scale) {
+		value = value * decimal_util::scaleMultiplier<T>(scale);
+		if (value > std::numeric_limits<T>::max() ||
+			value <= std::numeric_limits<T>::min()) {
+			throw RuntimeException("Decimal math overflow");
+		}
+		return static_cast<T>(value);
+	}
+	template <typename V, typename T>
+	void valueToDecimalraw(T *data, int scale, INDEX start, int len, const V* buf) {
+		for (auto i = 0, index = start; i < len; i++, index++) {
+			data[index] = decimal_util::valueToDecimalraw<V, T>(buf[i], scale);
+		}
+	}
+} // namespace decimal_util
+
+
+template <typename T>
+class Decimal : public Constant {
+public:
+	using raw_data_t = T;
+
+	Decimal() = delete;
+
+	explicit Decimal(int scale) : scale_(scale), rawData_() {
+		if (scale_ < 0 || scale_ > decimal_util::MaxPrecision<T>::value) {
+			throw RuntimeException("Scale out of bound");
+		}
+	}
+
+	Decimal(int scale, raw_data_t rawData) : scale_(scale), rawData_(rawData) {
+		if (scale_ < 0 || scale_ > decimal_util::MaxPrecision<T>::value) {
+			throw RuntimeException("Scale out of bound");
+		}
+	}
+
+	Decimal(const Decimal &other) : scale_(other.scale_), rawData_(other.rawData_) {}
+
+	template <typename U>
+	Decimal(const Decimal<U> &other) : Decimal(other.scale_) {
+		if (other.rawData_ > std::numeric_limits<T>::max() ||
+			other.rawData_ <= std::numeric_limits<T>::min()) {
+			throw RuntimeException("Decimal math overflow");
+		}
+		rawData_ = static_cast<T>(other.rawData_);
+	}
+
+public:
+	int getScale() const { return scale_; }
+
+	raw_data_t getRawData() const { return rawData_; }
+
+	void setRawData(const raw_data_t data) { rawData_ = data; }
+
+	std::string toString() const {
+		return decimal_util::toString(scale_, rawData_);
+	}
+
+public:
+	template <typename U, typename R = typename std::conditional<sizeof(T) >= sizeof(U), T, U>::type>
+	void assign(const Decimal<U> &other) {
+		if (std::is_same<T, U>::value && scale_ == other.scale_) {
+			rawData_ = other.rawData_;
+			return;
+		}
+
+		R value;
+		if (other.scale_ > scale_) {
+			value = static_cast<R>(other.rawData_) / decimal_util::scaleMultiplier<R>(other.scale_ - scale_);
+		}
+		else {
+			bool overflow = decimal_util::mulOverflow(static_cast<R>(other.rawData_),
+				decimal_util::scaleMultiplier<R>(scale_ - other.scale_), value);
+			if (overflow) {
+				throw RuntimeException("Decimal math overflow");
+			}
+		}
+
+		if (value > std::numeric_limits<T>::max() ||
+			value <= std::numeric_limits<T>::min()) {
+			throw RuntimeException("Decimal math overflow");
+		}
+		rawData_ = static_cast<T>(value);
+	}
+
+	/**
+	* @brief convert integer to decimal
+	*
+	* @tparam U integer data type (short/int/long)
+	*/
+	template <typename U>
+	typename std::enable_if<!std::is_same<U, float>::value && !std::is_same<U, double>::value, void>::type
+		assign(U value) {
+		if (value > std::numeric_limits<T>::max() ||
+			value <= std::numeric_limits<T>::min()) {
+			throw RuntimeException("Decimal math overflow");
+		}
+		bool overflow = decimal_util::mulOverflow(static_cast<T>(value),
+			decimal_util::scaleMultiplier<T>(scale_), rawData_);
+		if (overflow) {
+			throw RuntimeException("Decimal math overflow");
+		}
+	}
+
+	/**
+	* @brief convert float to decimal
+	*
+	* @tparam U float data type (float/double)
+	*/
+	template <typename U>
+	typename std::enable_if<std::is_same<U, float>::value || std::is_same<U, double>::value, void>::type
+		assign(U value) {
+		value = value * decimal_util::scaleMultiplier<T>(scale_);
+		if (value > std::numeric_limits<T>::max() ||
+			value <= std::numeric_limits<T>::min()) {
+			throw RuntimeException("Decimal math overflow");
+		}
+		rawData_ = static_cast<T>(value);
+	}
+
+	template <typename U, typename R = typename std::conditional<sizeof(T) >= sizeof(U), T, U>::type>
+	int compare(const Decimal<U> &other) const {
+		R lhs{}, rhs{};
+		if (scale_ < other.scale_) {
+			bool overflow = decimal_util::mulOverflow(static_cast<R>(rawData_),
+				decimal_util::scaleMultiplier<R>(other.scale_ - scale_), lhs);
+			if (overflow) {
+				throw RuntimeException("Decimal math overflow");
+			}
+
+			rhs = static_cast<R>(other.rawData_);
+		}
+		else {
+			lhs = static_cast<R>(rawData_);
+
+			bool overflow = decimal_util::mulOverflow(static_cast<R>(other.rawData_),
+				decimal_util::scaleMultiplier<R>(scale_ - other.scale_), rhs);
+			if (overflow) {
+				throw RuntimeException("Decimal math overflow");
+			}
+		}
+
+		if (lhs < rhs) {
+			return -1;
+		}
+		else if (lhs == rhs) {
+			return 0;
+		}
+		else {
+			return 1;
+		}
+	}
+
+public:  /// Interface of Constant
+	virtual int getExtraParamForType() const override { return scale_; }
+
+	virtual bool isNull() const override { return rawData_ == std::numeric_limits<T>::min(); }
+	virtual void setNull() override { rawData_ = std::numeric_limits<T>::min(); }
+
+	virtual float getFloat() const override { return decimal_util::decimalToValue<float, T>(rawData_, scale_); }
+	virtual double getDouble() const override { return decimal_util::decimalToValue<double, T>(rawData_, scale_); }
+	
+	virtual void setFloat(float val) override { rawData_ = decimal_util::valueToDecimalraw<float, T>(val, scale_); }
+	virtual void setDouble(double val) override { rawData_ = decimal_util::valueToDecimalraw<double, T>(val, scale_); }
+	virtual void setString(const string& val) override { decimal_util::ToDecimal(val, getScale(), rawData_); }
+	virtual void setBinary(const unsigned char* val, int unitLength) override {
+		if (unitLength != sizeof(T)) {
+			throw RuntimeException("Invalid unit length");
+		}
+		memcpy(&rawData_, val, unitLength);
+	}
+	virtual const unsigned char* getBinary() const override {
+		return (unsigned char*)&rawData_;
+	}
+	virtual DATA_TYPE getType() const override { return type(); }
+	virtual DATA_TYPE getRawType() const override { return type(); }
+	virtual DATA_CATEGORY getCategory() const override { return DENARY; }
+
+	virtual ConstantSP getInstance() const override { return ConstantSP(new Decimal(scale_, rawData_)); }
+	virtual ConstantSP getValue() const override { return ConstantSP(new Decimal(scale_, rawData_)); }
+
+	virtual std::string getString() const override {
+		if (isNull()) {
+			return "";
+		}
+		return toString();
+	}
+
+	virtual bool assign(const ConstantSP &value) override {
+		if (value->isNull()) {
+			setNull();
+			return true;
+		}
+
+#define NORMAL_CASE(TYPE, Type)     \
+            case DT_##TYPE: {               \
+                assign(value->get##Type()); \
+                break;                      \
+            }                               \
+        //======
+
+		DATA_TYPE type = value->getType();
+		switch (type) {
+		case DT_DECIMAL32: {
+			auto dec = reinterpret_cast<Decimal<int32_t> *>(value.get());
+			assign(*dec);
+			break;
+		}
+		case DT_DECIMAL64: {
+			auto dec = reinterpret_cast<Decimal<int64_t> *>(value.get());
+			assign(*dec);
+			break;
+		}
+						   NORMAL_CASE(SHORT, Short);
+						   NORMAL_CASE(INT, Int);
+						   NORMAL_CASE(LONG, Long);
+						   NORMAL_CASE(FLOAT, Float);
+						   NORMAL_CASE(DOUBLE, Double);
+		case DT_BLOB:
+		case DT_STRING: {
+			decimal_util::ToDecimal(value->getString(), getScale(), rawData_);
+			break;
+		}
+		default: return false;
+		}
+		return true;
+
+#undef NORMAL_CASE
+	}
+
+	virtual int compare(INDEX /*index*/, const ConstantSP &target) const override {
+		if (target->getCategory() != DENARY) {
+			Decimal<T> tmp{ scale_ };
+			tmp.assign(target);
+
+			if (rawData_ < tmp.rawData_) {
+				return -1;
+			}
+			else if (rawData_ == tmp.rawData_) {
+				return 0;
+			}
+			else {
+				return 1;
+			}
+		}
+
+		if (target->getType() == DT_DECIMAL32) {
+			return compare(*reinterpret_cast<Decimal<int32_t> *>(target.get()));
+		}
+		else if (target->getType() == DT_DECIMAL64) {
+			return compare(*reinterpret_cast<Decimal<int64_t> *>(target.get()));
+		}
+		else {
+			throw RuntimeException("Unknown decimal type");
+		}
+
+		return 0;
+	}
+
+	virtual int serialize(char *buf, int bufSize, INDEX indexStart, int offset,
+		int &numElement, int &partial) const override {
+		int len = sizeof(raw_data_t) - offset;
+		if (len < 0) {
+			return -1;
+		}
+
+		if (bufSize >= len) {
+			numElement = 1;
+			partial = 0;
+		}
+		else {
+			len = bufSize;
+			numElement = 0;
+			partial = offset + bufSize;
+		}
+		memcpy(buf, reinterpret_cast<const char *>(&rawData_) + offset, len);
+		return len;
+	}
+	IO_ERR deserialize(DataInputStream *in, INDEX indexStart, INDEX targetNumElement, INDEX &numElement) override {
+		IO_ERR ret = in->read(reinterpret_cast<char *>(&rawData_), sizeof(raw_data_t));
+		if (ret != OK) {
+			return ret;
+		}
+
+		numElement = 1;
+		return OK;
+	}
+
+private:
+	template <typename U = T>
+	typename std::enable_if<std::is_same<U, int32_t>::value == true, DATA_TYPE>::type
+		type() const { return DT_DECIMAL32; }
+
+	template <typename U = T>
+	typename std::enable_if<std::is_same<U, int64_t>::value == true, DATA_TYPE>::type
+		type() const { return DT_DECIMAL64; }
+
+private:
+	template <bool check_overflow>
+	friend struct DecimalBinaryOperation;
+
+	template <typename U>
+	friend class Decimal;
+
+	/**
+	* Determines how many decimal digits fraction can have.
+	* Valid range: [ 0 : precision_ ].
+	*/
+	int scale_;
+	raw_data_t rawData_;
+};
+
+using Decimal32 = Decimal<int32_t>;
+using Decimal64 = Decimal<int64_t>;
+typedef SmartPointer<Decimal32> Decimal32SP;
+typedef SmartPointer<Decimal64> Decimal64SP;
+
+
+namespace decimal_util {
+	template <typename T>
+	Decimal<T> convertFrom(const int scale, const ConstantSP &obj) {
+		Decimal<T> ret{ scale };
+
+		if (false == ret.assign(obj)) {
+			throw RuntimeException("Can't convert " + Util::getDataTypeString(obj->getType()) + " to Decimal");
+		}
+
+		return ret;
+	}
+} // namespace decimal_util
+
+
+template <typename T>
+class FastDecimalVector : public AbstractFastVector<T> {
+	using AbstractFastVector<T>::data_;
+	using AbstractFastVector<T>::nullVal_;
+	using AbstractFastVector<T>::size_;
+	using AbstractFastVector<T>::capacity_;
+	using AbstractFastVector<T>::containNull_;
+
+	typedef typename std::make_unsigned<T>::type unsigned_raw_data_t;
+	typedef typename std::add_pointer<unsigned_raw_data_t>::type unsigned_raw_data_ptr_t;
+
+public:
+	FastDecimalVector(int scale, int size, int capacity, T *srcData, bool containNull)
+		: AbstractFastVector<T>(size, capacity, srcData, std::numeric_limits<T>::min(), containNull),
+		scale_(scale) {
+		if (scale_ < 0 || scale_ > decimal_util::MaxPrecision<T>::value) {
+			throw RuntimeException("Scale out of bound");
+		}
+	}
+
+	virtual ~FastDecimalVector() = default;
+
+	int getScale() const { return scale_; }
+
+public:
+	virtual DATA_TYPE getType() const override { return type(); }
+	virtual DATA_TYPE getRawType() const override { return type(); }
+	virtual DATA_CATEGORY getCategory() const override { return DENARY; }
+
+	virtual int getExtraParamForType() const override { return scale_; }
+
+	virtual std::string getString(INDEX index) const override {
+		return decimal_util::toString(scale_, data_[index]);
+	}
+	virtual float getFloat(INDEX index) const { return decimal_util::decimalToValue<float,T>(data_[index],scale_); }
+	virtual bool getFloat(INDEX start, int len, float* buf) const {
+		decimal_util::decimalToValue<float, T>(data_, scale_, start, len, buf);
+		return true;
+	}
+	virtual double getDouble(INDEX index) const { return decimal_util::decimalToValue<double, T>(data_[index], scale_); }
+	virtual bool getDouble(INDEX start, int len, double* buf) const {
+		decimal_util::decimalToValue<double, T>(data_, scale_, start, len, buf);
+		return true;
+	}
+	virtual void setFloat(INDEX index, float val) { data_[index] = decimal_util::valueToDecimalraw<float, T>(val, scale_); }
+	virtual void setDouble(INDEX index, double val) { data_[index] = decimal_util::valueToDecimalraw<double, T>(val, scale_); }
+	virtual bool setFloat(INDEX start, int len, const float* buf) {
+		decimal_util::valueToDecimalraw<float, T>(data_, scale_, start, len, buf);
+		return true;
+	}
+	virtual bool setDouble(INDEX start, int len, const double* buf) {
+		decimal_util::valueToDecimalraw<double, T>(data_, scale_, start, len, buf);
+		return true;
+	}
+
+public:
+	virtual bool append(const ConstantSP& value, INDEX count) override {
+		return append(value, 0, count);
+	}
+	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize) override {
+		if (!this->checkCapacity(appendSize)) {
+			return false;
+		}
+
+		// fast path 1: append one element
+		if (appendSize == 1) {
+			Decimal<T> tmp = decimal_util::convertFrom<T>(scale_, value->get(start));
+			data_[size_] = tmp.getRawData();
+
+			if (!containNull_ && data_[size_] == nullVal_) {
+				containNull_ = true;
+			}
+
+			size_ += appendSize;
+			return true;
+		}
+
+		if (type() != value->getType() || scale_ != value->getExtraParamForType()) {
+			// slow path: value is a vector with different data type
+			for (INDEX i = 0; i < appendSize; ++i) {
+				Decimal<T> tmp = decimal_util::convertFrom<T>(scale_, value->get(start + i));
+				data_[size_ + i] = tmp.getRawData();
+
+				if (!containNull_ && tmp.getRawData() == nullVal_) {
+					containNull_ = true;
+				}
+			}
+		}
+		else {
+			// fast path 2: value is a vector with same data type
+
+			if (false == value->getBinary(start, appendSize, sizeof(T),
+				reinterpret_cast<unsigned char *>(data_ + size_))) {
+				return false;
+			}
+
+			if (!containNull_ && this->hasNull(size_, appendSize)) {
+				containNull_ = true;
+			}
+		}
+
+		size_ += appendSize;
+		return true;
+	}
+	virtual bool appendString(string *buf, int len) override {
+		if (!this->checkCapacity(len)) {
+			return false;
+		}
+
+		std::string errMsg;
+		for (int i = 0; i < len; ++i) {
+			if (false == decimal_util::parseString(buf[i].c_str(), buf[i].length(), data_[size_ + i], scale_, errMsg)) {
+				throw RuntimeException("Convert string to DECIMAL failed: " + errMsg);
+			}
+		}
+
+		if (!containNull_ && this->hasNull(size_, len)) {
+			containNull_ = true;
+		}
+
+		size_ += len;
+		return true;
+	}
+	virtual bool appendString(char **buf, int len) override {
+		if (!this->checkCapacity(len)) {
+			return false;
+		}
+
+		std::string errMsg;
+		for (int i = 0; i < len; ++i) {
+			if (false == decimal_util::parseString(buf[i], strlen(buf[i]), data_[size_ + i], scale_, errMsg)) {
+				throw RuntimeException("Convert string to DECIMAL failed: " + errMsg);
+			}
+		}
+
+		if (!containNull_ && this->hasNull(size_, len)) {
+			containNull_ = true;
+		}
+
+		size_ += len;
+		return true;
+	}
+
+	virtual bool set(INDEX index, const ConstantSP &value) override {
+		Decimal<T> tmp = decimal_util::convertFrom<T>(scale_, value);
+		data_[index] = tmp.getRawData();
+		if (data_[index] == nullVal_) {
+			containNull_ = true;
+		}
+		return true;
+	}
+
+	virtual bool set(const ConstantSP &index, const ConstantSP &value) override {
+		// fast path 1: value is a scala
+		if (index->isVector() == false) {
+			return set(index->getIndex(), value);
+		}
+
+		// slow path: value is a vector with different data type
+		if (type() != value->getType() || scale_ != value->getExtraParamForType()) {
+			INDEX len = index->size();
+			for (INDEX i = 0; i < len; ++i) {
+				if (false == set(index->getIndex(i), value->get(i))) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		// fast path 2: value is a vector with same data type
+
+		INDEX bufIndex[Util::BUF_SIZE];
+		T bufVal[Util::BUF_SIZE];
+
+		INDEX len = index->size();
+		for (INDEX start = 0; start < len; /**/) {
+			int count = std::min(len - start, Util::BUF_SIZE);
+			const INDEX *pindex = index->getIndexConst(start, count, bufIndex);
+			auto pval = reinterpret_cast<const T *>(value->getBinaryConst(start, count, sizeof(T),
+				reinterpret_cast<unsigned char *>(bufVal)));
+
+			for (int i = 0; i < count; ++i) {
+				data_[pindex[i]] = pval[i];
+
+				if (!containNull_ && pval[i] == nullVal_) {
+					containNull_ = true;
+				}
+			}
+			start += count;
+		}
+
+		return true;
+	}
+	
+	virtual ConstantSP get(INDEX index) const override {
+		if (index >= 0 && index < size_) {
+			return ConstantSP(new Decimal<T>(scale_, data_[index]));
+		}
+		return ConstantSP(new Decimal<T>(scale_, nullVal_));
+	}
+
+	virtual ConstantSP get(const ConstantSP &index) const override {
+		// fast path: index is a scala
+		if (index->isVector() == false) {
+			return get(index->getIndex());
+		}
+
+		// slow path: index is a vector
+		return AbstractFastVector<T>::retrieve(reinterpret_cast<Vector *>(index.get()));
+	}
+
+	virtual void fill(INDEX start, INDEX length, const ConstantSP &value) override {
+		// fast path 1: value is a scala or only has one element
+		if (value->size() == 1) {
+			Decimal<T> tmp = decimal_util::convertFrom<T>(scale_, value->get(0));
+			T fillVal = tmp.getRawData();
+
+			INDEX end = start + length;
+			for (INDEX i = start; i < end; ++i) {
+				data_[i] = fillVal;
+			}
+
+			if (!containNull_ && fillVal == nullVal_) {
+				containNull_ = true;
+			}
+			return;
+		}
+
+		if (value->size() != length) {
+			throw RuntimeException("Size don't match");
+		}
+
+		if (type() != value->getType() || scale_ != value->getExtraParamForType()) {
+			// slow path: value is a vector with different data type
+			for (INDEX i = 0; i < length; ++i) {
+				Decimal<T> tmp = decimal_util::convertFrom<T>(scale_, value->get(i));
+				T fillVal = tmp.getRawData();
+				data_[start + i] = fillVal;
+
+				if (!containNull_ && fillVal == nullVal_) {
+					containNull_ = true;
+				}
+			}
+		}
+		else {
+			// fast path 2: value is a vector with same data type
+
+			if (false == value->getBinary(0, length, sizeof(T), reinterpret_cast<unsigned char *>(data_ + start))) {
+				throw RuntimeException("Failed to read raw data from the given decimal vector.");
+			}
+
+			if (!containNull_) {
+				if (value->getNullFlag() || this->hasNull(start, length)) {
+					containNull_ = true;
+				}
+			}
+		}
+	}
+
+	virtual bool validIndex(INDEX uplimit) override {
+		return validIndex(0, size_, uplimit);
+	}
+
+	virtual bool validIndex(INDEX start, INDEX length, INDEX uplimit) override {
+		if (containNull_ && this->hasNull(start, length)) {
+			return false;
+		}
+
+		auto limit = static_cast<unsigned_raw_data_t>(uplimit);
+		auto data = reinterpret_cast<unsigned_raw_data_ptr_t>(data_);
+
+		INDEX end = start + length;
+		for (INDEX i = start; i < end; ++i) {
+			if (data[i] > limit) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	virtual int compare(INDEX index, const ConstantSP &target) const override {
+		Decimal<T> tmp(scale_, data_[index]);
+		return tmp.compare(/*index*/0, target);
+	}
+
+public:
+	virtual void nullFill(const ConstantSP &val) override {
+		if (!containNull_) {
+			return;
+		}
+
+		Decimal<T> tmp = decimal_util::convertFrom<T>(scale_, val);
+		T replace = tmp.getRawData();
+
+		this->replaceNull(replace);
+	}
+
+	virtual int serialize(char *buf, int bufSize, INDEX indexStart, int offset,
+		int &numElement, int &partial) const override {
+		// assume offset == 0 and bufSize >= sizeof(T)
+		if (indexStart >= size_) {
+			return -1;
+		}
+
+		int len = sizeof(T);
+		partial = 0;
+		numElement = std::min(bufSize / len, size_ - indexStart);
+		memcpy(buf, reinterpret_cast<char *>(data_ + indexStart), len * numElement);
+
+		return len * numElement;
+	}
+	//IO_ERR FastFixedLengthVector::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
+	virtual IO_ERR deserialize(DataInputStream *in, INDEX indexStart, INDEX targetNumElement,INDEX &numElement) override {
+		IO_ERR ret=OK;
+		INDEX end = indexStart + targetNumElement;
+		if (end > capacity_ && !this->checkCapacity(end - size_)) {
+			return NOSPACE;
+		}
+
+		INDEX i = indexStart;
+		size_t unitLength = sizeof(T);
+		if (!in->isIntegerReversed()) {
+			size_t actualLength;
+			ret = in->readBytes(reinterpret_cast<char *>(data_ + i), unitLength, targetNumElement, actualLength);
+			i += actualLength;
+		}
+		else {
+			for (/**/; i < end; ++i) {
+				ret = in->readBytes(reinterpret_cast<char *>(data_ + i), unitLength, true);
+				if (ret != OK) {
+					break;
+				}
+			}
+		}
+
+		numElement = i - indexStart;
+		if (i > size_) {
+			size_ = i;
+		}
+		if (!containNull_) {
+			containNull_ = this->hasNullInRange(indexStart, i);
+		}
+		return ret;
+	}
+
+public:
+	virtual bool getBinary(INDEX start, int len, int unitLength, unsigned char *buf) const override {
+		if (unitLength != static_cast<int>(sizeof(T))) {
+			throw RuntimeException("Invalid unit length");
+		}
+		memcpy(buf, data_ + start, sizeof(T) * len);
+		return true;
+	}
+
+	virtual const unsigned char *getBinaryConst(INDEX start, int len, int unitLength,
+		unsigned char *buf) const override {
+		if (unitLength != static_cast<int>(sizeof(T))) {
+			throw RuntimeException("Invalid unit length");
+		}
+		return reinterpret_cast<unsigned char *>(data_ + start);
+	}
+
+	virtual unsigned char *getBinaryBuffer(INDEX start, int len, int unitLength, unsigned char *buf) const override {
+		if (unitLength != static_cast<int>(sizeof(T))) {
+			throw RuntimeException("Invalid unit length");
+		}
+		return reinterpret_cast<unsigned char *>(data_ + start);
+	}
+
+	virtual bool setBinary(INDEX start, int len, int unitLength, const unsigned char *buf) override {
+		return true;
+	}
+
+private:
+	template <typename U = T>
+	typename std::enable_if<std::is_same<U, int32_t>::value == true, DATA_TYPE>::type
+		type() const { return DT_DECIMAL32; }
+
+	template <typename U = T>
+	typename std::enable_if<std::is_same<U, int64_t>::value == true, DATA_TYPE>::type
+		type() const { return DT_DECIMAL64; }
+
+private:
+	int scale_;
+};
+
+using FastDecimal32Vector = FastDecimalVector<int32_t>;
+using FastDecimal64Vector = FastDecimalVector<int64_t>;
+typedef SmartPointer<FastDecimal32Vector> FastDecimal32VectorSP;
+typedef SmartPointer<FastDecimal64Vector> FastDecimal64VectorSP;
 
 };
 #endif /* CONSTANTIMP_H_ */

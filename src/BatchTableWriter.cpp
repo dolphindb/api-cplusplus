@@ -3,17 +3,6 @@
 
 namespace dolphindb{
 
-class Executor : public dolphindb::Runnable {
-    using Func = std::function<void()>;
-
-public:
-    explicit Executor(Func f) : func_(std::move(f)){};
-    void run() override { func_(); };
-
-private:
-    Func func_;
-};
-
 BatchTableWriter::BatchTableWriter(const std::string& hostName, int port, const std::string& userId, const std::string& password, bool acquireLock):
     hostName_(hostName),
     port_(port),

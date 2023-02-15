@@ -29,20 +29,20 @@ string AbstractTable::getTableClassName() const {
 	switch(getTableType()){
 	case BASICTBL:
 		return "BasicTable";
-	case REALTIMETBL:
-		return "RealtimeTable";
-	case SNAPTBL:
-		return "SnapshotTable";
-	case JOINTBL:
-		return "JoinTable";
-	case FILETBL:
-		return "FileBackedTable";
-	case SEGTBL:
-		return "SegmentedTable";
-	case COMPRESSTBL:
-		return "CompressedTable";
-	case LOGROWTBL:
-		return "LogRowTable";
+	// case REALTIMETBL:
+	// 	return "RealtimeTable";
+	// case SNAPTBL:
+	// 	return "SnapshotTable";
+	// case JOINTBL:
+	// 	return "JoinTable";
+	// case FILETBL:
+	// 	return "FileBackedTable";
+	// case SEGTBL:
+	// 	return "SegmentedTable";
+	// case COMPRESSTBL:
+	// 	return "CompressedTable";
+	// case LOGROWTBL:
+	// 	return "LogRowTable";
 	default:
 		return "";
 	}
@@ -52,20 +52,20 @@ string AbstractTable::getTableTypeName() const {
 	switch(getTableType()){
 	case BASICTBL:
 		return "A basic table";
-	case REALTIMETBL:
-		return "A realtime table";
-	case SNAPTBL:
-		return "A snapshot table";
-	case JOINTBL:
-		return "A join table";
-	case FILETBL:
-		return "A file backed table";
-	case SEGTBL:
-		return "A segmented table";
-	case COMPRESSTBL:
-		return "A compressed table";
-	case LOGROWTBL:
-		return "A log table";
+	// case REALTIMETBL:
+	// 	return "A realtime table";
+	// case SNAPTBL:
+	// 	return "A snapshot table";
+	// case JOINTBL:
+	// 	return "A join table";
+	// case FILETBL:
+	// 	return "A file backed table";
+	// case SEGTBL:
+	// 	return "A segmented table";
+	// case COMPRESSTBL:
+	// 	return "A compressed table";
+	// case LOGROWTBL:
+	// 	return "A log table";
 	default:
 		return "";
 	}
@@ -244,7 +244,7 @@ string AbstractTable::getString() const {
 }
 
 COMPRESS_METHOD AbstractTable::getColumnCompressMethod(INDEX index) {
-	if (index < colCompresses_.size())
+	if (index < (INDEX)colCompresses_.size())
 		return colCompresses_[index];
 	else
 		return COMPRESS_NONE;
@@ -417,7 +417,7 @@ void BasicTable::initData(const vector<ConstantSP>& cols, const vector<string>& 
 	capacity_ = INDEX_MAX;
 	for(int i=0;i<len;i++){
 		if(!cols[i]->isArray()){
-			Vector* tmp=Util::createVector(cols[i]->getType(),rows);
+			Vector* tmp=Util::createVector(cols[i]->getType(),rows,0,true,cols[i]->getExtraParamForType());
 			tmp->fill(0,rows,cols[i]);
 			cols_.push_back(ConstantSP(tmp));
 		}
@@ -527,10 +527,9 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 			return false;
 		int i=0;
 		try{
-			string msg;
 			for(;i<num;++i){
 				if(!((Vector*)cols_[i].get())->append(tbl->getColumn(i))){
-					msg = "data type " + Util::getDataTypeString(tbl->getColumn(i)->getType()) + ", expect "+
+					errMsg = "data type " + Util::getDataTypeString(tbl->getColumn(i)->getType()) + ", expect "+
 							Util::getDataTypeString(cols_[i]->getType());
 					break;
 				}
@@ -543,7 +542,7 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 			else{
 				for(int k=0; k<i; ++k)
 					((Vector*)cols_[k].get())->remove(rows);
-				errMsg = "Failed to append data to column '" + getColumnName(i) +"' reason: " + msg;
+				errMsg = "Failed to append data to column '" + getColumnName(i) +"' reason: " + errMsg;
 				return false;
 			}
 		}
@@ -567,11 +566,10 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 			return false;
 		int i=0;
 		try{
-			string msg;
 			for(;i<num;++i){
 				ConstantSP col = tbl->get(i);
 				if(col->size() != rows || !((Vector*)cols_[i].get())->append(col)){
-					msg = "data type " + Util::getDataTypeString(col->getType()) + ", expect "+
+					errMsg = "data type " + Util::getDataTypeString(col->getType()) + ", expect "+
 							Util::getDataTypeString(cols_[i]->getType());
 					break;
 				}
@@ -584,7 +582,7 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 			else{
 				for(int k=0; k<i; ++k)
 					((Vector*)cols_[k].get())->remove(rows);
-				errMsg = "Failed to append data to column '" + getColumnName(i) +"' reason: " + msg;
+				errMsg = "Failed to append data to column '" + getColumnName(i) +"' reason: " + errMsg;
 				return false;
 			}
 		}
@@ -612,10 +610,9 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 
 		int i=0;
 		try{
-			string msg;
 			for(;i<num;i++){
 				if(!((Vector*)cols_[i].get())->append(values[i])){
-					msg = "data type " + Util::getDataTypeString(values[i]->getType()) + ", expect "+
+					errMsg = "data type " + Util::getDataTypeString(values[i]->getType()) + ", expect "+
 							Util::getDataTypeString(cols_[i]->getType());
 					break;
 				}
@@ -629,7 +626,7 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 				for(int k=0; k<i; ++k){
 					((Vector*)cols_[k].get())->remove(rows);
 				}
-				errMsg = "Failed to append data to column '" + getColumnName(i) +"' reason: " + msg;
+				errMsg = "Failed to append data to column '" + getColumnName(i) +"' reason: " + errMsg;
 				return false;
 			}
 		}
@@ -641,7 +638,7 @@ bool BasicTable::append(vector<ConstantSP>& values, INDEX& insertedRows, string&
 		}
 	}
 }
-
+/*
 bool BasicTable::internalAppend(vector<ConstantSP>& values, string& errMsg){
 	int rows = values[0]->size();
 	if(size_ + rows > capacity_ && !increaseCapacity(size_ + rows, errMsg))
@@ -677,7 +674,7 @@ bool BasicTable::internalAppend(vector<ConstantSP>& values, string& errMsg){
 		return false;
 	}
 }
-
+*/
 bool BasicTable::update(vector<ConstantSP>& values, const ConstantSP& indexSP, vector<string>& colNames, string& errMsg){
 	if(isReadOnly()){
 		errMsg = "Can't modify read only table.";
@@ -789,17 +786,21 @@ void BasicTable::internalDrop(vector<int>& columns){
 	vector<ConstantSP> newCols;
 	SmartPointer<vector<string>> newColNames = new vector<string>();
 	SmartPointer<unordered_map<string,int>> newColMap = new unordered_map<string,int>();
+	vector<COMPRESS_METHOD> newColCompresses;
 	int numCol = colNames_->size();
 	for(int i=0; i<numCol; ++i){
 		if(dropColumns.find(i) != dropColumns.end())
 			continue;
 		newCols.push_back(cols_[i]);
 		newColNames->push_back(colNames_->at(i));
+		if(!colCompresses_.empty())
+			newColCompresses.push_back(colCompresses_.at(i));
 		newColMap->insert(pair<string,int>(Util::lower(colNames_->at(i)), newCols.size()-1));
 	}
 	cols_ = newCols;
 	colNames_ = newColNames;
 	colMap_ = newColMap;
+	colCompresses_ = newColCompresses;
 }
 
 bool BasicTable::join(vector<ConstantSP>& columns){

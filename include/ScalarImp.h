@@ -257,7 +257,10 @@ public:
 	static bool parseInt128(const char* str, int len, unsigned char *buf);
 
 protected:
-	mutable unsigned char uuid_[16];
+	union{
+		mutable unsigned char uuid_[16];
+		Guid guid_;
+	};
 };
 
 class Uuid : public Int128 {

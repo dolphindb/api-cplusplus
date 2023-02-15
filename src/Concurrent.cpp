@@ -136,7 +136,7 @@ bool RWLock::tryAcquireRead(){
 #endif
 }
 
-bool RWLock::tryAcqurieWrite(){
+bool RWLock::tryAcquireWrite(){
 #ifdef WINDOWS
 	return TryAcquireSRWLockExclusive(&lock_);
 #else
@@ -448,6 +448,8 @@ void Thread::setAffinity(int id) {
 	if (SetThreadAffinityMask(thread_, 1 << id) == 0) {
 		throw RuntimeException("BindCore failed, error code "+GetLastError());
 	}
+#elif defined MAC
+	throw RuntimeException("MacOS can't setaffinity.");
 #else
 	int cpus = 0;
 	cpus = sysconf(_SC_NPROCESSORS_ONLN);

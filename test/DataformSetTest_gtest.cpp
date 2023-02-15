@@ -22,18 +22,12 @@ protected:
     {
         cout<<"check connect...";
 		ConstantSP res = conn.run("1+1");
-		if(!(res->getBool())){
-			cout<<"Server not responed, please check."<<endl;
-		}
-		else
-		{
-			cout<<"ok"<<endl;
-			
-		}
+		
+        cout<<"ok"<<endl;
     }
     virtual void TearDown()
     {
-        pass;
+        conn.run("undef all;");
     }
 };
 
@@ -43,12 +37,21 @@ TEST_F(DataformSetTest,testAnySet){
 	EXPECT_EQ(v1.isNull(),true);
 }
 
+TEST_F(DataformSetTest,testDecimal32Set){
+	SetSP v1 = Util::createSet(DT_DECIMAL32,5);
+	EXPECT_EQ(v1.isNull(),true);
+}
+
+TEST_F(DataformSetTest,testDecimal64Set){
+	SetSP v1 = Util::createSet(DT_DECIMAL64,5);
+	EXPECT_EQ(v1.isNull(),true);
+}
 
 TEST_F(DataformSetTest,testStringSet){
 	SetSP v1 = Util::createSet(DT_STRING,5);
     v1->append(Util::createString("123abc"));
     v1->append(Util::createString("中文*……%#￥#！a"));
-	cout<< v1->getString();
+
 	string script = "a=set([`123abc, '中文*……%#￥#！a']);a";
 	SetSP res_v = conn.run(script);
 	conn.upload("v1",{v1});
@@ -66,12 +69,22 @@ TEST_F(DataformSetTest,testStringSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(\"123abc\")");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createString("123abc"),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
 
 	EXPECT_FALSE(v1->inverse(Util::createString("abc")));
+	SetSP temp = Util::createSet(DT_NANOTIME,1);
+	SetSP temp1 = Util::createSet(DT_STRING,1);
+	temp1->append(Util::createString("dolphindb"));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -80,10 +93,33 @@ TEST_F(DataformSetTest,testStringSet){
     v2->append(Util::createString("中文*……%#￥#！a"));
 	EXPECT_TRUE(v2->isSuperset(v1));
 	EXPECT_FALSE(v1->isSuperset(v2));
+	EXPECT_TRUE(v2->isSuperset(v2->keys()->get(0)));
+	EXPECT_FALSE(v1->isSuperset(v2->keys()->get(0)));
 
 	EXPECT_EQ(v2->interaction(Util::createString("123abc"))->getString(),"set(\"123abc\")");
 	EXPECT_EQ(v2->interaction(Util::createString("中文*……%#￥#！a"))->getString(),"set(\"中文*……%#￥#！a\")");
 	EXPECT_EQ(v2->interaction(Util::createString("444"))->getString(),"set()");
+	VectorSP judge_res = Util::createVector(DT_BOOL, v2->size());
+	for(auto i=0;i<v2->size();i++){
+		v2->contain(v2->interaction(v2), judge_res);
+	}
+	EXPECT_EQ(judge_res->getString(),"[1,1]");
+
+	cout<<v2->getString()<<endl;
+	v1->append(v2);
+
+	ConstantSP result = Util::createNullConstant(DT_BOOL);
+	for(auto i=0;i<v2->size();i++){
+		v1->contain(v2->keys()->get(i), result);
+		EXPECT_EQ(result->getBool(), true);
+	}
+
+	v1->remove(v2);
+	EXPECT_EQ(v1->size(), 0);
+	EXPECT_EQ(v2->getSubVector(1,1)->get(0)->getString(),v2->keys()->get(1)->getString());
+
+	v2->clear();
+	EXPECT_EQ(v2->size(), 0);
 }
 
 TEST_F(DataformSetTest,testStringNullSet){
@@ -99,6 +135,12 @@ TEST_F(DataformSetTest,testStringNullSet){
 	EXPECT_EQ(conn.run("v1")->isSet(),true);
 	EXPECT_EQ(v1->sizeable(),true);
 	EXPECT_EQ(v1->keys()->getString(),res_v->keys()->getString());
+}
+
+
+TEST_F(DataformSetTest,testSymbolSet){
+	SetSP v1 = Util::createSet(DT_SYMBOL,5);
+	EXPECT_TRUE(v1.isNull()); // symbol set doesn't supported yet
 }
 
 TEST_F(DataformSetTest,testBoolSet){
@@ -128,12 +170,22 @@ TEST_F(DataformSetTest,testCharSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(1)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createChar(1),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
 
 	EXPECT_FALSE(v1->inverse(Util::createChar(2)));
+	SetSP temp = Util::createSet(DT_NANOTIME,1);
+	SetSP temp1 = Util::createSet(DT_CHAR,1);
+	temp1->append(Util::createChar(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -142,10 +194,34 @@ TEST_F(DataformSetTest,testCharSet){
     v2->append(Util::createChar(0));
 	EXPECT_TRUE(v2->isSuperset(v1));
 	EXPECT_FALSE(v1->isSuperset(v2));
+	EXPECT_TRUE(v2->isSuperset(v2->keys()->get(0)));
+	EXPECT_FALSE(v1->isSuperset(v2->keys()->get(0)));
 
 	EXPECT_EQ(v2->interaction(Util::createChar(1))->getString(),"set(1)");
 	EXPECT_EQ(v2->interaction(Util::createChar(0))->getString(),"set(0)");
 	EXPECT_EQ(v2->interaction(Util::createChar(2))->getString(),"set()");
+	VectorSP judge_res = Util::createVector(DT_BOOL, v2->size());
+	for(auto i=0;i<v2->size();i++){
+		v2->contain(v2->interaction(v2), judge_res);
+	}
+	EXPECT_EQ(judge_res->getString(),"[1,1]");
+
+	cout<<v2->getString()<<endl;
+	v1->append(v2);
+
+	ConstantSP result = Util::createNullConstant(DT_BOOL);
+	for(auto i=0;i<v2->size();i++){
+		v1->contain(v2->keys()->get(i), result);
+		EXPECT_EQ(result->getBool(), true);
+	}
+
+	v1->remove(v2);
+	EXPECT_EQ(v1->size(), 0);
+	EXPECT_EQ(v2->getSubVector(1,1)->get(0)->getString(),v2->keys()->get(1)->getString());
+
+	for(auto i=0; i<200; i++)
+		v2->append(Util::createChar(i));
+	cout<<v2->getString()<<endl;
 
 }
 
@@ -186,12 +262,22 @@ TEST_F(DataformSetTest,testIntSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(1)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createInt(1),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
 
 	EXPECT_FALSE(v1->inverse(Util::createInt(2)));
+	SetSP temp = Util::createSet(DT_NANOTIME,1);
+	SetSP temp1 = Util::createSet(DT_INT,1);
+	temp1->append(Util::createInt(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -200,10 +286,30 @@ TEST_F(DataformSetTest,testIntSet){
     v2->append(Util::createInt(0));
 	EXPECT_TRUE(v2->isSuperset(v1));
 	EXPECT_FALSE(v1->isSuperset(v2));
+	EXPECT_TRUE(v2->isSuperset(v2->keys()->get(0)));
+	EXPECT_FALSE(v1->isSuperset(v2->keys()->get(0)));
 
 	EXPECT_EQ(v2->interaction(Util::createInt(1))->getString(),"set(1)");
 	EXPECT_EQ(v2->interaction(Util::createInt(0))->getString(),"set(0)");
 	EXPECT_EQ(v2->interaction(Util::createInt(2))->getString(),"set()");
+	VectorSP judge_res = Util::createVector(DT_BOOL, v2->size());
+	for(auto i=0;i<v2->size();i++){
+		v2->contain(v2->interaction(v2), judge_res);
+	}
+	EXPECT_EQ(judge_res->getString(),"[1,1]");
+
+	cout<<v2->getString()<<endl;
+	v1->append(v2);
+
+	ConstantSP result = Util::createNullConstant(DT_BOOL);
+	for(auto i=0;i<v2->size();i++){
+		v1->contain(v2->keys()->get(i), result);
+		EXPECT_EQ(result->getBool(), true);
+	}
+
+	v1->remove(v2);
+	EXPECT_EQ(v1->size(), 0);
+	EXPECT_EQ(v2->getSubVector(1,1)->get(0)->getString(),v2->keys()->get(1)->getString());
 }
 
 TEST_F(DataformSetTest,testIntNullSet){
@@ -243,12 +349,22 @@ TEST_F(DataformSetTest,testLongSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(1)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createLong(1),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
 
 	EXPECT_FALSE(v1->inverse(Util::createLong(2)));
+	SetSP temp = Util::createSet(DT_NANOTIME,1);
+	SetSP temp1 = Util::createSet(DT_LONG,1);
+	temp1->append(Util::createLong(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -257,10 +373,30 @@ TEST_F(DataformSetTest,testLongSet){
     v2->append(Util::createLong(0));
 	EXPECT_TRUE(v2->isSuperset(v1));
 	EXPECT_FALSE(v1->isSuperset(v2));
+	EXPECT_TRUE(v2->isSuperset(v2->keys()->get(0)));
+	EXPECT_FALSE(v1->isSuperset(v2->keys()->get(0)));
 
 	EXPECT_EQ(v2->interaction(Util::createLong(1))->getString(),"set(1)");
 	EXPECT_EQ(v2->interaction(Util::createLong(0))->getString(),"set(0)");
 	EXPECT_EQ(v2->interaction(Util::createLong(2))->getString(),"set()");
+	VectorSP judge_res = Util::createVector(DT_BOOL, v2->size());
+	for(auto i=0;i<v2->size();i++){
+		v2->contain(v2->interaction(v2), judge_res);
+	}
+	EXPECT_EQ(judge_res->getString(),"[1,1]");
+
+	cout<<v2->getString()<<endl;
+	v1->append(v2);
+
+	ConstantSP result = Util::createNullConstant(DT_BOOL);
+	for(auto i=0;i<v2->size();i++){
+		v1->contain(v2->keys()->get(i), result);
+		EXPECT_EQ(result->getBool(), true);
+	}
+
+	v1->remove(v2);
+	EXPECT_EQ(v1->size(), 0);
+	EXPECT_EQ(v2->getSubVector(1,1)->get(0)->getString(),v2->keys()->get(1)->getString());
 }
 
 TEST_F(DataformSetTest,testLongNullSet){
@@ -315,11 +451,22 @@ TEST_F(DataformSetTest,testShortSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(1)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createShort(1),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(Util::createShort(2)));
+	SetSP temp = Util::createSet(DT_NANOTIME,1);
+	SetSP temp1 = Util::createSet(DT_SHORT,1);
+	temp1->append(Util::createShort(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -328,10 +475,30 @@ TEST_F(DataformSetTest,testShortSet){
     v2->append(Util::createShort(0));
 	EXPECT_TRUE(v2->isSuperset(v1));
 	EXPECT_FALSE(v1->isSuperset(v2));
+	EXPECT_TRUE(v2->isSuperset(v2->keys()->get(0)));
+	EXPECT_FALSE(v1->isSuperset(v2->keys()->get(0)));
 
 	EXPECT_EQ(v2->interaction(Util::createShort(1))->getString(),"set(1)");
 	EXPECT_EQ(v2->interaction(Util::createShort(0))->getString(),"set(0)");
 	EXPECT_EQ(v2->interaction(Util::createShort(2))->getString(),"set()");
+	VectorSP judge_res = Util::createVector(DT_BOOL, v2->size());
+	for(auto i=0;i<v2->size();i++){
+		v2->contain(v2->interaction(v2), judge_res);
+	}
+	EXPECT_EQ(judge_res->getString(),"[1,1]");
+
+	cout<<v2->getString()<<endl;
+	v1->append(v2);
+
+	ConstantSP result = Util::createNullConstant(DT_BOOL);
+	for(auto i=0;i<v2->size();i++){
+		v1->contain(v2->keys()->get(i), result);
+		EXPECT_EQ(result->getBool(), true);
+	}
+
+	v1->remove(v2);
+	EXPECT_EQ(v1->size(), 0);
+	EXPECT_EQ(v2->getSubVector(1,1)->get(0)->getString(),v2->keys()->get(1)->getString());
 }
 
 
@@ -357,11 +524,22 @@ TEST_F(DataformSetTest,testFloatSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(1)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createFloat(1),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(Util::createFloat(2)));
+	SetSP temp = Util::createSet(DT_NANOTIME,1);
+	SetSP temp1 = Util::createSet(DT_FLOAT,1);
+	temp1->append(Util::createFloat(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -370,10 +548,30 @@ TEST_F(DataformSetTest,testFloatSet){
     v2->append(Util::createFloat(0));
 	EXPECT_TRUE(v2->isSuperset(v1));
 	EXPECT_FALSE(v1->isSuperset(v2));
+	EXPECT_TRUE(v2->isSuperset(v2->keys()->get(0)));
+	EXPECT_FALSE(v1->isSuperset(v2->keys()->get(0)));
 
 	EXPECT_EQ(v2->interaction(Util::createFloat(1))->getString(),"set(1)");
 	EXPECT_EQ(v2->interaction(Util::createFloat(0))->getString(),"set(0)");
 	EXPECT_EQ(v2->interaction(Util::createFloat(2))->getString(),"set()");
+	VectorSP judge_res = Util::createVector(DT_BOOL, v2->size());
+	for(auto i=0;i<v2->size();i++){
+		v2->contain(v2->interaction(v2), judge_res);
+	}
+	EXPECT_EQ(judge_res->getString(),"[1,1]");
+
+	cout<<v2->getString()<<endl;
+	v1->append(v2);
+
+	ConstantSP result = Util::createNullConstant(DT_BOOL);
+	for(auto i=0;i<v2->size();i++){
+		v1->contain(v2->keys()->get(i), result);
+		EXPECT_EQ(result->getBool(), true);
+	}
+
+	v1->remove(v2);
+	EXPECT_EQ(v1->size(), 0);
+	EXPECT_EQ(v2->getSubVector(1,1)->get(0)->getString(),v2->keys()->get(1)->getString());
 }
 
 
@@ -414,12 +612,24 @@ TEST_F(DataformSetTest,testDoubleSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(1)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createDouble(1),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(Util::createDouble(2)));
+	SetSP temp = Util::createSet(DT_NANOTIME,1);
+	SetSP temp1 = Util::createSet(DT_DOUBLE,1);
+	temp1->append(Util::createDouble(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
+
 	EXPECT_EQ(v1->getString(),"set()");
 
 	SetSP v2 = Util::createSet(DT_DOUBLE,5);
@@ -427,10 +637,30 @@ TEST_F(DataformSetTest,testDoubleSet){
     v2->append(Util::createDouble(0));
 	EXPECT_TRUE(v2->isSuperset(v1));
 	EXPECT_FALSE(v1->isSuperset(v2));
+	EXPECT_TRUE(v2->isSuperset(v2->keys()->get(0)));
+	EXPECT_FALSE(v1->isSuperset(v2->keys()->get(0)));
 
 	EXPECT_EQ(v2->interaction(Util::createDouble(1))->getString(),"set(1)");
 	EXPECT_EQ(v2->interaction(Util::createDouble(0))->getString(),"set(0)");
 	EXPECT_EQ(v2->interaction(Util::createDouble(2))->getString(),"set()");
+	VectorSP judge_res = Util::createVector(DT_BOOL, v2->size());
+	for(auto i=0;i<v2->size();i++){
+		v2->contain(v2->interaction(v2), judge_res);
+	}
+	EXPECT_EQ(judge_res->getString(),"[1,1]");
+
+	cout<<v2->getString()<<endl;
+	v1->append(v2);
+
+	ConstantSP result = Util::createNullConstant(DT_BOOL);
+	for(auto i=0;i<v2->size();i++){
+		v1->contain(v2->keys()->get(i), result);
+		EXPECT_EQ(result->getBool(), true);
+	}
+
+	v1->remove(v2);
+	EXPECT_EQ(v1->size(), 0);
+	EXPECT_EQ(v2->getSubVector(1,1)->get(0)->getString(),v2->keys()->get(1)->getString());
 }
 
 
@@ -471,11 +701,22 @@ TEST_F(DataformSetTest,testDatehourSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(1981.05.29T16)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createDateHour(100000),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(Util::createDateHour(2)));
+	SetSP temp = Util::createSet(DT_STRING,1);
+	SetSP temp1 = Util::createSet(DT_DATEHOUR,1);
+	temp1->append(Util::createDateHour(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -527,11 +768,22 @@ TEST_F(DataformSetTest,testDateSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(2103.06.23)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createDate(48750),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(Util::createDate(2)));
+	SetSP temp = Util::createSet(DT_STRING,1);
+	SetSP temp1 = Util::createSet(DT_DATE,1);
+	temp1->append(Util::createDate(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -583,12 +835,20 @@ TEST_F(DataformSetTest,testMinuteSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(16:40m)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createMinute(1000),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(Util::createMinute(2)));
-	v1->inverse(v1);
+
+	EXPECT_FALSE(v1->inverse(Util::createString("2")));
+ v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
 	SetSP v2 = Util::createSet(DT_MINUTE,5);
@@ -640,11 +900,22 @@ TEST_F(DataformSetTest,testDatetimeSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(1970.01.01T13:32:30)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createDateTime(48750),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(Util::createDateTime(2)));
+	SetSP temp = Util::createSet(DT_STRING,1);
+	SetSP temp1 = Util::createSet(DT_DATETIME,1);
+	temp1->append(Util::createDateTime(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -696,13 +967,22 @@ TEST_F(DataformSetTest,testTimeStampSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(2001.09.09T01:46:40.000)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
-	cout<<v1->getString()<<endl;
-	cout<<Util::createTimestamp(1000000000000)->getString()<<endl;
+	res->setNull();
 	v1->contain(Util::createTimestamp(1000000000000),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(Util::createTimestamp(2)));
+	SetSP temp = Util::createSet(DT_STRING,1);
+	SetSP temp1 = Util::createSet(DT_TIMESTAMP,1);
+	temp1->append(Util::createTimestamp(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -754,11 +1034,22 @@ TEST_F(DataformSetTest,testnanotimeSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(00:16:40.000000000)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createNanoTime(1000000000000),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(Util::createNanoTime(2)));
+	SetSP temp = Util::createSet(DT_STRING,1);
+	SetSP temp1 = Util::createSet(DT_NANOTIME,1);
+	temp1->append(Util::createNanoTime(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -810,11 +1101,22 @@ TEST_F(DataformSetTest,testnanotimestampSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(1970.01.01T00:16:40.000000000)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createNanoTimestamp(1000000000000),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(Util::createNanoTimestamp(2)));
+	SetSP temp = Util::createSet(DT_STRING,1);
+	SetSP temp1 = Util::createSet(DT_NANOTIMESTAMP,1);
+	temp1->append(Util::createNanoTimestamp(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -866,11 +1168,22 @@ TEST_F(DataformSetTest,testmonthSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(0083.05M)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createMonth(1000),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(Util::createMonth(2)));
+	SetSP temp = Util::createSet(DT_STRING,1);
+	SetSP temp1 = Util::createSet(DT_MONTH,1);
+	temp1->append(Util::createMonth(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 
@@ -922,11 +1235,22 @@ TEST_F(DataformSetTest,testtimeSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(02:46:40.000)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(Util::createTime(10000000),res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(Util::createTime(2)));
+	SetSP temp = Util::createSet(DT_STRING,1);
+	SetSP temp1 = Util::createSet(DT_TIME,1);
+	temp1->append(Util::createTime(9));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 	
@@ -979,11 +1303,23 @@ TEST_F(DataformSetTest,testint128Set){
 	EXPECT_EQ(v1->getValue()->getString(),"set(e1671797c52e15f763380b45e841ec32)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(int128val,res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(int128val));
+	EXPECT_FALSE(v1->inverse(Util::createNullConstant(DT_INT128)));
+	SetSP temp = Util::createSet(DT_NANOTIME,1);
+	SetSP temp1 = Util::createSet(DT_INT128,1);
+	temp1->append(Util::createNullConstant(DT_INT128));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 	
@@ -992,10 +1328,30 @@ TEST_F(DataformSetTest,testint128Set){
     v2->append(int128val);
 	EXPECT_TRUE(v2->isSuperset(v1));
 	EXPECT_FALSE(v1->isSuperset(v2));
+	EXPECT_TRUE(v2->isSuperset(v2->keys()->get(0)));
+	EXPECT_FALSE(v1->isSuperset(v2->keys()->get(0)));
 
 	EXPECT_EQ(v2->interaction(int128val)->getString(),"set(e1671797c52e15f763380b45e841ec32)");
 	EXPECT_EQ(v2->interaction(Util::createNullConstant(DT_INT128))->getString(),"set(00000000000000000000000000000000)");
 	EXPECT_EQ(v2->interaction(Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec33"))->getString(),"set()");
+	VectorSP judge_res = Util::createVector(DT_BOOL, v2->size());
+	for(auto i=0;i<v2->size();i++){
+		v2->contain(v2->interaction(v2), judge_res);
+	}
+	EXPECT_EQ(judge_res->getString(),"[1,1]");
+
+	cout<<v2->getString()<<endl;
+	v1->append(v2);
+
+	ConstantSP result = Util::createNullConstant(DT_BOOL);
+	for(auto i=0;i<v2->size();i++){
+		v1->contain(v2->keys()->get(i), result);
+		EXPECT_EQ(result->getBool(), true);
+	}
+
+	v1->remove(v2);
+	EXPECT_EQ(v1->size(), 0);
+	EXPECT_EQ(v2->getSubVector(1,1)->get(0)->getString(),v2->keys()->get(1)->getString());
 }
 
 TEST_F(DataformSetTest,testipaddrSet){
@@ -1021,11 +1377,23 @@ TEST_F(DataformSetTest,testipaddrSet){
 	EXPECT_EQ(v1->getValue()->getString(),"set(192.168.1.13)");
 	ConstantSP res=Util::createConstant(DT_BOOL);
 	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
 	v1->contain(ipaddrval,res);
 	EXPECT_TRUE(res->getBool());
+	res1->setNull();
 	v1->contain(v1,res1);
-	EXPECT_FALSE(res1->getBool());
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
 	EXPECT_FALSE(v1->inverse(ipaddrval));
+	EXPECT_FALSE(v1->inverse(Util::createNullConstant(DT_IP)));
+	SetSP temp = Util::createSet(DT_NANOTIME,1);
+	SetSP temp1 = Util::createSet(DT_IP,1);
+	temp1->append(Util::createNullConstant(DT_IP));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
 	

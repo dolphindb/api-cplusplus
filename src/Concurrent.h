@@ -13,6 +13,7 @@
 #include <cassert>
 #include <algorithm>
 #include <memory>
+#include <functional>
 
 #ifdef WINDOWS
 	#include <winsock2.h>
@@ -26,7 +27,7 @@
 #include "SmartPointer.h"
 
 #ifdef _MSC_VER
-	#ifdef _USRDLL	
+	#ifdef _DDBAPIDLL	
 		#define EXPORT_DECL _declspec(dllexport)
 	#else
 		#define EXPORT_DECL __declspec(dllimport)
@@ -59,6 +60,17 @@ private:
 	std::atomic<char> status_;
 };
 
+class EXPORT_DECL Executor : public Runnable {
+	using Func = std::function<void()>;
+
+public:
+	explicit Executor(Func f) : func_(std::move(f)) {};
+	void run() override { func_(); };
+
+private:
+	Func func_;
+};
+
 class EXPORT_DECL Mutex{
 public:
 	Mutex();
@@ -87,7 +99,7 @@ public:
 	void releaseRead();
 	void releaseWrite();
 	bool tryAcquireRead();
-	bool tryAcqurieWrite();
+	bool tryAcquireWrite();
 private:
 #ifdef WINDOWS
 	SRWLOCK lock_;
@@ -171,8 +183,8 @@ private:
 template<class T>
 class RWLockGuard{
 public:
-	RWLockGuard(T* res, bool exclusive, bool acquireLock = true):res_(res), exclusive_(exclusive){
-		if(res != NULL && acquireLock){
+	RWLockGuard(T* res, bool exclusive, bool acquireLock = true):res_(res), exclusive_(exclusive), acquireLock_(acquireLock){
+		if(res != NULL && acquireLock_){
 			if(exclusive_)
 				res_->acquireWrite();
 			else
@@ -181,7 +193,7 @@ public:
 	}
 
 	void upgrade(){
-		if(res_ != NULL){
+		if(res_ != NULL && acquireLock_){
 			if(exclusive_)
 				return;
 			else{
@@ -193,7 +205,7 @@ public:
 	}
 
 	~RWLockGuard(){
-		if(res_ != NULL){
+		if(res_ != NULL && acquireLock_){
 			if(exclusive_)
 				res_->releaseWrite();
 			else
@@ -203,6 +215,7 @@ public:
 private:
 	T* res_;
 	bool exclusive_;
+	bool acquireLock_;
 };
 
 template<class T>

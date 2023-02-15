@@ -11,7 +11,7 @@
 #include "DolphinDB.h"
 #include "SysIO.h"
 #ifdef _MSC_VER
-	#ifdef _USRDLL	
+	#ifdef _DDBAPIDLL	
 		#define EXPORT_DECL _declspec(dllexport)
 	#else
 		#define EXPORT_DECL __declspec(dllimport)
@@ -189,13 +189,14 @@ public:
 
 class EXPORT_DECL ScalarUnmarshall: public ConstantUnmarshallImp{
 public:
-	ScalarUnmarshall(const DataInputStreamSP& in):ConstantUnmarshallImp(in), isCodeObject_(false), functionType_(-1){}
+	ScalarUnmarshall(const DataInputStreamSP& in):ConstantUnmarshallImp(in), isCodeObject_(false), scale_(0), functionType_(-1){}
 	virtual ~ScalarUnmarshall(){}
 	virtual bool start(short flag, bool blocking, IO_ERR& ret);
 	virtual void reset();
 
 private:
 	bool isCodeObject_;
+	int scale_;
 	char functionType_;
 };
 
@@ -219,12 +220,12 @@ private:
 
 class EXPORT_DECL VectorUnmarshall: public ConstantUnmarshallImp{
 public:
-	VectorUnmarshall(const DataInputStreamSP& in):ConstantUnmarshallImp(in), flag_(0), rows_(0), columns_(0), nextStart_(0), unmarshall_(0){}
+	VectorUnmarshall(const DataInputStreamSP& in):ConstantUnmarshallImp(in), flag_(0), rows_(0), columns_(0), nextStart_(0), unmarshall_(0), scale_(0){}
 	virtual ~VectorUnmarshall(){}
 	virtual bool start(short flag, bool blocking, IO_ERR& ret);
 	virtual void reset();
 	void resetSymbolBaseUnmarshall(DataInputStreamSP in, bool createIfNotExist);
-
+	void setNotify(std::function<void(const ConstantSP &vector, INDEX validSize)> notify) { notify_ = notify; }
 private:
 	short flag_;
 	int rows_;
@@ -232,6 +233,8 @@ private:
 	INDEX nextStart_;
 	ConstantUnmarshallSP unmarshall_;
 	SymbolBaseUnmarshallSP symbaseUnmarshall_;
+	int scale_;
+	std::function<void(const ConstantSP &vector, INDEX validSize)> notify_;
 };
 
 class EXPORT_DECL MatrixUnmarshall: public ConstantUnmarshallImp{
@@ -258,6 +261,7 @@ public:
 	virtual ~TableUnmarshall(){}
 	virtual bool start(short flag, bool blocking, IO_ERR& ret);
 	virtual void reset();
+	void setNotify(std::function<void(const ConstantSP &vector, INDEX validSize)> notify) { vectorUnmarshall_.setNotify(notify); }
 private:
 	TABLE_TYPE type_;
 	bool tableNameReceived_;

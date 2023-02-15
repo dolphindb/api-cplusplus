@@ -115,7 +115,7 @@ public:
 private:
 	bool increaseCapacity(long long newCapacity, string& errMsg);
 	void initData(const vector<ConstantSP>& cols, const vector<string>& colNames);
-	bool internalAppend(vector<ConstantSP>& values, string& errMsg);
+	//bool internalAppend(vector<ConstantSP>& values, string& errMsg);
 	bool internalRemove(const ConstantSP& indexSP, string& errMsg);
 	void internalDrop(vector<int>& columns);
 	bool internalUpdate(vector<ConstantSP>& values, const ConstantSP& indexSP, vector<string>& colNames, string& errMsg);

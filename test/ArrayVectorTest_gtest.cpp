@@ -22,21 +22,213 @@ protected:
     {
         cout<<"check connect...";
 		ConstantSP res = conn.run("1+1");
-		if(!(res->getBool())){
-			cout<<"Server not responed, please check."<<endl;
-		}
-		else
-		{
-			cout<<"ok"<<endl;
-			
-		}
+		
+        cout<<"ok"<<endl;
     }
     virtual void TearDown()
     {
-        pass;
+        conn.run("undef all;");
     }
 };
 
+#ifndef WINDOWS
+TEST_F(ArrayVectorTest,testArrayVector_append) {
+    VectorSP vec = Util::createArrayVector(DT_BOOL_ARRAY, 0, 1);
+    SmartPointer<FastArrayVector> av1 = vec;
+    VectorSP v1 = Util::createVector(DT_BOOL, 0, 6);
+    EXPECT_TRUE(av1->append(v1));
+    EXPECT_EQ(av1->size(), 1);
+
+    VectorSP v2 = Util::createVector(DT_BOOL, 6, 6);
+    v2->setNull(0);
+    EXPECT_TRUE(av1->append(v2));
+    EXPECT_EQ(av1->size(), 2);
+
+    VectorSP indexArray = Util::createVector(DT_INT, 2, 2);
+    indexArray->set(0, Util::createInt(0));
+    indexArray->set(1, Util::createInt(1));
+
+    EXPECT_FALSE(av1->append(Util::createInt(1),indexArray));
+    EXPECT_FALSE(av1->append(v2, indexArray));
+
+    VectorSP anyVector = Util::createVector(DT_ANY, 2, 2);
+    EXPECT_TRUE(av1->append(anyVector, indexArray));
+    EXPECT_EQ(av1->size(), 4);
+
+    EXPECT_TRUE(av1->append(av1, indexArray));
+    EXPECT_EQ(av1->size(), 6);
+}
+
+TEST_F(ArrayVectorTest, testArrayVector_checkVectorSize) {
+    VectorSP vec = Util::createArrayVector(DT_BOOL_ARRAY, 0, 2);
+    SmartPointer<FastArrayVector> av = vec;
+    EXPECT_EQ(av->checkVectorSize(), 0);
+
+    VectorSP v1 = Util::createVector(DT_BOOL, 6, 6);
+    EXPECT_TRUE(av->append(v1));
+    EXPECT_EQ(av->checkVectorSize(), 6);
+
+    v1 = Util::createVector(DT_BOOL, 5, 6);
+    EXPECT_TRUE(av->append(v1));
+    EXPECT_EQ(av->checkVectorSize(), -1);
+}
+
+TEST_F(ArrayVectorTest,testArrayVector_count) {
+    VectorSP vec = Util::createArrayVector(DT_BOOL_ARRAY, 0, 1);
+    SmartPointer<FastArrayVector> av1 = vec;
+    VectorSP v1 = Util::createVector(DT_BOOL, 0, 6);
+    EXPECT_TRUE(av1->append(v1));
+    EXPECT_EQ(av1->count(0, 1), 0);
+
+    VectorSP v2 = Util::createVector(DT_BOOL, 6, 6);
+    v2->setNull(0);
+    EXPECT_TRUE(av1->append(v2));
+    EXPECT_EQ(av1->count(0, 2), 1);
+
+    VectorSP indexArray = Util::createVector(DT_INT, 2, 2);
+    indexArray->set(0, Util::createInt(0));
+    indexArray->set(1, Util::createInt(1));
+
+    EXPECT_FALSE(av1->append(Util::createInt(1),indexArray));
+    EXPECT_EQ(av1->count(0, 3), 2);
+    EXPECT_FALSE(av1->append(v2, indexArray));
+    EXPECT_EQ(av1->count(0, 4), 3);
+
+    VectorSP anyVector = Util::createVector(DT_ANY, 2, 2);
+    EXPECT_TRUE(av1->append(anyVector, indexArray));
+    EXPECT_EQ(av1->size(), 4);
+    EXPECT_EQ(av1->count(0, 5), 2);
+
+    EXPECT_TRUE(av1->append(av1, indexArray));
+    EXPECT_EQ(av1->size(), 6);
+    EXPECT_EQ(av1->count(0, 6), 2);
+}
+
+TEST_F(ArrayVectorTest,testArrayVector_fill) {
+    VectorSP vec = Util::createArrayVector(DT_BOOL_ARRAY, 0, 1);
+    SmartPointer<FastArrayVector> av1 = vec;
+    
+    av1->fill(0, 0, Util::createBool(1));
+    EXPECT_EQ(av1->size(), 0);
+
+    VectorSP v1 = Util::createVector(DT_BOOL, 0, 6);
+    EXPECT_TRUE(av1->append(v1));
+    EXPECT_EQ(av1->size(), 1);
+
+    av1->fill(0, 1, Util::createBool(1));
+    EXPECT_EQ(av1->size(), 1);
+
+    VectorSP v2 = Util::createVector(DT_BOOL, 6, 6);
+    v2->setNull(0);
+    EXPECT_TRUE(av1->append(v2));
+    EXPECT_EQ(av1->size(), 2);
+
+    VectorSP indexArray = Util::createVector(DT_INT, 2, 2);
+    indexArray->set(0, Util::createInt(0));
+    indexArray->set(1, Util::createInt(1));
+    
+    av1->fill(0, 1, Util::createVector(DT_BOOL, 2, 2));
+
+    EXPECT_FALSE(av1->append(Util::createInt(1),indexArray));
+    EXPECT_FALSE(av1->append(v2, indexArray));
+
+    VectorSP anyVector = Util::createVector(DT_ANY, 2, 2);
+    EXPECT_TRUE(av1->append(anyVector, indexArray));
+    EXPECT_EQ(av1->size(), 4);
+
+    EXPECT_TRUE(av1->append(av1, indexArray));
+    EXPECT_EQ(av1->size(), 6);
+}
+
+TEST_F(ArrayVectorTest,testArrayVector_get) {
+    VectorSP vec = Util::createArrayVector(DT_BOOL_ARRAY, 0, 1);
+    SmartPointer<FastArrayVector> av1 = vec;
+
+    EXPECT_ANY_THROW(av1->get(Util::createInt(-1)));
+
+    VectorSP v1 = Util::createVector(DT_BOOL, 2, 2);
+    EXPECT_TRUE(av1->append(v1));
+    EXPECT_EQ(av1->size(), 1);
+    ConstantSP res = av1->get(Util::createInt(0));
+    EXPECT_EQ(res->getString(), "[1]");
+
+    VectorSP v2 = Util::createVector(DT_BOOL, 6, 6);
+    v2->setNull(0);
+    EXPECT_TRUE(av1->append(v2));
+    EXPECT_EQ(av1->size(), 2);
+
+    ConstantSP pair = Util::createPair(DT_INT);
+    pair->set(0, Util::createInt(-1));
+    pair->set(1, Util::createInt(1));
+    EXPECT_ANY_THROW(res = av1->get(pair));
+
+    pair->set(0, Util::createInt(1));
+    pair->set(1, Util::createInt(1));
+    EXPECT_ANY_THROW(res = av1->get(pair));
+
+    pair->set(0, Util::createInt(0));
+    pair->set(1, Util::createInt(1));
+    res = av1->get(pair);
+    EXPECT_EQ(res->getString(), "[[1],[]]");
+
+    VectorSP indexArray = Util::createVector(DT_INT, 2, 2);
+    indexArray->set(0, Util::createInt(0));
+    indexArray->set(1, Util::createInt(1));
+    res = av1->get(indexArray);
+
+    EXPECT_FALSE(av1->append(Util::createInt(1),indexArray));
+    EXPECT_FALSE(av1->append(v2, indexArray));
+
+    VectorSP anyVector = Util::createVector(DT_ANY, 2, 2);
+    EXPECT_TRUE(av1->append(anyVector, indexArray));
+    EXPECT_EQ(av1->size(), 4);
+    EXPECT_ANY_THROW(res = av1->get(anyVector));
+}
+
+TEST_F(ArrayVectorTest,testArrayVector_getSubVector) {
+    VectorSP vec = Util::createArrayVector(DT_BOOL_ARRAY, 0, 1);
+    SmartPointer<FastArrayVector> av1 = vec;
+
+    VectorSP v1 = Util::createVector(DT_BOOL, 2, 2);
+    EXPECT_TRUE(av1->append(v1));
+    ConstantSP av2 = av1->getSubVector(0, -1, 1);
+    EXPECT_EQ(av2->getString(), "[]");
+
+    av2 = av1->getSubVector(1, -1, 2);
+    EXPECT_EQ(av2->getString(), "[]");
+}
+
+TEST_F(ArrayVectorTest,testArrayVector_set) {
+    VectorSP vec = Util::createArrayVector(DT_INT_ARRAY, 0, 2);
+    SmartPointer<FastArrayVector> av1 = vec;
+
+    VectorSP v1 = Util::createVector(DT_INT, 2, 2);
+    v1->set(0, Util::createInt(0));
+    v1->set(1, Util::createInt(1));
+    EXPECT_TRUE(av1->append(v1));
+    EXPECT_FALSE(av1->set(v1, Util::createInt(0)));
+
+    VectorSP v2 = Util::createVector(DT_INT, 3, 3);
+    v2->set(0, Util::createInt(0));
+    v2->set(1, Util::createInt(1));
+    v2->set(2, Util::createInt(2));
+    EXPECT_FALSE(av1->set(v1, v2));
+
+    VectorSP v3 = Util::createVector(DT_ANY, 1, 1);
+    v3->set(0, Util::createInt(0));
+    EXPECT_FALSE(av1->set(v1, v3));
+
+    VectorSP v4 = Util::createVector(DT_INT, 2, 2);
+    v4->set(0, Util::createInt(0));
+    v4->set(1, Util::createInt(1));
+    EXPECT_FALSE(av1->set(v1, v4));
+
+    VectorSP v5 = Util::createVector(DT_INT_ARRAY, 0, 2);
+    v5->append(v2);
+    v5->append(v2);
+    EXPECT_FALSE(av1->set(v1, v5));
+}
+#endif
 
 TEST_F(ArrayVectorTest,test_BoolArrayVector){
 	vector<char> testValues{ 1,-1,12,0,-12};
@@ -165,6 +357,137 @@ TEST_F(ArrayVectorTest,test_IntArrayVector){
 	EXPECT_TRUE(res->getBool());
 	EXPECT_EQ(av1->getString(),ex_av1->getString());
 	EXPECT_EQ(av1->getType(),ex_av1->getType());
+
+    VectorSP inst_av1 =  av1->getInstance(0);
+    EXPECT_EQ(inst_av1->getString(),"[]");
+    VectorSP inst_av2 =  av1->getInstance(1);
+    EXPECT_EQ(inst_av2->size(),1);
+
+    VectorSP indexVec = Util::createIndexVector(0,1);
+    ConstantSP index = Util::createInt(0);
+    INDEX ind = 0;
+    ConstantSP val_1 = Util::createInt(1000);
+    VectorSP val_v1 = Util::createVector(DT_INT,1,1);
+    val_v1->set(0,Util::createInt(2000));
+    VectorSP val_v2 = Util::createVector(DT_INT,1,1);
+    val_v2->set(0,Util::createInt(3000));
+    VectorSP val_t3 = Util::createVector(DT_ANY,1,1);
+    val_t3->set(0,Util::createInt(4000));
+    VectorSP val_av1 = Util::createArrayVector(DT_INT_ARRAY,0,1);
+    VectorSP val_av2 = Util::createArrayVector(DT_INT_ARRAY,0,2);
+    val_av1->append(val_v2);
+
+    EXPECT_FALSE(av1->set(ind, val_av2));
+    av1->set(ind, val_1);
+    EXPECT_EQ(av1->getString(0),"[1000]");
+    av1->set(ind, val_v1);
+    EXPECT_EQ(av1->getString(0),"[2000]");
+    av1->set(ind, val_av1);
+    EXPECT_EQ(av1->getString(0),"[3000]");
+    av1->set(ind, val_t3);
+    EXPECT_EQ(av1->getString(0),"[4000]");
+    val_t3->append(Util::createInt(4000));
+    EXPECT_FALSE(av1->set(ind, val_t3));
+
+    av1->set(0,val_v2);
+    val_t3->remove(1);
+    av1->set(indexVec, val_1);
+    EXPECT_EQ(av1->getString(0),"[1000]");
+    av1->set(indexVec, val_v1);
+    EXPECT_EQ(av1->getString(0),"[2000]");
+    av1->set(indexVec, val_av1);
+    EXPECT_EQ(av1->getString(0),"[3000]");
+    av1->set(indexVec, val_t3);
+    EXPECT_EQ(av1->getString(0),"[4000]");
+    val_t3->append(Util::createInt(4000));
+    EXPECT_FALSE(av1->set(indexVec, val_t3));
+
+    val_t3->remove(1);
+    TableSP tab1 = conn.run("table(1 2 3 as col1)");
+    EXPECT_ANY_THROW(av1->fill(0,10,val_1));
+    EXPECT_ANY_THROW(av1->fill(0,1,tab1));
+    EXPECT_ANY_THROW(av1->fill(1,1,val_1));
+    
+    av1->fill(0,1, val_1);
+    EXPECT_EQ(av1->getString(),"[[1000]]");
+    av1->append(val_1);
+    val_av1->append(val_v2);
+
+    av1->fill(0,2, val_av1);
+    EXPECT_EQ(av1->getString(),"[[3000],[3000]]");
+    val_t3->append(Util::createInt(4000));
+    av1->fill(0,2, val_t3);
+    EXPECT_EQ(av1->getString(),"[[4000],[4000]]");
+
+    av1->set(0,val_v1);
+
+    av1->reverse(0,0);
+    av1->reverse();
+    EXPECT_EQ(av1->getString(),"[[4000],[2000]]");
+    av1->reverse(0,2);
+    EXPECT_EQ(av1->getString(),"[[2000],[4000]]");
+
+    av1->append(val_1,1);
+    EXPECT_EQ(av1->getString(),"[[2000],[4000],[1000]]");
+    av1->append(val_av1,1);
+    EXPECT_EQ(av1->getString(),"[[2000],[4000],[1000],[3000]]");
+    av1->append(val_t3,1);
+    EXPECT_EQ(av1->getString(),"[[2000],[4000],[1000],[3000],[4000],[4000]]");
+
+    EXPECT_FALSE(av1->remove(10));
+    av1->remove(2);
+    EXPECT_EQ(av1->getString(),"[[2000],[4000],[1000],[3000]]");
+    av1->remove(-1);
+    EXPECT_EQ(av1->getString(),"[[4000],[1000],[3000]]");
+    av1->remove(3);
+    EXPECT_EQ(av1->getString(),"[]");
+    av1->append(val_v1);
+    av1->remove(-1);
+    EXPECT_EQ(av1->getString(),"[]");
+
+    av1->append(val_v1);
+    av1->append(val_v2);
+    av1->append(val_t3);
+    VectorSP nulIndexVec = Util::createIndexVector(0,0);
+    VectorSP IndexVec = Util::createIndexVector(0,1);
+    VectorSP IndexVec1 = Util::createIndexVector(0,3);
+    EXPECT_TRUE(av1->remove(nulIndexVec));
+    EXPECT_FALSE(av1->remove(Util::createInt(1)));
+    av1->remove(IndexVec);
+    EXPECT_EQ(av1->getString(),"[[3000],[4000],[4000]]");
+    av1->remove(IndexVec1);
+    EXPECT_EQ(av1->getString(),"[]");
+
+    av1->append(val_v1);
+    av1->append(val_v2);
+    av1->append(val_t3);
+    EXPECT_EQ(av1->get(0,0,1)->getString(),av1->get(0)->getString());
+    EXPECT_EQ(av1->get(0,1,2)->getString(),av1->get(1)->getString());
+    EXPECT_EQ(av1->get(0,2,3)->getString(),av1->get(2)->getString());
+
+    EXPECT_FALSE(av1->isNull());
+    av1->append(Util::createNullConstant(DT_INT));
+    EXPECT_FALSE(av1->isNull(3));
+    EXPECT_TRUE(av1->isNull(4));
+
+    char* buf = new char[5];
+    char* buf1 = new char[5];
+    av1->isNull(0,5,buf);
+    av1->isValid(0,5,buf1);
+    for(int i=0;i<4;i++){
+        EXPECT_TRUE((int)buf1[i]);
+        EXPECT_FALSE((int)buf[i]);
+    }
+    EXPECT_TRUE((int)buf[4]);
+    EXPECT_FALSE((int)buf1[4]);
+
+    delete[] buf,buf1;
+
+    for(unsigned int i=0;i<121;i++)
+        val_v1->append(Util::createInt(1));
+    av1->set(0,val_v1);
+    EXPECT_EQ(av1->getString(0),"[2000,1,1...]");
+    EXPECT_EQ(av1->getString(),"[[2000,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1...],[3000],[4000],[4000],[]]");
 
 }
 
@@ -1315,7 +1638,7 @@ TEST_F(ArrayVectorTest,testDoubleArrayVectorBigger65535){
     ConstantSP data1 = conn.run("a");
 
     VectorSP v2 = conn.run("a=rand(524288.0,524288);\n"
-                           "index = rand(1..524288,10000);\n"
+                           "index = rand(1..524287,10000);\n"
                            "for(idx in index){\n"
                            "\ta[idx] = NULL\t\n"
                            "};"
@@ -2698,6 +3021,7 @@ TEST_F(ArrayVectorTest,testCastTemporalDatetimeToDatetime){
         anyv1->set(0, time);
         av0->append(anyv1);
     }
+    EXPECT_ANY_THROW(av1 = av0->castTemporal(DT_INT));
     av1 = av0->castTemporal(DT_DATETIME_ARRAY);
 
     string script1 = "index=2 4 6 8 10;\
@@ -3807,7 +4131,7 @@ TEST_F(ArrayVectorTest,testCastTemporalNanotimeToMinute){
     for (int i = 0; i < 5; i++) {
         VectorSP time = Util::createVector(DT_NANOTIME, 2);
         for (int j = 0; j < 2; j++) {
-            time->set(j, Util::createNanoTime(j * (long)60000000000));
+            time->set(j, Util::createNanoTime(j * (long long)60000000000));
         }
         VectorSP anyv1 = Util::createVector(DT_ANY, 1);
         anyv1->set(0, time);
@@ -4186,7 +4510,7 @@ TEST_F(ArrayVectorTest,testCastTemporalNanotimestampToDate){
     for (int i = 0; i < 5; i++) {
         VectorSP time = Util::createVector(DT_NANOTIMESTAMP, 2);
         for (int j = 0; j < 2; j++) {
-            time->set(j, Util::createNanoTimestamp(j * (long)86400000000000));
+            time->set(j, Util::createNanoTimestamp(j * (long long)86400000000000));
         }
         VectorSP anyv1 = Util::createVector(DT_ANY, 1);
         anyv1->set(0, time);
@@ -4326,4 +4650,89 @@ TEST_F(ArrayVectorTest,testCastTemporalSecondToDate){
         av1->append(anyv1);
     }
     EXPECT_ANY_THROW(av0 = av1->castTemporal(DT_DATE_ARRAY));
+}
+
+TEST_F(ArrayVectorTest,testDecimal32ArrayVector){
+    VectorSP av1 = Util::createArrayVector(DT_DECIMAL32_ARRAY, 0, 3, true, 2);
+    VectorSP v1 = Util::createVector(DT_DECIMAL32, 2, 2, true, 2);
+    VectorSP v2 = Util::createVector(DT_DECIMAL32, 2, 2, true, 2);
+    ConstantSP val1 = Util::createDecimal32(2, 2.35123);
+    ConstantSP val2 = Util::createDecimal32(2, 0.1);
+    for(auto i =0;i<v1->size();i++){
+        v1->set(i, val1);
+        v2->set(i, val2);
+    }
+    av1->append(v1);
+    av1->append(v2);
+    conn.upload("av1",av1);
+    ConstantSP res = conn.run("index = 2 4;val = [decimal32(2.35123,2),decimal32(2.35123,2),decimal32(0.1,2),decimal32(0.1,2)];\
+                                ex=arrayVector(index,val);eqObj(ex,av1)");
+    EXPECT_TRUE(res->getBool());
+    ConstantSP ex = conn.run("ex");
+    EXPECT_EQ(ex->getString(),av1->getString());
+
+}
+
+TEST_F(ArrayVectorTest,testDecimal64ArrayVector){
+    VectorSP av1 = Util::createArrayVector(DT_DECIMAL64_ARRAY, 0, 3, true, 11);
+    VectorSP v1 = Util::createVector(DT_DECIMAL64, 2, 2, true, 11);
+    VectorSP v2 = Util::createVector(DT_DECIMAL64, 2, 2, true, 11);
+    ConstantSP val1 = Util::createDecimal64(11, 2.35123);
+    ConstantSP val2 = Util::createDecimal64(11, 0.1);
+    for(auto i =0;i<v1->size();i++){
+        v1->set(i, val1);
+        v2->set(i, val2);
+    }
+    av1->append(v1);
+    av1->append(v2);
+    conn.upload("av1",av1);
+    ConstantSP res = conn.run("index = 2 4;val = [decimal64(2.35123,11),decimal64(2.35123,11),decimal64(0.1,11),decimal64(0.1,11)];\
+                                ex=arrayVector(index,val);eqObj(ex,av1)");
+    EXPECT_TRUE(res->getBool());
+    ConstantSP ex = conn.run("ex");
+    EXPECT_EQ(ex->getString(),av1->getString());
+}
+
+TEST_F(ArrayVectorTest,testDecimal32ArrayVector_gt65535){
+    VectorSP indV = conn.run("1..35000*2");
+    VectorSP valV = Util::createVector(DT_DECIMAL32, 70000, 70000, true, 2);
+    ConstantSP val1 = Util::createDecimal32(2, 2.35123);
+    ConstantSP val2 = Util::createDecimal32(2, 0.1);
+    for(auto i =0;i<valV->size() /2;i++){
+        valV->set(2*i, val1);
+        valV->set(2*i+1, val2);
+    }
+
+    VectorSP av1 = Util::createArrayVector(indV, valV);
+    conn.upload("av1",av1);
+
+    ConstantSP res = conn.run("index = 1..35000*2;val = take([decimal32(2.35123,2),decimal32(0.1,2),decimal32(2.35123,2),decimal32(0.1,2)],70000);\
+                                ex=arrayVector(index,val);eqObj(ex,av1)");
+    EXPECT_TRUE(res->getBool());
+
+    ConstantSP ex = conn.run("ex");
+    EXPECT_EQ(ex->getString(),av1->getString());
+
+}
+
+TEST_F(ArrayVectorTest,testDecimal64ArrayVector_gt65535){
+    VectorSP indV = conn.run("1..35000*2");
+    VectorSP valV = Util::createVector(DT_DECIMAL64, 70000, 70000, true, 11);
+    ConstantSP val1 = Util::createDecimal64(11, 2.35123);
+    ConstantSP val2 = Util::createDecimal64(11, 0.1);
+    for(auto i =0;i<valV->size() /2;i++){
+        valV->set(2*i, val1);
+        valV->set(2*i+1, val2);
+    }
+
+    VectorSP av1 = Util::createArrayVector(indV, valV);
+    conn.upload("av1",av1);
+
+    ConstantSP res = conn.run("index = 1..35000*2;val = take([decimal64(2.35123,11),decimal64(0.1,11),decimal64(2.35123,11),decimal64(0.1,11)],70000);\
+                                ex=arrayVector(index,val);eqObj(ex,av1)");
+    EXPECT_TRUE(res->getBool());
+    
+    ConstantSP ex = conn.run("ex");
+    EXPECT_EQ(ex->getString(),av1->getString());
+
 }

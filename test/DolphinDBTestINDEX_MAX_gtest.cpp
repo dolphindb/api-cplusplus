@@ -1,11 +1,3 @@
-#include "DolphinDBTestINDEX_MAX.h"
-
-
-using std::endl;
-using std::cout;
-
-
-
 TEST(DolphinDBTestINDEX_MAX,test_DolphinDBTestINDEX_MAX){
     int dolphindbINDEX_MAX = dolphindb::INDEX_MAX;
     int dolphindbINDEX_MIN = dolphindb::INDEX_MIN;

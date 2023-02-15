@@ -26,7 +26,7 @@
 #include "SysIO.h"
 
 #ifdef _MSC_VER
-	#ifdef _USRDLL	
+	#ifdef _DDBAPIDLL	
 		#define EXPORT_DECL _declspec(dllexport)
 	#else
 		#define EXPORT_DECL __declspec(dllimport)
@@ -82,7 +82,7 @@ typedef SmartPointer<BlockReader> BlockReaderSP;
 typedef SmartPointer<Domain> DomainSP;
 typedef SmartPointer<SymbolBase> SymbolBaseSP;
 
-class Guid {
+class EXPORT_DECL Guid {
 public:
 	Guid(bool newGuid = false);
 	Guid(unsigned char* guid);
@@ -388,7 +388,7 @@ private:
 	unsigned short flag_;
 };
 
-class Vector:public Constant{
+class EXPORT_DECL Vector:public Constant{
 public:
 	Vector(): Constant(259){}
 	virtual ~Vector(){}
@@ -396,7 +396,6 @@ public:
 	const string& getName() const {return name_;}
 	void setName(const string& name){name_=name;}
 	virtual bool isLargeConstant() const { return isMatrix() || size()>1024; }
-	virtual bool isView() const {return false;}
 	virtual void initialize(){}
 	virtual INDEX getCapacity() const = 0;
 	virtual	INDEX reserve(INDEX capacity) {throw RuntimeException("Vector::reserve method not supported");}
@@ -408,7 +407,7 @@ public:
 	virtual bool remove(const ConstantSP& index){return false;}
 	virtual bool append(const ConstantSP& value){return append(value, value->size());}
 	virtual bool append(const ConstantSP& value, INDEX count){return false;}
-	virtual bool append(const ConstantSP index, INDEX start, INDEX length){return false;}
+	virtual bool append(const ConstantSP value, INDEX start, INDEX length){return false;}
 	virtual bool appendBool(char* buf, int len){return false;}
 	virtual bool appendChar(char* buf, int len){return false;}
 	virtual bool appendShort(short* buf, int len){return false;}
@@ -453,7 +452,7 @@ private:
 	string name_;
 };
 
-class Matrix{
+class EXPORT_DECL Matrix{
 public:
 	Matrix(int cols, int rows);
 	virtual ~Matrix(){}
@@ -476,7 +475,7 @@ protected:
 	ConstantSP colLabel_;
 };
 
-class Set: public Constant {
+class EXPORT_DECL Set: public Constant {
 public:
 	Set() : Constant(1027){}
 	virtual ~Set() {}
@@ -492,7 +491,7 @@ public:
 	virtual bool isLargeConstant() const {return true;}
 };
 
-class Dictionary:public Constant{
+class EXPORT_DECL Dictionary:public Constant{
 public:
 	Dictionary() : Constant(1283){}
 	virtual ~Dictionary() {}
@@ -520,7 +519,7 @@ public:
 
 };
 
-class Table: public Constant{
+class EXPORT_DECL Table: public Constant{
 public:
 	Table() : Constant(1539){}
 	virtual ~Table(){}
@@ -571,7 +570,7 @@ public:
 	virtual void setColumnCompressMethods(const vector<COMPRESS_METHOD> &methods) = 0;
 };
 
-class DFSChunkMeta : public Constant{
+class EXPORT_DECL DFSChunkMeta : public Constant{
 public:
 	DFSChunkMeta(const string& path, const Guid& id, int version, int size, CHUNK_TYPE chunkType, const vector<string>& sites, long long cid);
 	DFSChunkMeta(const string& path, const Guid& id, int version, int size, CHUNK_TYPE chunkType, const string* sites, int siteCount, long long cid);
@@ -619,7 +618,7 @@ private:
 	Guid id_;
 };
 
-class ConstantMarshall {
+class EXPORT_DECL ConstantMarshall {
 public:
 	virtual ~ConstantMarshall(){}
 	virtual bool start(const ConstantSP& target, bool blocking, bool compress, IO_ERR& ret)=0;
@@ -628,7 +627,7 @@ public:
 	virtual IO_ERR flush() = 0;
 };
 
-class ConstantUnmarshall{
+class EXPORT_DECL ConstantUnmarshall{
 public:
 	virtual ~ConstantUnmarshall(){}
 	virtual bool start(short flag, bool blocking, IO_ERR& ret)=0;
@@ -639,7 +638,7 @@ protected:
 	ConstantSP obj_;
 };
 
-class Domain{
+class EXPORT_DECL Domain{
 public:
 	Domain(PARTITION_TYPE partitionType, DATA_TYPE partitionColType);
 	virtual ~Domain(){}
@@ -653,7 +652,7 @@ protected:
 	DATA_CATEGORY partitionColCategory_;
 };
 
-class SymbolBase{
+class EXPORT_DECL SymbolBase{
 public:
 	SymbolBase(int id):id_(id){}
 
@@ -661,7 +660,7 @@ public:
 
 	SymbolBase(int id, const DataInputStreamSP& in, IO_ERR& ret);
 
-	string getSymbol(int index){ return syms_[index];}
+	const string& getSymbol(int index) const { return syms_[index];}
 
 	int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const;
 	
@@ -680,7 +679,7 @@ private:
 
 class EXPORT_DECL DBConnection {
 public:
-	DBConnection(bool enableSSL = false, bool asyncTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false);
+	DBConnection(bool enableSSL = false, bool asyncTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false, bool isReverseStreaming = false);
 	~DBConnection();
 	DBConnection(DBConnection&& oth);
 	DBConnection& operator=(DBConnection&& oth);
@@ -739,7 +738,7 @@ public:
 	void setInitScript(const string& script);
 
 	const string& getInitScript() const;
-
+	SocketSP getSocket();
 private:
     DBConnection(DBConnection& oth); // = delete
     DBConnection& operator=(DBConnection& oth); // = delete
@@ -782,12 +781,12 @@ private:
     bool ha_;
 	bool enableSSL_;
     bool asynTask_;
-    static const int maxRerunCnt_ = 30;
-    vector<Node> nodes_;
+    bool compress_;
+	vector<Node> nodes_;
 	int lastConnNodeIndex_;
-	bool compress_;
 	bool enablePickle_, python_;
 	bool reconnect_, closed_;
+	static const int maxRerunCnt_ = 30;
 };
 
 class EXPORT_DECL BlockReader : public Constant{
@@ -813,7 +812,7 @@ class EXPORT_DECL DBConnectionPool{
 public:
     DBConnectionPool(const string& hostName, int port, int threadNum = 10, const string& userId = "", const string& password = "",
 		bool loadBalance = false, bool highAvailability = false, bool compress = false, bool reConnect = false, bool python = false);
-	
+	~DBConnectionPool();
 	void run(const string& script, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
 	
 	void run(const string& functionName, const vector<ConstantSP>& args, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
@@ -838,7 +837,7 @@ public:
 	PartitionedTableAppender(string dbUrl, string tableName, string partitionColName, DBConnectionPool& pool);
 
 	PartitionedTableAppender(string dbUrl, string tableName, string partitionColName, string appendFunction, DBConnectionPool& pool);
-
+	~PartitionedTableAppender();
 	int append(TableSP table);
 
 private:
@@ -956,6 +955,7 @@ private:
 };
 
 class EXPORT_DECL DLogger {
+public:
 	enum Level {
 		LevelDebug,
 		LevelInfo,
@@ -963,52 +963,52 @@ class EXPORT_DECL DLogger {
 		LevelError,
 		LevelCount,
 	};
-public:
 	template<typename... TArgs>
-	static void Info(TArgs... args) {
+	static bool Info(TArgs... args) {
 		std::string text;
-		Write(text, LevelInfo, 0, args...);
+		return Write(text, LevelInfo, 0, args...);
 	}
 	template<typename... TArgs>
-	static void Debug(TArgs... args) {
+	static bool Debug(TArgs... args) {
 		std::string text;
-		Write(text, LevelDebug, 0, args...);
+		return Write(text, LevelDebug, 0, args...);
 	}
 	template<typename... TArgs>
-	static void Warn(TArgs... args) {
+	static bool Warn(TArgs... args) {
 		std::string text;
-		Write(text, LevelWarn, 0, args...);
+		return Write(text, LevelWarn, 0, args...);
 	}
 	template<typename... TArgs>
-	static void Error(TArgs... args) {
+	static bool Error(TArgs... args) {
 		std::string text;
-		Write(text, LevelError, 0, args...);
+		return Write(text, LevelError, 0, args...);
 	}
 	static void SetLogFilePath(const std::string &filepath){ logFilePath_=filepath; }
 	static void SetMinLevel(Level level);
+	static Level GetMinLevel(){ return minLevel_; }
 private:
 	static Level minLevel_;
 	static std::string logFilePath_;
 	static std::string levelText_[LevelCount];
 	static bool FormatFirst(std::string &text, Level level);
-	static void WriteLog(std::string &text);
+	static bool WriteLog(std::string &text);
 	template<typename TA, typename... TArgs>
-	static void Write(std::string &text, Level level, int deepth, TA first, TArgs... args) {
+	static bool Write(std::string &text, Level level, int deepth, TA first, TArgs... args) {
 		if (deepth == 0) {
 			if (FormatFirst(text, level) == false)
-				return;
+				return false;
 		}
 		text += " " + Create(first);
-		Write(text, level, deepth + 1, args...);
+		return Write(text, level, deepth + 1, args...);
 	}
 	template<typename TA>
-	static void Write(std::string &text, Level level, int deepth, TA first) {
+	static bool Write(std::string &text, Level level, int deepth, TA first) {
 		if (deepth == 0) {
 			if (FormatFirst(text, level) == false)
-				return;
+				return false;
 		}
 		text += " " + Create(first);
-		WriteLog(text);
+		return WriteLog(text);
 	}
 	static std::string Create(const char *value) {
 		std::string str(value);
@@ -1051,7 +1051,7 @@ private:
 		return std::to_string(value);
 	}
 };
-};
+}
 
 namespace std {
 template<>
@@ -1059,7 +1059,7 @@ struct hash<dolphindb::Guid> {
 	size_t operator()(const dolphindb::Guid& val) const;
 };
 
-};
+}
 
 
 #endif /* DOLPHINDB_H_ */

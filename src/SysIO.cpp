@@ -28,6 +28,7 @@
 	#include <winsock2.h>
 	#include <windows.h>
 	#include <ws2tcpip.h>
+	#include <mstcpip.h>
 #endif
 #include <string.h>
 #include <iostream>
@@ -190,7 +191,7 @@ IO_ERR Socket::write(const char* buffer, size_t length, size_t& actualLength){
 		}
 #else
 		senddata:
-		actualLength=send(handle_, (const void*)buffer, length,blocking_ ? 0: MSG_DONTWAIT|MSG_NOSIGNAL);
+		actualLength=send(handle_, (const void*)buffer, length,blocking_ ? MSG_NOSIGNAL: MSG_DONTWAIT|MSG_NOSIGNAL);
 		RECORD_WRITE(buffer, actualLength);
 		if(actualLength == (size_t)SOCKET_ERROR && errno == EINTR) goto senddata;
 
@@ -301,6 +302,14 @@ IO_ERR Socket::connect(){
 #ifdef WINDOWS
         if(::setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, (const char*)&enabled, sizeof(int)) != 0)
             LOG_ERR("Subscription socket failed to enable TCP_KEEPALIVE with error: " +  std::to_string(getErrorCode()));
+
+		struct tcp_keepalive kavars;
+		kavars.onoff = TRUE;
+		kavars.keepalivetime = keepAliveTime_ * 1000;
+		kavars.keepaliveinterval = 5 * 1000;
+
+		unsigned long ulBytesReturn = 0;
+		WSAIoctl(handle_, SIO_KEEPALIVE_VALS, &kavars, sizeof(kavars), NULL, 0, &ulBytesReturn, NULL, NULL);
 #elif defined MAC
 		if(::setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, (const char*)&enabled, sizeof(int)) != 0)
             LOG_ERR("Subscription socket failed to enable TCP_KEEPALIVE with error: " +  std::to_string(getErrorCode()));
@@ -696,11 +705,23 @@ DataInputStream::DataInputStream(const char* data, int size, bool copy) : file_(
 	}
 }
 
+DataInputStream::DataInputStream(DataQueueSP dataQueue) : file_(nullptr), buf_(nullptr), source_(QUEUE_STREAM), reverseOrder_(false), externalBuf_(false),
+		closed_(false), capacity_(0), size_(0), cursor_(0), dataQueue_(dataQueue){
+}
+
 DataInputStream::~DataInputStream(){
 	if(!externalBuf_)
 		delete[] buf_;
 	if(source_ == FILE_STREAM)
 		close();
+	if(source_ == QUEUE_STREAM){
+		while(dataQueue_->size() > 0){
+			DataBlock block;
+			dataQueue_->pop(block);
+			char* buf = block.getDataBuf();
+			delete[] buf;
+		}
+	}
 }
 
 IO_ERR DataInputStream::internalStreamRead(char* buf, size_t length, size_t& actualLength){
@@ -708,7 +729,7 @@ IO_ERR DataInputStream::internalStreamRead(char* buf, size_t length, size_t& act
 }
 
 IO_ERR DataInputStream::internalClose(){
-	throw RuntimeException("DataInputStream::internalStreamRead not implemented yet.");
+	throw RuntimeException("DataInputStream::internalClose not implemented yet.");
 }
 
 bool DataInputStream::reset(int size){
@@ -823,6 +844,30 @@ IO_ERR DataInputStream::readDouble(double& value){
 }
 
 IO_ERR DataInputStream::readString(string& value){
+	if(source_ == QUEUE_STREAM){
+		value.clear();
+		bool isStringFinished = true;
+		size_t endPos = 0;
+		IO_ERR result = OK;
+		while(true){
+			result = prepareData();
+			if(result != OK) return result;
+			isStringFinished = isHaveBytesEndWith(0, endPos);
+			if(isStringFinished){
+				size_t lineLength = endPos - cursor_;
+				value.append(buf_ + cursor_, lineLength);
+				size_ -= endPos - cursor_ + 1;
+				cursor_ = endPos + 1;
+				break;
+			}
+			else{
+				value.append(buf_ + cursor_, size_);
+				size_ = 0;
+				cursor_ = capacity_;
+			}
+		}
+		return OK;
+	}
 	size_t endPos;
 	IO_ERR ret = prepareBytesEndWith(0, endPos);
 	if(ret != OK)
@@ -839,6 +884,21 @@ IO_ERR DataInputStream::readString(string& value){
 }
 
 IO_ERR DataInputStream::readString(string& value, size_t length){
+	if(source_ == QUEUE_STREAM){
+		value.clear();
+		size_t left = length;
+		IO_ERR result = OK;
+		while(left > 0){
+			result = prepareData();
+			if(result != OK) return result;
+			int num = std::min(size_, left);
+			value.append(buf_ + cursor_, num);
+			size_ -= num;
+			cursor_ += num;
+			left -= num;
+		}
+		return OK;
+	}
 	if(size_ < length){
 		IO_ERR ret =prepareBytes(length);
 		if(ret != OK)
@@ -853,6 +913,35 @@ IO_ERR DataInputStream::readString(string& value, size_t length){
 }
 
 IO_ERR DataInputStream::readLine(string& value){
+	if(source_ == QUEUE_STREAM){
+		value.clear();
+		bool isStringFinished = true;
+		size_t endPos = 0;
+		IO_ERR result = OK;
+		while(true){
+			result = prepareData();
+			if(result != OK) return result;
+			isStringFinished = isHaveBytesEndWith('\n', endPos);
+			if(isStringFinished){
+				size_t lineLength = endPos - cursor_;
+				if(lineLength > 0 && buf_[endPos - 1] == '\r')
+					lineLength--;
+				value.append(buf_ + cursor_, lineLength);
+				if(endPos == 0 && !value.empty() && value.back() == '\r'){
+					value.pop_back();
+				}
+				size_ -= endPos - cursor_ + 1;
+				cursor_ = endPos + 1;
+				break;
+			}
+			else{
+				value.append(buf_ + cursor_, size_);
+				size_ = 0;
+				cursor_ = capacity_;
+			}
+		}
+		return OK;
+	}
 	size_t endPos;
 	IO_ERR ret = prepareBytesEndWith('\n', endPos);
 	if(ret != OK)
@@ -894,6 +983,9 @@ IO_ERR DataInputStream::peekLine(string& value){
 }
 
 IO_ERR DataInputStream::bufferBytes(size_t length){
+	if(source_ == QUEUE_STREAM){
+		return OK;
+	}
 	if(size_ >= length)
 		return OK;
 	else
@@ -901,6 +993,32 @@ IO_ERR DataInputStream::bufferBytes(size_t length){
 }
 
 IO_ERR DataInputStream::readBytes(char* buf, size_t length, bool reverseOrder){
+	if(source_ == QUEUE_STREAM){
+		size_t left = length;
+		IO_ERR result = OK;
+		while(left > 0){
+			result = prepareData();
+			if(result != OK) return result;
+			int num = std::min(size_, left);
+			if(reverseOrder){
+				char* dst = buf + left - 1;
+				char* src = buf_ + cursor_ ;
+				size_t count = num;
+				while(count){
+					*dst-- = *src++;
+					--count;
+				}
+			}
+			else{
+				memcpy(buf, buf_ + cursor_, num);
+				buf += num;
+			}
+			size_ -= num;
+			cursor_ += num;
+			left -= num;
+		}
+		return OK;
+	}
 	if(size_ < length){
 		IO_ERR ret =prepareBytes(length);
 		if(ret != OK)
@@ -927,6 +1045,23 @@ IO_ERR DataInputStream::readBytes(char* buf, size_t length, bool reverseOrder){
 
 IO_ERR DataInputStream::readBytes(char* buf, size_t length, size_t& actualLength){
 	actualLength = 0;
+	if(source_ == QUEUE_STREAM){
+		size_t left = length;
+		IO_ERR result = OK;
+		while(left > 0){
+			result = prepareData();
+			if(result != OK) return result;
+			int num = std::min(size_, left);
+			memcpy(buf, buf_ + cursor_, num);
+			buf += num;
+			actualLength += num;
+			size_ -= num;
+			cursor_ += num;
+			left -= num;
+		}
+		return OK;
+	}
+
     size_t count = ((std::min))(size_, length);
     if(count){
 		memcpy(buf, buf_+cursor_, count);
@@ -981,12 +1116,34 @@ IO_ERR DataInputStream::readBytes(char* buf, size_t unitLength, size_t length, s
 	IO_ERR ret = readBytes(buf, length * unitLength, actualLength);
 	int remainder = actualLength % unitLength;
 	actualLength = actualLength / unitLength;
-	if(remainder >0){
+	if(remainder > 0 && source_ != QUEUE_STREAM){
 		cursor_ = 0;
 		size_ = remainder;
 		memcpy(buf_, buf + unitLength * actualLength, size_);
 	}
 	return ret;
+}
+
+IO_ERR DataInputStream::prepareData(){
+	if(source_ != QUEUE_STREAM){
+		return OTHERERR;
+	}
+	if(size_ > 0){
+		return OK;
+	}
+	if(buf_ != nullptr){
+		delete[] buf_;
+	}
+	DataBlock block;
+	dataQueue_->pop(block);
+	buf_ = block.getDataBuf();
+	capacity_ = block.getDataLength();
+	if(buf_ == nullptr && capacity_ == 0){
+		return END_OF_STREAM;
+	}
+	size_ = capacity_;
+	cursor_ = 0;
+	return OK;
 }
 
 IO_ERR DataInputStream::prepareBytes(size_t length){
@@ -1044,6 +1201,23 @@ IO_ERR DataInputStream::prepareBytes(size_t length){
 		else
 			return ret;
 	}
+}
+
+bool DataInputStream::isHaveBytesEndWith(char endChar, size_t& endPos){
+	if(source_ != QUEUE_STREAM){
+		return OTHERERR;
+	}
+	char* cur = buf_ + cursor_;
+	int count = size_;
+	while(count && *cur != endChar){
+		--count;
+		++cur;
+	}
+	if(count > 0){
+		endPos = cur - buf_;
+		return true;
+	}
+	return false;
 }
 
 IO_ERR DataInputStream::prepareBytesEndWith(char endChar, size_t& endPos){
@@ -1117,7 +1291,7 @@ IO_ERR DataInputStream::prepareBytesEndWith(char endChar, size_t& endPos){
 }
 
 IO_ERR DataInputStream::close(){
-	if(closed_ || source_ == ARRAY_STREAM)
+	if(closed_ || source_ == ARRAY_STREAM || source_ == QUEUE_STREAM)
 		return OK;
 
 	if(source_ == SOCKET_STREAM){
@@ -1162,6 +1336,9 @@ DataOutputStream::DataOutputStream(size_t capacity) : source_(ARRAY_STREAM), flu
 DataOutputStream::DataOutputStream(STREAM_TYPE source) : source_(source), flushThreshold_(0), file_(0), buf_(0), capacity_(0), size_(0), autoClose_(false){
 }
 
+DataOutputStream::DataOutputStream(DataQueueSP dataQueue) : source_(QUEUE_STREAM), flushThreshold_(0), file_(0), buf_(0), capacity_(0), size_(0), autoClose_(false), dataQueue_(dataQueue){
+}
+
 DataOutputStream::~DataOutputStream(){
 	if(buf_ != NULL && source_ <= FILE_STREAM){
 		delete[] buf_;
@@ -1200,6 +1377,14 @@ IO_ERR DataOutputStream::write(const char* buffer, size_t length, size_t& actual
 	IO_ERR ret = OK;
 	size_t sent= 0;
 	switch(source_){
+	case QUEUE_STREAM:
+	{
+		char* buf = (char*)buffer;
+		DataBlock block(buf, length);
+		dataQueue_->emplace(std::move(block));
+		actualWritten = length;
+		return ret;
+	}
 	case SOCKET_STREAM:
 		if(size_ + length < flushThreshold_){
 			memcpy(buf_ + size_, buffer, length);
@@ -1301,6 +1486,13 @@ IO_ERR DataOutputStream::write(const char* buffer, size_t length){
 	size_t actualLength;
 
 	switch(source_){
+	case QUEUE_STREAM:
+	{
+		char* buf = (char*)buffer;
+		DataBlock block(buf, length);
+		dataQueue_->emplace(std::move(block));
+		return OK;
+	}
 	case SOCKET_STREAM:
 		//socket write must use another method write(const char* buffer, size_t length, size_t& actualWritten)
 		return OTHERERR;
@@ -1490,41 +1682,6 @@ IO_ERR DataStream::write(const char* buf, int length, int& sent){
 	}
 }
 
-IO_ERR DataStream::write(Constant* obj, INDEX offset, INDEX length, INDEX& sent){
-	int partial = 0;
-	int readBytes = 0;
-	int count = 0;
-	sent = 0;
-	if(source_ == FILE_STREAM){
-		if(size_ >0){
-			clearReadBuffer();
-		}
-		while((readBytes=obj->serialize(outBuf_, outSize_, offset + sent , partial, count, partial))>0){
-			int sentBytes = fwrite(outBuf_, 1, readBytes, file_);
-			if(sentBytes < readBytes){
-				LOG_ERR("disk writing failure: " + Util::getLastErrorMessage());
-				return NOSPACE;
-			}
-			sent += count;
-			if(sent >= length)
-				return OK;
-		}
-		return OK;
-	}
-	else{
-		while((readBytes=obj->serialize(outBuf_, outSize_, offset + sent , partial, count, partial))>0){
-			size_t actualSent;
-			IO_ERR ret = socket_->write(outBuf_, readBytes, actualSent);
-			if(ret != OK)
-				return ret;
-			sent += count;
-			if(sent >= length)
-				return OK;
-		}
-		return OK;
-	}
-}
-
 IO_ERR DataStream::writeLine(const char* obj, const char* newline){
 	if(source_ == FILE_STREAM){
 		if(size_ >0){
@@ -1550,97 +1707,6 @@ IO_ERR DataStream::writeLine(const char* obj, const char* newline){
 			return ret;
 		return socket_->write(newline, strlen(newline), actualSent);
 	}
-}
-
-IO_ERR DataStream::writeLine(Constant* obj, INDEX offset, INDEX length, const char* newline, INDEX& sent){
-	IO_ERR ret;
-	if(source_ == FILE_STREAM){
-		if(size_ >0){
-			if((ret = clearReadBuffer()) != OK)
-				return ret;
-		}
-	}
-
-	size_t additionalChars = strlen(newline);
-	size_t sentBytes;
-	INDEX initOffset = offset;
-	sent = 0;
-
-	int count;
-	const int bufSize = Util::BUF_SIZE;
-	char* buf[bufSize];
-
-	while(length){
-		count = ((std::min))(bufSize, length);
-		obj->getString(offset, count, buf);
-
-		size_t cursor = 0;
-		for(int i=0; i<count; ++i){
-			size_t curSize = strlen(buf[i]);
-			if(cursor + curSize + additionalChars > outSize_){
-				if(cursor){
-					if(source_ == FILE_STREAM){
-						sentBytes = fwrite(outBuf_, 1, cursor, file_);
-						if(sentBytes < cursor)
-							return OTHERERR;
-					}
-					else{
-						ret = socket_->write(outBuf_, cursor, sentBytes);
-						if(ret != OK)
-							return ret;
-					}
-					sent = offset + i - initOffset;
-					cursor = 0;
-				}
-			}
-			if(curSize + additionalChars > outSize_){
-				if(source_ == FILE_STREAM){
-					sentBytes = fwrite(buf[i], 1, curSize, file_);
-					if(sentBytes < curSize)
-						return OTHERERR;
-					if(fputs(newline, file_) >= 0)
-						ret = OK;
-					else
-						ret = OTHERERR;
-				}
-				else{
-					ret = socket_->write(buf[i], curSize, sentBytes);
-					if(ret != OK)
-						return ret;
-					ret = socket_->write(newline, additionalChars, sentBytes);
-				}
-				if(ret == OK)
-					++sent;
-				else
-					return ret;
-			}
-			else{
-				memcpy(outBuf_ + cursor, buf[i], curSize);
-				cursor += curSize;
-				memcpy(outBuf_ + cursor, newline, additionalChars);
-				cursor += additionalChars;
-			}
-		}
-
-		if(cursor){
-			if(source_ == FILE_STREAM){
-				sentBytes = fwrite(outBuf_, 1, cursor, file_);
-				if(sentBytes < cursor)
-					return OTHERERR;
-			}
-			else{
-				ret = socket_->write(outBuf_, cursor, sentBytes);
-				if(ret != OK)
-					return ret;
-			}
-			sent = offset + count - initOffset;
-		}
-
-		offset += count;
-		length -= count;
-	}
-	return OK;
-
 }
 
 IO_ERR DataStream::seek(long long offset, int mode, long long& newPosition){

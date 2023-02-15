@@ -24,7 +24,6 @@ CompressEncoderDecoderSP CompressionFactory::GetEncodeDecoder(COMPRESS_METHOD ty
 }
 
 IO_ERR CompressionFactory::decode(DataInputStreamSP compressSrc, DataOutputStreamSP &uncompressResult, Header &header) {
-	compressSrc->read((char*)&header, sizeof(header));
 	CompressEncoderDecoderSP decoder=GetEncodeDecoder((COMPRESS_METHOD)header.compressedType);
 	if (decoder.isNull()) {
 		return INVALIDDATA;
@@ -567,6 +566,23 @@ CompressDeltaofDelta::~CompressDeltaofDelta() {
 	}
 }
 
+//This part must match code in VectorUnmarshall::start
+static IO_ERR writeVectorMetaValue(const CompressionFactory::Header &header, BufferWriter<DataOutputStreamSP> &out) {
+	int size = sizeof(header.elementCount) + sizeof(header.colCount) + sizeof(header.extra);
+	char* buf = new char[size];
+	memcpy(buf, &(header.elementCount), sizeof(header.elementCount));
+	memcpy(buf + sizeof(header.elementCount), &(header.colCount), sizeof(header.colCount));
+	int actualLength = sizeof(header.elementCount) + sizeof(header.colCount);	
+	DATA_TYPE type = (DATA_TYPE)header.dataType;
+
+	if (Util::getCategory(type) == DENARY || type == DT_DECIMAL32_ARRAY || type == DT_DECIMAL64_ARRAY) {
+		int scale = header.reserved;
+		memcpy(buf + actualLength, &(scale), sizeof(scale));
+		actualLength += sizeof(scale);
+	}
+	return out.start(buf, actualLength);
+}
+
 IO_ERR CompressDeltaofDelta::decode(DataInputStreamSP compressSrc, DataOutputStreamSP &decompressResult, const CompressionFactory::Header &header) {
 	int unitLength = header.unitLength;
 	INDEX start = 0;
@@ -580,22 +596,20 @@ IO_ERR CompressDeltaofDelta::decode(DataInputStreamSP compressSrc, DataOutputStr
 	int count;
 	size_t actualRead;
 	IO_ERR ret;
-	DATA_TYPE type = (DATA_TYPE)header.dataType;
+	//DATA_TYPE type = (DATA_TYPE)header.dataType;
 	bool calcChecksum = (checksum != -1) && !compressSrc->isIntegerReversed();
 	unsigned int cksum = 0;
 	bool containLSN;
 	char *compressedBuf = newBuffer(maxCompressedSize_);
-	char *decompressedBuf = newBuffer(maxDecompressedSize_);
 	CheckSum checkSum;
 
 	BufferWriter<DataOutputStreamSP> out(decompressResult);
-	ret = out.start((char*)&(header.elementCount), sizeof(header.elementCount));
-	if (ret != OK)
-		return ret;
-	ret = out.start((char*)&(header.colCount), sizeof(header.elementCount));
+	ret = writeVectorMetaValue(header,out);
 	if (ret != OK)
 		return ret;
 	while (fileCursor < byteSize && start < len) {
+		//new here, after out.start(), it's handled and deleted in DataIutputStreamSP
+		char *decompressedBuf = new char[maxDecompressedSize_];
 		ret = compressSrc->readInt(blockSize);
 		if (ret != OK)
 			return ret; 
@@ -683,9 +697,9 @@ IO_ERR CompressDeltaofDelta::encodeContent(const VectorSP &vec, const DataOutput
 	IO_ERR ret = OK;
 	bool lsnFlag = false;
 	long long *compressedBuf = (long long*)newBuffer(maxCompressedSize_ + sizeof(int));
-	int compressedBufSize = maxCompressedSize_ / sizeof(long long);
+	//int compressedBufSize = maxCompressedSize_ / sizeof(long long);
 	char *decompressedBuf = newBuffer(maxDecompressedSize_);
-	int decompressedBufSize = maxDecompressedSize_ / header.unitLength;
+	//int decompressedBufSize = maxDecompressedSize_ / header.unitLength;
 	unsigned int cksum = 0;
 	INDEX start = 0;
 	{
@@ -694,7 +708,7 @@ IO_ERR CompressDeltaofDelta::encodeContent(const VectorSP &vec, const DataOutput
 		int offset;
 		int blockSize;
 		char* blockBuf;
-		size_t actualWritten, actualLength;
+		//size_t actualWritten, actualLength;
 		CheckSum checkSum;
 		while (start < len) {
 			int count = std::min(maxDecompressedSize_ / header.unitLength, len - start);
@@ -748,7 +762,7 @@ IO_ERR CompressDeltaofDelta::encodeContent(const VectorSP &vec, const DataOutput
 		ret = out.start((char*)&header, sizeof(header));
 		if (ret != OK)
 			return ret;
-		for (int i = 0; i < blockBufList.size(); i++) {
+		for (size_t i = 0; i < blockBufList.size(); i++) {
 			ret = out.start(blockBufList[i], blockSizeList[i]);
 			//delete[] blockBufList[i];
 			if (ret != OK)
@@ -770,9 +784,9 @@ CompressLZ4::~CompressLZ4() {
 IO_ERR CompressLZ4::decode(DataInputStreamSP compressSrc, DataOutputStreamSP &uncompressResult, const CompressionFactory::Header &header) {
 	int unitLength = header.unitLength;
 	long long fileCursor = 20;
-	long long lsn = -1;
+	//long long lsn = -1;
 	long long byteSize = header.byteSize;
-	bool calcChecksum = false;
+	//bool calcChecksum = false;
 	INDEX start = 0;
 	INDEX len = header.elementCount;
 	int blockSize;
@@ -780,30 +794,28 @@ IO_ERR CompressLZ4::decode(DataInputStreamSP compressSrc, DataOutputStreamSP &un
 	size_t actualRead;
 	IO_ERR ret = OK;
 	DATA_TYPE type = (DATA_TYPE)header.dataType;
-	bool containLSN;
+	//bool containLSN;
 	
 	char *compressedBuf = newBuffer(MAX_COMPRESSED_SIZE);
-	char *decompressedBuf = newBuffer(MAX_DECOMPRESSED_SIZE);
 	bool isMappingMode = (!compressSrc->isIntegerReversed() && type != DT_STRING && type != DT_BLOB && type < ARRAY_TYPE_BASE);
 	
-	int pattial = 0;
+	//int pattial = 0;
 	BufferWriter<DataOutputStreamSP> out(uncompressResult);
-	ret = out.start((char*)&(header.elementCount), sizeof(header.elementCount));
-	if (ret != OK)
-		return ret;
-	ret = out.start((char*)&(header.colCount), sizeof(header.colCount));
+	ret = writeVectorMetaValue(header, out);
 	if (ret != OK)
 		return ret;
 	while (fileCursor < byteSize && start < len) {
+		//new here, after out.start(), it's handled and deleted in DataIutputStreamSP
+		char *decompressedBuf = new char[MAX_DECOMPRESSED_SIZE];
 		ret = compressSrc->readInt(blockSize);
 		if (ret != OK)
 			return ret;
 		if (blockSize < 0) {
-			containLSN = true;
+			//containLSN = true;
 			blockSize = blockSize & 2147483647;
 		}
-		else
-			containLSN = false;
+		//else
+		//	containLSN = false;
 		fileCursor += 4;
 		if (ret != OK || blockSize <= 0 || blockSize > MAX_COMPRESSED_SIZE || fileCursor + blockSize > byteSize) {
 			std::cout << "Failed to decode. blockSize=" + std::to_string(blockSize) + " fileCursor=" +
@@ -849,7 +861,7 @@ IO_ERR CompressLZ4::decode(DataInputStreamSP compressSrc, DataOutputStreamSP &un
 				return INVALIDDATA;
 			}
 			if ((DATA_TYPE)header.dataType == DT_SYMBOL) {
-				int *buf = (int*)decompressedBuf;
+				//int *buf = (int*)decompressedBuf;
 				count = bytes / unitLength;
 
 				bool done = false;
@@ -897,7 +909,7 @@ IO_ERR CompressLZ4::encodeContent(const VectorSP &vec, const DataOutputStreamSP 
 		INDEX len = header.elementCount;
 		int offset = 0;
 		int blockSize;
-		size_t actualWritten, actualLength;
+		//size_t actualWritten, actualLength;
 		CheckSum checkSum;
 		bool lsnFlag = false;
 		if (type != DT_SYMBOL) {
@@ -951,7 +963,7 @@ IO_ERR CompressLZ4::encodeContent(const VectorSP &vec, const DataOutputStreamSP 
 		ret = out.start((char*)&header, sizeof(header));
 		if (ret != OK)
 			return ret;
-		for (int i = 0; i < blockBufList.size(); i++) {
+		for (size_t i = 0; i < blockBufList.size(); i++) {
 			ret = out.start(blockBufList[i], blockSizeList[i]);
 			//delete[] blockBufList[i];
 			if (ret != OK)
