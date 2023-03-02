@@ -53,7 +53,7 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
     if (pHighAvailabilitySites != nullptr) {
         highAvailabilitySites.assign(pHighAvailabilitySites->begin(), pHighAvailabilitySites->end());
     }
-    bool ret = pConn->connect(hostName, port, userId, password, "", enableHighAvailability, highAvailabilitySites);
+    bool ret = pConn->connect(hostName, port, userId, password, "", enableHighAvailability, highAvailabilitySites, 30);
     if (!ret) {
         throw RuntimeException("Failed to connect to server " + hostName + ":" + std::to_string(port));
     }
@@ -211,15 +211,12 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
         writerThread.sendingRows = 0;
         writerThread.exit = false;
         LockGuard<Mutex> _(&writerThread.mutex_);
-        if (i == 0) {
-            writerThread.conn = pConn;
+
+        writerThread.conn = new DBConnection(useSSL, false, keepAliveTime, isCompress);
+        if (writerThread.conn->connect(hostName, port, userId, password, "", enableHighAvailability, highAvailabilitySites, 30, true) == false) {
+            throw RuntimeException("Failed to connect to server " + hostName + ":" + std::to_string(port));
         }
-        else {
-            writerThread.conn = new DBConnection(useSSL, false, keepAliveTime, isCompress);
-            if (writerThread.conn->connect(hostName, port, userId, password, "", enableHighAvailability, highAvailabilitySites) == false) {
-                throw RuntimeException("Failed to connect to server " + hostName + ":" + std::to_string(port));
-            }
-        }
+
         writerThread.writeThread = new Thread(new SendExecutor(*this, writerThread));
         writerThread.writeThread->start();
     }
