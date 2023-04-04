@@ -83,7 +83,7 @@ Windows Desktop->Dynamic Link Library (DLL)
 
 #### 添加下面的宏定义
 
-C/C++ -> 预处理器 -> 预处理器定义 ->WIN32_LEAN_AND_MEAN; _WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;WINDOWS;NOMINMAX;NDEBUG;CPPAPI_EXPORTS;_WINDOWS;_DDBAPIDLL;
+C/C++ -> 预处理器 -> 预处理器定义 ->WIN32_LEAN_AND_MEAN; _WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;WINDOWS;NOMINMAX;NDEBUG;_WINDOWS;_DDBAPIDLL;
 
 
 
@@ -240,6 +240,8 @@ DBConnection conn(false,true)
 DBConnection conn; 
 bool ret = conn.connect("127.0.0.1", 8848, "admin", "123456"); 
 ```
+
+可通过 `connect` 函数的返回值来确认是否连接成功。若结果返回 Ture，则说明连接成功；若返回值为 False，则表示连接失败。
 
 若未使用用户名及密码连接成功，则脚本在Guest权限下运行。后续运行中若需要提升权限，可以使用 conn.login('admin','123456',true) 登录获取权限。
 
@@ -483,6 +485,46 @@ VectorSP v = conn.run("2010.10.01..2010.10.30");
 int size = v->size(); 
 for(int i = 0; i < size; ++i)
     cout<<v->getString(i)<<endl;
+```
+
+从 1.30.21/2.00.9 版本开始，C++ API 新增 DdbVector 类，可方便地创建 DolphinDB 各种数据类型的 Vector。使用时需要注意以下几点：
+
+1. DdbVector 为泛型类，在创建时需指定 C++ 原生类型，如std::string, int, double 等。
+2. 必须在创建时指明 Vector 的容量。不支持扩容。
+3. 可通过 `add`, `append`, `set` 等方法填充数据。
+4. 在填充数据后，通过 `createVector` 来创建 DDB Vector，须指定与 DdbVector 声明类型相匹配的 DolphinDB 的数据类型，如 DT_STRING, DT_INT 等。
+
+举例说明：
+
+```
+//创建一个包含30000行元素的表
+TableSP table;
+int size = 30000;
+DdbVector<double> doubleV(0, size);
+DdbVector<float> floatV(0, size);
+DdbVector<int> intV(0, size);
+DdbVector<short> shortV(0, size);
+DdbVector<char> boolV(0, size);
+DdbVector<char> charV(0, size);
+DdbVector<string> strV(0, size);
+unsigned char int128[16];
+DdbVector<Guid> int128V(0, size);
+for (auto i = 0; i < size; i++) {
+	doubleV.add(i);
+	floatV.add(i);
+	intV.add(i);
+	shortV.add(i);
+	boolV.add(i%1);
+	charV.add(i%256);
+	strV.add("str"+std::to_string(i));
+	int128[i % 16] = i % 256;
+	int128V.add(int128);
+}
+table=Util::createTable({ "double","float","int","short","bool","char","str","int128" },
+	{ doubleV.createVector(DT_DOUBLE),floatV.createVector(DT_FLOAT),intV.createVector(DT_INT),
+		shortV.createVector(DT_SHORT),boolV.createVector(DT_BOOL),charV.createVector(DT_CHAR),
+		strV.createVector(DT_STRING),int128V.createVector(DT_INT128) });
+cout << "table:" << endl << table->getString() << endl;
 ```
 
 ### 7.2 集合
@@ -974,7 +1016,7 @@ insert(const string& dbName, const string& tableName, Fargs)
 
 - Fargs：是变长参数，代表插入的一行数据。写入的数据可以使用dolphindb的数据类型，也可以使用C++原生数据类型。数据类型和表中列的类型需要一一对应。数据类型对应关系见下表：
 
-C++ 原生数据类型与DolphinDB数据类型对应关系表
+C++ 原生数据类型与 DolphinDB 数据类型对应关系表
 
 | DolphinDB类型 | C++类型         |
 | ------------- | --------------- |
@@ -1000,6 +1042,7 @@ C++ 原生数据类型与DolphinDB数据类型对应关系表
 | UUID          | unsigned char*  |
 | IPADDR        | unsigned char*  |
 | INT128        | unsigned char*  |
+| DECIMAL       | double          |
 
 **请注意:**
 
