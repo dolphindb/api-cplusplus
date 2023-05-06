@@ -416,7 +416,7 @@ name_4  2019.01.05 5
 name_5  2019.01.06 31
 ...
 ```
-### 6.1 上传压缩后的表对象
+### 6.2 上传压缩后的表对象
 自 1.30.19 版本开始，C++ API 支持通过 `setColumnCompressMethods` 方法，对表数据压缩后上传，以减少网络传输的开销。`setColumnCompressMethods` 方法可以灵活的为表中每列数据分别指定不同的压缩方式。目前支持 lz4 和 delta 两种压缩算法，但 delta 算法仅可用于 SHORT, INT, LONG 与时间或日期类型数据。   
 在网络速度较慢的情况下，推荐对表数据进行压缩。使用方法如下：
 1. 创建 DBConnection 对象时，需指定 compress=true 以开启压缩下载功能。
