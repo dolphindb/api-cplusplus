@@ -619,7 +619,7 @@ cout<<table->getRow(0)->getMember(Util::createString("price"))->getDouble()<<end
 37.811678
 ```
 
-需要注意的是，按行访问table并逐一进行计算非常低效。为了达到更好的性能，建议参考[6.5.2小节](#652-getcolumn方法按列获取表的内容)的方式按列访问table并批量计算。
+需要注意的是，按行访问table并逐一进行计算非常低效。为了达到更好的性能，建议参考[7.5.2小节](#752-getcolumn方法按列获取表的内容)的方式按列访问table并批量计算。
 
 #### 7.5.4 使用`BlockReaderSP`对象分段读取表数据
 
