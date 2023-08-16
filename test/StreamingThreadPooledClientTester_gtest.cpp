@@ -45,7 +45,11 @@ namespace STPCT
         }
         virtual void TearDown()
         {
-            conn.run("undef all;");
+            string del_streamtable = "login(\"admin\",\"123456\");"
+                                     "try{ dropStreamTable(`outTables);}catch(ex){};"
+                                     "try{ dropStreamTable(`st1);}catch(ex){};"
+                                     "try{ dropStreamTable(`arrayVectorTable);}catch(ex){};";
+            conn.run(del_streamtable+"go;undef all;");
         }
     };
 
