@@ -45,7 +45,12 @@ public:
     }
     virtual void TearDown()
     {
-        conn.run("undef all;");
+        string del_streamtable = "login(\"admin\",\"123456\");"
+                                 "try{ dropStreamTable(`SDoutTables);}catch(ex){};"
+                                 "try{ dropStreamTable(`st2);}catch(ex){};"
+                                 "try{ dropStreamTable(`table1_SDPT);}catch(ex){};"
+                                 "try{ dropStreamTable(`table2_SDPT);}catch(ex){};";
+        conn.run(del_streamtable+"go;undef all;");
     }
 };
 

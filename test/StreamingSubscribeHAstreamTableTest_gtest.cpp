@@ -44,7 +44,7 @@ public:
             string createHAstreamTable = "try{dropStreamTable(`tradesHA);}catch(ex){};go;\
                                     colNames = `timestamp`sym`qty`price;\
                                     colTypes = [TIMESTAMP,SYMBOL,INT,DOUBLE];\
-                                    t=table(100:0,colNames,colTypes);\
+                                    t=table(2000:0,colNames,colTypes);\
                                     haStreamTable(" +
                                          raftsGroup + ",t,`tradesHA,100000);sleep(1000);";
             conn.run(createHAstreamTable);
@@ -52,7 +52,7 @@ public:
     }
     virtual void TearDown()
     {
-        conn.run("undef all;");
+        conn.run("try{dropStreamTable(`tradesHA);}catch(ex){};go;undef all;");
     }
 };
 
@@ -145,7 +145,8 @@ void insert_task(string host, int port, int totalInsertNum)
     DBConnection conn_1;
     conn_1.connect(host, port, "admin", "123456", "", true, sites);
     cout << "insert datas to HAstreamtable..." << endl;
-    conn_1.run("for (i in 1.." + to_string(totalInsertNum) + "){tableInsert(`tradesHA,rand(timestamp(10000)..timestamp(20000),1),rand(`a`b`c`d,1),rand(1000,1),rand(100.00,1));}");
+    for(auto i =0;i<totalInsertNum;i++)
+        ASSERT_TRUE(conn_1.run("tableInsert(`tradesHA,rand(timestamp(10000)..timestamp(20000),1),rand(`a`b`c`d,1),rand(1000,1),rand(100.00,1))")->getBool());
     cout << "insert finished!" << endl;
     Util::sleep(1000);
     conn_1.close();
@@ -263,7 +264,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Threadclient_onehandler_subscri
                     t=table(100:0,colNames,colTypes);\
                     haStreamTable(" +
                     raftsGroup + ",t,`tradesHA,100000);sleep(1000);go");
-        conn_1.run("for (i in 1.." + to_string(insert_total_rows) + "){tableInsert(`tradesHA,rand(timestamp(10000)..timestamp(20000),1),rand(`a`b`c`d,1),rand(1000,1),rand(100.00,1));}");
+        for(auto i =0;i<insert_total_rows;i++)
+            conn_1.run("tableInsert(`tradesHA,rand(timestamp(10000)..timestamp(20000),1),rand(`a`b`c`d,1),rand(1000,1),rand(100.00,1))");
         cout << "insert finished!" << endl;
         Util::sleep(1000);
         conn_1.close(); });
@@ -443,7 +445,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_subscribeStreamTa
                     t=table(100:0,colNames,colTypes);\
                     haStreamTable(" +
                     raftsGroup + ",t,`tradesHA,100000);sleep(1000);go");
-        conn_1.run("for (i in 1.." + to_string(insert_total_rows) + "){tableInsert(`tradesHA,rand(timestamp(10000)..timestamp(20000),1),rand(`a`b`c`d,1),rand(1000,1),rand(100.00,1));}");
+        for(auto i =0;i<insert_total_rows;i++)
+            conn_1.run("tableInsert(`tradesHA,rand(timestamp(10000)..timestamp(20000),1),rand(`a`b`c`d,1),rand(1000,1),rand(100.00,1))");
         cout << "insert finished!" << endl;
         Util::sleep(1000);
         conn_1.close(); });
@@ -591,7 +594,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Threadpooledclient_threadCount_
                     t=table(100:0,colNames,colTypes);\
                     haStreamTable(" +
                     raftsGroup + ",t,`tradesHA,100000);sleep(1000);go");
-        conn_1.run("for (i in 1.." + to_string(insert_total_rows) + "){tableInsert(`tradesHA,rand(timestamp(10000)..timestamp(20000),1),rand(`a`b`c`d,1),rand(1000,1),rand(100.00,1));}");
+        for(auto i =0;i<insert_total_rows;i++)
+            conn_1.run("tableInsert(`tradesHA,rand(timestamp(10000)..timestamp(20000),1),rand(`a`b`c`d,1),rand(1000,1),rand(100.00,1))");
         cout << "insert finished!" << endl;
         Util::sleep(1000);
         conn_1.close(); });

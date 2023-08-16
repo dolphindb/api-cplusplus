@@ -40,12 +40,18 @@ namespace SPCT
             string del_streamtable = "login(\"admin\",\"123456\");"
                                      "try{ dropStreamTable(`outTables);}catch(ex){};"
                                      "try{ dropStreamTable(`st1);}catch(ex){};"
-                                     "try{ dropStreamTable(`arrayVectorTable);}catch(ex){};";
+                                     "try{ dropStreamTable(`arrayVectorTable);}catch(ex){};go;sleep(1000)";
             conn.run(del_streamtable);
         }
         virtual void TearDown()
         {
-            conn.run("undef all;");
+            string del_streamtable = "login(\"admin\",\"123456\");"
+                                     "try{ dropStreamTable(`outTables);}catch(ex){};"
+                                     "try{ dropStreamTable(`st1);}catch(ex){};"
+                                     "try{ dropStreamTable(`arrayVectorTable);}catch(ex){};go;sleep(1000)";
+            conn.run(del_streamtable);
+            Util::sleep(1000);
+            // conn.run("undef all;");
         }
     };
 
@@ -53,7 +59,7 @@ namespace SPCT
     {
         string script = "login(\"admin\",\"123456\")\n\
                 st1 = streamTable(100:0, `datetimev`timestampv`sym`price1`price2,[DATETIME,TIMESTAMP,SYMBOL,DOUBLE,DOUBLE])\n\
-                enableTableShareAndPersistence(table=st1, tableName=`outTables, asynWrite=true, compress=true, cacheSize=200000, retentionMinutes=180, preCache = 0)\n\
+                enableTableShareAndPersistence(table=st1, tableName=`outTables)\n\
                 go\n\
                 setStreamTableFilterColumn(outTables, `sym)";
         conn.run(script);
@@ -73,7 +79,7 @@ namespace SPCT
                               "colType = [BOOL, CHAR, SHORT, INT,LONG, DATE, MONTH, TIME, MINUTE, SECOND, DATETIME, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, SYMBOL, STRING, BLOB, IPADDR, UUID, INT128, DECIMAL32(" +
                               to_string(scale32) + "), DECIMAL64(" + to_string(scale64) + ")];"
                                                                                           "st1 = streamTable(100:0,colName, colType);"
-                                                                                          "enableTableShareAndPersistence(table=st1, tableName=`outTables, asynWrite=true, compress=true, cacheSize=200000, retentionMinutes=180, preCache = 0);go;"
+                                                                                          "enableTableShareAndPersistence(table=st1, tableName=`outTables);go;"
                                                                                           "setStreamTableFilterColumn(outTables, `csymbol);go;"
                                                                                           "row_num = 1000;"
                                                                                           "table1_SPCT = table(100:0, colName, colType);"
@@ -93,7 +99,7 @@ namespace SPCT
         string replayScript = "colName =  `ts`cbool`cchar`cshort`cint`clong`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cfloat`cdouble`cipaddr`cuuid`cint128;"
                               "colType = [TIMESTAMP,BOOL[], CHAR[], SHORT[], INT[],LONG[], DATE[], MONTH[], TIME[], MINUTE[], SECOND[], DATETIME[], TIMESTAMP[], NANOTIME[], NANOTIMESTAMP[], FLOAT[], DOUBLE[], IPADDR[], UUID[], INT128[]];"
                               "st1 = streamTable(100:0,colName, colType);"
-                              "enableTableShareAndPersistence(table=st1, tableName=`arrayVectorTable, asynWrite=true, compress=true, cacheSize=200000, retentionMinutes=180, preCache = 0);go;"
+                              "enableTableShareAndPersistence(table=st1, tableName=`arrayVectorTable);go;"
                               "row_num = 1000;"
                               "table1_SPCT = table(100:0, colName, colType);"
                               "col0=rand(0..row_num ,row_num);col1 = arrayVector(1..row_num,rand(2 ,row_num));col2 = arrayVector(1..row_num,rand(256 ,row_num));col3 = arrayVector(1..row_num,rand(-row_num..row_num ,row_num));"

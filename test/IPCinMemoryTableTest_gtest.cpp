@@ -48,7 +48,8 @@ int insertTask(int insertNum, int sleepMS)
 {
     DBConnection connNew(false, false);
     connNew.connect(hostName, port, "admin", "123456");
-    connNew.run("for (i in 1.." + to_string(insertNum) + "){tableInsert(pubTable,rand(1..100,1),norm(2,0.4,1),take(now(true),1));sleep(" + to_string(sleepMS) + ")}");
+    for(auto i =0;i<insertNum;i++)
+        connNew.run("tableInsert(pubTable,rand(1..100,1),norm(2,0.4,1),take(now(true),1));sleep(" + to_string(sleepMS) + ")");
     connNew.close();
     cout << "insert finished!" << endl;
     return 0;
