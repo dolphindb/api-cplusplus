@@ -25,7 +25,14 @@ protected:
 	virtual void SetUp()
 	{
 		cout << "check connect...";
-		ConstantSP res = conn.run("1+1");
+		try
+		{
+			ConstantSP res = conn.run("1+1");
+		}
+		catch(const std::exception& e)
+		{
+			conn.connect(hostName, port, "admin", "123456");
+		}
 
 		cout << "ok" << endl;
 	}
@@ -741,7 +748,7 @@ TEST_F(MultithreadedTableWriterTest, insertValuesErrorTypeDataMemoryTable_1)
 	mulwrite = new MultithreadedTableWriter(hostName, port, "admin", "123456", "", "t1", false, false, nullptr, 1, 0, 5, "sym");
 	bool flag = mulwrite->insert(pErrorInfo, "A", 12, 12.9);
 	EXPECT_EQ(flag, false);
-	EXPECT_EQ(pErrorInfo.errorInfo, "Cannot convert double to INT");
+	EXPECT_EQ(pErrorInfo.errorInfo, "Cannot convert double to INT for col 3");
 }
 
 TEST_F(MultithreadedTableWriterTest, insertValuesMemoryTable)
@@ -4805,7 +4812,7 @@ TEST_F(MultithreadedTableWriterTest, insertWorkflow)
                 if(exists(dbName)){\
                 dropDatabase(dbName);\
                 }\
-                datetest=table(1000:0,`date`symbol`id`ip`int128s`uuids,[DATE,SYMBOL,LONG,IPADDR,INT128,UUID]);\
+                datetest=table(1000:0,`date`symbol`id`ip`int128s`uuids,[DATE,SYMBOL,INT,IPADDR,INT128,UUID]);\
                 db = database(directory=dbName, partitionType=HASH, partitionScheme=[INT, 10]);\
                 pt=db.createPartitionedTable(datetest,'pdatetest','id');");
 	conn_wf.run("mtwCreateTime=now()");
@@ -5015,7 +5022,8 @@ TEST_F(MultithreadedTableWriterTest, insertTo_inMemoryTable_with_CallbackHandler
 
 	SmartPointer<MultithreadedTableWriter> mulwrite;
 	ErrorCodeInfo pErrorInfo;
-	auto callback = [&](ConstantSP callbackTable) {
+	auto callback = [&](ConstantSP callbackTable)
+	{
 		/***
 			callbackTable schema:
 			column 0: id->string
@@ -5039,7 +5047,7 @@ TEST_F(MultithreadedTableWriterTest, insertTo_inMemoryTable_with_CallbackHandler
 	for (auto i = 0; i < rowNum; i++)
 	{
 		callbackfunc_id = "row" + to_string(i);
-		mulwrite->insert(pErrorInfo, callbackfunc_id, 1, "str"+to_string(i), double(i));
+		mulwrite->insert(pErrorInfo, callbackfunc_id, 1, "str" + to_string(i), double(i));
 	}
 
 	mulwrite->waitForThreadCompletion();
@@ -5057,7 +5065,8 @@ TEST_F(MultithreadedTableWriterTest, insertTo_dfsTable_with_CallbackHandlerFunc_
 
 	SmartPointer<MultithreadedTableWriter> mulwrite;
 	ErrorCodeInfo pErrorInfo;
-	auto callback = [&](ConstantSP callbackTable) {
+	auto callback = [&](ConstantSP callbackTable)
+	{
 		/***
 			callbackTable schema:
 			column 0: id->string
@@ -5129,7 +5138,8 @@ TEST_F(MultithreadedTableWriterTest, insertTo_inMemorytable_with_CallbackHandler
 
 	SmartPointer<MultithreadedTableWriter> mulwrite;
 	ErrorCodeInfo pErrorInfo;
-	auto callback = [&](ConstantSP callbackTable) {
+	auto callback = [&](ConstantSP callbackTable)
+	{
 		/***
 			callbackTable schema:
 			column 0: id->string
@@ -5173,7 +5183,6 @@ TEST_F(MultithreadedTableWriterTest, insertTo_inMemorytable_with_CallbackHandler
 		EXPECT_TRUE(res->get(i)->getBool());
 }
 
-
 TEST_F(MultithreadedTableWriterTest, insert_with_CallbackHandlerFunc_getUnwrittenData)
 {
 	int colNum = 3, rowNum = 10;
@@ -5208,7 +5217,8 @@ TEST_F(MultithreadedTableWriterTest, insert_with_CallbackHandlerFunc_getUnwritte
 
 	SmartPointer<MultithreadedTableWriter> mulwrite;
 	ErrorCodeInfo pErrorInfo;
-	auto callback = [&](ConstantSP callbackTable) {
+	auto callback = [&](ConstantSP callbackTable)
+	{
 		/***
 			callbackTable schema:
 			column 0: id->string
@@ -5221,7 +5231,6 @@ TEST_F(MultithreadedTableWriterTest, insert_with_CallbackHandlerFunc_getUnwritte
 		cout << "callbackTable is below: " << endl;
 		DLogger::Info("callback", callbackTable->getString());
 	};
-
 
 	mulwrite = new MultithreadedTableWriter(hostName, port, "admin", "123456", "", "target", false, false, NULL,
 											1000, 1, 1, "", nullptr, MultithreadedTableWriter::M_Append, nullptr, callback);
@@ -5246,4 +5255,144 @@ TEST_F(MultithreadedTableWriterTest, insert_with_CallbackHandlerFunc_getUnwritte
 
 	vector<vector<ConstantSP> *> unwrittenData;
 	EXPECT_ANY_THROW(mulwrite->getUnwrittenData(unwrittenData));
+}
+
+TEST_F(MultithreadedTableWriterTest, test_column_info_in_errMsg)
+{
+	string script =
+		"colName =  `cbool`cchar`cshort`cint`clong`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cdatehour`cfloat`cdouble`csymbol`cstring`cblob`cipaddr`cuuid`cint128`cdecimal32`cdecimal64;"
+		"colType = [BOOL, CHAR, SHORT, INT,LONG, DATE, MONTH, TIME, MINUTE, SECOND, DATETIME, TIMESTAMP, NANOTIME, NANOTIMESTAMP, DATEHOUR, FLOAT, DOUBLE, SYMBOL, STRING, BLOB, IPADDR, UUID, INT128,DECIMAL32(2),DECIMAL64(11)];"
+		"share table(1:0, colName,colType) as t1";
+	conn.run(script);
+	ErrorCodeInfo errorInfo;
+	MultithreadedTableWriter writer(hostName, port, "admin", "123456", "", "t1", false, false, nullptr, 1, 0.1, 1, "csymbol");
+	MultithreadedTableWriter writer2(hostName, port, "admin", "123456", "", "t1", false, false, nullptr, 1, 0.1, 1, "csymbol");
+	char msg[] = "123456msg";
+
+	writer.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1l, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1);
+	writer.waitForThreadCompletion();
+	EXPECT_TRUE(conn.run("eqObj(values t1, [[false], ['1'], [short(1)], [int(1)], [long(1)], [date(1)], [month(1)], [time(1)], [minute(1)], [second(1)], [datetime(1)], [timestamp(1)], [nanotime(1)], [nanotimestamp(1)], [datehour(1)], [float(10.0)], [double(-0.123)], symbol([`123456msg]), [`123456msg], [blob(`123456msg)], [ipaddr('192.168.2.1')], [uuid('0f0e0d0c-0b0a-0908-0706-050403020100')], [int128('0f0e0d0c0b0a09080706050403020100')], decimal32([0.2353], 2), decimal64([-1], 11)])")->getBool());
+
+	// insert int to timestamp
+	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1))
+	{
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert int to TIMESTAMP for col 12");
+	}
+
+	// insert int to nanotime
+	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1))
+	{
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert int to NANOTIME for col 13");
+	}
+
+	// insert int to nanotimestamp
+	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1ll, 1, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1))
+	{
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert int to NANOTIMESTAMP for col 14");
+	}
+
+	// insert int to float
+	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1ll, 1ll, 1, 1, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1))
+	{
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert int to FLOAT for col 16");
+	}
+
+	// insert double to int
+	if (!writer2.insert(errorInfo, false, '1', 1, 1.123, 1, 1, 1, 1, 1, 1, 1, 1ll, 1ll, 1ll, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 1, -1))
+	{
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert double to INT for col 4");
+	}
+
+	// insert error form ipaddr to ipaddr
+	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1ll, 1ll, 1, 10.0, -0.123, msg, msg, msg, "baskdjwjkn", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 1, -1))
+	{
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert string to IPADDR for col 21");
+	}
+
+	// insert int to string/symbol/blob
+	if(!writer2.insert(errorInfo, true, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1ll, 1ll, 1, 10.0, -0.123, 1, 1, 1, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 1, -1)){
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert int to BLOB for col 20");
+	}
+	writer2.waitForThreadCompletion();
+	// EXPECT_TRUE(conn.run("eqObj(values t1, [[false,true], ['1', '1'], [short(1),short(1)], [int(1),int(1)], [long(1),long(1)], [date(1),date(1)], [month(1),month(1)], [time(1),time(1)], [minute(1),minute(1)], [second(1),second(1)], [datetime(1),datetime(1)], [timestamp(1),timestamp(1)], [nanotime(1),nanotime(1)], [nanotimestamp(1),nanotimestamp(1)], [datehour(1),datehour(1)], [float(10.0),float(10.0)], [double(-0.123),double(-0.123)], symbol([`123456msg,`1]), [`123456msg, `1], blob(`123456msg`1), [ipaddr('192.168.2.1'),ipaddr('192.168.2.1')], [uuid('0f0e0d0c-0b0a-0908-0706-050403020100'),uuid('0f0e0d0c-0b0a-0908-0706-050403020100')], [int128('0f0e0d0c0b0a09080706050403020100'),int128('0f0e0d0c0b0a09080706050403020100')], decimal32([0.2353, 0.2353], 2), decimal64([-1,-1], 11)])")->getBool());
+
+}
+
+
+TEST_F(MultithreadedTableWriterTest, test_insert_dfs_column_info_in_errMsg)
+{
+	string script =
+		"colName =  `cbool`cchar`cshort`cint`clong`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cdatehour`cfloat`cdouble`csymbol`cstring`cblob`cipaddr`cuuid`cint128`cdecimal32`cdecimal64;"
+		"colType = [BOOL, CHAR, SHORT, INT,LONG, DATE, MONTH, TIME, MINUTE, SECOND, DATETIME, TIMESTAMP, NANOTIME, NANOTIMESTAMP, DATEHOUR, FLOAT, DOUBLE, SYMBOL, STRING, BLOB, IPADDR, UUID, INT128,DECIMAL32(2),DECIMAL64(11)];"
+		"t = table(1:0, colName,colType);"
+		"dbpath = 'dfs://test_errMsg';if(existsDatabase(dbpath)){dropDatabase(dbpath)};"
+		"db = database(dbpath, HASH,[INT, 1],,'TSDB');"
+		"db.createPartitionedTable(t,`pt,`cint,,`cint);";
+	conn.run(script);
+	ErrorCodeInfo errorInfo;
+	MultithreadedTableWriter writer(hostName, port, "admin", "123456", "dfs://test_errMsg", "pt", false, false, nullptr, 1, 0.1, 1, "cint");
+	MultithreadedTableWriter writer2(hostName, port, "admin", "123456", "dfs://test_errMsg", "pt", false, false, nullptr, 1, 0.1, 1, "cint");
+	char msg[] = "123456msg";
+
+	writer.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1l, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1);
+	writer.waitForThreadCompletion();
+	EXPECT_TRUE(conn.run("eqObj(values t1, [[false], ['1'], [short(1)], [int(1)], [long(1)], [date(1)], [month(1)], [time(1)], [minute(1)], [second(1)], [datetime(1)], [timestamp(1)], [nanotime(1)], [nanotimestamp(1)], [datehour(1)], [float(10.0)], [double(-0.123)], symbol([`123456msg]), [`123456msg], [blob(`123456msg)], [ipaddr('192.168.2.1')], [uuid('0f0e0d0c-0b0a-0908-0706-050403020100')], [int128('0f0e0d0c0b0a09080706050403020100')], decimal32([0.2353], 2), decimal64([-1], 11)])")->getBool());
+
+	// insert int to timestamp
+	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1))
+	{
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert int to TIMESTAMP for col 12");
+	}
+
+	// insert int to nanotime
+	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1))
+	{
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert int to NANOTIME for col 13");
+	}
+
+	// insert int to nanotimestamp
+	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1ll, 1, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1))
+	{
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert int to NANOTIMESTAMP for col 14");
+	}
+
+	// insert int to float
+	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1ll, 1ll, 1, 1, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1))
+	{
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert int to FLOAT for col 16");
+	}
+
+	// insert double to int
+	if (!writer2.insert(errorInfo, false, '1', 1, 1.123, 1, 1, 1, 1, 1, 1, 1, 1ll, 1ll, 1ll, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 1, -1))
+	{
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert double to INT for col 4");
+	}
+
+	// insert error form ipaddr to ipaddr
+	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1ll, 1ll, 1, 10.0, -0.123, msg, msg, msg, "baskdjwjkn", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 1, -1))
+	{
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert string to IPADDR for col 21");
+	}
+
+	// insert int to string/symbol/blob
+	if(!writer2.insert(errorInfo, true, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1ll, 1ll, 1, 10.0, -0.123, 1, 1, 1, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 1, -1)){
+		std::cout << "insert fail " << errorInfo.errorInfo << std::endl;
+		EXPECT_EQ(errorInfo.errorInfo, "Cannot convert int to BLOB for col 20");
+	}
+	writer2.waitForThreadCompletion();
+	// EXPECT_TRUE(conn.run("eqObj(values t1, [[false,true], ['1', '1'], [short(1),short(1)], [int(1),int(1)], [long(1),long(1)], [date(1),date(1)], [month(1),month(1)], [time(1),time(1)], [minute(1),minute(1)], [second(1),second(1)], [datetime(1),datetime(1)], [timestamp(1),timestamp(1)], [nanotime(1),nanotime(1)], [nanotimestamp(1),nanotimestamp(1)], [datehour(1),datehour(1)], [float(10.0),float(10.0)], [double(-0.123),double(-0.123)], symbol([`123456msg,`1]), [`123456msg, `1], blob(`123456msg`1), [ipaddr('192.168.2.1'),ipaddr('192.168.2.1')], [uuid('0f0e0d0c-0b0a-0908-0706-050403020100'),uuid('0f0e0d0c-0b0a-0908-0706-050403020100')], [int128('0f0e0d0c0b0a09080706050403020100'),int128('0f0e0d0c0b0a09080706050403020100')], decimal32([0.2353, 0.2353], 2), decimal64([-1,-1], 11)])")->getBool());
+
 }

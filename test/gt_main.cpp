@@ -13,6 +13,7 @@
 #include "DataformSetTest_gtest.cpp"
 #include "DataformTableTest_gtest.cpp"
 #include "DataformVectorTest_gtest.cpp"
+#include "SqlTest_gtest.cpp"
 #include "SysIOTest_gtest.cpp"
 #include "FunctionTest_gtest.cpp"
 #include "DolphinDBTestINDEX_MAX_gtest.cpp"
@@ -46,6 +47,12 @@ int main(int argc, char *argv[]){
     // -	排除，如，-a 表示除了a
     // :	取或，如，a:b 表示a或b
     // ::testing::GTEST_FLAG(filter) = "*Counter*:*DolphinDBTest.*huge*:ScalarTest.testGuid";
+
+    // 检查api版本是否与当前待测试版本一致
+    checkAPIVersion();
+
+    //运行测试
     int res = RUN_ALL_TESTS();
-    return EXIT_SUCCESS;
+    // return EXIT_SUCCESS;
+    return res;
 }

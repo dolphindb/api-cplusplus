@@ -575,7 +575,7 @@ static IO_ERR writeVectorMetaValue(const CompressionFactory::Header &header, Buf
 	int actualLength = sizeof(header.elementCount) + sizeof(header.colCount);	
 	DATA_TYPE type = (DATA_TYPE)header.dataType;
 
-	if (Util::getCategory(type) == DENARY || type == DT_DECIMAL32_ARRAY || type == DT_DECIMAL64_ARRAY) {
+	if (Util::getCategory(type) == DENARY || type == DT_DECIMAL32_ARRAY || type == DT_DECIMAL64_ARRAY || type == DT_DECIMAL128_ARRAY) {
 		int scale = header.reserved;
 		memcpy(buf + actualLength, &(scale), sizeof(scale));
 		actualLength += sizeof(scale);

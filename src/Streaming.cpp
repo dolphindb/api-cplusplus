@@ -436,13 +436,12 @@ class StreamingClientImpl {
     };
 	class ActivePublisher {
 	public:
-		ActivePublisher(std::shared_ptr<DBConnection> conn) : socket_(conn->getSocket()), conn_(conn) {}
+		ActivePublisher(std::shared_ptr<DBConnection> conn) : conn_(conn) {}
 		~ActivePublisher() {}
-		SocketSP getSocket() { return socket_; }
+		DataInputStreamSP getDataInputStream(){ return conn_->getDataInputStream();}
 	private:
 		enum SubscriberRPCType { RPC_OK, RPC_START, RPC_END };
 		enum SubscriberFromType { FROM_DDB, FROM_API };
-		SocketSP socket_;
 		std::shared_ptr<DBConnection> conn_;
 	};
 	typedef SmartPointer<ActivePublisher> ActivePublisherSP;
@@ -579,7 +578,7 @@ private:
 	bool isListenMode() {
 		return listeningPort_ > 0;
 	}
-    void parseMessage(SocketSP socket, ActivePublisherSP publisher);
+    void parseMessage(DataInputStreamSP in, ActivePublisherSP publisher);
 	void sendPublishRequest(DBConnection &conn, SubscribeInfo &info);
     void reconnect();
 	static bool initSocket(const SocketSP &socket) {
@@ -610,31 +609,31 @@ private:
 private:
     void daemon() {
 		DLOG("daemon start.");
-		SocketSP socket;
+		DataInputStreamSP inputStream;
 		ActivePublisherSP publisher;
 		//IO_ERR ret;
         while (isExit() == false) {
             try {
 				if (isListenMode()) {
-					socket = listenerSocket_->accept();
+					SocketSP socket = listenerSocket_->accept();
 					if (!initSocket(socket))
 						break;
+					inputStream = new DataInputStream(socket);
 				}
 				else {
 					publishers_.pop(publisher);
 					if (publisher.isNull())
 						break;
-					socket = publisher->getSocket();
+					inputStream = publisher->getDataInputStream();
 				}
-                if (socket.isNull()) {
+                if (inputStream->getSocket().isNull()) {
                     //cerr << "Streaming Daemon socket accept failed, aborting." << endl;
                     break;
                 };
 
-                ThreadSP t = new Thread(new Executor(std::bind(&StreamingClientImpl::parseMessage, this, socket, publisher)));
+                ThreadSP t = new Thread(new Executor(std::bind(&StreamingClientImpl::parseMessage, this, inputStream, publisher)));
                 t->start();
-				parseSocketThread_.push(SocketThread(socket,t,publisher));
-				socket.clear();
+				parseSocketThread_.push(SocketThread(inputStream->getSocket(),t,publisher));
             } catch (exception &e) {
                 cerr << "Daemon exception: " << e.what() << endl;
                 cerr << "Restart Daemon in 1 second" << endl;
@@ -961,9 +960,8 @@ void StreamingClientImpl::reconnect() {
 	DLOG("reconnect exit.");
 }
 
-void StreamingClientImpl::parseMessage(SocketSP socket, ActivePublisherSP publisher) {
+void StreamingClientImpl::parseMessage(DataInputStreamSP in, ActivePublisherSP publisher) {
 	DLOG("parseMessage start.");
-    DataInputStreamSP in = new DataInputStream(socket);
     auto factory = ConstantUnmarshallFactory(in);
     ConstantUnmarshall *unmarshall = nullptr;
 
@@ -989,7 +987,7 @@ void StreamingClientImpl::parseMessage(SocketSP socket, ActivePublisherSP publis
             }
             // close this socket, and do resub
             in->close();
-            socket.clear();
+            in->getSocket().clear();
 			if (topics.empty())
 				break;
 			auto site = getSite(topics[0]);
@@ -1136,9 +1134,6 @@ void StreamingClientImpl::parseMessage(SocketSP socket, ActivePublisherSP publis
 			break;
         }
     }
-	parseSocketThread_.removeItem([&](const SocketThread &socketthread) {
-		return socketthread.socket == socket;
-	});
 	DLOG("parseMessage exit");
 }
 
@@ -1191,7 +1186,7 @@ string StreamingClientImpl::subscribeInternal(DBConnection &conn, SubscribeInfo 
 		}
 		sendPublishRequest(*activeConn, info);
 		ActivePublisherSP publisher = new ActivePublisher(activeConn);
-		info.socket = publisher->getSocket();
+		info.socket = publisher->getDataInputStream()->getSocket();
 		publishers_.push(publisher);
 	}
 	else {

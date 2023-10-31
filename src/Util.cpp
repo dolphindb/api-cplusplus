@@ -8,6 +8,7 @@
 #include <fstream>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <WideInteger.h>
 #ifdef _MSC_VER
 	#include <time.h>
 #else
@@ -47,9 +48,9 @@ namespace dolphindb{
 
 const bool Util::LITTLE_ENDIAN_ORDER = isLittleEndian();
 SmartPointer<ConstantFactory> Util::constFactory_(new ConstantFactory());
-string Util::VER = "1.30.19.2";
-int Util::VERNUM = 111;
-string Util::BUILD = "2022.08.23";
+string Util::VER = "1.30.22.1";
+int Util::VERNUM = 13022;
+string Util::BUILD = "2023.07.15";
 #ifndef _MSC_VER
 const int Util::BUF_SIZE = 1024;
 #endif
@@ -323,6 +324,12 @@ Constant* Util::createDecimal32(int scale, double value) {
 
 Constant* Util::createDecimal64(int scale, double value) {
 	Decimal64 *decimal=new Decimal64(scale);
+	decimal->setDouble(value);
+	return decimal;
+}
+
+Constant* Util::createDecimal128(int scale, double value) {
+	Decimal128 *decimal=new Decimal128(scale);
 	decimal->setDouble(value);
 	return decimal;
 }
@@ -1004,9 +1011,9 @@ string Util::toMicroTimestampStr(std::chrono::system_clock::time_point& tp, bool
 		localtime_r(&now_c, &lt);
 	#endif
 	int microsecond= (tp.time_since_epoch()/std::chrono::microseconds(1)) % 1000000;
-	char buf[30];
+	char buf[100]{};
 	if(printDate)
-		sprintf(buf, "%d-%02d-%02d %02d:%02d:%02d.%06d", lt.tm_year+1900, lt.tm_mon+1, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec, microsecond);
+		sprintf(buf, "%04d-%02d-%02d %02d:%02d:%02d.%06d", lt.tm_year+1900, lt.tm_mon+1, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec, microsecond);
 	else
 		sprintf(buf, "%02d:%02d:%02d.%06d",lt.tm_hour, lt.tm_min, lt.tm_sec, microsecond);
 	return string(buf);
@@ -1041,6 +1048,9 @@ int Util::getDataTypeSize(DATA_TYPE type){
 	}
 	else if (type == DT_DECIMAL64) {
 		return sizeof(int64_t);
+	}
+	else if(type == DT_DECIMAL128){
+		return sizeof(wide_integer::int128);
 	}
 	else if(type == DT_INT128||type== DT_IP||type==DT_UUID)
 		return sizeof(Guid);
@@ -1350,6 +1360,12 @@ ConstantSP Util::createObject(DATA_TYPE dataType, bool val, ErrorCodeInfo *error
 
 ConstantSP Util::createValue(DATA_TYPE dataType, long long val, const char *pTypeName, ErrorCodeInfo *errorCodeInfo, int extraParam) {
 	switch (dataType) {
+	case DATA_TYPE::DT_DECIMAL128:
+		if (extraParam > 0)
+			return createDecimal128(extraParam, (double)val);
+		else
+			return createDouble(val);
+		break;
 	case DATA_TYPE::DT_DECIMAL64:
 		if (extraParam > 0)
 			return createDecimal64(extraParam, (double)val);
@@ -1476,6 +1492,12 @@ ConstantSP Util::createObject(DATA_TYPE dataType, const void* val, ErrorCodeInfo
 			return pdecimal;
 		}
 		break;
+		case DATA_TYPE::DT_DECIMAL128:
+		{
+			Decimal128 *pdecimal = new Decimal128(extraParam, *(wide_integer::int128*)val);
+			return pdecimal;
+		}
+		break;
 		case DATA_TYPE::DT_INT128:
 		{
 			ConstantSP tmp = createConstant(DATA_TYPE::DT_INT128);
@@ -1530,6 +1552,9 @@ ConstantSP Util::createObject(DATA_TYPE dataType, const unsigned char* val, Erro
 }
 ConstantSP Util::createObject(DATA_TYPE dataType, unsigned char val[], ErrorCodeInfo *errorCodeInfo, int extraParam) {
 	return createObject(dataType, (const void *)val, errorCodeInfo, extraParam);
+}
+ConstantSP Util::createObject(DATA_TYPE dataType, char val[], ErrorCodeInfo *errorCodeInfo, int extraParam) {
+    return createObject(dataType, (const void *)val, errorCodeInfo, extraParam);
 }
 ConstantSP Util::createObject(DATA_TYPE dataType, long int val, ErrorCodeInfo *errorCodeInfo, int extraParam) {
 	return createObject(dataType, (long long)val, errorCodeInfo, extraParam);
@@ -1588,6 +1613,12 @@ ConstantSP Util::createObject(DATA_TYPE dataType, float val, ErrorCodeInfo *erro
 		else
 			return createDouble(val);
 		break;
+	case DATA_TYPE::DT_DECIMAL128:
+		if(extraParam > 0)
+			return createDecimal128(extraParam, val);
+		else
+			return createDouble(val);
+		break;
 	case DATA_TYPE::DT_FLOAT:
 		return createFloat(val);
 		break;
@@ -1618,6 +1649,13 @@ ConstantSP Util::createObject(DATA_TYPE dataType, double val, ErrorCodeInfo *err
 	case DATA_TYPE::DT_DECIMAL64:
 		if (extraParam > 0)
 			return createDecimal64(extraParam, val);
+		else
+			return createDouble(val);
+
+		break;
+	case DATA_TYPE::DT_DECIMAL128:
+		if (extraParam > 0)
+			return createDecimal128(extraParam, val);
 		else
 			return createDouble(val);
 

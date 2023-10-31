@@ -51,7 +51,14 @@ protected:
     virtual void SetUp()
     {
         cout<<"check connect...";
-		ConstantSP res = conn.run("1+1");
+		try
+		{
+			ConstantSP res = conn.run("1+1");
+		}
+		catch(const std::exception& e)
+		{
+			conn.connect(hostName, port, "admin", "123456");
+		}
 		
         cout<<"ok"<<endl;
     }
@@ -150,7 +157,7 @@ TEST_F(FunctionTest,test_function_get){
     EXPECT_FALSE(uuidval->getSymbol(0,1,buf2,symbase,false)); 
     EXPECT_FALSE(uuidval->getString(0,1,buf8));
     EXPECT_FALSE(uuidval->getString(0,1,buf9));
-    EXPECT_FALSE(voidval->getBinary(0,1,1,buf10));
+    EXPECT_TRUE(voidval->getBinary(0,1,1,buf10));
     EXPECT_FALSE(voidval->getHash(0,1,buckets,buf2));
 
     EXPECT_ANY_THROW(uuidval->getBoolConst(0,1,buf));

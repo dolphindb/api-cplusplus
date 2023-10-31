@@ -34,7 +34,14 @@ namespace SPCT
         virtual void SetUp()
         {
             cout << "check connect...";
-            ConstantSP res = conn.run("1+1");
+            try
+            {
+                ConstantSP res = conn.run("1+1");
+            }
+            catch(const std::exception& e)
+            {
+                conn.connect(hostName, port, "admin", "123456");
+            }
 
             cout << "ok" << endl;
             string del_streamtable = "login(\"admin\",\"123456\");"
@@ -675,7 +682,7 @@ namespace SPCT
                 else{
                     msg_total+=1;
                     for (auto i = 0; i < ex_tab->columns(); i++)
-                        EXPECT_EQ(ex_tab->getColumn(i)->get(index)->getString(), msg->get(i)->getString());
+                        ASSERT_EQ(ex_tab->getColumn(i)->get(index)->getString(), msg->get(i)->getString());
                     }
                 index++;
             } });

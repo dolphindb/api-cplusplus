@@ -31,12 +31,17 @@ public:
     virtual void SetUp()
     {
         cout << "check connect...";
-        ConstantSP res = conn.run("1+1");
+		try
+		{
+			ConstantSP res = conn.run("1+1");
+		}
+		catch(const std::exception& e)
+		{
+			conn.connect(hostName, port, "admin", "123456");
+		}
 
         cout << "ok" << endl;
         string del_streamtable = "login(\"admin\",\"123456\");"
-                                 "st2 = streamTable(100:0, `timestampv`sym`blob`price1,[TIMESTAMP,SYMBOL,BLOB,DOUBLE]);"
-                                 "try{ enableTableShareAndPersistence(table=st2, tableName=`SDoutTables, asynWrite=true, compress=true, cacheSize=200000, retentionMinutes=180, preCache = 10000);}catch(ex){};"
                                  "try{ dropStreamTable(`SDoutTables);}catch(ex){};"
                                  "try{ dropStreamTable(`st2);}catch(ex){};"
                                  "try{ dropStreamTable(`table1_SDPT);}catch(ex){};"
@@ -45,7 +50,12 @@ public:
     }
     virtual void TearDown()
     {
-        conn.run("undef all;");
+        string del_streamtable = "login(\"admin\",\"123456\");"
+                                 "try{ dropStreamTable(`SDoutTables);}catch(ex){};"
+                                 "try{ dropStreamTable(`st2);}catch(ex){};"
+                                 "try{ dropStreamTable(`table1_SDPT);}catch(ex){};"
+                                 "try{ dropStreamTable(`table2_SDPT);}catch(ex){};";
+        conn.run(del_streamtable+"go;undef all;");
     }
 };
 
@@ -183,20 +193,20 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_onehandler_subscribeWithstr
         if (symbol == "msg1")
         {
             msg1_total += 1;
-            EXPECT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-            EXPECT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-            EXPECT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-            EXPECT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-            EXPECT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+            ASSERT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+            ASSERT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+            ASSERT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+            ASSERT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+            ASSERT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
             index1++;
         }
         else if (symbol == "msg2")
         {
             msg2_total += 1;
-            EXPECT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-            EXPECT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-            EXPECT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-            EXPECT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+            ASSERT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+            ASSERT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+            ASSERT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+            ASSERT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
             index2++;
         }
         if (msg1_total + msg2_total == 2000)
@@ -260,11 +270,11 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_batchhandler_subscribeWiths
                 // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString()<<",";
                 // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString()<<endl<<endl;
 
-                // EXPECT_EQ(msg->get(0)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-                // EXPECT_EQ(msg->get(1)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-                // EXPECT_EQ(msg->get(2)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-                // EXPECT_EQ(msg->get(3)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-                // EXPECT_EQ(msg->get(4)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+                // ASSERT_EQ(msg->get(0)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+                // ASSERT_EQ(msg->get(1)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+                // ASSERT_EQ(msg->get(2)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+                // ASSERT_EQ(msg->get(3)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+                // ASSERT_EQ(msg->get(4)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
                 index1++;
             }
             else if (symbol == "msg2")
@@ -280,10 +290,10 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_batchhandler_subscribeWiths
                 // cout<<table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString()<<",";
                 // cout<<table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString()<<endl<<endl;
 
-                // EXPECT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-                // EXPECT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-                // EXPECT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-                // EXPECT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+                // ASSERT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+                // ASSERT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+                // ASSERT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+                // ASSERT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
                 index2++;
             }
             if (msg1_total + msg2_total == 2000)
@@ -359,11 +369,11 @@ TEST_P(StreamingDeserilizerTester, test_Pollingclient_subscribeWithstreamDeseril
                     // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString()<<",";
                     // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString()<<endl<<endl;
 
-                    EXPECT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-                    EXPECT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-                    EXPECT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-                    EXPECT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-                    EXPECT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+                    ASSERT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+                    ASSERT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+                    ASSERT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+                    ASSERT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+                    ASSERT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
                     index1++;
                 }
                 else if (symbol == "msg2")
@@ -379,10 +389,10 @@ TEST_P(StreamingDeserilizerTester, test_Pollingclient_subscribeWithstreamDeseril
                     // cout<<table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString()<<",";
                     // cout<<table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString()<<endl<<endl;
 
-                    EXPECT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-                    EXPECT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-                    EXPECT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-                    EXPECT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+                    ASSERT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+                    ASSERT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+                    ASSERT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+                    ASSERT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
                     index2++;
                 }
             }
@@ -417,20 +427,20 @@ TEST_P(StreamingDeserilizerTester, test_Threadpooledclient_threadCount_1_subscri
         if (symbol == "msg1")
         {
             msg1_total += 1;
-            EXPECT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-            EXPECT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-            EXPECT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-            EXPECT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-            EXPECT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+            ASSERT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+            ASSERT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+            ASSERT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+            ASSERT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+            ASSERT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
             index1++;
         }
         else if (symbol == "msg2")
         {
             msg2_total += 1;
-            EXPECT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-            EXPECT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-            EXPECT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-            EXPECT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+            ASSERT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+            ASSERT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+            ASSERT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+            ASSERT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
             index2++;
         }
         if (msg1_total + msg2_total == 2000)
@@ -587,20 +597,20 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_onehandler_subscribeWithstr
         if (symbol == "msg1")
         {
             msg1_total += 1;
-            EXPECT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-            EXPECT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-            EXPECT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-            EXPECT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-            EXPECT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+            ASSERT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+            ASSERT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+            ASSERT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+            ASSERT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+            ASSERT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
             index1++;
         }
         else if (symbol == "msg2")
         {
             msg2_total += 1;
-            EXPECT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-            EXPECT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-            EXPECT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-            EXPECT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+            ASSERT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+            ASSERT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+            ASSERT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+            ASSERT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
             index2++;
         }
         if (msg1_total + msg2_total == 2000)
@@ -664,11 +674,11 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_batchhandler_subscribeWiths
                 // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString()<<",";
                 // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString()<<endl<<endl;
 
-                // EXPECT_EQ(msg->get(0)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-                // EXPECT_EQ(msg->get(1)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-                // EXPECT_EQ(msg->get(2)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-                // EXPECT_EQ(msg->get(3)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-                // EXPECT_EQ(msg->get(4)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+                // ASSERT_EQ(msg->get(0)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+                // ASSERT_EQ(msg->get(1)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+                // ASSERT_EQ(msg->get(2)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+                // ASSERT_EQ(msg->get(3)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+                // ASSERT_EQ(msg->get(4)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
                 index1++;
             }
             else if (symbol == "msg2")
@@ -684,10 +694,10 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_batchhandler_subscribeWiths
                 // cout<<table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString()<<",";
                 // cout<<table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString()<<endl<<endl;
 
-                // EXPECT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-                // EXPECT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-                // EXPECT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-                // EXPECT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+                // ASSERT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+                // ASSERT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+                // ASSERT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+                // ASSERT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
                 index2++;
             }
             if (msg1_total + msg2_total == 2000)
@@ -763,11 +773,11 @@ TEST_P(StreamingDeserilizerTester, test_Pollingclient_subscribeWithstreamDeseril
                     // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString()<<",";
                     // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString()<<endl<<endl;
 
-                    EXPECT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-                    EXPECT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-                    EXPECT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-                    EXPECT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-                    EXPECT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+                    ASSERT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+                    ASSERT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+                    ASSERT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+                    ASSERT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+                    ASSERT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
                     index1++;
                 }
                 else if (symbol == "msg2")
@@ -783,10 +793,10 @@ TEST_P(StreamingDeserilizerTester, test_Pollingclient_subscribeWithstreamDeseril
                     // cout<<table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString()<<",";
                     // cout<<table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString()<<endl<<endl;
 
-                    EXPECT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-                    EXPECT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-                    EXPECT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-                    EXPECT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+                    ASSERT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+                    ASSERT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+                    ASSERT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+                    ASSERT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
                     index2++;
                 }
             }
@@ -822,20 +832,20 @@ TEST_P(StreamingDeserilizerTester, test_Threadpooledclient_threadCount_1_subscri
         if (symbol == "msg1")
         {
             msg1_total += 1;
-            EXPECT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-            EXPECT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-            EXPECT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-            EXPECT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-            EXPECT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+            ASSERT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+            ASSERT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+            ASSERT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+            ASSERT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+            ASSERT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
             index1++;
         }
         else if (symbol == "msg2")
         {
             msg2_total += 1;
-            EXPECT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-            EXPECT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-            EXPECT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-            EXPECT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+            ASSERT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+            ASSERT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+            ASSERT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+            ASSERT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
             index2++;
         }
         if (msg1_total + msg2_total == 2000)
@@ -994,20 +1004,20 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_onehandler_subscribeWithstr
         if (symbol == "msg1")
         {
             msg1_total += 1;
-            EXPECT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-            EXPECT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-            EXPECT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-            EXPECT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-            EXPECT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+            ASSERT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+            ASSERT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+            ASSERT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+            ASSERT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+            ASSERT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
             index1++;
         }
         else if (symbol == "msg2")
         {
             msg2_total += 1;
-            // EXPECT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-            // EXPECT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-            // EXPECT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-            // EXPECT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+            // ASSERT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+            // ASSERT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+            // ASSERT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+            // ASSERT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
             index2++;
         }
         if (msg1_total + msg2_total == 2000)
@@ -1071,11 +1081,11 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_batchhandler_subscribeWiths
                 // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString()<<",";
                 // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString()<<endl<<endl;
 
-                // EXPECT_EQ(msg->get(0)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-                // EXPECT_EQ(msg->get(1)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-                // EXPECT_EQ(msg->get(2)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-                // EXPECT_EQ(msg->get(3)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-                // EXPECT_EQ(msg->get(4)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+                // ASSERT_EQ(msg->get(0)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+                // ASSERT_EQ(msg->get(1)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+                // ASSERT_EQ(msg->get(2)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+                // ASSERT_EQ(msg->get(3)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+                // ASSERT_EQ(msg->get(4)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
                 index1++;
             }
             else if (symbol == "msg2")
@@ -1091,10 +1101,10 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_batchhandler_subscribeWiths
                 // cout<<table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString()<<",";
                 // cout<<table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString()<<endl<<endl;
 
-                // EXPECT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-                // EXPECT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-                // EXPECT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-                // EXPECT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+                // ASSERT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+                // ASSERT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+                // ASSERT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+                // ASSERT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
                 index2++;
             }
             if (msg1_total + msg2_total == 2000)
@@ -1170,11 +1180,11 @@ TEST_P(StreamingDeserilizerTester, test_Pollingclient_subscribeWithstreamDeseril
                     // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString()<<",";
                     // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString()<<endl<<endl;
 
-                    EXPECT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-                    EXPECT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-                    EXPECT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-                    EXPECT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-                    EXPECT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+                    ASSERT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+                    ASSERT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+                    ASSERT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+                    ASSERT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+                    ASSERT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
                     index1++;
                 }
                 else if (symbol == "msg2")
@@ -1190,10 +1200,10 @@ TEST_P(StreamingDeserilizerTester, test_Pollingclient_subscribeWithstreamDeseril
                     // cout<<table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString()<<",";
                     // cout<<table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString()<<endl<<endl;
 
-                    // EXPECT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-                    // EXPECT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-                    // EXPECT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-                    // EXPECT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+                    // ASSERT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+                    // ASSERT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+                    // ASSERT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+                    // ASSERT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
                     index2++;
                 }
             }
@@ -1229,20 +1239,20 @@ TEST_P(StreamingDeserilizerTester, test_Threadpooledclient_threadCount_1_subscri
         if (symbol == "msg1")
         {
             msg1_total += 1;
-            EXPECT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-            EXPECT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-            EXPECT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-            EXPECT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-            EXPECT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+            ASSERT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+            ASSERT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+            ASSERT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+            ASSERT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+            ASSERT_EQ(msg->get(4)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
             index1++;
         }
         else if (symbol == "msg2")
         {
             msg2_total += 1;
-            // EXPECT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-            // EXPECT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-            // EXPECT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-            // EXPECT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+            // ASSERT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+            // ASSERT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+            // ASSERT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+            // ASSERT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
             index2++;
         }
         if (msg1_total + msg2_total == 2000)
@@ -1411,11 +1421,11 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_onehandler_subscribeWithstr
             // cout<<table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString()<<",";
             // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString()<<",";
             // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString()<<endl<<endl;
-            EXPECT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-            EXPECT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-            EXPECT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-            EXPECT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-            EXPECT_EQ(msg->get(4)->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+            ASSERT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+            ASSERT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+            ASSERT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+            ASSERT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+            ASSERT_EQ(msg->get(4)->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
             index1++;
         }
         else if (symbol == "msg2")
@@ -1429,10 +1439,10 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_onehandler_subscribeWithstr
             // cout<<table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString()<<",";
             // cout<<table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString()<<",";
             // cout<<table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString()<<endl<<endl;
-            EXPECT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-            EXPECT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-            EXPECT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-            EXPECT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+            ASSERT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+            ASSERT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+            ASSERT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+            ASSERT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
             index2++;
         }
         if (msg1_total + msg2_total == 2000)
@@ -1497,11 +1507,11 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_batchhandler_subscribeWiths
                 // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString()<<",";
                 // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString()<<endl<<endl;
 
-                // EXPECT_EQ(msg->get(0)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-                // EXPECT_EQ(msg->get(1)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-                // EXPECT_EQ(msg->get(2)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-                // EXPECT_EQ(msg->get(3)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-                // EXPECT_EQ(msg->get(4)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+                // ASSERT_EQ(msg->get(0)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+                // ASSERT_EQ(msg->get(1)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+                // ASSERT_EQ(msg->get(2)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+                // ASSERT_EQ(msg->get(3)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+                // ASSERT_EQ(msg->get(4)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
                 index1++;
             }
             else if (symbol == "msg2")
@@ -1517,10 +1527,10 @@ TEST_P(StreamingDeserilizerTester, test_Threadclient_batchhandler_subscribeWiths
                 // cout<<table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString()<<",";
                 // cout<<table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString()<<endl<<endl;
 
-                // EXPECT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-                // EXPECT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-                // EXPECT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-                // EXPECT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+                // ASSERT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+                // ASSERT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+                // ASSERT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+                // ASSERT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
                 index2++;
             }
             if (msg1_total + msg2_total == 2000)
@@ -1597,11 +1607,11 @@ TEST_P(StreamingDeserilizerTester, test_Pollingclient_subscribeWithstreamDeseril
                     // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString()<<",";
                     // cout<<table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString()<<endl<<endl;
 
-                    EXPECT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-                    EXPECT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-                    EXPECT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-                    EXPECT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-                    EXPECT_EQ(msg->get(4)->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+                    ASSERT_EQ(msg->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+                    ASSERT_EQ(msg->get(1)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+                    ASSERT_EQ(msg->get(2)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+                    ASSERT_EQ(msg->get(3)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+                    ASSERT_EQ(msg->get(4)->get(0)->getString(), table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
                     index1++;
                 }
                 else if (symbol == "msg2")
@@ -1617,10 +1627,10 @@ TEST_P(StreamingDeserilizerTester, test_Pollingclient_subscribeWithstreamDeseril
                     // cout<<table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString()<<",";
                     // cout<<table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString()<<endl<<endl;
 
-                    EXPECT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-                    EXPECT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-                    EXPECT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-                    EXPECT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+                    ASSERT_EQ(msg->get(0)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+                    ASSERT_EQ(msg->get(1)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+                    ASSERT_EQ(msg->get(2)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+                    ASSERT_EQ(msg->get(3)->getString(), table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
                     index2++;
                 }
             }
@@ -1657,20 +1667,20 @@ TEST_P(StreamingDeserilizerTester, test_Threadpooledclient_subscribeWithstreamDe
         {
             msg1_total += 1;
             EXPECT_EQ(msg->get(4)->getType(), DT_DOUBLE_ARRAY);
-            // EXPECT_EQ(msg->get(0)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
-            // EXPECT_EQ(msg->get(1)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
-            // EXPECT_EQ(msg->get(2)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
-            // EXPECT_EQ(msg->get(3)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
-            // EXPECT_EQ(msg->get(4)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
+            // ASSERT_EQ(msg->get(0)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("datetimev"))->getString());
+            // ASSERT_EQ(msg->get(1)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("timestampv"))->getString());
+            // ASSERT_EQ(msg->get(2)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("sym"))->getString());
+            // ASSERT_EQ(msg->get(3)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price1"))->getString());
+            // ASSERT_EQ(msg->get(4)->getString(),table1_SDPT->getRow(index1)->get(Util::createString("price2"))->getString());
             index1++;
         }
         else if (symbol == "msg2")
         {
             msg2_total += 1;
-            // EXPECT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
-            // EXPECT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
-            // EXPECT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
-            // EXPECT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
+            // ASSERT_EQ(msg->get(0)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("datetimev"))->getString());
+            // ASSERT_EQ(msg->get(1)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("timestampv"))->getString());
+            // ASSERT_EQ(msg->get(2)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("sym"))->getString());
+            // ASSERT_EQ(msg->get(3)->getString(),table2_SDPT->getRow(index2)->get(Util::createString("price1"))->getString());
             index2++;
         }
         if (msg1_total + msg2_total == 2000)

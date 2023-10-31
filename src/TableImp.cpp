@@ -193,7 +193,7 @@ string AbstractTable::getString() const {
     		if((int)listTmp[i+1].size()>maxColWidth)
     			maxColWidth=listTmp[i+1].size();
     	}
-    	if(maxColWidth>strColMaxWidth && getColumn(curCol)->getCategory()==LITERAL)
+    	if(maxColWidth>strColMaxWidth)
     		maxColWidth=strColMaxWidth;
     	if((int)listTmp[0].size()>maxColWidth)
     		maxColWidth=(std::min)(strColMaxWidth,(int)listTmp[0].size());

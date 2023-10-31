@@ -399,21 +399,21 @@ void MultithreadedTableWriter::SendExecutor::run(){
     if(init()==false){
         return;
     }
-	long batchWaitTimeout = 0, diff;
+    long batchWaitTimeout = 0, diff;
     while(isExit() == false){
         {
             if(writeThread_.writeQueue.size() < 1){//Wait for first data
-				writeThread_.nonemptySignal.wait();
+                writeThread_.nonemptySignal.wait();
             }
             if (isExit())
                 break;
             //wait for batchsize
-			if (tableWriter_.batchSize_ > 1 && tableWriter_.throttleMilsecond_ > 0) {
+            if (tableWriter_.batchSize_ > 1 && tableWriter_.throttleMilsecond_ > 0) {
                 batchWaitTimeout = Util::getEpochTime() + tableWriter_.throttleMilsecond_;
-                while (isExit() == false && writeThread_.writeQueue.size() < tableWriter_.batchSize_) {//check batchsize
+                while (isExit() == false && writeThread_.writeQueue.size() < static_cast<std::size_t>(tableWriter_.batchSize_)) {//check batchsize
                     diff = batchWaitTimeout - Util::getEpochTime();
                     if (diff > 0) {
-						writeThread_.nonemptySignal.tryWait(diff);
+                        writeThread_.nonemptySignal.tryWait(diff);
                     }
                     else {
                         break;
@@ -424,7 +424,7 @@ void MultithreadedTableWriter::SendExecutor::run(){
         while (isExit() == false && writeAllData());//write all data
     }
     //write left data
-    while (tableWriter_.hasError_.load() == false && writeAllData());
+    while (tableWriter_.hasError_.load() == false && writeAllData()){}
     //call back
     {
         LockGuard<Mutex> _(&writeThread_.writeQueueMutex_);

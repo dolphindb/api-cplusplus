@@ -8,7 +8,7 @@ namespace dolphindb{
 vector<int> HashDomain::getPartitionKeys(const ConstantSP& partitionColTable) const {
     if(partitionColTable->getCategory() != partitionColCategory_)
         throw RuntimeException("Data category incompatible.");
-	ConstantSP partitionCol = partitionColTable;
+    ConstantSP partitionCol = partitionColTable;
     if(partitionColCategory_ == TEMPORAL && partitionColType_ != partitionCol->getType()){
     	partitionCol = ((FastTemporalVector*)partitionCol.get())->castTemporal(partitionColType_);
     	if(partitionCol == NULL)
@@ -55,12 +55,12 @@ ListDomain::ListDomain(DATA_TYPE partitionColType, ConstantSP partitionSchema) :
 vector<int> ListDomain::getPartitionKeys(const ConstantSP& partitionColTable) const {
     if(partitionColTable->getCategory() != partitionColCategory_)
         throw RuntimeException("Data category incompatible.");
-	ConstantSP partitionCol = partitionColTable;
-	if (partitionColCategory_ == TEMPORAL && partitionColType_ != partitionCol->getType()) {
-		partitionCol = ((FastTemporalVector*)partitionCol.get())->castTemporal(partitionColType_);
-		if (partitionCol == NULL)
-			throw new RuntimeException("Can't convert partition column");
-	}
+    ConstantSP partitionCol = partitionColTable;
+    if (partitionColCategory_ == TEMPORAL && partitionColType_ != partitionCol->getType()) {
+        partitionCol = ((FastTemporalVector*)partitionCol.get())->castTemporal(partitionColType_);
+        if (partitionCol == NULL)
+            throw new RuntimeException("Can't convert partition column");
+    }
     int rows = partitionCol->rows();
     vector<int> keys(rows);
     for(int i=0; i<rows; ++i){
@@ -76,12 +76,12 @@ vector<int> ListDomain::getPartitionKeys(const ConstantSP& partitionColTable) co
 vector<int> ValueDomain::getPartitionKeys(const ConstantSP& partitionColTable) const {
     if(partitionColTable->getCategory() != partitionColCategory_)
         throw RuntimeException("Data category incompatible.");
-	ConstantSP partitionCol = partitionColTable;
-	if (partitionColCategory_ == TEMPORAL && partitionColType_ != partitionCol->getType()) {
-		partitionCol = ((FastTemporalVector*)partitionCol.get())->castTemporal(partitionColType_);
-		if (partitionCol == NULL)
-			throw new RuntimeException("Can't convert partition column");
-	}
+    ConstantSP partitionCol = partitionColTable;
+    if (partitionColCategory_ == TEMPORAL && partitionColType_ != partitionCol->getType()) {
+        partitionCol = ((FastTemporalVector*)partitionCol.get())->castTemporal(partitionColType_);
+        if (partitionCol == NULL)
+            throw new RuntimeException("Can't convert partition column");
+    }
     if(partitionColType_ == DT_LONG)
         throw RuntimeException("Long type value can't be used as a partition column.");
     int rows = partitionCol->rows();
@@ -103,12 +103,12 @@ vector<int> ValueDomain::getPartitionKeys(const ConstantSP& partitionColTable) c
 vector<int> RangeDomain::getPartitionKeys(const ConstantSP& partitionColTable) const {
     if(partitionColTable->getCategory() != partitionColCategory_)
         throw RuntimeException("Data category incompatible.");
-	ConstantSP partitionCol = partitionColTable;
-	if (partitionColCategory_ == TEMPORAL && partitionColType_ != partitionCol->getType()) {
-		partitionCol = ((FastTemporalVector*)partitionCol.get())->castTemporal(partitionColType_);
-		if (partitionCol == NULL)
-			throw new RuntimeException("Can't convert partition column");
-	}
+    ConstantSP partitionCol = partitionColTable;
+    if (partitionColCategory_ == TEMPORAL && partitionColType_ != partitionCol->getType()) {
+        partitionCol = ((FastTemporalVector*)partitionCol.get())->castTemporal(partitionColType_);
+        if (partitionCol == NULL)
+            throw new RuntimeException("Can't convert partition column");
+    }
     int rows = partitionCol->rows();
     int partitions = range_->size() - 1;
     vector<int> keys(rows);

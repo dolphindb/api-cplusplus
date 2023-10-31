@@ -26,6 +26,19 @@ TableSP SharedMemStream::readData(TableSP& copy, const bool& overwrite, size_t& 
         startRows = copy->rows();
     }
 
+    char* dataStartBuf = shmpHeader_->data_ + shmpHeader_->readOffset_;
+    DataHeader* dataHeader = (DataHeader*)(dataStartBuf);
+
+    // LOG_INFO("SharedMemStream readData, write_page:", shmpHeader_->writePage_, ", read_page:", shmpHeader_->readPage_, ", data length:", 
+    //  dataHeader->length_, "write offset:", shmpHeader_->writeOffset_, "read offset:", shmpHeader_->readOffset_);
+    int pageDiff = shmpHeader_->writePage_ - shmpHeader_->readPage_;
+    if (pageDiff >= 2 || ((pageDiff == 1) && (dataHeader->length_ == 0 || shmpHeader_->writeOffset_ > shmpHeader_->readOffset_))) {
+        shmpHeader_->readOffset_ = isFirstRead_ ? shmpHeader_->writeOffset_ : 0;
+        shmpHeader_->readPage_ = shmpHeader_->writePage_;
+        dataStartBuf = shmpHeader_->data_ + shmpHeader_->readOffset_;
+        dataHeader = (DataHeader*)(dataStartBuf);
+    }
+    isFirstRead_ = false;
     if (shmpHeader_->writePage_ == shmpHeader_->readPage_ && shmpHeader_->readOffset_ == shmpHeader_->writeOffset_) {
         auto it = tableMeta_.begin();
         if (copy.isNull()) {
@@ -35,20 +48,6 @@ TableSP SharedMemStream::readData(TableSP& copy, const bool& overwrite, size_t& 
             return copy;
         }
     }
-
-    char* dataStartBuf = shmpHeader_->data_ + shmpHeader_->readOffset_;
-    DataHeader* dataHeader = (DataHeader*)(dataStartBuf);
-
-    // LOG_INFO("SharedMemStream readData, write_page:", shmpHeader_->writePage_, ", read_page:", shmpHeader_->readPage_, ", data length:", 
-    //  dataHeader->length_, "write offset:", shmpHeader_->writeOffset_, "read offset:", shmpHeader_->readOffset_);
-    if ((shmpHeader_->writePage_ > shmpHeader_->readPage_) && (dataHeader->length_ == 0 || \
-        shmpHeader_->writeOffset_ > shmpHeader_->readOffset_)) {
-        shmpHeader_->readOffset_ = 0;
-        shmpHeader_->readPage_ = shmpHeader_->writePage_;
-        dataStartBuf = shmpHeader_->data_ + shmpHeader_->readOffset_;
-        dataHeader = (DataHeader*)(dataStartBuf);
-    }
-
     //int writeTimeSeconds = dataHeader->timestampSeconds_;
     //int writeTimeMicroSeconds = dataHeader->timestampMicro_;
 

@@ -427,6 +427,9 @@ int StringVector::serialize(char* buf, int bufSize, INDEX indexStart, int offset
     if (!blob_) {
         while (bufSize > 0 && indexStart < size_) {
             const string& str = data_[indexStart];
+            if(str.size() >= 262144){
+                throw RuntimeException("String in vector too long, Serialization failed, length must be less than 256K bytes");
+            }
             int len = str.size() + 1 - offset;
             if (bufSize >= len) {
                 memcpy(buf, str.c_str() + offset, len);

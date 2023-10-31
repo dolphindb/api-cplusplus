@@ -23,8 +23,15 @@ protected:
     virtual void SetUp()
     {
         cout<<"check connect...";
-		ConstantSP res = conn.run("1+1");
-		
+		try
+		{
+			ConstantSP res = conn.run("1+1");
+		}
+		catch(const std::exception& e)
+		{
+			conn.connect(hostName, port, "admin", "123456");
+		}
+
         cout<<"ok"<<endl;
     }
     virtual void TearDown()
@@ -242,7 +249,7 @@ TEST_F(ScalarTest,testScalar){
             temp->setChar(2);
             EXPECT_EQ(temp->getString(), vals[i]->getString());
         }
-        
+
 
     }
 
@@ -325,77 +332,88 @@ TEST_F(ScalarTest,testGuid){
     GuidHash(ghash);
 }
 
-TEST_F(ScalarTest,testDecimal){
-    ConstantSP ddbval1 = conn.run("a=3.1626$DECIMAL32(8);a");
+TEST_F(ScalarTest,testDecimal32){
+    ConstantSP decimal32_normal = conn.run("a=3.1626$DECIMAL32(8);a");
+    ConstantSP decimal32_null = conn.run("b=NULL$DECIMAL32(8);b");
     EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal32(-1, 3.1626));
+    EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal32(0, 10000000000)); //scale + value's places must less than 10
     EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal32(10, 3.1626)); //scale + value's places must less than 10
     EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal32(9, 3.1626));
     ConstantSP decimalval1 = Util::createDecimal32(8, 3.1626);
-    EXPECT_EQ(decimalval1->getString(), ddbval1->getString());
-    EXPECT_EQ(decimalval1->getType(), ddbval1->getType());
-    EXPECT_EQ(decimalval1->getRawType(), ddbval1->getRawType());
-    EXPECT_EQ(Util::getCategoryString(decimalval1->getCategory()), "DENARY");
-    conn.upload("decimalval1",decimalval1);
-    EXPECT_TRUE(conn.run("eqObj(a,decimalval1)")->getBool());
+    ConstantSP decimalval2 = Util::createNullConstant(DT_DECIMAL32, 8);
 
-    ConstantSP ddbval2 = conn.run("b=3.1626$DECIMAL64(17);b");
-    EXPECT_ANY_THROW(ConstantSP decimalval2 = Util::createDecimal64(-1, 13.1626));
-    EXPECT_ANY_THROW(ConstantSP decimalval2 = Util::createDecimal64(19, 13.1626)); //scale + value's places must less than 19
-    EXPECT_ANY_THROW(ConstantSP decimalval2 = Util::createDecimal64(18, 13.1626));
-    ConstantSP decimalval2 = Util::createDecimal64(17, 3.1626);
-    EXPECT_EQ(decimalval2->getString(), ddbval2->getString());
-    EXPECT_EQ(decimalval2->getType(), ddbval2->getType());
-    EXPECT_EQ(decimalval2->getRawType(), ddbval2->getRawType());
-    EXPECT_EQ(Util::getCategoryString(decimalval2->getCategory()), "DENARY");
-    conn.upload("decimalval2",decimalval2);
+    EXPECT_EQ(decimalval1->getString(), "3.16260000");
+    EXPECT_EQ(decimalval1->getString(), decimal32_normal->getString());
+    EXPECT_EQ(decimalval1->getType(), DT_DECIMAL32);
+    EXPECT_EQ(decimalval1->getType(), decimal32_normal->getType());
+    EXPECT_EQ(decimalval1->getRawType(), DT_DECIMAL32);
+    EXPECT_EQ(decimalval1->getRawType(), decimal32_normal->getRawType());
+
+    EXPECT_EQ(decimalval2->getString(), "");
+    EXPECT_EQ(decimalval2->getString(), decimal32_null->getString());
+    EXPECT_EQ(decimalval2->getType(), DT_DECIMAL32);
+    EXPECT_EQ(decimalval2->getType(), decimal32_null->getType());
+    EXPECT_EQ(decimalval2->getRawType(), DT_DECIMAL32);
+    EXPECT_EQ(decimalval2->getRawType(), decimal32_null->getRawType());
+    EXPECT_TRUE(decimalval2->isNull());
+
+    EXPECT_EQ(Util::getCategoryString(decimalval1->getCategory()), "DENARY");
+    vector<string> names = {"decimalval1", "decimalval2"};
+    vector<ConstantSP> vals = {decimalval1, decimalval2};
+    conn.upload(names, vals);
+    EXPECT_TRUE(conn.run("eqObj(a,decimalval1)")->getBool());
     EXPECT_TRUE(conn.run("eqObj(b,decimalval2)")->getBool());
+
+    srand(time(NULL));
+    // 随机10000个数据和scale进行断言
+    std::random_device rd;  // 随机设备，用于获取种子
+    std::mt19937 gen(rd()); // Mersenne Twister 19937 生成器，种子初始化
+
+    // 创建分布对象，指定浮点数范围
+    std::uniform_real_distribution<double> dist(0.0, 1.0);
+    for(auto i=0;i<1000;i++){
+        string data = to_string(dist(gen));
+        int scale = rand() % 10;
+        ConstantSP ex = conn.run("data=`"+ data +";"
+                                "scale="+to_string(scale)+";go;"
+                                "d=data$DECIMAL32(scale);d");
+        ConstantSP res = Util::createConstant(DT_DECIMAL32, scale);
+        // cout<< "data: "<< data<< ", scale: "<<scale<<endl;
+        res->setString(data);
+        ASSERT_DOUBLE_EQ(ex->getDouble(), res->getDouble());
+        conn.upload("res", res);
+        ASSERT_EQ(conn.run("eqFloat(res, d, "+to_string(scale)+")")->getBool(), true);
+    }
 
 	decimalval1->setDouble(1.2);
     EXPECT_EQ(decimalval1->getDouble(), (double)1.2);
 	decimalval2->setFloat(1.223f);
     EXPECT_EQ(decimalval2->getFloat(), (float)1.223);
-    decimalval2->setString("3.2561889425648");
-    EXPECT_EQ(decimalval2->getString(), "3.25618894256480000");
-    decimalval2->setNull();
-    EXPECT_TRUE(decimalval2->isNull());
+    decimalval2->setString("3.2561");
+    EXPECT_EQ(decimalval2->getString(), "3.25610000");
+    decimalval1->setNull();
+    EXPECT_TRUE(decimalval1->isNull());
 
     decimalval1->assign(Util::createDecimal32(2,1.34567));
-    decimalval2->assign(Util::createDecimal32(2,1.34567));
     EXPECT_EQ(decimalval1->getString(),"1.34000000");
-    EXPECT_EQ(decimalval2->getString(),"1.34000000000000000");
-    EXPECT_ANY_THROW(decimalval1->assign(Util::createDecimal64(0,-1000000000000000000)));
-    EXPECT_ANY_THROW(decimalval1->assign(Util::createDecimal64(0,1000000000000000000)));
+    EXPECT_FALSE(decimalval1->assign(Util::createDecimal32(0,-1000000)));
+    EXPECT_FALSE(decimalval1->assign(Util::createDecimal32(0,1000000)));
     decimalval1->assign(Util::createDecimal32(8,2.3641553));
-    decimalval2->assign(Util::createDecimal64(17,2.3641553));
     EXPECT_EQ(decimalval1->getString(),"2.36415530");
-    EXPECT_FLOAT_EQ(decimalval2->getFloat(), float(2.36415530000000000)); // result is 2.36415530000000032
-    EXPECT_ANY_THROW(decimalval1->assign(Util::createString("11.111111111111111111")));
-    EXPECT_ANY_THROW(decimalval2->assign(Util::createBlob("11.111111111111111111")));
+    EXPECT_FALSE(decimalval1->assign(Util::createString("11.111111111111111111")));
     decimalval1->assign(Util::createString("1.11111"));
-    decimalval2->assign(Util::createBlob("1.11111"));
     EXPECT_EQ(decimalval1->getString(),"1.11111000");
-    EXPECT_EQ(decimalval2->getString(),"1.11111000000000000");
     EXPECT_FALSE(decimalval1->assign(Util::createDate(10000)));
     decimalval1->assign(Util::createShort(3));
-    decimalval2->assign(Util::createShort(3));
     EXPECT_EQ(decimalval1->getString(),"3.00000000");
-    EXPECT_EQ(decimalval2->getString(),"3.00000000000000000");
     decimalval1->assign(Util::createInt(1));
-    decimalval2->assign(Util::createInt(1));
     EXPECT_EQ(decimalval1->getString(),"1.00000000");
-    EXPECT_EQ(decimalval2->getString(),"1.00000000000000000");
     decimalval1->assign(Util::createLong(2));
-    decimalval2->assign(Util::createLong(2));
     EXPECT_EQ(decimalval1->getString(),"2.00000000");
-    EXPECT_EQ(decimalval2->getString(),"2.00000000000000000");
     decimalval1->assign(Util::createFloat((float)3.1315));
-    decimalval2->assign(Util::createFloat((float)3.1315));
     EXPECT_NEAR(decimalval1->getFloat(),(float)3.1315, 4);
-    EXPECT_NEAR(decimalval2->getFloat(),(float)3.1315, 4);
     decimalval1->assign(Util::createDouble(-3.131544));
-    decimalval2->assign(Util::createDouble(-3.131544));
     EXPECT_EQ(decimalval1->getString(),"-3.13154400");
-    EXPECT_EQ(decimalval2->getString(),"-3.13154400000000000");
 
     decimalval1->assign(Util::createInt(1));
 	EXPECT_EQ(decimalval1->compare(0,Util::createInt(0)),1);
@@ -410,27 +428,381 @@ TEST_F(ScalarTest,testDecimal){
 	EXPECT_ANY_THROW(decimalval1->compare(0,Util::createBlob("blob1")));
 
     ConstantSP decimalval3 = Util::createDecimal32(0, 100);
-    ConstantSP decimalval4 = Util::createDecimal64(0, 100);
     decimalval3->setDouble(-1000000000);
-    decimalval4->setDouble(-1000000000000000000);
     EXPECT_ANY_THROW(decimalval3->setString("1000000000"));
-    EXPECT_ANY_THROW(decimalval4->setString("1000000000000000000"));
     EXPECT_EQ(decimalval3->getString(), "-1000000000");
-    EXPECT_EQ(decimalval4->getString(), "-1000000000000000000");
     EXPECT_EQ(decimalval3->getInstance()->getString(),decimalval3->getString());
-    EXPECT_EQ(decimalval4->getValue()->getString(),decimalval4->getString());
 
     EXPECT_EQ(decimalval3->getExtraParamForType(),0);
     EXPECT_FALSE(decimalval3->isNull());
-    EXPECT_FALSE(decimalval4->isNull());
     decimalval3->setNull();
-    decimalval4->setNull();
     EXPECT_EQ(decimalval3->getString(),"");
+    EXPECT_TRUE(decimalval3->isNull());
+}
+
+TEST_F(ScalarTest,testDecimal64){
+    ConstantSP decimal64_normal = conn.run("a=13.1626$DECIMAL64(16);a");
+    ConstantSP decimal64_null = conn.run("b=NULL$DECIMAL64(16);b");
+    EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal64(-1, 13.1626));
+    EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal64(0, 10000000000000000000.0)); //scale + value's places must less than 20
+    EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal64(19, 13.1626)); //scale + value's places must less than 20
+    EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal64(18, 13.1626));
+    ConstantSP decimalval1 = Util::createDecimal64(16, 13.1626);
+    ConstantSP decimalval2 = Util::createNullConstant(DT_DECIMAL64, 16);
+
+    EXPECT_EQ(decimalval1->getString(), "13.1626000000000000");
+    EXPECT_EQ(decimalval1->getString(), decimal64_normal->getString());
+    EXPECT_EQ(decimalval1->getType(), DT_DECIMAL64);
+    EXPECT_EQ(decimalval1->getType(), decimal64_normal->getType());
+    EXPECT_EQ(decimalval1->getRawType(), DT_DECIMAL64);
+    EXPECT_EQ(decimalval1->getRawType(), decimal64_normal->getRawType());
+
+    EXPECT_EQ(decimalval2->getString(), "");
+    EXPECT_EQ(decimalval2->getString(), decimal64_null->getString());
+    EXPECT_EQ(decimalval2->getType(), DT_DECIMAL64);
+    EXPECT_EQ(decimalval2->getType(), decimal64_null->getType());
+    EXPECT_EQ(decimalval2->getRawType(), DT_DECIMAL64);
+    EXPECT_EQ(decimalval2->getRawType(), decimal64_null->getRawType());
+    EXPECT_TRUE(decimalval2->isNull());
+
+    EXPECT_EQ(Util::getCategoryString(decimalval1->getCategory()), "DENARY");
+    vector<string> names = {"decimalval1", "decimalval2"};
+    vector<ConstantSP> vals = {decimalval1, decimalval2};
+    conn.upload(names, vals);
+    EXPECT_TRUE(conn.run("eqObj(a,decimalval1)")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(b,decimalval2)")->getBool());
+
+    srand(time(NULL));
+    // 随机10000个数据和scale进行断言
+    std::random_device rd;  // 随机设备，用于获取种子
+    std::mt19937 gen(rd()); // Mersenne Twister 19937 生成器，种子初始化
+
+    // 创建分布对象，指定浮点数范围
+    std::uniform_real_distribution<double> dist(0.0, 1000.0);
+    for(auto i=0;i<1000;i++){
+        string data = to_string(dist(gen));
+        int scale = rand() % 16;
+        // cout<< "data: "<< data<< ", scale: "<<scale<<endl;
+        ConstantSP ex = conn.run("data=`"+ data +";"
+                                "scale="+to_string(scale)+";go;"
+                                "d=data$DECIMAL64(scale);d");
+        ConstantSP res = Util::createConstant(DT_DECIMAL64, scale);
+        res->setString(data);
+        ASSERT_DOUBLE_EQ(ex->getDouble(), res->getDouble());
+        conn.upload("res", res);
+        ASSERT_EQ(conn.run("eqFloat(res, d, "+to_string(scale)+")")->getBool(), true);
+    }
+
+	decimalval1->setDouble(1.2);
+    EXPECT_EQ(decimalval1->getDouble(), (double)1.2);
+	decimalval2->setFloat(1.223f);
+    EXPECT_EQ(decimalval2->getFloat(), (float)1.223);
+    decimalval2->setString("3.256164354978934568721652635");
+    EXPECT_EQ(decimalval2->getString(), "3.2561643549789346");
+    decimalval1->setNull();
+    EXPECT_TRUE(decimalval1->isNull());
+
+    decimalval2->assign(Util::createDecimal64(2,1.34567));
+    EXPECT_EQ(decimalval2->getString(),"1.3400000000000000");
+    EXPECT_FALSE(decimalval1->assign(Util::createDecimal64(0,-10000000000000000)));
+    EXPECT_FALSE(decimalval1->assign(Util::createDecimal64(0,10000000000000000)));
+    decimalval2->assign(Util::createDecimal64(17,2.3641553));
+    EXPECT_FLOAT_EQ(decimalval2->getFloat(), float(2.36415530000000000)); // result is 2.36415530000000064
+    EXPECT_FALSE(decimalval1->assign(Util::createString("111.1")));
+    EXPECT_FALSE(decimalval2->assign(Util::createBlob("111.1")));
+    decimalval1->assign(Util::createString("1.11111"));
+    decimalval2->assign(Util::createBlob("1.11111"));
+    EXPECT_EQ(decimalval1->getString(),"1.1111100000000000");
+    EXPECT_EQ(decimalval2->getString(),"1.1111100000000000");
+    EXPECT_FALSE(decimalval1->assign(Util::createDate(10000)));
+    decimalval1->assign(Util::createShort(3));
+    EXPECT_EQ(decimalval1->getString(),"3.0000000000000000");
+    decimalval2->assign(Util::createInt(1));
+    EXPECT_EQ(decimalval2->getString(),"1.0000000000000000");
+    decimalval2->assign(Util::createLong(2));
+    EXPECT_EQ(decimalval2->getString(),"2.0000000000000000");
+    decimalval1->assign(Util::createFloat((float)3.1315));
+    decimalval2->assign(Util::createFloat((float)3.1315));
+    EXPECT_NEAR(decimalval1->getFloat(),(float)3.1315, 4);
+    EXPECT_NEAR(decimalval2->getFloat(),(float)3.1315, 4);
+    decimalval2->assign(Util::createDouble(-3.131544));
+    EXPECT_EQ(decimalval2->getString(),"-3.1315440000000000");
+
+    decimalval1->assign(Util::createInt(1));
+	EXPECT_EQ(decimalval1->compare(0,Util::createInt(0)),1);
+	EXPECT_EQ(decimalval1->compare(0,Util::createInt(2)),-1);
+	EXPECT_EQ(decimalval1->compare(0,Util::createInt(1)),0);
+	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal64(13,0.99)),1);
+	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal64(12,2.01)),-1);
+	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal64(11,1)),0);
+	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal64(18,0.999999999)),1);
+	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal64(10,2.00001)),-1);
+	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal64(11,1)),0);
+	EXPECT_ANY_THROW(decimalval1->compare(0,Util::createBlob("blob1")));
+
+    ConstantSP decimalval4 = Util::createDecimal64(0, 100);
+    decimalval4->setDouble(-1000000000000000000);
+    EXPECT_ANY_THROW(decimalval4->setString("1000000000000000000"));
+    EXPECT_EQ(decimalval4->getString(), "-1000000000000000000");
+    EXPECT_EQ(decimalval4->getValue()->getString(),decimalval4->getString());
+
+    EXPECT_FALSE(decimalval4->isNull());
+    decimalval4->setNull();
     EXPECT_EQ(decimalval4->getString(),"");
-    EXPECT_TRUE(decimalval3->isNull());
-    EXPECT_TRUE(decimalval3->isNull());
+    EXPECT_TRUE(decimalval4->isNull());
+}
+
+TEST_F(ScalarTest,testDecimal128){
+    ConstantSP decimal128_normal = conn.run("a=13.1626$DECIMAL128(26);a");
+    ConstantSP decimal128_null = conn.run("b=NULL$DECIMAL128(26);b");
+    EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal128(-1, 13.1626));
+    ConstantSP d0 = Util::createConstant(DT_DECIMAL128, 0);
+    EXPECT_ANY_THROW(d0->setString("100000000000000000000000000000000000000.0")); // scale + value's places must less than 40
+    EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal128(38, 13.1626)); // scale + value's places must less than 40
+    EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal128(37, 113.1626));
+    ConstantSP decimalval1 = Util::createDecimal128(26, 13.1626);
+    ConstantSP decimalval2 = Util::createNullConstant(DT_DECIMAL128, 26);
+
+    EXPECT_DOUBLE_EQ(decimalval1->getDouble(), 13.1626);
+    EXPECT_EQ(decimalval1->getString(), decimal128_normal->getString());
+    EXPECT_EQ(decimalval1->getType(), DT_DECIMAL128);
+    EXPECT_EQ(decimalval1->getType(), decimal128_normal->getType());
+    EXPECT_EQ(decimalval1->getRawType(), DT_DECIMAL128);
+    EXPECT_EQ(decimalval1->getRawType(), decimal128_normal->getRawType());
+
+    EXPECT_EQ(decimalval2->getString(), "");
+    EXPECT_TRUE(decimalval2->isNull());
+    EXPECT_TRUE(decimal128_null->isNull());
+    EXPECT_EQ(decimalval2->getString(), decimal128_null->getString());
+    EXPECT_EQ(decimalval2->getType(), DT_DECIMAL128);
+    EXPECT_EQ(decimalval2->getType(), decimal128_null->getType());
+    EXPECT_EQ(decimalval2->getRawType(), DT_DECIMAL128);
+    EXPECT_EQ(decimalval2->getRawType(), decimal128_null->getRawType());
+    EXPECT_TRUE(decimalval2->isNull());
+
+    EXPECT_EQ(Util::getCategoryString(decimalval1->getCategory()), "DENARY");
+    vector<string> names = {"decimalval1", "decimalval2"};
+    vector<ConstantSP> vals = {decimalval1, decimalval2};
+    conn.upload(names, vals);
+    EXPECT_TRUE(conn.run("eqObj(a,decimalval1)")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(b,decimalval2)")->getBool());
+
+    srand(time(NULL));
+    // 随机10000个数据和scale进行断言
+    std::random_device rd;  // 随机设备，用于获取种子
+    std::mt19937 gen(rd()); // Mersenne Twister 19937 生成器，种子初始化
+
+    // 创建分布对象，指定浮点数范围
+    std::uniform_real_distribution<double> dist(0.0, 1000000.0);
+    for(auto i=0;i<1000;i++){
+        string data = to_string(dist(gen));
+        int scale = rand() % 33;
+        // cout<< "data: "<< data<< ", scale: "<<scale<<endl;
+        ConstantSP ex = conn.run("data=`"+ data +";"
+                                "scale="+to_string(scale)+";go;"
+                                "d=data$DECIMAL128(scale);d");
+        ConstantSP res = Util::createConstant(DT_DECIMAL128, scale);
+        res->setString(data);
+        ASSERT_DOUBLE_EQ(ex->getDouble(), res->getDouble());
+        conn.upload("res", res);
+        ASSERT_EQ(conn.run("eqObj(res, d)")->getBool(), true);
+    }
+
+	decimalval1->setDouble(1.2);
+    EXPECT_EQ(decimalval1->getDouble(), (double)1.2);
+	decimalval2->setFloat(1.223f);
+    EXPECT_EQ(decimalval2->getFloat(), (float)1.223);
+    decimalval2->setString("3.256164354978934568721652635");
+    EXPECT_EQ(decimalval2->getString(), "3.25616435497893456872165264");
+    decimalval1->setNull();
+    EXPECT_TRUE(decimalval1->isNull());
+
+    decimalval2->assign(Util::createDecimal128(2,1.1));
+    EXPECT_DOUBLE_EQ(decimalval2->getDouble(), 1.1);
+    EXPECT_FALSE(decimalval1->assign(Util::createDecimal128(0,-1000000000000000000)));
+    EXPECT_FALSE(decimalval1->assign(Util::createDecimal128(0,1000000000000000000)));
+    decimalval2->assign(Util::createDecimal128(17,2.3641553));
+    EXPECT_FLOAT_EQ(decimalval2->getFloat(), float(2.36415530000000000)); // result is 2.36415530000000064
+    EXPECT_FALSE(decimalval1->assign(Util::createString("1111111111111.1")));
+    EXPECT_FALSE(decimalval2->assign(Util::createBlob("1111111111111.1")));
+    decimalval1->assign(Util::createString("2.11111"));
+    decimalval2->assign(Util::createBlob("2.11111"));
+    EXPECT_EQ(decimalval1->getString(),"2.11111000000000000000000000");
+    EXPECT_EQ(decimalval2->getString(),"2.11111000000000000000000000");
+    EXPECT_FALSE(decimalval1->assign(Util::createTimestamp(10000000000000000)));
+    decimalval1->assign(Util::createShort(3));
+    EXPECT_EQ(decimalval1->getString(),"3.00000000000000000000000000");
+    decimalval2->assign(Util::createInt(1));
+    EXPECT_EQ(decimalval2->getString(),"1.00000000000000000000000000");
+    decimalval2->assign(Util::createLong(2));
+    EXPECT_EQ(decimalval2->getString(),"2.00000000000000000000000000");
+    decimalval1->assign(Util::createFloat((float)3.1315));
+    decimalval2->assign(Util::createFloat((float)3.1315));
+    EXPECT_NEAR(decimalval1->getFloat(),(float)3.1315, 4);
+    EXPECT_NEAR(decimalval2->getFloat(),(float)3.1315, 4);
+    decimalval2->assign(Util::createDouble(-3.131544));
+    EXPECT_EQ(decimalval2->getString(),"-3.13154400000000037287362560");
+
+    decimalval1->assign(Util::createInt(1));
+	EXPECT_EQ(decimalval1->compare(0,Util::createInt(0)),1);
+	EXPECT_EQ(decimalval1->compare(0,Util::createInt(2)),-1);
+	EXPECT_EQ(decimalval1->compare(0,Util::createInt(1)),0);
+	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal128(13,0.99)),1);
+	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal128(12,2.01)),-1);
+	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal128(11,1)),0);
+	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal128(18,0.999999999)),1);
+	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal128(10,2.00001)),-1);
+	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal128(11,1)),0);
+	EXPECT_ANY_THROW(decimalval1->compare(0,Util::createBlob("blob1")));
+
+    ConstantSP decimalval4 = Util::createDecimal128(0, 100);
+    decimalval4->setString("-10000000000000000000000000000");
+    EXPECT_ANY_THROW(decimalval4->setString("10000000000000000000000000000111111111111"));
+    EXPECT_EQ(decimalval4->getString(), "-10000000000000000000000000000");
+    EXPECT_EQ(decimalval4->getValue()->getString(),decimalval4->getString());
+
+    EXPECT_FALSE(decimalval4->isNull());
+    decimalval4->setNull();
+    EXPECT_EQ(decimalval4->getString(),"");
+    EXPECT_TRUE(decimalval4->isNull());
+}
+
+TEST_F(ScalarTest, test_convertType_decimal32){
+    ConstantSP dcmVal = Util::createDecimal32(5, 1.6612348486);
+    EXPECT_EQ(dcmVal->getString(), "1.66123");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setDouble(-0.3456);
+    EXPECT_DOUBLE_EQ(dcmVal->getDouble(), -0.3456);
+    EXPECT_EQ(dcmVal->getString(), "-0.34560");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("987.213");
+    EXPECT_EQ(dcmVal->getString(), "987.21300");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setBool(false);
+    EXPECT_EQ(dcmVal->getString(), "0.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setChar('\1');
+    EXPECT_EQ(dcmVal->getString(), "1.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setFloat(-1.1);
+    EXPECT_EQ(dcmVal->getString(), "-1.10000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setInt(1234);
+    EXPECT_EQ(dcmVal->getString(), "1234.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setLong(9999l);
+    EXPECT_EQ(dcmVal->getString(), "9999.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setShort(10000);
+    EXPECT_EQ(dcmVal->getString(), "10000.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setNull();
+    EXPECT_EQ(dcmVal->getString(), "");
+    EXPECT_TRUE(dcmVal->isNull());
+    cout<< dcmVal->getString()<<endl;
 
 }
+
+TEST_F(ScalarTest, test_convertType_decimal64){
+    ConstantSP dcmVal = Util::createDecimal64(16, 1.661);
+    EXPECT_EQ(dcmVal->getString(), "1.6610000000000000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setDouble(-0.3456);
+    EXPECT_DOUBLE_EQ(dcmVal->getDouble(), -0.3456);
+    EXPECT_EQ(dcmVal->getString(), "-0.3456000000000000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("0.21364538294533664856788");
+    EXPECT_EQ(dcmVal->getString(), "0.2136453829453366");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setBool(false);
+    EXPECT_EQ(dcmVal->getString(), "0.0000000000000000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setChar('\1');
+    EXPECT_EQ(dcmVal->getString(), "1.0000000000000000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setFloat(-1.1);
+
+    EXPECT_EQ(dcmVal->getString(), "-1.1000000729317376");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setInt(1);
+    EXPECT_EQ(dcmVal->getString(), "1.0000000000000000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setLong(-1ll);
+    EXPECT_EQ(dcmVal->getString(), "-1.0000000000000000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setShort(1);
+    EXPECT_EQ(dcmVal->getString(), "1.0000000000000000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setNull();
+    EXPECT_EQ(dcmVal->getString(), "");
+    EXPECT_TRUE(dcmVal->isNull());
+    cout<< dcmVal->getString()<<endl;
+
+}
+
+TEST_F(ScalarTest, test_convertType_decimal128){
+    ConstantSP dcmVal = Util::createDecimal128(26, -0.53);
+    EXPECT_EQ(dcmVal->getString(), "-0.53000000000000007163871232");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setDouble(8.3456);
+    EXPECT_DOUBLE_EQ(dcmVal->getDouble(), 8.3456);
+    EXPECT_EQ(dcmVal->getString(), "8.34560000000000010737418240");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("987.213649237905538612254387602358");
+    EXPECT_EQ(dcmVal->getString(), "987.21364923790553861225438760");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setBool(false);
+    EXPECT_EQ(dcmVal->getString(), "0.00000000000000000000000000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setChar('\1');
+    EXPECT_EQ(dcmVal->getString(), "1.00000000000000000000000000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setFloat(-1.1);
+    EXPECT_EQ(dcmVal->getString(), "-1.10000000946866311755988992");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setInt(1);
+    EXPECT_EQ(dcmVal->getString(), "1.00000000000000000000000000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setLong(-1ll);
+    EXPECT_EQ(dcmVal->getString(), "-1.00000000000000000000000000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setShort(1);
+    EXPECT_EQ(dcmVal->getString(), "1.00000000000000000000000000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setNull();
+    EXPECT_EQ(dcmVal->getString(), "");
+    EXPECT_TRUE(dcmVal->isNull());
+    cout<< dcmVal->getString()<<endl;
+
+}
+
 
 TEST_F(ScalarTest,testScalarFunction){
 
@@ -438,7 +810,7 @@ TEST_F(ScalarTest,testScalarFunction){
     int buckets=2;
     char *buf0 = new char[2];
     char *buf00 = new char[2];
-    char *buf = new char[2]; 
+    char *buf = new char[2];
     short *buf1 = new short[2];
     int *buf2 = new int[2];
     INDEX *buf4 = new INDEX[2];
@@ -496,34 +868,34 @@ TEST_F(ScalarTest,testScalarFunction){
     EXPECT_TRUE(voidval->isValid(0,1,buf0));
     EXPECT_TRUE(voidval->getBool(0,1,buf00));
     EXPECT_TRUE(voidval->getChar(0,1,buf));
-    EXPECT_TRUE(voidval->getShort(0,1,buf1)); 
+    EXPECT_TRUE(voidval->getShort(0,1,buf1));
     EXPECT_TRUE(voidval->getInt(0,1,buf2));
     EXPECT_TRUE(voidval->getLong(0,1,buf3));
     EXPECT_TRUE(voidval->getIndex(0,1,buf4));
     EXPECT_TRUE(voidval->getFloat(0,1,buf5));
-    EXPECT_TRUE(voidval->getDouble(0,1,buf6));   
-    EXPECT_FALSE(voidval->getSymbol(0,1,buf2,symbase,false)); 
+    EXPECT_TRUE(voidval->getDouble(0,1,buf6));
+    EXPECT_FALSE(voidval->getSymbol(0,1,buf2,symbase,false));
     EXPECT_TRUE(voidval->getString(0,1,buf8));
     EXPECT_FALSE(voidval->getString(0,1,buf9));
-    EXPECT_FALSE(voidval->getBinary(0,1,1,buf10));
+    EXPECT_TRUE(voidval->getBinary(0,1,1,buf10));
     EXPECT_FALSE(voidval->getHash(0,1,buckets,buf2));
     cout<<voidval->getAllocatedMemory();
-    EXPECT_EQ(voidval->getBoolConst(0,1,buf)[0], CHAR_MIN); 
-    EXPECT_EQ(voidval->getCharConst(0,1,buf)[0], CHAR_MIN); 
-    EXPECT_EQ(voidval->getShortConst(0,1,buf1)[0], SHRT_MIN); 
+    EXPECT_EQ(voidval->getBoolConst(0,1,buf)[0], CHAR_MIN);
+    EXPECT_EQ(voidval->getCharConst(0,1,buf)[0], CHAR_MIN);
+    EXPECT_EQ(voidval->getShortConst(0,1,buf1)[0], SHRT_MIN);
     EXPECT_EQ(voidval->getIntConst(0,1,buf2)[0], INT_MIN);
     EXPECT_EQ(voidval->getLongConst(0,1,buf3)[0], LLONG_MIN);
     EXPECT_EQ(voidval->getIndexConst(0,1,buf4)[0], INT_MIN);
     EXPECT_EQ(voidval->getFloatConst(0,1,buf5)[0], FLT_NMIN);
-    EXPECT_EQ(voidval->getDoubleConst(0,1,buf6)[0], DBL_NMIN);   
-    EXPECT_ANY_THROW(voidval->getSymbolConst(0,1,buf2,symbase,false)); 
+    EXPECT_EQ(voidval->getDoubleConst(0,1,buf6)[0], DBL_NMIN);
+    EXPECT_ANY_THROW(voidval->getSymbolConst(0,1,buf2,symbase,false));
     EXPECT_EQ(*(voidval->getStringConst(0,1,buf8)[0]),"");
     EXPECT_ANY_THROW(voidval->getStringConst(0,1,buf9));
     EXPECT_ANY_THROW(voidval->getBinaryConst(0,1,1,buf10));
 
-    EXPECT_EQ(voidval->getBoolBuffer(0,1,buf)[0], CHAR_MIN); 
-    EXPECT_EQ(voidval->getCharBuffer(0,1,buf)[0], CHAR_MIN); 
-    EXPECT_EQ(voidval->getShortBuffer(0,1,buf1)[0], SHRT_MIN); 
+    EXPECT_EQ(voidval->getBoolBuffer(0,1,buf)[0], CHAR_MIN);
+    EXPECT_EQ(voidval->getCharBuffer(0,1,buf)[0], CHAR_MIN);
+    EXPECT_EQ(voidval->getShortBuffer(0,1,buf1)[0], SHRT_MIN);
     cout<<voidval->getIntBuffer(0,1,buf2)<<endl;
     EXPECT_EQ(buf2[0], INT_MIN);
     EXPECT_EQ(voidval->getLongBuffer(0,1,buf3)[0], LLONG_MIN);
@@ -553,13 +925,13 @@ TEST_F(ScalarTest,testScalarFunction){
     EXPECT_TRUE(stringval->isValid(0,1,buf0));
     EXPECT_FALSE(stringval->getBool(0,1,buf00));
     EXPECT_FALSE(stringval->getChar(0,1,buf));
-    EXPECT_FALSE(stringval->getShort(0,1,buf1)); 
+    EXPECT_FALSE(stringval->getShort(0,1,buf1));
     EXPECT_FALSE(stringval->getInt(0,1,buf2));
     EXPECT_FALSE(stringval->getLong(0,1,buf3));
     EXPECT_FALSE(stringval->getIndex(0,1,buf4));
     EXPECT_FALSE(stringval->getFloat(0,1,buf5));
-    EXPECT_FALSE(stringval->getDouble(0,1,buf6));   
-    EXPECT_FALSE(stringval->getSymbol(0,1,buf2,symbase,false)); 
+    EXPECT_FALSE(stringval->getDouble(0,1,buf6));
+    EXPECT_FALSE(stringval->getSymbol(0,1,buf2,symbase,false));
     EXPECT_TRUE(stringval->getString(0,1,buf8));
     EXPECT_FALSE(stringval->getString(0,1,buf9));
     EXPECT_FALSE(stringval->getBinary(0,1,1,buf10));
@@ -567,17 +939,17 @@ TEST_F(ScalarTest,testScalarFunction){
     cout<<stringval->getAllocatedMemory()<<endl;
     EXPECT_ANY_THROW(stringval->getBoolConst(0,1,buf)[0]);
     EXPECT_ANY_THROW(stringval->getCharConst(0,1,buf)[0]);
-    EXPECT_ANY_THROW(stringval->getShortConst(0,1,buf1)[0]); 
+    EXPECT_ANY_THROW(stringval->getShortConst(0,1,buf1)[0]);
     EXPECT_ANY_THROW(stringval->getIntConst(0,1,buf2)[0]);
     EXPECT_ANY_THROW(stringval->getLongConst(0,1,buf3)[0]);
     EXPECT_ANY_THROW(stringval->getIndexConst(0,1,buf4)[0]);
     EXPECT_ANY_THROW(stringval->getFloatConst(0,1,buf5)[0]);
-    EXPECT_ANY_THROW(stringval->getDoubleConst(0,1,buf6)[0]);   
-    EXPECT_ANY_THROW(stringval->getSymbolConst(0,1,buf2,symbase,false)); 
+    EXPECT_ANY_THROW(stringval->getDoubleConst(0,1,buf6)[0]);
+    EXPECT_ANY_THROW(stringval->getSymbolConst(0,1,buf2,symbase,false));
     EXPECT_EQ(*(stringval->getStringConst(0,1,buf8)[0]), "this is a string scalar");
     EXPECT_STREQ(*(stringval->getStringConst(0,24,buf9)), "this is a string scalar");
     EXPECT_ANY_THROW(stringval->getBinaryConst(0,1,1,buf10));
-    
+
     stringval->getDataBuffer(0,1,buf8);
     EXPECT_EQ(*(buf8[0]), "this is a string scalar");
 
@@ -601,13 +973,13 @@ TEST_F(ScalarTest,testScalarFunction){
             EXPECT_TRUE(val->isValid(0,1,buf0));
             EXPECT_TRUE(val->getBool(0,1,buf00));
             EXPECT_TRUE(val->getChar(0,1,buf));
-            EXPECT_TRUE(val->getShort(0,1,buf1)); 
+            EXPECT_TRUE(val->getShort(0,1,buf1));
             EXPECT_TRUE(val->getInt(0,1,buf2));
             EXPECT_TRUE(val->getLong(0,1,buf3));
             EXPECT_TRUE(val->getIndex(0,1,buf4));
             EXPECT_TRUE(val->getFloat(0,1,buf5));
-            EXPECT_TRUE(val->getDouble(0,1,buf6));   
-            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false)); 
+            EXPECT_TRUE(val->getDouble(0,1,buf6));
+            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false));
             EXPECT_FALSE(val->getString(0,1,buf8));
             EXPECT_FALSE(val->getString(0,1,buf9));
             EXPECT_FALSE(val->getBinary(0,1,1,buf10));
@@ -615,13 +987,13 @@ TEST_F(ScalarTest,testScalarFunction){
             cout<<val->getAllocatedMemory();
             EXPECT_EQ(val->getBoolConst(0,1,buf)[0], 1);
             EXPECT_EQ(val->getCharConst(0,1,buf)[0], '\xA0');
-            // EXPECT_EQ(val->getShortConst(0,1,buf1)[0], SHRT_MIN); 
-            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], (int)100000); 
-            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], (long long)100000); 
-            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], (INDEX)100000); 
-            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], (float)100000); 
-            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], (double)100000); 
-            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false)); 
+            // EXPECT_EQ(val->getShortConst(0,1,buf1)[0], SHRT_MIN);
+            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], (int)100000);
+            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], (long long)100000);
+            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], (INDEX)100000);
+            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], (float)100000);
+            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], (double)100000);
+            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false));
             EXPECT_ANY_THROW(val->getStringConst(0,1,buf8)[0]);
             EXPECT_ANY_THROW(val->getStringConst(0,24,buf9));
             EXPECT_ANY_THROW(val->getBinaryConst(0,1,1,buf10));
@@ -632,13 +1004,13 @@ TEST_F(ScalarTest,testScalarFunction){
             EXPECT_TRUE(val->isValid(0,1,buf0));
             EXPECT_TRUE(val->getBool(0,1,buf00));
             EXPECT_TRUE(val->getChar(0,1,buf));
-            EXPECT_TRUE(val->getShort(0,1,buf1)); 
+            EXPECT_TRUE(val->getShort(0,1,buf1));
             EXPECT_TRUE(val->getInt(0,1,buf2));
             EXPECT_TRUE(val->getLong(0,1,buf3));
             EXPECT_TRUE(val->getIndex(0,1,buf4));
             EXPECT_TRUE(val->getFloat(0,1,buf5));
-            EXPECT_TRUE(val->getDouble(0,1,buf6));   
-            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false)); 
+            EXPECT_TRUE(val->getDouble(0,1,buf6));
+            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false));
             EXPECT_FALSE(val->getString(0,1,buf8));
             EXPECT_FALSE(val->getString(0,1,buf9));
             EXPECT_FALSE(val->getBinary(0,1,1,buf10));
@@ -646,13 +1018,13 @@ TEST_F(ScalarTest,testScalarFunction){
             cout<<val->getAllocatedMemory();
             EXPECT_EQ(val->getBoolConst(0,1,buf)[0], '\x80');
             EXPECT_EQ(val->getCharConst(0,1,buf)[0], '\x80');
-            // EXPECT_EQ(val->getShortConst(0,1,buf1)[0], SHRT_MIN); 
-            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], INT_MIN); 
-            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], LLONG_MIN); 
-            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], INDEX_MIN); 
-            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], FLT_NMIN); 
-            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], DBL_NMIN); 
-            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false)); 
+            // EXPECT_EQ(val->getShortConst(0,1,buf1)[0], SHRT_MIN);
+            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], INT_MIN);
+            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], LLONG_MIN);
+            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], INDEX_MIN);
+            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], FLT_NMIN);
+            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], DBL_NMIN);
+            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false));
             EXPECT_ANY_THROW(val->getStringConst(0,1,buf8)[0]);
             EXPECT_ANY_THROW(val->getStringConst(0,24,buf9));
             EXPECT_ANY_THROW(val->getBinaryConst(0,1,1,buf10));
@@ -661,7 +1033,7 @@ TEST_F(ScalarTest,testScalarFunction){
 
     EXPECT_EQ(intval->getBoolBuffer(0,1,buf)[0], '\xA0');
     EXPECT_EQ(intval->getCharBuffer(0,1,buf)[0], '\xA0');
-    // EXPECT_EQ(intval->getShortBuffer(0,1,buf1)[0], SHRT_MIN); 
+    // EXPECT_EQ(intval->getShortBuffer(0,1,buf1)[0], SHRT_MIN);
     cout<<intval->getIntBuffer(0,1,buf2)<<endl;
     EXPECT_EQ(buf2[0], 100000);
     EXPECT_EQ(intval->getLongBuffer(0,1,buf3)[0], 100000);
@@ -692,13 +1064,13 @@ TEST_F(ScalarTest,testScalarFunction){
             EXPECT_TRUE(val->isValid(0,1,buf0));
             EXPECT_TRUE(val->getBool(0,1,buf00));
             EXPECT_TRUE(val->getChar(0,1,buf));
-            EXPECT_TRUE(val->getShort(0,1,buf1)); 
+            EXPECT_TRUE(val->getShort(0,1,buf1));
             EXPECT_TRUE(val->getInt(0,1,buf2));
             EXPECT_TRUE(val->getLong(0,1,buf3));
             EXPECT_TRUE(val->getIndex(0,1,buf4));
             EXPECT_TRUE(val->getFloat(0,1,buf5));
-            EXPECT_TRUE(val->getDouble(0,1,buf6));   
-            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false)); 
+            EXPECT_TRUE(val->getDouble(0,1,buf6));
+            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false));
             EXPECT_FALSE(val->getString(0,1,buf8));
             EXPECT_FALSE(val->getString(0,1,buf9));
             EXPECT_FALSE(val->getBinary(0,1,1,buf10));
@@ -706,13 +1078,13 @@ TEST_F(ScalarTest,testScalarFunction){
             cout<<val->getAllocatedMemory();
             EXPECT_EQ(val->getBoolConst(0,1,buf)[0], 1);
             EXPECT_EQ(val->getCharConst(0,1,buf)[0], rand_val);
-            EXPECT_EQ(val->getShortConst(0,1,buf1)[0], (short)rand_val); 
-            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], (int)rand_val); 
-            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], (long long)rand_val); 
-            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], (INDEX)rand_val); 
-            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], (float)rand_val); 
-            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], (double)rand_val); 
-            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false)); 
+            EXPECT_EQ(val->getShortConst(0,1,buf1)[0], (short)rand_val);
+            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], (int)rand_val);
+            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], (long long)rand_val);
+            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], (INDEX)rand_val);
+            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], (float)rand_val);
+            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], (double)rand_val);
+            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false));
             EXPECT_ANY_THROW(val->getStringConst(0,1,buf8)[0]);
             EXPECT_ANY_THROW(val->getStringConst(0,24,buf9));
             EXPECT_ANY_THROW(val->getBinaryConst(0,1,1,buf10));
@@ -722,13 +1094,13 @@ TEST_F(ScalarTest,testScalarFunction){
             EXPECT_TRUE(val->isValid(0,1,buf0));
             EXPECT_TRUE(val->getBool(0,1,buf00));
             EXPECT_TRUE(val->getChar(0,1,buf));
-            EXPECT_TRUE(val->getShort(0,1,buf1)); 
+            EXPECT_TRUE(val->getShort(0,1,buf1));
             EXPECT_TRUE(val->getInt(0,1,buf2));
             EXPECT_TRUE(val->getLong(0,1,buf3));
             EXPECT_TRUE(val->getIndex(0,1,buf4));
             EXPECT_TRUE(val->getFloat(0,1,buf5));
-            EXPECT_TRUE(val->getDouble(0,1,buf6));   
-            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false)); 
+            EXPECT_TRUE(val->getDouble(0,1,buf6));
+            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false));
             EXPECT_FALSE(val->getString(0,1,buf8));
             EXPECT_FALSE(val->getString(0,1,buf9));
             EXPECT_FALSE(val->getBinary(0,1,1,buf10));
@@ -736,22 +1108,22 @@ TEST_F(ScalarTest,testScalarFunction){
             cout<<val->getAllocatedMemory();
             EXPECT_EQ(val->getBoolConst(0,1,buf)[0], CHAR_MIN);
             EXPECT_EQ(val->getCharConst(0,1,buf)[0], CHAR_MIN);
-            EXPECT_EQ(val->getShortConst(0,1,buf1)[0], SHRT_MIN); 
-            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], INT_MIN); 
-            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], LLONG_MIN); 
-            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], INDEX_MIN); 
-            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], FLT_NMIN); 
-            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], DBL_NMIN); 
-            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false)); 
+            EXPECT_EQ(val->getShortConst(0,1,buf1)[0], SHRT_MIN);
+            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], INT_MIN);
+            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], LLONG_MIN);
+            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], INDEX_MIN);
+            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], FLT_NMIN);
+            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], DBL_NMIN);
+            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false));
             EXPECT_ANY_THROW(val->getStringConst(0,1,buf8)[0]);
             EXPECT_ANY_THROW(val->getStringConst(0,24,buf9));
             EXPECT_ANY_THROW(val->getBinaryConst(0,1,1,buf10));
         }
     }
 
-    EXPECT_EQ(charval->getBoolBuffer(0,1,buf)[0], rand_val); 
-    EXPECT_EQ(charval->getCharBuffer(0,1,buf)[0], rand_val); 
-    EXPECT_EQ(charval->getShortBuffer(0,1,buf1)[0], (short)rand_val); 
+    EXPECT_EQ(charval->getBoolBuffer(0,1,buf)[0], rand_val);
+    EXPECT_EQ(charval->getCharBuffer(0,1,buf)[0], rand_val);
+    EXPECT_EQ(charval->getShortBuffer(0,1,buf1)[0], (short)rand_val);
     cout<<charval->getIntBuffer(0,1,buf2)<<endl;
     EXPECT_EQ(buf2[0], (int)rand_val);
     EXPECT_EQ(charval->getLongBuffer(0,1,buf3)[0], (long)rand_val);
@@ -777,13 +1149,13 @@ TEST_F(ScalarTest,testScalarFunction){
             EXPECT_TRUE(val->isValid(0,1,buf0));
             EXPECT_TRUE(val->getBool(0,1,buf00));
             EXPECT_TRUE(val->getChar(0,1,buf));
-            EXPECT_TRUE(val->getShort(0,1,buf1)); 
+            EXPECT_TRUE(val->getShort(0,1,buf1));
             EXPECT_TRUE(val->getInt(0,1,buf2));
             EXPECT_TRUE(val->getLong(0,1,buf3));
             EXPECT_TRUE(val->getIndex(0,1,buf4));
             EXPECT_TRUE(val->getFloat(0,1,buf5));
-            EXPECT_TRUE(val->getDouble(0,1,buf6));   
-            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false)); 
+            EXPECT_TRUE(val->getDouble(0,1,buf6));
+            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false));
             EXPECT_FALSE(val->getString(0,1,buf8));
             EXPECT_FALSE(val->getString(0,1,buf9));
             EXPECT_FALSE(val->getBinary(0,1,1,buf10));
@@ -791,13 +1163,13 @@ TEST_F(ScalarTest,testScalarFunction){
             cout<<val->getAllocatedMemory();
             // EXPECT_EQ(val->getBoolConst(0,1,buf)[0], 1);
             // EXPECT_EQ(val->getCharConst(0,1,buf)[0], rand_val2);
-            EXPECT_EQ(val->getShortConst(0,1,buf1)[0], (short)rand_val2); 
-            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], (int)rand_val2); 
-            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], (long long)rand_val2); 
-            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], (INDEX)rand_val2); 
-            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], (float)rand_val2); 
-            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], (double)rand_val2); 
-            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false)); 
+            EXPECT_EQ(val->getShortConst(0,1,buf1)[0], (short)rand_val2);
+            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], (int)rand_val2);
+            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], (long long)rand_val2);
+            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], (INDEX)rand_val2);
+            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], (float)rand_val2);
+            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], (double)rand_val2);
+            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false));
             EXPECT_ANY_THROW(val->getStringConst(0,1,buf8)[0]);
             EXPECT_ANY_THROW(val->getStringConst(0,24,buf9));
             EXPECT_ANY_THROW(val->getBinaryConst(0,1,1,buf10));
@@ -807,13 +1179,13 @@ TEST_F(ScalarTest,testScalarFunction){
             EXPECT_TRUE(val->isValid(0,1,buf0));
             EXPECT_TRUE(val->getBool(0,1,buf00));
             EXPECT_TRUE(val->getChar(0,1,buf));
-            EXPECT_TRUE(val->getShort(0,1,buf1)); 
+            EXPECT_TRUE(val->getShort(0,1,buf1));
             EXPECT_TRUE(val->getInt(0,1,buf2));
             EXPECT_TRUE(val->getLong(0,1,buf3));
             EXPECT_TRUE(val->getIndex(0,1,buf4));
             EXPECT_TRUE(val->getFloat(0,1,buf5));
-            EXPECT_TRUE(val->getDouble(0,1,buf6));   
-            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false)); 
+            EXPECT_TRUE(val->getDouble(0,1,buf6));
+            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false));
             EXPECT_FALSE(val->getString(0,1,buf8));
             EXPECT_FALSE(val->getString(0,1,buf9));
             EXPECT_FALSE(val->getBinary(0,1,1,buf10));
@@ -821,22 +1193,22 @@ TEST_F(ScalarTest,testScalarFunction){
             cout<<val->getAllocatedMemory();
             // EXPECT_EQ(val->getBoolConst(0,1,buf)[0], 1);
             // EXPECT_EQ(val->getCharConst(0,1,buf)[0], rand_val2);
-            EXPECT_EQ(val->getShortConst(0,1,buf1)[0], SHRT_MIN); 
-            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], INT_MIN); 
-            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], LLONG_MIN); 
-            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], INDEX_MIN); 
-            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], FLT_NMIN); 
-            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], DBL_NMIN); 
-            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false)); 
+            EXPECT_EQ(val->getShortConst(0,1,buf1)[0], SHRT_MIN);
+            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], INT_MIN);
+            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], LLONG_MIN);
+            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], INDEX_MIN);
+            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], FLT_NMIN);
+            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], DBL_NMIN);
+            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false));
             EXPECT_ANY_THROW(val->getStringConst(0,1,buf8)[0]);
             EXPECT_ANY_THROW(val->getStringConst(0,24,buf9));
             EXPECT_ANY_THROW(val->getBinaryConst(0,1,1,buf10));
         }
     }
 
-    // EXPECT_EQ(shortval->getBoolBuffer(0,1,buf)[0], rand_val2); 
-    // EXPECT_EQ(shortval->getCharBuffer(0,1,buf)[0], rand_val2); 
-    EXPECT_EQ(shortval->getShortBuffer(0,1,buf1)[0], (short)rand_val2); 
+    // EXPECT_EQ(shortval->getBoolBuffer(0,1,buf)[0], rand_val2);
+    // EXPECT_EQ(shortval->getCharBuffer(0,1,buf)[0], rand_val2);
+    EXPECT_EQ(shortval->getShortBuffer(0,1,buf1)[0], (short)rand_val2);
     cout<<shortval->getIntBuffer(0,1,buf2)<<endl;
     EXPECT_EQ(buf2[0], (int)rand_val2);
     EXPECT_EQ(shortval->getLongBuffer(0,1,buf3)[0], (long)rand_val2);
@@ -862,13 +1234,13 @@ TEST_F(ScalarTest,testScalarFunction){
             EXPECT_TRUE(val->isValid(0,1,buf0));
             EXPECT_TRUE(val->getBool(0,1,buf00));
             EXPECT_TRUE(val->getChar(0,1,buf));
-            EXPECT_TRUE(val->getShort(0,1,buf1)); 
+            EXPECT_TRUE(val->getShort(0,1,buf1));
             EXPECT_TRUE(val->getInt(0,1,buf2));
             EXPECT_TRUE(val->getLong(0,1,buf3));
             EXPECT_TRUE(val->getIndex(0,1,buf4));
             EXPECT_TRUE(val->getFloat(0,1,buf5));
-            EXPECT_TRUE(val->getDouble(0,1,buf6));   
-            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false)); 
+            EXPECT_TRUE(val->getDouble(0,1,buf6));
+            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false));
             EXPECT_FALSE(val->getString(0,1,buf8));
             EXPECT_FALSE(val->getString(0,1,buf9));
             EXPECT_FALSE(val->getBinary(0,1,1,buf10));
@@ -876,13 +1248,13 @@ TEST_F(ScalarTest,testScalarFunction){
             cout<<val->getAllocatedMemory();
             // EXPECT_EQ(val->getBoolConst(0,1,buf)[0], 1);
             // EXPECT_EQ(val->getCharConst(0,1,buf)[0], rand_val3);
-            // EXPECT_EQ(val->getShortConst(0,1,buf1)[0], (short)rand_val3); 
-            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], (int)rand_val3); 
-            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], (long long)rand_val3); 
-            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], (INDEX)rand_val3); 
-            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], (float)rand_val3); 
-            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], (double)rand_val3); 
-            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false)); 
+            // EXPECT_EQ(val->getShortConst(0,1,buf1)[0], (short)rand_val3);
+            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], (int)rand_val3);
+            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], (long long)rand_val3);
+            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], (INDEX)rand_val3);
+            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], (float)rand_val3);
+            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], (double)rand_val3);
+            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false));
             EXPECT_ANY_THROW(val->getStringConst(0,1,buf8)[0]);
             EXPECT_ANY_THROW(val->getStringConst(0,24,buf9));
             EXPECT_ANY_THROW(val->getBinaryConst(0,1,1,buf10));
@@ -892,13 +1264,13 @@ TEST_F(ScalarTest,testScalarFunction){
             EXPECT_TRUE(val->isValid(0,1,buf0));
             EXPECT_TRUE(val->getBool(0,1,buf00));
             EXPECT_TRUE(val->getChar(0,1,buf));
-            EXPECT_TRUE(val->getShort(0,1,buf1)); 
+            EXPECT_TRUE(val->getShort(0,1,buf1));
             EXPECT_TRUE(val->getInt(0,1,buf2));
             EXPECT_TRUE(val->getLong(0,1,buf3));
             EXPECT_TRUE(val->getIndex(0,1,buf4));
             EXPECT_TRUE(val->getFloat(0,1,buf5));
-            EXPECT_TRUE(val->getDouble(0,1,buf6));   
-            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false)); 
+            EXPECT_TRUE(val->getDouble(0,1,buf6));
+            EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false));
             EXPECT_FALSE(val->getString(0,1,buf8));
             EXPECT_FALSE(val->getString(0,1,buf9));
             EXPECT_FALSE(val->getBinary(0,1,1,buf10));
@@ -906,22 +1278,22 @@ TEST_F(ScalarTest,testScalarFunction){
             cout<<val->getAllocatedMemory();
             // EXPECT_EQ(val->getBoolConst(0,1,buf)[0], 1);
             // EXPECT_EQ(val->getCharConst(0,1,buf)[0], rand_val3);
-            // EXPECT_EQ(val->getShortConst(0,1,buf1)[0], (short)rand_val3); 
-            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], INT_MIN); 
-            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], LLONG_MIN); 
-            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], INDEX_MIN); 
-            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], FLT_NMIN); 
-            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], DBL_NMIN); 
-            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false)); 
+            // EXPECT_EQ(val->getShortConst(0,1,buf1)[0], (short)rand_val3);
+            EXPECT_EQ(val->getIntConst(0,1,buf2)[0], INT_MIN);
+            EXPECT_EQ(val->getLongConst(0,1,buf3)[0], LLONG_MIN);
+            EXPECT_EQ(val->getIndexConst(0,1,buf4)[0], INDEX_MIN);
+            EXPECT_EQ(val->getFloatConst(0,1,buf5)[0], FLT_NMIN);
+            EXPECT_EQ(val->getDoubleConst(0,1,buf6)[0], DBL_NMIN);
+            EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false));
             EXPECT_ANY_THROW(val->getStringConst(0,1,buf8)[0]);
             EXPECT_ANY_THROW(val->getStringConst(0,24,buf9));
             EXPECT_ANY_THROW(val->getBinaryConst(0,1,1,buf10));
         }
     }
 
-    // EXPECT_EQ(longval->getBoolBuffer(0,1,buf)[0], rand_val3); 
-    // EXPECT_EQ(longval->getCharBuffer(0,1,buf)[0], rand_val3); 
-    // EXPECT_EQ(longval->getShortBuffer(0,1,buf1)[0], (short)rand_val3); 
+    // EXPECT_EQ(longval->getBoolBuffer(0,1,buf)[0], rand_val3);
+    // EXPECT_EQ(longval->getCharBuffer(0,1,buf)[0], rand_val3);
+    // EXPECT_EQ(longval->getShortBuffer(0,1,buf1)[0], (short)rand_val3);
     cout<<longval->getIntBuffer(0,1,buf2)<<endl;
     EXPECT_EQ(buf2[0], (int)rand_val3);
     EXPECT_EQ(longval->getLongBuffer(0,1,buf3)[0], (long long)rand_val3);
@@ -945,34 +1317,34 @@ TEST_F(ScalarTest,testScalarFunction){
     for(auto &val:f_vals){
         EXPECT_TRUE(val->getBool(0,1,buf00));
         EXPECT_TRUE(val->getChar(0,1,buf));
-        EXPECT_TRUE(val->getShort(0,1,buf1)); 
+        EXPECT_TRUE(val->getShort(0,1,buf1));
         EXPECT_TRUE(val->getInt(0,1,buf2));
         EXPECT_TRUE(val->getLong(0,1,buf3));
         EXPECT_TRUE(val->getIndex(0,1,buf4));
         EXPECT_TRUE(val->getFloat(0,1,buf5));
-        EXPECT_TRUE(val->getDouble(0,1,buf6));   
-        EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false)); 
+        EXPECT_TRUE(val->getDouble(0,1,buf6));
+        EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false));
         EXPECT_FALSE(val->getString(0,1,buf8));
         EXPECT_FALSE(val->getString(0,1,buf9));
         EXPECT_FALSE(val->getBinary(0,1,1,buf10));
         EXPECT_FALSE(val->getHash(0,1,buckets,buf2));
         EXPECT_TRUE(val->getBoolConst(0,1,buf));
         EXPECT_TRUE(val->getCharConst(0,1,buf));
-        EXPECT_TRUE(val->getShortConst(0,1,buf1)); 
+        EXPECT_TRUE(val->getShortConst(0,1,buf1));
         EXPECT_TRUE(val->getIntConst(0,1,buf2));
         EXPECT_TRUE(val->getLongConst(0,1,buf3));
         EXPECT_TRUE(val->getIndexConst(0,1,buf4));
         EXPECT_TRUE(val->getFloatConst(0,1,buf5));
-        EXPECT_TRUE(val->getDoubleConst(0,1,buf6));   
-        EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false)[0]); 
+        EXPECT_TRUE(val->getDoubleConst(0,1,buf6));
+        EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false)[0]);
         EXPECT_ANY_THROW(val->getStringConst(0,1,buf8)[0]);
         EXPECT_ANY_THROW(val->getStringConst(0,1,buf9)[0]);
         EXPECT_ANY_THROW(val->getBinaryConst(0,1,1,buf10)[0]);
     }
 
-    // EXPECT_EQ(longval->getBoolBuffer(0,1,buf)[0], 1); 
-    // EXPECT_EQ(longval->getCharBuffer(0,1,buf)[0], rand_val4); 
-    EXPECT_EQ(floatval->getShortBuffer(0,1,buf1)[0], (short)2); 
+    // EXPECT_EQ(longval->getBoolBuffer(0,1,buf)[0], 1);
+    // EXPECT_EQ(longval->getCharBuffer(0,1,buf)[0], rand_val4);
+    EXPECT_EQ(floatval->getShortBuffer(0,1,buf1)[0], (short)2);
     cout<<floatval->getIntBuffer(0,1,buf2)<<endl;
     EXPECT_EQ(buf2[0], (int)2);
     EXPECT_EQ(floatval->getLongBuffer(0,1,buf3)[0], (long long)2);
@@ -996,34 +1368,34 @@ TEST_F(ScalarTest,testScalarFunction){
     for(auto &val:double_vals){
         EXPECT_TRUE(val->getBool(0,1,buf00));
         EXPECT_TRUE(val->getChar(0,1,buf));
-        EXPECT_TRUE(val->getShort(0,1,buf1)); 
+        EXPECT_TRUE(val->getShort(0,1,buf1));
         EXPECT_TRUE(val->getInt(0,1,buf2));
         EXPECT_TRUE(val->getLong(0,1,buf3));
         EXPECT_TRUE(val->getIndex(0,1,buf4));
         EXPECT_TRUE(val->getFloat(0,1,buf5));
-        EXPECT_TRUE(val->getDouble(0,1,buf6));   
-        EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false)); 
+        EXPECT_TRUE(val->getDouble(0,1,buf6));
+        EXPECT_FALSE(val->getSymbol(0,1,buf2,symbase,false));
         EXPECT_FALSE(val->getString(0,1,buf8));
         EXPECT_FALSE(val->getString(0,1,buf9));
         EXPECT_FALSE(val->getBinary(0,1,1,buf10));
         EXPECT_FALSE(val->getHash(0,1,buckets,buf2));
         EXPECT_TRUE(val->getBoolConst(0,1,buf));
         EXPECT_TRUE(val->getCharConst(0,1,buf));
-        EXPECT_TRUE(val->getShortConst(0,1,buf1)); 
+        EXPECT_TRUE(val->getShortConst(0,1,buf1));
         EXPECT_TRUE(val->getIntConst(0,1,buf2));
         EXPECT_TRUE(val->getLongConst(0,1,buf3));
         EXPECT_TRUE(val->getIndexConst(0,1,buf4));
         EXPECT_TRUE(val->getFloatConst(0,1,buf5));
-        EXPECT_TRUE(val->getDoubleConst(0,1,buf6));   
-        EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false)); 
+        EXPECT_TRUE(val->getDoubleConst(0,1,buf6));
+        EXPECT_ANY_THROW(val->getSymbolConst(0,1,buf2,symbase,false));
         EXPECT_ANY_THROW(val->getStringConst(0,1,buf8));
         EXPECT_ANY_THROW(val->getStringConst(0,1,buf9));
         EXPECT_ANY_THROW(val->getBinaryConst(0,1,1,buf10));
     }
 
-    // EXPECT_EQ(longval->getBoolBuffer(0,1,buf)[0], 1); 
-    // EXPECT_EQ(longval->getCharBuffer(0,1,buf)[0], rand_val4); 
-    EXPECT_EQ(doubleval->getShortBuffer(0,1,buf1)[0], (short)2); 
+    // EXPECT_EQ(longval->getBoolBuffer(0,1,buf)[0], 1);
+    // EXPECT_EQ(longval->getCharBuffer(0,1,buf)[0], rand_val4);
+    EXPECT_EQ(doubleval->getShortBuffer(0,1,buf1)[0], (short)2);
     cout<<doubleval->getIntBuffer(0,1,buf2)<<endl;
     EXPECT_EQ(buf2[0], (int)2);
     EXPECT_EQ(doubleval->getLongBuffer(0,1,buf3)[0], (long long)2);
@@ -1145,7 +1517,7 @@ TEST_F(ScalarTest,testFunctionCastTemporal_datatime){
     EXPECT_EQ(datetimeval->castTemporal(DT_TIMESTAMP)->getString(),conn.run("timestamp(datetime(1))")->getString());
     EXPECT_EQ(datetimeval->castTemporal(DT_NANOTIME)->getString(),conn.run("nanotime(datetime(1))")->getString());
     EXPECT_EQ(datetimeval->castTemporal(DT_NANOTIMESTAMP)->getString(),conn.run("nanotimestamp(datetime(1))")->getString());
-    EXPECT_EQ(datetimeval->castTemporal(DT_DATEHOUR)->getString(),conn.run("datehour(datetime(1))")->getString()); 
+    EXPECT_EQ(datetimeval->castTemporal(DT_DATEHOUR)->getString(),conn.run("datehour(datetime(1))")->getString());
 
     int negSec = 0 - rand() % INT_MAX;
     int posSec = rand() % INT_MAX;
@@ -1289,7 +1661,7 @@ TEST_F(ScalarTest,testFunctionCastTemporal_Timestamp){
     EXPECT_EQ(timestampval->castTemporal(DT_TIMESTAMP)->getString(),conn.run("timestamp(timestamp(1000000))")->getString());
     EXPECT_EQ(timestampval->castTemporal(DT_NANOTIME)->getString(),conn.run("nanotime(timestamp(1000000))")->getString());
     EXPECT_EQ(timestampval->castTemporal(DT_NANOTIMESTAMP)->getString(),conn.run("nanotimestamp(timestamp(1000000))")->getString());
-    EXPECT_EQ(timestampval->castTemporal(DT_DATEHOUR)->getString(),conn.run("datehour(timestamp(1000000))")->getString()); 
+    EXPECT_EQ(timestampval->castTemporal(DT_DATEHOUR)->getString(),conn.run("datehour(timestamp(1000000))")->getString());
 
     long long negSec = 0 - rand() % LLONG_MAX;
     long long posSec = rand() % LLONG_MAX;
@@ -1420,7 +1792,7 @@ TEST_F(ScalarTest,testFunctionCastTemporal_second){
     EXPECT_ANY_THROW(secondval->castTemporal(DT_TIMESTAMP));
     EXPECT_EQ(secondval->castTemporal(DT_NANOTIME)->getString(),conn.run("nanotime(second(1))")->getString());
     EXPECT_ANY_THROW(secondval->castTemporal(DT_NANOTIMESTAMP));
-    EXPECT_ANY_THROW(secondval->castTemporal(DT_DATEHOUR)); 
+    EXPECT_ANY_THROW(secondval->castTemporal(DT_DATEHOUR));
 
     // cout<<negSec<<endl<<posSec<<endl<<negSec3600<<endl<<posSec3600<<endl;
     EXPECT_EQ(Util::createSecond(INT_MIN)->castTemporal(DT_TIME)->getString(),conn.run("time(second("+to_string(INT_MIN)+"))")->getString());
@@ -1446,7 +1818,7 @@ TEST_F(ScalarTest,testFunctionCastTemporal_minute){
     EXPECT_ANY_THROW(minuteval->castTemporal(DT_TIMESTAMP));
     EXPECT_EQ(minuteval->castTemporal(DT_NANOTIME)->getString(),conn.run("nanotime(minute(1))")->getString());
     EXPECT_ANY_THROW(minuteval->castTemporal(DT_NANOTIMESTAMP));
-    EXPECT_ANY_THROW(minuteval->castTemporal(DT_DATEHOUR));  
+    EXPECT_ANY_THROW(minuteval->castTemporal(DT_DATEHOUR));
 
     // cout<<negSec<<endl<<posSec<<endl<<negSec3600<<endl<<posSec3600<<endl;
     EXPECT_EQ(Util::createMinute(INT_MIN)->castTemporal(DT_TIME)->getString(),conn.run("time(minute("+to_string(INT_MIN)+"))")->getString());
@@ -2009,7 +2381,7 @@ TEST_F(ScalarTest,testFunction_parseIP4){
     ipv4Val = Util::parseConstant(DT_IP, "192.168.111.12");
     ConstantSP ipv4Val1 = Util::parseConstant(DT_IP, "255.255..");
     ConstantSP ipv4Val2 = Util::parseConstant(DT_IP, "124.013.22.1");
-    ConstantSP ipv4Val3 = Util::parseConstant(DT_IP, "0.0.000.55"); 
+    ConstantSP ipv4Val3 = Util::parseConstant(DT_IP, "0.0.000.55");
     ConstantSP ipv4Val4 = Util::parseConstant(DT_IP, "0.0.0.0");
 
     // cout<<ipv4Val->getString()<<endl<<ipv4Val1->getString()<<endl<<ipv4Val2->getString()<<endl<<ipv4Val3->getString()<<endl<<ipv4Val4->getString()<<endl;
@@ -2025,7 +2397,7 @@ TEST_F(ScalarTest,testFunction_parseIP6){
     ipv6Val = Util::parseConstant(DT_IP, "2001:3CA1:010F:001A:121B:0000:2C3B:0010");
     ConstantSP ipv6Val1 = Util::parseConstant(DT_IP, "2001:3CA1:010F:001A:121B:0000:3100:0");
     ConstantSP ipv6Val2 = Util::parseConstant(DT_IP, ":3CA1:10F:001A:121B:::10");
-    ConstantSP ipv6Val3 = Util::parseConstant(DT_IP, "2001:3CA1:010F:1A:121B:00::0010"); 
+    ConstantSP ipv6Val3 = Util::parseConstant(DT_IP, "2001:3CA1:010F:1A:121B:00::0010");
     ConstantSP ipv6Val4 = Util::parseConstant(DT_IP, "0:0:0:0:0:0:0:0");
 
     // cout<<ipv6Val->getString()<<endl<<ipv6Val1->getString()<<endl<<ipv6Val2->getString()<<endl<<ipv6Val3->getString()<<endl<<ipv6Val4->getString()<<endl;

@@ -56,48 +56,63 @@ void LOG_INFO(const string& msg){
 	std::cout<<msg<<std::endl;
 }
 
-Socket::Socket():host_(""), port_(-1), blocking_(true), autoClose_(true), enableSSL_(false), ctx_(nullptr), ssl_(nullptr), keepAliveTime_(30) {
+Socket::Socket():host_(""), port_(-1), blocking_(true), autoClose_(true), enableSSL_(false),
+#ifdef USE_OPENSSL
+    ctx_(nullptr), ssl_(nullptr),
+#endif
+    keepAliveTime_(30) {
     handle_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(INVALID_SOCKET == handle_) {
-    	throw IOException("Couldn't create a socket with error code " + std::to_string(getErrorCode()));
+        throw IOException("Couldn't create a socket with error code " + std::to_string(getErrorCode()));
     }
-	else if(!blocking_){
-		setNonBlocking();
-	}
+    else if(!blocking_){
+        setNonBlocking();
+    }
     if(ENABLE_TCP_NODELAY)
-    	setTcpNoDelay();
+        setTcpNoDelay();
 }
 
-Socket::Socket(const string& host, int port, bool blocking, int keepAliveTime, bool enableSSL) : host_(host), port_(port), blocking_(blocking), autoClose_(true), enableSSL_(enableSSL), ctx_(nullptr), ssl_(nullptr), keepAliveTime_(keepAliveTime) {
-	if(host.empty() && port > 0){
-		//server mode
-		handle_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if(INVALID_SOCKET == handle_) {
-			throw IOException("Couldn't create a socket with error code " + std::to_string(getErrorCode()));
-		}
-		else if(!blocking_){
-			setNonBlocking();
-		}
-	    if(ENABLE_TCP_NODELAY)
-	    	setTcpNoDelay();
-	}
-	else if(!host.empty() && port > 0){
-		//client mode
+Socket::Socket(const string& host, int port, bool blocking, int keepAliveTime, bool enableSSL) : host_(host), port_(port), blocking_(blocking), autoClose_(true), enableSSL_(enableSSL),
+#ifdef USE_OPENSSL
+    ctx_(nullptr), ssl_(nullptr),
+#endif
+    keepAliveTime_(keepAliveTime) {
+#ifndef USE_OPENSSL
+    enableSSL_ = false;
+#endif
+    if(host.empty() && port > 0){
+        //server mode
+        handle_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if(INVALID_SOCKET == handle_) {
+            throw IOException("Couldn't create a socket with error code " + std::to_string(getErrorCode()));
+        }
+        else if(!blocking_){
+            setNonBlocking();
+        }
+        if(ENABLE_TCP_NODELAY)
+            setTcpNoDelay();
+    }
+    else if(!host.empty() && port > 0){
+        //client mode
 
-	}
-	else
-		handle_ = INVALID_SOCKET;
+    }
+    else
+        handle_ = INVALID_SOCKET;
 }
 
-Socket::Socket(SOCKET handle, bool blocking, int keepAliveTime) : host_(""), port_(-1), handle_(handle), blocking_(blocking), autoClose_(true), enableSSL_(false), ctx_(nullptr), ssl_(nullptr), keepAliveTime_(keepAliveTime) {
-	if(INVALID_SOCKET == handle_) {
-		throw IOException("The given socket is invalid.");
-	}
-	else if(!blocking){
-		setNonBlocking();
-	}
+Socket::Socket(SOCKET handle, bool blocking, int keepAliveTime) : host_(""), port_(-1), handle_(handle), blocking_(blocking), autoClose_(true), enableSSL_(false),
+#ifdef USE_OPENSSL
+    ctx_(nullptr), ssl_(nullptr),
+#endif
+    keepAliveTime_(keepAliveTime) {
+    if(INVALID_SOCKET == handle_) {
+        throw IOException("The given socket is invalid.");
+    }
+    else if(!blocking){
+        setNonBlocking();
+    }
     if(ENABLE_TCP_NODELAY)
-    	setTcpNoDelay();
+        setTcpNoDelay();
 }
 
 Socket::~Socket(){
@@ -152,6 +167,7 @@ readdata:
 		}
 #endif// end of enableSSL_=false
 	} else {
+#ifdef USE_OPENSSL
 readdata2:
         actualLength = SSL_read(ssl_, buffer, length);
 		RECORD_READ(buffer, actualLength);
@@ -164,6 +180,7 @@ readdata2:
             LOG_ERR("Socket(SSL)::read err =" + std::to_string(err));
             return OTHERERR;
         }
+#endif
         return OK;
     }
 }
@@ -212,6 +229,7 @@ IO_ERR Socket::write(const char* buffer, size_t length, size_t& actualLength){
 #endif
 	}
 	else {
+#ifdef USE_OPENSSL
 		senddata2:
 		actualLength = SSL_write(ssl_, (const void*)buffer, length);
 		RECORD_WRITE(buffer, actualLength);
@@ -222,6 +240,7 @@ IO_ERR Socket::write(const char* buffer, size_t length, size_t& actualLength){
 			LOG_ERR("Socket(SSL)::write err =" + std::to_string(err));
 			return OTHERERR;
 		}
+#endif
 		return OK;
 	}
 }
@@ -267,6 +286,9 @@ IO_ERR Socket::connect(const string& host, int port, bool blocking, int keepAliv
 	port_ = port;
 	blocking_ = blocking;
 	enableSSL_ = sslEnable;
+#ifndef USE_OPENSSL
+    enableSSL_ = false;
+#endif
 	keepAliveTime_ = keepAliveTime;
 	return connect();
 }
@@ -367,13 +389,16 @@ IO_ERR Socket::connect(){
 
 	if(!enableSSL_)
 		return OK;
+#ifdef USE_OPENSSL
 	else if(sslConnect() != OK)
 		return DISCONNECTED;
+#endif
 	else
 		return OK;
 }
 
 IO_ERR Socket::close(){
+#ifdef USE_OPENSSL
 	if(ssl_ != nullptr) {
 		//shutdown until it done.
 		while (SSL_shutdown(ssl_) == 0) {
@@ -382,6 +407,7 @@ IO_ERR Socket::close(){
 		SSL_free(ssl_);
 		ssl_ = nullptr;
 	}
+#endif
 	if(handle_!= INVALID_SOCKET){
 #if defined LINUX
 		shutdown(handle_, SHUT_RDWR);
@@ -393,10 +419,12 @@ IO_ERR Socket::close(){
 		}
 		handle_=INVALID_SOCKET;
 	}
+#ifdef USE_OPENSSL
 	if (ctx_ != nullptr) {
 		SSL_CTX_free(ctx_);
 		ctx_ = nullptr;
 	}
+#endif
 	return OK;
 }
 
@@ -537,17 +565,21 @@ int Socket::getErrorCode(){
 #endif
 }
 
+#ifdef USE_OPENSSL
 SSL_CTX* Socket::initCTX(){
     const SSL_METHOD* method;
     SSL_CTX* ctx;
 
     OpenSSL_add_all_algorithms();
     SSL_load_error_strings();
-	#ifdef SSL1_1
-		method = TLS_client_method();
-	#else
-	    method = TLSv1_2_client_method();
-	#endif
+	
+#if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+	// Code for OpenSSL 1.1.0 and above
+	method = TLS_client_method();
+#else
+	// Code for OpenSSL versions below 1.1.0
+	method = TLSv1_2_client_method();
+#endif
     ctx = SSL_CTX_new(method);
     return ctx;
 }
@@ -598,7 +630,7 @@ void Socket::showCerts(SSL *ssl) {
     else
         printf("Info: No client certificates configured.\n");
 }
-
+#endif
 UdpSocket::UdpSocket(int port) : port_(port), remotePort_(-1){
     if ((handle_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
     	throw IOException("Couldn't create a udp socket with error code " + std::to_string(getErrorCode()));
@@ -1111,8 +1143,7 @@ IO_ERR DataInputStream::readBytes(char* buf, size_t length, size_t& actualLength
 IO_ERR DataInputStream::readBytes(char* buf, size_t unitLength, size_t length, size_t& actualLength){
 	if(unitLength == 1)
 		return readBytes(buf, length, actualLength);
-	else if(unitLength > MAX_CAPACITY)
-		return TOO_LARGE_DATA;
+
 	IO_ERR ret = readBytes(buf, length * unitLength, actualLength);
 	int remainder = actualLength % unitLength;
 	actualLength = actualLength / unitLength;
@@ -1151,8 +1182,6 @@ IO_ERR DataInputStream::prepareBytes(size_t length){
 		return END_OF_STREAM;
 
 	if(capacity_ < length){
-		if(length > MAX_CAPACITY)
-			return TOO_LARGE_DATA;
 		char* tmp = new char[length];
 		memcpy(tmp, buf_+cursor_, size_);
 		capacity_ = length;
@@ -1205,7 +1234,7 @@ IO_ERR DataInputStream::prepareBytes(size_t length){
 
 bool DataInputStream::isHaveBytesEndWith(char endChar, size_t& endPos){
 	if(source_ != QUEUE_STREAM){
-		return OTHERERR;
+		return false;
 	}
 	char* cur = buf_ + cursor_;
 	int count = size_;
@@ -1248,11 +1277,9 @@ IO_ERR DataInputStream::prepareBytesEndWith(char endChar, size_t& endPos){
 				memmove(buf_, buf_+cursor_, size_);
 				cursor_ =0;
 			}
-			else if(size_ >= MAX_CAPACITY)
-				return TOO_LARGE_DATA;
 			else {
 				//increase capacity
-				capacity_ = ((std::min))(2 * capacity_, (size_t)MAX_CAPACITY);
+				capacity_ = 2 * capacity_;
 				char* tmp = new char[capacity_];
 				memcpy(tmp, buf_ + cursor_, size_);
 				delete[] buf_;

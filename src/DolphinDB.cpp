@@ -111,17 +111,18 @@ public:
     ~DBConnectionImpl();
     bool connect(const string& hostName, int port, const string& userId = "", const string& password = "",bool sslEnable = false, bool asynTask = false, int keepAliveTime = -1, bool compress= false, bool python = false);
     void login(const string& userId, const string& password, bool enableEncryption);
-    ConstantSP run(const string& script, int priority = 4, int parallelism = 2, int fetchSize = 0, bool clearMemory = false);
-    ConstantSP run(const string& funcName, vector<ConstantSP>& args, int priority = 4, int parallelism = 2, int fetchSize = 0, bool clearMemory = false);
+    ConstantSP run(const string& script, int priority = 4, int parallelism = 2, int fetchSize = 0, bool clearMemory = false, long seqNum = 0);
+    ConstantSP run(const string& funcName, vector<ConstantSP>& args, int priority = 4, int parallelism = 2, int fetchSize = 0, bool clearMemory = false, long seqNum = 0);
     ConstantSP upload(const string& name, const ConstantSP& obj);
 	ConstantSP upload(vector<string>& names, vector<ConstantSP>& objs);
     void close();
     bool isConnected() { return isConnected_; }
 	void getHostPort(string &host, int &port) { host = hostName_; port = port_; }
-	SocketSP getSocket(){return conn_;}
+    void setClientId(const std::string& clientId){runClientId_ = clientId;}
+    DataInputStreamSP getDataInputStream(){return inputStream_;}
 private:
 	long generateRequestFlag(bool clearSessionMemory = false, bool disablepickle = false, bool pickleTableToList = false);
-    ConstantSP run(const string& script, const string& scriptType, vector<ConstantSP>& args, int priority = 4, int parallelism = 2,int fetchSize = 0, bool clearMemory = false);
+    ConstantSP run(const string& script, const string& scriptType, vector<ConstantSP>& args, int priority = 4, int parallelism = 2,int fetchSize = 0, bool clearMemory = false, long seqNum = 0);
     bool connect();
     void login();
 
@@ -142,6 +143,8 @@ private:
 	bool enablePickle_, python_;
     static DdbInit ddbInit_;
     bool isReverseStreaming_;
+    string runClientId_;
+    DataInputStreamSP inputStream_;
 };
 
 class TaskStatusMgmt{
@@ -758,9 +761,9 @@ ConstantSP DFSChunkMeta::values() const {
 
 DdbInit DBConnectionImpl::ddbInit_;
 DBConnectionImpl::DBConnectionImpl(bool sslEnable, bool asynTask, int keepAliveTime, bool compress, bool python, bool isReverseStreaming)
-		: port_(0), encrypted_(false), isConnected_(false), littleEndian_(Util::isLittleEndian()), 
-		sslEnable_(sslEnable),asynTask_(asynTask), keepAliveTime_(keepAliveTime), compress_(compress),
-		enablePickle_(false), python_(python), isReverseStreaming_(isReverseStreaming){
+    : port_(0), encrypted_(false), isConnected_(false), littleEndian_(Util::isLittleEndian()), sslEnable_(sslEnable),asynTask_(asynTask)
+    , keepAliveTime_(keepAliveTime), compress_(compress), enablePickle_(false), python_(python), isReverseStreaming_(isReverseStreaming)
+{
 }
 
 DBConnectionImpl::~DBConnectionImpl() {
@@ -859,6 +862,7 @@ bool DBConnectionImpl::connect() {
     }
 
     conn_ = conn;
+    inputStream_ = new DataInputStream(conn_);
     sessionId_ = sessionId;
     isConnected_ = true;
     littleEndian_ = remoteLittleEndian;
@@ -920,13 +924,13 @@ void DBConnectionImpl::login() {
         throw IOException("Failed to authenticate the user " + userId_);
 }
 
-ConstantSP DBConnectionImpl::run(const string& script, int priority, int parallelism, int fetchSize, bool clearMemory) {
+ConstantSP DBConnectionImpl::run(const string& script, int priority, int parallelism, int fetchSize, bool clearMemory, long seqNum) {
     vector<ConstantSP> args;
-    return run(script, "script", args, priority, parallelism, fetchSize, clearMemory);
+    return run(script, "script", args, priority, parallelism, fetchSize, clearMemory, seqNum);
 }
 
-ConstantSP DBConnectionImpl::run(const string& funcName, vector<ConstantSP>& args, int priority, int parallelism, int fetchSize, bool clearMemory) {
-    return run(funcName, "function", args, priority, parallelism, fetchSize, clearMemory);
+ConstantSP DBConnectionImpl::run(const string& funcName, vector<ConstantSP>& args, int priority, int parallelism, int fetchSize, bool clearMemory, long seqNum) {
+    return run(funcName, "function", args, priority, parallelism, fetchSize, clearMemory, seqNum);
 }
 
 ConstantSP DBConnectionImpl::upload(const string& name, const ConstantSP& obj) {
@@ -981,13 +985,13 @@ long DBConnectionImpl::generateRequestFlag(bool clearSessionMemory, bool disable
 }
 
 ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType, vector<ConstantSP>& args,
-			int priority, int parallelism, int fetchSize, bool clearMemory) {
-	DLOG("run1",script,"start");
+            int priority, int parallelism, int fetchSize, bool clearMemory, long seqNum) {
+    DLOG("run1",script,"start");
     if (!isConnected_)
         throw IOException("Couldn't send script/function to the remote host because the connection has been closed");
 
-    if(fetchSize > 0 && fetchSize < 8192)
-        throw IOException("fetchSize must be greater than 8192");
+    if(fetchSize < 8192 && fetchSize != 0)
+        throw IOException("fetchSize must be greater than 8192 and not less than 0");
     string body;
     int argCount = args.size();
     if (scriptType == "script")
@@ -1001,8 +1005,10 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
     string out("API2 " + sessionId_ + " ");
     out.append(Util::convert((int)body.size()));
     out.append(" / " + std::to_string(generateRequestFlag(clearMemory,true)) + "_1_" + std::to_string(priority) + "_" + std::to_string(parallelism));
-    if(fetchSize > 0)
-        out.append("__" + std::to_string(fetchSize));
+    out.append("__" + std::to_string(fetchSize));
+    if(!runClientId_.empty() && seqNum != 0){
+        out.append(std::string("__").append(runClientId_).append("_").append(std::to_string(seqNum)));
+    }
     out.append(1, '\n');
     out.append(body);
     DLOG("run1",script,"header",out);
@@ -1014,68 +1020,70 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
                 throw IOException("The function argument or uploaded object is not marshallable.");
             }
         }
-		DataOutputStreamSP outStream = new DataOutputStream(conn_);
-		ConstantMarshallFactory marshallFactory(outStream);
+        DataOutputStreamSP outStream = new DataOutputStream(conn_);
+        ConstantMarshallFactory marshallFactory(outStream);
+        bool enableCompress = false;
         for (int i = 0; i < argCount; ++i) {
+            enableCompress = (args[i]->getForm() == DATA_FORM::DF_TABLE) ? compress_ : false;
             ConstantMarshall* marshall = marshallFactory.getConstantMarshall(args[i]->getForm());
             if (i == 0)
-                marshall->start(out.c_str(), out.size(), args[i], true, compress_, ret);
+                marshall->start(out.c_str(), out.size(), args[i], true, enableCompress, ret);
             else
-                marshall->start(args[i], true, compress_, ret);
+                marshall->start(args[i], true, enableCompress, ret);
             marshall->reset();
             if (ret != OK) {
-				close();
+                close();
                 throw IOException("Couldn't send function argument to the remote host with IO error type " + std::to_string(ret));
             }
         }
         ret = outStream->flush();
         if (ret != OK) {
-			close();
+            close();
             throw IOException("Failed to marshall code with IO error type " + std::to_string(ret));
         }
     } else {
         size_t actualLength;
         IO_ERR ret = conn_->write(out.c_str(), out.size(), actualLength);
         if (ret != OK) {
-			close();
-            throw IOException("Couldn't send script/function to the remote host because the connection has been closed");
+            close();
+            throw IOException("Couldn't send script/function to the remote host because the connection has been closed, IO error type " + std::to_string(ret));
         }
     }
-	
+    
     if(asynTask_)
         return new Void();
     DLOG("run1",script,"read");
-	DataInputStreamSP in = new DataInputStream(conn_);
+    
     if (littleEndian_ != (char)Util::isLittleEndian())
-        in->enableReverseIntegerByteOrder();
+        inputStream_->enableReverseIntegerByteOrder();
 
     string line;
-    if ((ret = in->readLine(line)) != OK) {
-		close();
+    if ((ret = inputStream_->readLine(line)) != OK) {
+        close();
         throw IOException("Failed to read response header from the socket with IO error type " + std::to_string(ret));
     }
-	while (line == "MSG") {
-		if ((ret = in->readString(line)) != OK) {
-			close();
-			throw IOException("Failed to read response msg from the socket with IO error type " + std::to_string(ret));
-		}
-		std::cout << line << std::endl;
-		if ((ret = in->readLine(line)) != OK) {
-			close();
-			throw IOException("Failed to read response header from the socket with IO error type " + std::to_string(ret));
-		}
-	}
-	vector<string> headers;
+    while (line == "MSG") {
+        if ((ret = inputStream_->readString(line)) != OK) {
+            close();
+            throw IOException("Failed to read response msg from the socket with IO error type " + std::to_string(ret));
+        }
+        std::cout << line << std::endl;
+        if ((ret = inputStream_->readLine(line)) != OK) {
+            close();
+            throw IOException("Failed to read response header from the socket with IO error type " + std::to_string(ret));
+        }
+    }
+    vector<string> headers;
     Util::split(line.c_str(), ' ', headers);
     if (headers.size() != 3) {
-		close();
+        close();
         throw IOException("Received invalid header");
     }
     sessionId_ = headers[0];
     int numObject = atoi(headers[1].c_str());
 
-    if ((ret = in->readLine(line)) != OK) {
-		close();
+    if ((ret = inputStream_->readLine(line)) != OK) {
+        close();
         throw IOException("Failed to read response message from the socket with IO error type " + std::to_string(ret));
     }
 
@@ -1086,48 +1094,48 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
     if (numObject == 0) {
         return new Void();
     }
-	
+    
     short flag;
-    if ((ret = in->readShort(flag)) != OK) {
-		close();
+    if ((ret = inputStream_->readShort(flag)) != OK) {
+        close();
         throw IOException("Failed to read object flag from the socket with IO error type " + std::to_string(ret));
     }
     
     DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
     DATA_TYPE type = static_cast<DATA_TYPE >(flag & 0xff);
     if(fetchSize > 0 && form == DF_VECTOR && type == DT_ANY)
-        return new BlockReader(in);
-    ConstantUnmarshallFactory factory(in);
+        return new BlockReader(inputStream_);
+    ConstantUnmarshallFactory factory(inputStream_);
     ConstantUnmarshall* unmarshall = factory.getConstantUnmarshall(form);
     if(unmarshall == NULL){
         DLogger::Error("Unknow incoming object form",form,"of type",type);
-        in->reset(0);
+        inputStream_->reset(0);
         conn_->skipAll();
         return Constant::void_;
     }
-	if (!unmarshall->start(flag, true, ret)) {
+    if (!unmarshall->start(flag, true, ret)) {
         unmarshall->reset();
-		close();
+        close();
         throw IOException("Failed to parse the incoming object with IO error type " + std::to_string(ret));
     }
 
     ConstantSP result = unmarshall->getConstant();
     unmarshall->reset();
-	DLOG("run1",script,"end");
+    DLOG("run1",script,"end");
     return result;
 }
 
 DBConnection::DBConnection(bool enableSSL, bool asyncTask, int keepAliveTime, bool compress, bool python, bool isReverseStreaming) :
 	conn_(new DBConnectionImpl(enableSSL, asyncTask, keepAliveTime, compress, python, isReverseStreaming)), uid_(""), pwd_(""), ha_(false),
 		enableSSL_(enableSSL), asynTask_(asyncTask), compress_(compress), nodes_({}),
-		lastConnNodeIndex_(0), python_(python), reconnect_(false), closed_(true){
+		lastConnNodeIndex_(0), python_(python), reconnect_(false), closed_(true), runSeqNo_(0){
 }
 
 DBConnection::DBConnection(DBConnection&& oth) :
 		conn_(move(oth.conn_)), uid_(move(oth.uid_)), pwd_(move(oth.pwd_)),
 		initialScript_(move(oth.initialScript_)), ha_(oth.ha_), enableSSL_(oth.enableSSL_),
 		asynTask_(oth.asynTask_),compress_(oth.compress_),nodes_(oth.nodes_),lastConnNodeIndex_(0),
-		reconnect_(oth.reconnect_), closed_(oth.closed_){}
+		reconnect_(oth.reconnect_), closed_(oth.closed_), runSeqNo_(oth.runSeqNo_){}
 
 DBConnection& DBConnection::operator=(DBConnection&& oth) {
     if (this == &oth) { return *this; }
@@ -1144,6 +1152,7 @@ DBConnection& DBConnection::operator=(DBConnection&& oth) {
 	lastConnNodeIndex_ = oth.lastConnNodeIndex_;
 	reconnect_ = oth.reconnect_;
 	closed_ = oth.closed_;
+    runSeqNo_ = oth.runSeqNo_;
     return *this;
 }
 
@@ -1276,6 +1285,7 @@ bool DBConnection::connect(const string& hostName, int port, const string& userI
 				return false;
 		}
     }
+    initClientID();
 	if (!initialScript_.empty()) {
 		run(initialScript_);
 	}
@@ -1349,28 +1359,29 @@ DBConnection::ExceptionType DBConnection::parseException(const string &msg, stri
 }
 
 void DBConnection::switchDataNode(const string &host, int port) {
-	bool connected = false;
-	while (connected == false && closed_ == false){
-		if (!host.empty()) {
-			if (connectNode(host, port)) {
-				connected = true;
-				break;
-			}
-		}
-		if (nodes_.empty()) {
-			throw RuntimeException("Failed to connect to " + host + ":" + std::to_string(port));
-		}
-		for (int i = nodes_.size() - 1; i >= 0; i--) {
-			lastConnNodeIndex_ = (lastConnNodeIndex_ + 1) % nodes_.size();
-			if (connectNode(nodes_[lastConnNodeIndex_].hostName, nodes_[lastConnNodeIndex_].port)) {
-				connected = true;
-				break;
-			}
-		}
-		Thread::sleep(1000);
-	}
+    bool connected = false;
+    while (connected == false && closed_ == false){
+        if (!host.empty()) {
+            if (connectNode(host, port)) {
+                connected = true;
+                break;
+            }
+        }
+        if (nodes_.empty()) {
+            throw RuntimeException("Failed to connect to " + host + ":" + std::to_string(port));
+        }
+        for (int i = nodes_.size() - 1; i >= 0; i--) {
+            lastConnNodeIndex_ = (lastConnNodeIndex_ + 1) % nodes_.size();
+            if (connectNode(nodes_[lastConnNodeIndex_].hostName, nodes_[lastConnNodeIndex_].port)) {
+                connected = true;
+                break;
+            }
+        }
+        if(connected) break;
+        Thread::sleep(1000);
+    }
     if (connected && initialScript_.empty() == false)
-		run(initialScript_);
+        run(initialScript_);
 }
 
 void DBConnection::login(const string& userId, const string& password, bool enableEncryption) {
@@ -1380,12 +1391,16 @@ void DBConnection::login(const string& userId, const string& password, bool enab
 }
 
 ConstantSP DBConnection::run(const string& script, int priority, int parallelism, int fetchSize, bool clearMemory) {
+    LockGuard<Mutex> LockGuard(&mutex_);
     if (nodes_.empty()==false) {
+        long seqNo = nextSeqNo();
 		while(closed_ == false){
 			try {
-				return conn_->run(script, priority, parallelism, fetchSize, clearMemory);
+				return conn_->run(script, priority, parallelism, fetchSize, clearMemory, seqNo);
 			}
 			catch (IOException& e) {
+                if(seqNo > 0)
+                    seqNo = -seqNo;
 				string host;
 				int port = 0;
 				if (connected()) {
@@ -1402,18 +1417,22 @@ ConstantSP DBConnection::run(const string& script, int priority, int parallelism
 			}
 		}
     } else {
-        return conn_->run(script, priority, parallelism, fetchSize, clearMemory);
+        return conn_->run(script, priority, parallelism, fetchSize, clearMemory, 0);
     }
     return NULL;
 }
 
 ConstantSP DBConnection::run(const string& funcName, vector<dolphindb::ConstantSP>& args, int priority, int parallelism, int fetchSize, bool clearMemory) {
+    LockGuard<Mutex> LockGuard(&mutex_);
     if (nodes_.empty() == false) {
+        long seqNo = nextSeqNo();
         while (closed_ == false) {
 			try {
-				return conn_->run(funcName, args, priority, parallelism, fetchSize, clearMemory);
+				return conn_->run(funcName, args, priority, parallelism, fetchSize, clearMemory, seqNo);
 			}
 			catch (IOException& e) {
+                if(seqNo > 0)
+                    seqNo = -seqNo;
 				string host;
 				int port = 0;
 				if (connected()) {
@@ -1430,12 +1449,13 @@ ConstantSP DBConnection::run(const string& funcName, vector<dolphindb::ConstantS
 			}
 		}
     } else {
-        return conn_->run(funcName, args, priority, parallelism, fetchSize, clearMemory);
+        return conn_->run(funcName, args, priority, parallelism, fetchSize, clearMemory, 0);
     }
     return NULL;
 }
 
 ConstantSP DBConnection::upload(const string& name, const ConstantSP& obj) {
+    LockGuard<Mutex> LockGuard(&mutex_);
     if (nodes_.empty() == false) {
 		while (closed_ == false) {
 			try {
@@ -1464,6 +1484,7 @@ ConstantSP DBConnection::upload(const string& name, const ConstantSP& obj) {
 }
 
 ConstantSP DBConnection::upload(vector<string>& names, vector<ConstantSP>& objs) {
+    LockGuard<Mutex> LockGuard(&mutex_);
     if (nodes_.empty() == false) {
 		while(closed_ == false){
 			try {
@@ -1505,6 +1526,29 @@ void DBConnection::parseIpPort(const string &ipport, string &ip, int &port) {
 	}
 }
 
+long DBConnection::nextSeqNo(){
+    runSeqNo_++;
+    if(runSeqNo_ <= 0){
+        runSeqNo_ = 1;
+    }
+    return runSeqNo_;
+}
+
+void DBConnection::initClientID(){
+    if(nodes_.empty()){
+        return;
+    }
+    auto versionStr = conn_->run("version()")->getString();
+    versionStr = Util::split(versionStr, ' ')[0];
+
+    if ((versionStr >= "1.30.20.5" && versionStr < "2") || versionStr >= "2.00.9") {
+        //server support clientId and seqNo
+        Uuid uuid(true);
+        std::string clientId_ = uuid.getValue()->getString();
+        conn_->setClientId(clientId_);
+    }
+}
+
 DBConnection::Node::Node(const string &ipport, double loadValue) {
 	DBConnection::parseIpPort(ipport, hostName, port);
 	load = loadValue;
@@ -1518,9 +1562,10 @@ void DBConnection::close() {
 const std::string& DBConnection::getInitScript() const {
     return initialScript_;
 }
-SocketSP DBConnection::getSocket()
+
+DataInputStreamSP DBConnection::getDataInputStream()
 {
-    return conn_->getSocket();
+    return conn_->getDataInputStream();
 }
 
 void DBConnection::setInitScript(const std::string & script) {
@@ -2087,6 +2132,9 @@ int SymbolBase::serialize(char* buf, int bufSize, INDEX indexStart, int offset, 
     int index = indexStart;
     int initSize = bufSize;
     while(index < (int)syms_.size() && bufSize > 0){
+        if(syms_[index].size() >= 262144){
+            throw RuntimeException("String in symbol too long, Serialization failed, length must be less than 256K bytes");
+        }
         int size = std::min(bufSize, (int)syms_[index].size() + 1 - offset);
         memcpy(buf, syms_[index].data() + offset,  size);
         buf += size;

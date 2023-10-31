@@ -1,0 +1,515 @@
+login(`admin,`123456)
+a=int(1);a
+b=bool(1);b
+c=char(1);c
+d=NULL;d
+ee=short(1);ee
+f=long(1);f
+g=date(1);g
+h=month(1);print(h)
+i=time(1);i
+j=minute(1);j
+k=second(1);k
+l=datetime(1);l
+m=timestamp(1);m
+n=nanotime(1);n
+o=nanotimestamp(1);o
+p=float(1.131586);p
+q=double(11012.4567486452);q
+r="1";r
+s=uuid("5d212a78-cc48-e3b1-4235-b4d91473ee87");s
+t=blob(`12312);t
+u=table(1 2 3 as col1, `a`b`c as col2);u
+v=arrayVector(1 2 3 , 9 9 9);v
+def w(){return 1+1};w
+de1 = decimal32("-2.65484623",3)
+de2 =decimal64(`2.65484623,12)
+de3 =decimal128(`0.65484623123123123123123123123123123123,38)
+
+
+z=1.123:2.2555;z
+aa=set(1 2 3);aa
+bb=matrix(1 2 3 , 4 5 6);bb
+cc=1 2 3;cc
+dd={`a:235};dd
+asd=complex(2, 5);asd
+zzz=point(2, 5);zzz
+zxc=200ms;zxc
+vv=<1+2>;vv
+def f1(a,b) {return a+b;};f1
+getActiveMaster
+plot(1 2 3 4,chartType=BAR)
+plot(1 2 3 4,chartType=LINE)
+plot(1 2 3 4,chartType=PIE)
+plot(1 2 3 4,chartType=COLUMN)
+plot(1 2 3 4,chartType=AREA)
+plot(1..100, rand(100,100),chartType=SCATTER)
+x=norm(0.0, 1.0, 10000);
+plotHist(x, 10)
+plotHist(x, 10, -2:2)
+defs()
+print(a,b,c,d,ee,f,g)
+
+// job test
+table1 = table(100:0,`col1`col2`col3,[INT,INT,INT]);share table1 as tmp
+def insert_job(n){
+	for(i in 1..100){tableInsert(tmp,rand(100,1),rand(100,1),rand(100,1));sleep(100)};
+	return tmp.rows();
+};go
+for(i in 1..100){
+    submitJob("insert"+i,"insert job demo "+i, insert_job, 100);
+}
+getRecentJobs().endTime;
+
+def f():1+2;
+scheduleJob(jobId=`daily, jobDesc="Daily Job 1", jobFunc=f, scheduleTime=17:23m, startDate=2018.01.01, endDate=2018.12.31, frequency='D');
+scheduleJob(jobId=`weekly, jobDesc="Weekly Job", jobFunc=f, scheduleTime=17:30m, startDate=2018.01.01, endDate=2018.12.31, frequency='W', days=2);
+getScheduledJobs()
+
+
+// rpc test
+rpc(getControllerAlias(),def(x,y):x+y, 10, 15)
+
+
+
+
+// database test
+def createDatabaseAndDfsTable(num){
+    for(i in 1..num){
+        dbName="dfs://DB_"+i
+        if(existsDatabase(dbName)){dropDatabase(dbName)}
+        if(existsDatabase("dfs://DBA.DBAA.DBAAA_"+i)){dropDatabase("dfs://DBA.DBAA.DBAAA_"+i)}
+        if(existsDatabase('dfs://TSDB_'+i)){dropDatabase('dfs://TSDB_'+i)}
+        db=database(dbName, HASH, partitionScheme=[INT, 1])
+        db2=database("dfs://DBA.DBAA.DBAAA_"+i, HASH, partitionScheme=[INT, 1])
+        db3=database('dfs://TSDB_'+i, VALUE, [INT, 1],,'TSDB')
+        t=table(1 2 3 as c1, `a`b`c as c2)
+        db.createPartitionedTable(t, "a_"+i, `c1).append!(t)
+        db.createPartitionedTable(t, "b_"+i, `c1).append!(t)
+        db2.createPartitionedTable(t, "a_"+i, `c1).append!(t)
+        db3.createPartitionedTable(t, "a_"+i,`c1,,[`c1]).append!(t)
+    }
+}
+createDatabaseAndDfsTable(20)
+getDFSDatabases()
+
+// database permission
+try{deleteUser(`a)}catch(ex){}
+try{deleteUser(`b)}catch(ex){}
+try{deleteUser(`c)}catch(ex){};go
+try{deleteGroup(`group_demo)}catch(ex){};go
+
+createUser(`a, "123456")
+createUser(`b, "123456")
+createUser(`c, "123456")
+createGroup(`group_demo, `a`b`c)
+grant(`group_demo, TABLE_READ, "dfs://DB_1/a_1")
+grant(`group_demo, DB_READ, "dfs://DB_2")
+grant("c", DB_OWNER);
+
+login(`a, "123456");
+db=database("dfs://db2", HASH,  [INT, 2]); // <NoPrivilege>
+getClusterDFSTables() // only one database: DB_1 and one table a_1
+
+login(`c, "123456");
+
+
+
+//share table
+table1 = table(100:0,`col1`col2`col3,[INT,INT,INT]);
+for(i in 0:100){
+    share(table1, `tb+string(i))
+}
+
+
+
+//arrayvector test
+anyv = array(UUID[], 0, 10)
+append!(anyv, [[uuid("9d457e79-1bed-d6c2-3612-b0d31c1881f6"), uuid("9d457e79-1bed-d6c2-3612-b0d31c1881f6")]])
+append!(anyv, [[uuid("9d457e79-1bed-d6c2-3612-b0d31c1881f6"), uuid("9d457e79-1bed-d6c2-3612-b0d31c1881f6")]])
+anyv
+
+values table1
+KLINE
+getSessionMemoryStat()
+
+tableInsert(table1, 1, 1, 1)
+update table1 set col1=1, col2=2 where col3 =1
+
+table([1.21315123,2.4] as col1)
+
+
+//以下验证小数位数＞scale的场景，以及scale溢出场景
+scale32=rand(10,1)[0]
+scale64=rand(19,1)[0]
+print(scale32+", "+scale64)
+go
+val=rand(1.0,1)[0];
+
+print("val="+val)
+go
+x=val$DECIMAL32(scale32);x
+y=val$DECIMAL64(scale64);y
+
+//以下验证小数位数＜scale的场景，以及scale溢出场景
+int_val=rand(10,1)[0];
+scale32=8
+scale64=18
+print("val="+int_val+" scale32="+scale32+" scale64="+scale64)
+x1=int_val$DECIMAL32(scale32);x1
+y1=int_val$DECIMAL64(scale64);y1
+
+//any vector
+zxcd=[x,y,x1,y1];zxcd
+
+//decimal arrayvector
+s=rand(1.0,1)[0]
+x=s$DECIMAL32(scale32);x
+y=s$DECIMAL64(scale64);y
+ind= 1 3 5
+val=[y,y,y,y,y]
+//val=[x,x,x,x,x]
+go
+av=arrayVector(ind,val)
+print(av)
+
+a=[char(1)]
+b=[blob(`1)]
+x=dict(a,b)
+typestr(x)
+
+//big object
+ex1 = table(rand(1.0000,10000000) as c1);ex1
+1..10000000
+
+
+//SQL
+values select count(*) from ex1 where c1 > 0.5 and c1 <=0.8
+t1 = table(1 2 3 4 as price1, `a`b`c`d as col2)
+t2 = table(123 5 76 42 16 as price2, `v`b`h`g`a as col2)
+
+select price1,price2 from t1 right join t2 on t1.col2=t2.col2 where t1.col2 is not null
+
+
+`1_dd // string '1_dd'
+`ddd+`ddd // string 'dddddd'
+
+a=`ddd;go;`ddd+a // string 'dddddd'
+
+`@ // not allowed
+`* // not allowed
+`# // not allowed
+`. // string '.'
+`? // not allowed
+`[] // not allowed
+`() // not allowed
+`'asd' // string vector
+`"ddd" // string vector
+`{} // not allowed
+`/ // not allowed
+`\ // not allowed
+`| // not allowed
+`$ // not allowed
+`! // not allowed
+`range(1) // not allowed
+
+
+types = [bool,char,short,int,long,date,month,time,minute,second,datetime,timestamp,nanotime,nanotimestamp,datehour,float,double,string]
+
+types_2 = [symbol,blob,uuid,ipaddr,int128,duration]
+
+v = array(INT, 0, 10).append!(NULL 1 -1 0)
+strv = array(STRING, 0, 10).append!(NULL 1 -1 0)
+empty_v = array(INT, 0, 10)
+empty_strv = array(STRING, 0, 10)
+
+empty_v1 = decimal32(empty_v,2)
+empty_v2 = decimal64(empty_v,10)
+empty_v3 = point(empty_v, empty_v)
+empty_v4 = complex(empty_v, empty_v)
+empty_v5 = types[0](empty_v)
+empty_v6 = types[1](empty_v)
+empty_v7 = types[2](empty_v)
+empty_v8 = types[3](empty_v)
+empty_v9 = types[4](empty_v)
+empty_v10 = types[5](empty_v)
+empty_v11 = types[6](empty_v)
+empty_v12 = types[7](empty_v)
+empty_v13 = types[8](empty_v)
+empty_v14 = types[9](empty_v)
+empty_v15 = types[10](empty_v)
+empty_v16 = types[11](empty_v)
+empty_v17 = types[12](empty_v)
+empty_v18 = types[13](empty_v)
+empty_v19 = types[14](empty_v)
+empty_v20 = types[15](empty_v)
+empty_v21 = types[16](empty_v)
+empty_v22 = types[17](empty_v)
+empty_v23 = types_2[0](empty_strv)
+empty_v24 = types_2[1](empty_strv)
+empty_v25 = types_2[2](empty_strv)
+empty_v26 = types_2[3](empty_strv)
+empty_v27 = types_2[4](empty_strv)
+empty_v28 = types_2[5](empty_strv)
+empty_v29 = decimal128(empty_v,38)
+for(i in 1:30){
+     print(objByName(`empty_v + string(i)))
+     assert 1,objByName(`empty_v + string(i)).size() == 0
+     assert 2,objByName(`empty_v + string(i)).isNull()
+}
+
+v1 = decimal32(v,2)
+v2 = decimal64(v,10)
+v3 = point(v, v)
+v4 = complex(v, v)
+v5 = types[0](v)
+v6 = types[1](v)
+v7 = types[2](v)
+v8 = types[3](v)
+v9 = types[4](v)
+v10 = types[5](v)
+v11 = types[6](v)
+v12 = types[7](v)
+v13 = types[8](v)
+v14 = types[9](v)
+v15 = types[10](v)
+v16 = types[11](v)
+v17 = types[12](v)
+v18 = types[13](v)
+v19 = types[14](v)
+v20 = types[15](v)
+v21 = types[16](v)
+v22 = types[17](v)
+v23 = types_2[0](strv)
+v24 = types_2[1](strv)
+v25 = types_2[2](take(uuid("5d212a78-cc48-e3b1-4235-b4d91473ee87"),4))
+v26 = types_2[3](take(ipaddr(`1.1.1.1),4))
+v27 = types_2[4](take(int128(`e1671797c52e15f763380b45e841ec32),4))
+v28 = types_2[5](take(`200ms,4))
+v29 = decimal128(v,38)
+for(i in 1:30){
+     print(objByName(`v + string(i)))
+     assert 3, objByName(`v + string(i)).size() == 4
+}
+
+
+d1 = dict(`a`b`c`d, decimal32(v,2))
+d2 = dict(`a`b`c`d, decimal64(v,10))
+d3 = dict(`a`b`c`d, point(v, v))
+d4 = dict(`a`b`c`d, complex(v, v))
+d5 = dict(`a`b`c`d, types[0](v))
+d6 = dict(`a`b`c`d, types[1](v))
+d7 = dict(`a`b`c`d, types[2](v))
+d8 = dict(`a`b`c`d, types[3](v))
+d9 = dict(`a`b`c`d, types[4](v))
+d10 = dict(`a`b`c`d, types[5](v))
+d11 = dict(`a`b`c`d, types[6](v))
+d12 = dict(`a`b`c`d, types[7](v))
+d13 = dict(`a`b`c`d, types[8](v))
+d14 = dict(`a`b`c`d, types[9](v))
+d15 = dict(`a`b`c`d, types[10](v))
+d16 = dict(`a`b`c`d, types[11](v))
+d17 = dict(`a`b`c`d, types[12](v))
+d18 = dict(`a`b`c`d, types[13](v))
+d19 = dict(`a`b`c`d, types[14](v))
+d20 = dict(`a`b`c`d, types[15](v))
+d21 = dict(`a`b`c`d, types[16](v))
+d22 = dict(`a`b`c`d, types[17](v))
+d23 = dict(`a`b`c`d, types_2[0](strv))
+d24 = dict(`a`b`c`d, types_2[1](strv))
+d25 = dict(`a`b`c`d, types_2[2](take(uuid("5d212a78-cc48-e3b1-4235-b4d91473ee87"),4)))
+d26 = dict(`a`b`c`d, types_2[3](take(ipaddr(`1.1.1.1),4)))
+d27 = dict(`a`b`c`d, types_2[4](take(int128(`e1671797c52e15f763380b45e841ec32),4)))
+d28 = dict(`a`b`c`d, types_2[5](take(`200ms,4)))
+d29 = dict(`a`b`c`d, decimal128(v,38))
+for(i in 1:30){
+     print(objByName(`d + string(i)))
+     assert 4, objByName(`d + string(i)).values().size() == 4
+     assert 5, reverse(objByName(`d + string(i)).keys()) == `a`b`c`d
+}
+
+m5 = matrix(types[0](v), types[0](v))
+m6 = matrix(types[1](v), types[1](v))
+m7 = matrix(types[2](v), types[2](v))
+m8 = matrix(types[3](v), types[3](v))
+m9 = matrix(types[4](v), types[4](v))
+m10 = matrix(types[5](v), types[5](v))
+m11 = matrix(types[6](v), types[6](v))
+m12 = matrix(types[7](v), types[7](v))
+m13 = matrix(types[8](v), types[8](v))
+m14 = matrix(types[9](v), types[9](v))
+m15 = matrix(types[10](v), types[10](v))
+m16 = matrix(types[11](v), types[11](v))
+m17 = matrix(types[12](v), types[12](v))
+m18 = matrix(types[13](v), types[13](v))
+m19 = matrix(types[14](v), types[14](v))
+m20 = matrix(types[15](v), types[15](v))
+m21 = matrix(types[16](v), types[16](v))
+
+for(i in 5:22){
+     print(objByName(`m + string(i)))
+     assert 6, objByName(`m + string(i)).column(1) == types[i-5](v)
+     assert 7, objByName(`m + string(i)).column(0) == types[i-5](v)
+}
+
+p1 = pair(decimal32(NULL,2), decimal32(1,2))
+p2 = pair(decimal64(NULL,10), decimal64(1,10))
+p3 = pair(types[0](NULL), types[0](1))
+p4 = pair(types[1](NULL), types[1](1))
+p5 = pair(types[2](NULL), types[2](1))
+p6 = pair(types[3](NULL), types[3](1))
+p7 = pair(types[4](NULL), types[4](1))
+p8 = pair(types[5](NULL), types[5](1))
+p9 = pair(types[6](NULL), types[6](1))
+p10 = pair(types[7](NULL), types[7](1))
+p11 = pair(types[8](NULL), types[8](1))
+p12 = pair(types[9](NULL), types[9](1))
+p13 = pair(types[10](NULL), types[10](1))
+p14 = pair(types[11](NULL), types[11](1))
+p15 = pair(types[12](NULL), types[12](1))
+p16 = pair(types[13](NULL), types[13](1))
+p17 = pair(types[14](NULL), types[14](1))
+p18 = pair(types[15](NULL), types[15](1))
+p19 = pair(types[16](NULL), types[16](1))
+p20 = pair(types[17](NULL), types[17](1))
+p21 = pair(types_2[0]([""])[0], types_2[0](["1"])[0])
+p22 = pair(types_2[1](""), types_2[1]("1"))
+p23 = pair(types_2[2](""), types_2[2]("5d212a78-cc48-e3b1-4235-b4d91473ee87"))
+p24 = pair(types_2[3](""), types_2[3](`1.1.1.1))
+p25 = pair(types_2[4](""), types_2[4](`e1671797c52e15f763380b45e841ec32))
+p26 = pair(types_2[5]("0d"), types_2[5](`200ms))
+p27 = pair(decimal128(NULL,38), decimal128(1,38))
+for(i in 1:23){
+     print(objByName(`p + string(i)))
+     assert 8, objByName(`p + string(i))[0].isNull()
+     assert 9, objByName(`p + string(i))[1] == 1
+}
+
+s6 = set(types[1](v))
+s7 = set(types[2](v))
+s8 = set(types[3](v))
+s9 = set(types[4](v))
+s10 = set(types[5](v))
+s11 = set(types[6](v))
+s12 = set(types[7](v))
+s13 = set(types[8](v))
+s14 = set(types[9](v))
+s15 = set(types[10](v))
+s16 = set(types[11](v))
+s17 = set(types[12](v))
+s18 = set(types[13](v))
+s19 = set(types[14](v))
+s20 = set(types[15](v))
+s21 = set(types[16](v))
+s22 = set(types[17](v))
+s23 = set(types_2[0](strv))
+s24 = set(types_2[1](strv))
+s25 = set(types_2[2](take(uuid("5d212a78-cc48-e3b1-4235-b4d91473ee87"),4)))
+s26 = set(types_2[3](take(ipaddr(`1.1.1.1),4)))
+s27 = set(types_2[4](take(int128(`e1671797c52e15f763380b45e841ec32),4)))
+
+for(i in 6:25){
+     print("s"+string(i), objByName(`s + string(i)))
+     if(not i in 17 12 13 14){
+         assert 10, objByName(`s + string(i)).size() == 4
+     }else{
+        assert 11, objByName(`s + string(i)).size() == 3
+     }
+}
+for(i in 25:28){
+     print(objByName(`s + string(i)))
+     assert 12, objByName(`s + string(i)).size() == 1
+}
+
+
+//======================arrayVector table==========================================//
+row_num=5;
+colName =  `cbool`cchar`cshort`cint`clong`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cdatehour`cfloat`cdouble`cipaddr`cuuid`cint128`cdecimal32`cdecimal64`cdecimal128;
+colType = [BOOL[], CHAR[], SHORT[], INT[],LONG[], DATE[], MONTH[], TIME[], MINUTE[], SECOND[], DATETIME[], TIMESTAMP[], NANOTIME[], NANOTIMESTAMP[], DATEHOUR[], FLOAT[], DOUBLE[], IPADDR[], UUID[], INT128[],DECIMAL32(2)[],DECIMAL64(11)[],DECIMAL128(30)[]];
+ind = [1,3,row_num];
+col1= arrayVector(ind, bool(take(2 ,row_num)));col2 = arrayVector(ind, char(take(256 ,row_num)));col3 = arrayVector(ind, short(take(-10000..10000 ,row_num)));col4 = arrayVector(ind, int(take(-10000..10000 ,row_num)));
+col5 = arrayVector(ind, long(take(-10000..10000 ,row_num)));col6 = arrayVector(ind, date(take(10000 ,row_num)));col7 = arrayVector(ind, month(take(23000..25000 ,row_num)));col8 = arrayVector(ind, time(take(10000 ,row_num)));
+col9 = arrayVector(ind, minute(take(100 ,row_num)));col10 = arrayVector(ind, second(take(100 ,row_num)));col11 = arrayVector(ind, datetime(take(10000 ,row_num)));col12 = arrayVector(ind, timestamp(take(10000 ,row_num)));
+col13 = arrayVector(ind, nanotime(take(10000 ,row_num)));col14 = arrayVector(ind, nanotimestamp(take(10000 ,row_num)));col15 = arrayVector(ind, datehour(take(10000 ,row_num)));col16 = arrayVector(ind, take(round(10000,2) ,row_num));col17 = arrayVector(ind, take(round(10000,2) ,row_num));
+col18 =  arrayVector(ind, take(ipaddr("192.168.1.13"),row_num));col19 = arrayVector(ind, take(uuid("5d212a78-cc48-e3b1-4235-b4d91473ee87"),row_num));col20 = arrayVector(ind, take(int128("e1671797c52e15f763380b45e841ec32"),row_num));
+col21= arrayVector(ind, decimal32(take(2 ,row_num),2));
+col22= arrayVector(ind, decimal64(take(2 ,row_num),11));
+col23= arrayVector(ind, decimal128(take(2 ,row_num),30));
+table1=table(col1,col2,col3,col4,col5,col6,col7,col8,col9,col10,col11,col12,col13,col14,col15,col16,col17,col18,col19,col20,col21,col22,col23);
+tableInsert(table1, NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+res = select * from table1
+assert eqObj((values res)[0], col1.append!(NULL))
+assert eqObj((values res)[1], col2.append!(NULL))
+assert eqObj((values res)[2], col3.append!(NULL))
+assert eqObj((values res)[3], col4.append!(NULL))
+assert eqObj((values res)[4], col5.append!(NULL))
+assert eqObj((values res)[5], col6.append!(NULL))
+assert eqObj((values res)[6], col7.append!(NULL))
+assert eqObj((values res)[7], col8.append!(NULL))
+assert eqObj((values res)[8], col9.append!(NULL))
+assert eqObj((values res)[9], col10.append!(NULL))
+assert eqObj((values res)[10], col11.append!(NULL))
+assert eqObj((values res)[11], col12.append!(NULL))
+assert eqObj((values res)[12], col13.append!(NULL))
+assert eqObj((values res)[13], col14.append!(NULL))
+assert eqObj((values res)[14], col15.append!(NULL))
+assert eqObj((values res)[15], col16.append!(NULL))
+assert eqObj((values res)[16], col17.append!(NULL))
+assert eqObj((values res)[17], col18.append!(NULL))
+assert eqObj((values res)[18], col19.append!(NULL))
+assert eqObj((values res)[19], col20.append!(NULL))
+assert eqObj((values res)[20], col21.append!(NULL))
+assert eqObj((values res)[21], col22.append!(NULL))
+assert eqObj((values res)[22], col23.append!(NULL))
+
+//==========================normal table======================================//
+row_num=5
+colName =  `cbool`cchar`cshort`cint`clong`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cdatehour`cfloat`cdouble`csymbol`cstring`cblob`cipaddr`cuuid`cint128`ccomplex`cpoint`cdecimal32`cdecimal64`cdecimal128;
+colType = [BOOL, CHAR, SHORT, INT,LONG, DATE, MONTH, TIME, MINUTE, SECOND, DATETIME, TIMESTAMP, NANOTIME, NANOTIMESTAMP, DATEHOUR, FLOAT, DOUBLE, SYMBOL, STRING, BLOB, IPADDR, UUID, INT128, COMPLEX, POINT,DECIMAL32(2),DECIMAL64(11),DECIMAL128(30)];
+
+col1 = bool(take(2 ,row_num));col2 = char(take(256 ,row_num));col3 = short(take(-row_num..row_num ,row_num));col4 = int(take(-row_num..row_num ,row_num));col5 = long(take(-row_num..row_num ,row_num));
+
+col6 = date(take(10000 ,row_num));col7 = month(take(23000..25000 ,row_num));col8 = time(take(10000 ,row_num));col9 = minute(take(100 ,row_num));
+col10 = second(take(100 ,row_num));col11 = datetime(take(10000 ,row_num));col12 = timestamp(take(10000 ,row_num));col13 = nanotime(take(10000 ,row_num));
+col14= nanotimestamp(take(10000 ,row_num));col15= datehour(take(10000 ,row_num));col16 = take(round(row_num,2) ,row_num);col17 = take(round(row_num,2) ,row_num);col18 =take(`a`s`sym`d`zdg`f`y`ddvb,row_num);
+col19 =blob(string(take(`a`s`sym`d`zdg`f`y`ddvb,row_num)));
+col20 =take(`a`s`sym`d`zdg`f`y`ddvb,row_num);col21 =  take(ipaddr("192.168.1.13"),row_num);col22 = take(uuid("5d212a78-cc48-e3b1-4235-b4d91473ee87"),row_num);col23 = take(int128("e1671797c52e15f763380b45e841ec32"),row_num);col24 = take(complex(1 2 ,3 4), row_num);col25 = take(point(1 2 ,3 4),row_num);
+col26 = take(decimal32(rand(1.0000, 1),2), row_num);
+col27 = take(decimal64(rand(1.000, 1),11), row_num);
+col28 = take(decimal128(rand(1.000, 1),30), row_num);
+
+table2=table(col1,col2,col3,col4,col5,col6,col7,col8,col9,col10,col11,col12,col13,col14,col15,col16,col17,col18,col19,col20,col21,col22,col23,col24,col25,col26,col27,col28);
+tableInsert(table2, NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)
+table2
+
+res = select * from table2
+assert eqObj((values res)[0], col1.append!(NULL))
+assert eqObj((values res)[1], col2.append!(NULL))
+assert eqObj((values res)[2], col3.append!(NULL))
+assert eqObj((values res)[3], col4.append!(NULL))
+assert eqObj((values res)[4], col5.append!(NULL))
+assert eqObj((values res)[5], col6.append!(NULL))
+assert eqObj((values res)[6], col7.append!(NULL))
+assert eqObj((values res)[7], col8.append!(NULL))
+assert eqObj((values res)[8], col9.append!(NULL))
+assert eqObj((values res)[9], col10.append!(NULL))
+assert eqObj((values res)[10], col11.append!(NULL))
+assert eqObj((values res)[11], col12.append!(NULL))
+assert eqObj((values res)[12], col13.append!(NULL))
+assert eqObj((values res)[13], col14.append!(NULL))
+assert eqObj((values res)[14], col15.append!(NULL))
+assert eqObj((values res)[15], col16.append!(NULL))
+assert eqObj((values res)[16], col17.append!(NULL))
+assert eqObj((values res)[17], col18.append!(NULL))
+assert eqObj((values res)[18], col19.append!(NULL))
+assert eqObj((values res)[19], col20.append!(NULL))
+assert eqObj((values res)[20], col21.append!(NULL))
+assert eqObj((values res)[21], col22.append!(NULL))
+assert eqObj((values res)[22], col23.append!(NULL))
+assert eqObj((values res)[23], col24.append!(NULL))
+assert eqObj((values res)[24], col25.append!(NULL))
+assert eqObj((values res)[25], col26.append!(NULL))
+assert eqObj((values res)[26], col27.append!(NULL))
+assert eqObj((values res)[27], col28.append!(NULL))
+
+print('assert all passed')

@@ -122,8 +122,7 @@ bool VectorMarshall::writeMetaValues(BufferWriter<DataOutputStreamSP> &output, c
 		offset += sizeof(int);
 		memcpy(buf_ + offset, (char*)&cols, sizeof(int));
 		offset += sizeof(int);
-
-		if (target->getRawType() == DT_DECIMAL32 || target->getRawType() == DT_DECIMAL64) {
+		if (target->getRawType() == DT_DECIMAL32 || target->getRawType() == DT_DECIMAL64 || target->getRawType() == DT_DECIMAL128) {
 			int scale = target->getExtraParamForType();
 			memcpy(buf_ + offset, &scale, 4);
 			offset += 4;
@@ -703,7 +702,7 @@ bool VectorUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 	else if(actualType == DT_SYMBOL){
 		actualType = DT_STRING;
 	}
-	if (Util::getCategory(actualType) == DENARY || actualType == DT_DECIMAL32_ARRAY || actualType == DT_DECIMAL64_ARRAY) {
+	if (Util::getCategory(actualType) == DENARY || actualType == DT_DECIMAL32_ARRAY || actualType == DT_DECIMAL64_ARRAY || actualType == DT_DECIMAL128_ARRAY) {
 		ret = input->readInt(scale_);
 		if (ret != OK) {
 			return false;
@@ -713,6 +712,7 @@ bool VectorUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 			return false;
 		}
 	}
+
 	//If above part modified, remember to modify Compress.writeVectorMetaValue function
 	if(form == DF_PAIR)
 		obj_ = Util::createPair(actualType, scale_);

@@ -21,7 +21,14 @@ protected:
     virtual void SetUp()
     {
         cout<<"check connect...";
-		ConstantSP res = conn.run("1+1");
+		try
+		{
+			ConstantSP res = conn.run("1+1");
+		}
+		catch(const std::exception& e)
+		{
+			conn.connect(hostName, port, "admin", "123456");
+		}
 		
         cout<<"ok"<<endl;
     }
@@ -3101,3 +3108,10 @@ TEST_F(SysIOTest, test_DataStream_File){
     remove(file.c_str());
 #endif
 }
+
+#ifdef USE_OPENSSL
+TEST_F(SysIOTest, test_USE_OPENSSL){
+	const char* openSSLVersion = SSLeay_version(SSLEAY_VERSION);
+	std::cout << "OpenSSL Version: " << openSSLVersion << std::endl;
+}
+#endif
