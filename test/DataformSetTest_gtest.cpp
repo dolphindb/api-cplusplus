@@ -21,8 +21,15 @@ protected:
     virtual void SetUp()
     {
         cout<<"check connect...";
-		ConstantSP res = conn.run("1+1");
-		
+		try
+		{
+			ConstantSP res = conn.run("1+1");
+		}
+		catch(const std::exception& e)
+		{
+			conn.connect(hostName, port, "admin", "123456");
+		}
+
         cout<<"ok"<<endl;
     }
     virtual void TearDown()
@@ -44,6 +51,16 @@ TEST_F(DataformSetTest,testDecimal32Set){
 
 TEST_F(DataformSetTest,testDecimal64Set){
 	SetSP v1 = Util::createSet(DT_DECIMAL64,5);
+	EXPECT_EQ(v1.isNull(),true);
+}
+
+TEST_F(DataformSetTest,testDecimal128Set){
+	SetSP v1 = Util::createSet(DT_DECIMAL128,5);
+	EXPECT_EQ(v1.isNull(),true);
+}
+
+TEST_F(DataformSetTest,testBlobSet){
+	SetSP v1 = Util::createSet(DT_BLOB,5);
 	EXPECT_EQ(v1.isNull(),true);
 }
 
@@ -1253,7 +1270,7 @@ TEST_F(DataformSetTest,testtimeSet){
 	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
-	
+
 	SetSP v2 = Util::createSet(DT_TIME,5);
     v2->append(Util::createTime(1));
     v2->append(Util::createTime(10000000));
@@ -1322,7 +1339,7 @@ TEST_F(DataformSetTest,testint128Set){
 	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
-	
+
 	SetSP v2 = Util::createSet(DT_INT128,5);
     v2->append(Util::createNullConstant(DT_INT128));
     v2->append(int128val);
@@ -1396,7 +1413,7 @@ TEST_F(DataformSetTest,testipaddrSet){
 	EXPECT_TRUE(v1->inverse(temp1));
 	v1->inverse(v1);
 	EXPECT_EQ(v1->getString(),"set()");
-	
+
 	SetSP v2 = Util::createSet(DT_IP,5);
     v2->append(Util::createNullConstant(DT_IP));
     v2->append(ipaddrval);

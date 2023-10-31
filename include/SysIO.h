@@ -15,7 +15,7 @@
 #include "Types.h"
 #include "Concurrent.h"
 
-#define MAX_CAPACITY 65536
+#define MAX_CAPACITY 262144
 #define MAX_PACKET_SIZE 1400
 
 #ifdef WINDOWS
@@ -30,8 +30,10 @@
 	#define SOCKET_ERROR   -1
 #endif
 
+#ifdef USE_OPENSSL
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#endif
 
 #ifdef _MSC_VER
 	#ifdef _DDBAPIDLL	
@@ -75,7 +77,9 @@ public:
 	IO_ERR listen();
 	IO_ERR connect(const string& host, int port, bool blocking, int keepAliveTime, bool enableSSL = false);
 	IO_ERR connect();
+#ifdef USE_OPENSSL
 	IO_ERR sslConnect();
+#endif
 	IO_ERR close();
 	Socket* accept();
 	SOCKET getHandle();
@@ -93,11 +97,11 @@ private:
 	bool setBlocking();
 	bool setTcpNoDelay();
 	int getErrorCode();
-
+#ifdef USE_OPENSSL
 	SSL_CTX* initCTX();
 	bool sslInit();
 	void showCerts(SSL* ssl);
-
+#endif
 private:
 	string host_;
 	int port_;
@@ -105,8 +109,10 @@ private:
 	bool blocking_;
 	bool autoClose_;
 	bool enableSSL_;
+#ifdef USE_OPENSSL
 	SSL_CTX* ctx_;
 	SSL* ssl_;
+#endif
 	int keepAliveTime_;
 };
 
@@ -132,7 +138,7 @@ private:
 	struct sockaddr_in addrRemote_;
 };
 
-struct DataBlock{
+class DataBlock{
 public:
 	DataBlock() : buf_(nullptr), length_(0){}
 	DataBlock(char* buf, size_t length) : buf_(buf), length_(length){}

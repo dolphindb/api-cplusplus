@@ -129,7 +129,7 @@ class SharedMemStream {
     * @param path  String, the key to point the same shared memory between multi processes.
     * @param size  max data size of shared memory. the actual size is max of 1G and the param.
     */
-   SharedMemStream(bool create, std::string path, int64_t size):  create_(create), path_(path), size_(size){
+   SharedMemStream(bool create, std::string path, int64_t size):  create_(create), path_(path), size_(size), isFirstRead_(true){
       shmpHeader_ = NULL;
       shmFd_ = 0;
    }
@@ -195,6 +195,7 @@ class SharedMemStream {
     std::string path_;
     int64_t size_;
     int shmFd_;
+    bool isFirstRead_;
 };
 
 

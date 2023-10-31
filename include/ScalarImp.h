@@ -210,6 +210,7 @@ public:
 	virtual int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const;
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
 	virtual int compare(INDEX index, const ConstantSP& target) const {return target->getType() == DT_VOID ? 0 : -1;}
+	virtual bool getBinary(INDEX start, int len, int unitLength, unsigned char* buf) const;
 };
 
 class Int128: public Constant{
@@ -536,6 +537,34 @@ public:
 		}
 	}
 
+	int32_t getDecimal32(INDEX index, int scale) const override {
+		int32_t result = 0;
+		getDecimal32(index, /*len*/1, scale, &result);
+		return result;
+	}
+	int64_t getDecimal64(INDEX index, int scale) const override {
+		int64_t result = 0;
+		getDecimal64(index, /*len*/1, scale, &result);
+		return result;
+	}
+
+	wide_integer::int128 getDecimal128(INDEX index, int scale) const override {
+		wide_integer::int128 result = 0;
+		getDecimal128(index, /*len*/1, scale, &result);
+		return result;
+	}
+
+	bool getDecimal32(INDEX start, int len, int scale, int32_t *buf) const override {
+		return getDecimal(start, len, scale, buf);
+	}
+	bool getDecimal64(INDEX start, int len, int scale, int64_t *buf) const override {
+		return getDecimal(start, len, scale, buf);
+	}
+
+	bool getDecimal128(INDEX start, int len, int scale, wide_integer::int128 *buf) const override {
+		return getDecimal(start, len, scale, buf);
+	}
+
 	virtual bool add(INDEX start, INDEX length, long long inc) {
 		if(isNull())
 			return false;
@@ -561,6 +590,9 @@ public:
 		}
 	}
 
+private:
+	template <typename R>
+	bool getDecimal(INDEX /*start*/, int len, int scale, R *buf) const;
 protected:
 	T val_;
 };

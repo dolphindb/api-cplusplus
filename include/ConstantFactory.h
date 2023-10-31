@@ -271,9 +271,11 @@ private:
 	Constant* createIPAddr(int extraParam){return new IPAddr();}
 	Constant* createDecima32(int extraParam) { return new Decimal32(extraParam); }
 	Constant* createDecima64(int extraParam) { return new Decimal64(extraParam); }
+	Constant* createDecima128(int extraParam) { return new Decimal128(extraParam); }
 
 	Vector* createVoidVector(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
-		throw RuntimeException("Not allowed to create void vector");
+		// throw RuntimeException("Not allowed to create void vector");
+		return new FastVoidVector(size, capacity, (char*)data, containNull);
 	}
 
 	Vector* createBoolVector(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
@@ -497,6 +499,16 @@ private:
 			return NULL;
 	}
 
+	Vector* createDecimal128Vector(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull) {
+		if (data == NULL && dataSegment == NULL) {
+			allocate<wide_integer::int128>(size, capacity, fastMode, segmentSizeInBit, data, dataSegment);
+		}
+		if (data != NULL)
+			return new FastDecimalVector<wide_integer::int128>(extraParam, size, capacity, (wide_integer::int128*)data, containNull);
+		else
+			return NULL;
+	}
+
 	Vector* createBoolArrayVector(INDEX size, INDEX capacity, bool fastMode, int extraParam, void *data, void *pindex, void** dataSegment, int segmentSizeInBit, bool containNull) {
 		//if(data == NULL && dataSegment == NULL){
 		//	allocate<char>(size, capacity, fastMode, segmentSizeInBit, data, dataSegment);
@@ -626,6 +638,10 @@ private:
 
 	Vector* createDecimal64ArrayVector(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void *pindex, void** dataSegment, int segmentSizeInBit, bool containNull) {
 		return new FastArrayVector(size, capacity, (char*)data, containNull, DATA_TYPE(DT_DECIMAL64 + ARRAY_TYPE_BASE), (INDEX *)pindex, extraParam);
+	}
+
+	Vector* createDecimal128ArrayVector(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void *pindex, void** dataSegment, int segmentSizeInBit, bool containNull) {
+		return new FastArrayVector(size, capacity, (char*)data, containNull, DATA_TYPE(DT_DECIMAL128 + ARRAY_TYPE_BASE), (INDEX *)pindex, extraParam);
 	}
 
 	Vector* createVoidMatrix(int cols, int rows, int colCapacity, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
@@ -808,6 +824,8 @@ private:
 		arrConstFactory[DT_IP]=&ConstantFactory::createIPAddr;
 		arrConstFactory[DT_DECIMAL32] = &ConstantFactory::createDecima32;
 		arrConstFactory[DT_DECIMAL64] = &ConstantFactory::createDecima64;
+		arrConstFactory[DT_DECIMAL128] = &ConstantFactory::createDecima128;
+
 		arrConstFactory[DT_DICTIONARY]=NULL;
 
 		arrConstVectorFactory[DT_VOID]=&ConstantFactory::createVoidVector;
@@ -836,6 +854,8 @@ private:
 		arrConstVectorFactory[DT_IP]=&ConstantFactory::createIPAddrVector;
 		arrConstVectorFactory[DT_DECIMAL32] = &ConstantFactory::createDecimal32Vector;
 		arrConstVectorFactory[DT_DECIMAL64] = &ConstantFactory::createDecimal64Vector;
+		arrConstVectorFactory[DT_DECIMAL128] = &ConstantFactory::createDecimal128Vector;
+
 		arrConstVectorFactory[DT_FUNCTIONDEF]=&ConstantFactory::createAnyVector;
 		arrConstVectorFactory[DT_HANDLE]=&ConstantFactory::createAnyVector;
 		arrConstVectorFactory[DT_ANY]=&ConstantFactory::createAnyVector;
@@ -867,6 +887,7 @@ private:
 		arrConstArrayVectorFactory[DT_IP] = &ConstantFactory::createIpArrayVector;
 		arrConstArrayVectorFactory[DT_DECIMAL32] = &ConstantFactory::createDecimal32ArrayVector;
 		arrConstArrayVectorFactory[DT_DECIMAL64] = &ConstantFactory::createDecimal64ArrayVector;
+		arrConstArrayVectorFactory[DT_DECIMAL128] = &ConstantFactory::createDecimal128ArrayVector;
 
 		arrConstMatrixFactory[DT_VOID]=&ConstantFactory::createVoidMatrix;
 		arrConstMatrixFactory[DT_BOOL]=&ConstantFactory::createBoolMatrix;
@@ -968,30 +989,35 @@ private:
 		arrTypeStr[DT_SHORT]="SHORT";
 		arrTypeStr[DT_INT]="INT";
 		arrTypeStr[DT_LONG]="LONG";
-		arrTypeStr[DT_FLOAT]="FLOAT";
-		arrTypeStr[DT_DOUBLE]="DOUBLE";
 		arrTypeStr[DT_DATE]="DATE";
 		arrTypeStr[DT_MONTH]="MONTH";
-		arrTypeStr[DT_DATETIME]="DATETIME";
-		arrTypeStr[DT_DATEHOUR]="DATEHOUR";
 		arrTypeStr[DT_TIME]="TIME";
+		arrTypeStr[DT_MINUTE]="MINUTE";
+		arrTypeStr[DT_SECOND]="SECOND";
+		arrTypeStr[DT_DATETIME]="DATETIME";
 		arrTypeStr[DT_TIMESTAMP]="TIMESTAMP";
 		arrTypeStr[DT_NANOTIME]="NANOTIME";
 		arrTypeStr[DT_NANOTIMESTAMP]="NANOTIMESTAMP";
-		arrTypeStr[DT_MINUTE]="MINUTE";
-		arrTypeStr[DT_SECOND]="SECOND";
+		arrTypeStr[DT_FLOAT]="FLOAT";
+		arrTypeStr[DT_DOUBLE]="DOUBLE";
 		arrTypeStr[DT_SYMBOL]="SYMBOL";
 		arrTypeStr[DT_STRING]="STRING";
+		arrTypeStr[DT_UUID]="UUID";
 		arrTypeStr[DT_FUNCTIONDEF]="FUNCTIONDEF";
 		arrTypeStr[DT_HANDLE]="HANDLE";
+		arrTypeStr[DT_CODE]="CODE";
 		arrTypeStr[DT_DATASOURCE]="DATASOURCE";
 		arrTypeStr[DT_RESOURCE]="RESOURCE";
 		arrTypeStr[DT_ANY]="ANY";
-		arrTypeStr[DT_INT128]="INT128";
-		arrTypeStr[DT_UUID]="UUID";
-		arrTypeStr[DT_IP]="IPADDR";
+		arrTypeStr[DT_COMPRESS] = "COMPRESS";
 		arrTypeStr[DT_DICTIONARY]="DICTIONARY";
-		arrTypeStr[DT_CODE]="CODE";
+		arrTypeStr[DT_DATEHOUR]="DATEHOUR";
+		arrTypeStr[DT_IP]="IPADDR";
+		arrTypeStr[DT_INT128]="INT128";
+		arrTypeStr[DT_BLOB] = "BLOB";
+		arrTypeStr[DT_COMPLEX] = "COMPLEX";
+		arrTypeStr[DT_POINT] = "POINT";
+		arrTypeStr[DT_DURATION] = "DURATION";
 		arrTypeStr[DT_DECIMAL32] = "DECIMAL32";
 		arrTypeStr[DT_DECIMAL64] = "DECIMAL64";
 		arrTypeStr[DT_DECIMAL128] = "DECIMAL128";

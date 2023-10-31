@@ -24,7 +24,7 @@
 #include "SmartPointer.h"
 #include "Exceptions.h"
 #include "SysIO.h"
-
+#include "WideInteger.h"
 #ifdef _MSC_VER
 	#ifdef _DDBAPIDLL	
 		#define EXPORT_DECL _declspec(dllexport)
@@ -166,6 +166,10 @@ struct GuidHash {
 	uint64_t operator()(const Guid& guid) const;
 };
 
+#define NOT_IMPLEMENT \
+    throw RuntimeException("Data type [" + std::to_string(static_cast<int>(getType())) + "] form [" + \
+            std::to_string(static_cast<int>(getForm())) + "] does not implement `" + __func__ + "`");
+
 class EXPORT_DECL Constant {
 public:
 	static string EMPTY;
@@ -251,6 +255,10 @@ public:
 	virtual const string& getStringRef(INDEX index) const {return EMPTY;}
 	virtual bool isNull(INDEX index) const {return isNull();}
 
+	virtual int32_t getDecimal32(INDEX index, int scale) const { NOT_IMPLEMENT; }
+	virtual int64_t getDecimal64(INDEX index, int scale) const { NOT_IMPLEMENT; }
+	virtual wide_integer::int128 getDecimal128(INDEX index, int scale) const { NOT_IMPLEMENT; }
+
 	virtual ConstantSP get(INDEX index) const {return getValue();}
 	virtual ConstantSP get(INDEX column, INDEX row) const {return get(row);}
 	virtual ConstantSP get(const ConstantSP& index) const {return getValue();}
@@ -276,6 +284,9 @@ public:
 	virtual bool getString(INDEX start, int len, char** buf) const {return false;}
 	virtual bool getBinary(INDEX start, int len, int unitLength, unsigned char* buf) const {return false;}
 	virtual bool getHash(INDEX start, int len, int buckets, int* buf) const {return false;}
+	virtual bool getDecimal32(INDEX start, int len, int scale, int32_t *buf) const { NOT_IMPLEMENT; }
+	virtual bool getDecimal64(INDEX start, int len, int scale, int64_t *buf) const { NOT_IMPLEMENT; }
+	virtual bool getDecimal128(INDEX start, int len, int scale, wide_integer::int128 *buf) const { NOT_IMPLEMENT; }
 
 	virtual const char* getBoolConst(INDEX start, int len, char* buf) const {throw RuntimeException("getBoolConst method not supported");}
 	virtual const char* getCharConst(INDEX start, int len,char* buf) const {throw RuntimeException("getCharConst method not supported");}
@@ -568,6 +579,8 @@ public:
 	virtual ConstantSP getSubTable(vector<int> indices) const = 0;
 	virtual COMPRESS_METHOD getColumnCompressMethod(INDEX index) = 0;
 	virtual void setColumnCompressMethods(const vector<COMPRESS_METHOD> &methods) = 0;
+	virtual bool clear()=0;
+	virtual void updateSize() = 0;
 };
 
 class EXPORT_DECL DFSChunkMeta : public Constant{
@@ -738,7 +751,8 @@ public:
 	void setInitScript(const string& script);
 
 	const string& getInitScript() const;
-	SocketSP getSocket();
+
+	DataInputStreamSP getDataInputStream();
 private:
     DBConnection(DBConnection& oth); // = delete
     DBConnection& operator=(DBConnection& oth); // = delete
@@ -773,6 +787,9 @@ private:
 		Node(const string &ipport, double loadValue = DBL_MAX);
 	};
 	static void parseIpPort(const string &ipport, string &ip, int &port);
+	long nextSeqNo();
+	void initClientID();
+
 
     std::unique_ptr<DBConnectionImpl> conn_;
     string uid_;
@@ -787,6 +804,8 @@ private:
 	bool enablePickle_, python_;
 	bool reconnect_, closed_;
 	static const int maxRerunCnt_ = 30;
+	long   runSeqNo_;
+	Mutex	mutex_;
 };
 
 class EXPORT_DECL BlockReader : public Constant{

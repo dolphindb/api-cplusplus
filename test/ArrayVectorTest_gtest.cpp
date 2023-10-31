@@ -21,8 +21,15 @@ protected:
     virtual void SetUp()
     {
         cout<<"check connect...";
-		ConstantSP res = conn.run("1+1");
-		
+		try
+		{
+			ConstantSP res = conn.run("1+1");
+		}
+		catch(const std::exception& e)
+		{
+			conn.connect(hostName, port, "admin", "123456");
+		}
+
         cout<<"ok"<<endl;
     }
     virtual void TearDown()
@@ -107,7 +114,7 @@ TEST_F(ArrayVectorTest,testArrayVector_count) {
 TEST_F(ArrayVectorTest,testArrayVector_fill) {
     VectorSP vec = Util::createArrayVector(DT_BOOL_ARRAY, 0, 1);
     SmartPointer<FastArrayVector> av1 = vec;
-    
+
     av1->fill(0, 0, Util::createBool(1));
     EXPECT_EQ(av1->size(), 0);
 
@@ -126,7 +133,7 @@ TEST_F(ArrayVectorTest,testArrayVector_fill) {
     VectorSP indexArray = Util::createVector(DT_INT, 2, 2);
     indexArray->set(0, Util::createInt(0));
     indexArray->set(1, Util::createInt(1));
-    
+
     av1->fill(0, 1, Util::createVector(DT_BOOL, 2, 2));
 
     EXPECT_FALSE(av1->append(Util::createInt(1),indexArray));
@@ -147,6 +154,8 @@ TEST_F(ArrayVectorTest,testArrayVector_get) {
     EXPECT_ANY_THROW(av1->get(Util::createInt(-1)));
 
     VectorSP v1 = Util::createVector(DT_BOOL, 2, 2);
+    v1->set(0, Util::createBool(1));
+    v1->set(1, Util::createBool(0));
     EXPECT_TRUE(av1->append(v1));
     EXPECT_EQ(av1->size(), 1);
     ConstantSP res = av1->get(Util::createInt(0));
@@ -243,18 +252,20 @@ TEST_F(ArrayVectorTest,test_BoolArrayVector){
 	VectorSP av1=Util::createArrayVector(DT_BOOL_ARRAY,0,1);
 	VectorSP av2=Util::createArrayVector(DT_BOOL_ARRAY,1,1);
 	VectorSP av3=Util::createArrayVector(DT_BOOL_ARRAY,1,1);
-	VectorSP av4=Util::createArrayVector(DT_BOOL_ARRAY,0,1);
+	VectorSP av4=Util::createArrayVector(DT_BOOL_ARRAY,1,1);
 	av1->append(v1);
 	av2->fill(0,1,v1);
 	av3->set(0,v1);
 	av4->append(Util::createVector(DT_BOOL,6,6));
-	av4->set(Util::createConstant(DT_INT),v1);
-
-	conn.upload("av1", { av1 });
+	av4->set(Util::createInt(1),v1);
+    
+    vector<string> names = {"av1", "av2", "av3", "av4"};
+    vector<ConstantSP> datas = { av1, av2, av3, av4 };
+	conn.upload(names, datas);
 	string script = "value = bool[1,-1,12,0,-12,NULL]\n\
 					index = [6]\n\
 					b=arrayVector(index, value);b";
-	TableSP ex_av1 = conn.run(script);
+	auto ex_av1 = conn.run(script);
 	ConstantSP res = conn.run("eqObj(av1,b)");
 
 	EXPECT_TRUE(res->getBool());
@@ -407,7 +418,7 @@ TEST_F(ArrayVectorTest,test_IntArrayVector){
     EXPECT_ANY_THROW(av1->fill(0,10,val_1));
     EXPECT_ANY_THROW(av1->fill(0,1,tab1));
     EXPECT_ANY_THROW(av1->fill(1,1,val_1));
-    
+
     av1->fill(0,1, val_1);
     EXPECT_EQ(av1->getString(),"[[1000]]");
     av1->append(val_1);
@@ -4653,51 +4664,244 @@ TEST_F(ArrayVectorTest,testCastTemporalSecondToDate){
 }
 
 TEST_F(ArrayVectorTest,testDecimal32ArrayVector){
-    VectorSP av1 = Util::createArrayVector(DT_DECIMAL32_ARRAY, 0, 3, true, 2);
-    VectorSP v1 = Util::createVector(DT_DECIMAL32, 2, 2, true, 2);
-    VectorSP v2 = Util::createVector(DT_DECIMAL32, 2, 2, true, 2);
-    ConstantSP val1 = Util::createDecimal32(2, 2.35123);
-    ConstantSP val2 = Util::createDecimal32(2, 0.1);
-    for(auto i =0;i<v1->size();i++){
-        v1->set(i, val1);
-        v2->set(i, val2);
-    }
+    int scale = 2;
+    VectorSP av1 = Util::createArrayVector(DT_DECIMAL32_ARRAY, 0, 4, true, scale);
+    VectorSP v1 = Util::createVector(DT_DECIMAL32, 0, 8, true, scale);
+    VectorSP v2 = Util::createVector(DT_DECIMAL32, 0, 1, true, scale);
+    VectorSP v3 = Util::createVector(DT_DECIMAL32, 0, 1, true, scale);
+    VectorSP v4 = Util::createVector(DT_DECIMAL32, 0, 4, true, scale);
+    ConstantSP val1 = Util::createDecimal32(scale, 4);
+    ConstantSP val2 = Util::createDecimal32(scale, 1336432.032);
+    ConstantSP val3 = Util::createDecimal32(scale, 0.3546299566546123);
+    ConstantSP val4 = Util::createDecimal32(scale, -1336432.032);
+    ConstantSP val5 = Util::createDecimal32(scale, -0.3546299566546123);
+    ConstantSP val6 = Util::createDecimal32(scale, 3);
+    ConstantSP val_null = Util::createNullConstant(DT_DECIMAL32, scale);
+    VectorSP vec_null1 = Util::createVector(DT_DECIMAL32, 0, 1, true, scale);
+    vec_null1->append(val_null);
+    VectorSP vec_null2 = Util::createVector(DT_DECIMAL32, 1, 1, true, scale);
+    vec_null2->setNull(0);
+    // v1 -> [4, 1336432.032, NULL, 0.3546299566546123, NULL, -1336432.032, -0.3546299566546123, 3]
+    v1->append(val1);
+    v1->append(val2);
+    v1->append(val_null);
+    v1->append(val3);
+    v1->append(val_null);
+    v1->append(val4);
+    v1->append(val5);
+    v1->append(val6);
+    // v2 -> []
+    v2 = vec_null1;
+    // v3 -> []
+    v3 = vec_null2;
+    // v4 -> [1336432.032, 2, 0.3546299566546123, -1336432.032]
+    v4->append(val2);
+    v4->append(val1);
+    v4->append(val3);
+    v4->append(val4);
+
     av1->append(v1);
     av1->append(v2);
+    av1->append(v3);
+    av1->append(v4);
     conn.upload("av1",av1);
-    ConstantSP res = conn.run("index = 2 4;val = [decimal32(2.35123,2),decimal32(2.35123,2),decimal32(0.1,2),decimal32(0.1,2)];\
-                                ex=arrayVector(index,val);eqObj(ex,av1)");
+    ConstantSP res = conn.run("sca = "+to_string(scale)+";go;\
+                                ex = array(DECIMAL32(sca)[], 0, 4).append!([[4, 1336432.032, NULL, 0.3546299566546123, NULL, -1336432.032, -0.3546299566546123, 3], [], [00i], [1336432.032, 4, 0.3546299566546123, -1336432.032]]);\
+                                eqObj(ex,av1)");
     EXPECT_TRUE(res->getBool());
     ConstantSP ex = conn.run("ex");
     EXPECT_EQ(ex->getString(),av1->getString());
 
 }
 
-TEST_F(ArrayVectorTest,testDecimal64ArrayVector){
-    VectorSP av1 = Util::createArrayVector(DT_DECIMAL64_ARRAY, 0, 3, true, 11);
-    VectorSP v1 = Util::createVector(DT_DECIMAL64, 2, 2, true, 11);
-    VectorSP v2 = Util::createVector(DT_DECIMAL64, 2, 2, true, 11);
-    ConstantSP val1 = Util::createDecimal64(11, 2.35123);
-    ConstantSP val2 = Util::createDecimal64(11, 0.1);
-    for(auto i =0;i<v1->size();i++){
-        v1->set(i, val1);
-        v2->set(i, val2);
+TEST_F(ArrayVectorTest,testDecimal32ArrayVector_null){
+    srand(time(NULL));
+    for(auto i =0;i<1000;i++){
+        int scale = rand()%10;
+        VectorSP av1 = Util::createArrayVector(DT_DECIMAL32_ARRAY, 0, 10, true, scale);
+        VectorSP v1 = Util::createVector(DT_DECIMAL32, 0, 2, true, scale);
+        VectorSP v2 = Util::createVector(DT_DECIMAL32, 0, 2, true, scale);
+        VectorSP v3 = Util::createVector(DT_DECIMAL32, 0, 2, true, scale);
+        ConstantSP null_val = Util::createNullConstant(DT_DECIMAL32, scale);
+        v1->append(null_val);
+        v2->append(null_val);
+        v2->append(null_val);
+        v3->append(null_val);
+        av1->append(v1);
+        av1->append(v2);
+        av1->append(v3);
+        conn.upload("av1",av1);
+        ConstantSP res = conn.run("sca = "+to_string(scale)+";go;\
+                                    m = array(DECIMAL32(sca)[], 0, 10).append!(decimal32([NULL, take(decimal32(NULL, sca),2), []],sca));\
+                                    eqObj(m,av1)");
+        EXPECT_TRUE(res->getBool());
+        ConstantSP ex = conn.run("m");
+        EXPECT_EQ(ex->getString(),av1->getString());
     }
+}
+
+TEST_F(ArrayVectorTest,testDecimal64ArrayVector){
+    int scale = 16;
+    VectorSP av1 = Util::createArrayVector(DT_DECIMAL64_ARRAY, 0, 4, true, scale);
+    VectorSP v1 = Util::createVector(DT_DECIMAL64, 0, 8, true, scale);
+    VectorSP v2 = Util::createVector(DT_DECIMAL64, 0, 1, true, scale);
+    VectorSP v3 = Util::createVector(DT_DECIMAL64, 0, 1, true, scale);
+    VectorSP v4 = Util::createVector(DT_DECIMAL64, 0, 4, true, scale);
+    ConstantSP val1 = Util::createDecimal64(scale, 4);
+    ConstantSP val2 = Util::createDecimal64(scale, 1.3);
+    ConstantSP val3 = Util::createDecimal64(scale, 0.3546299566546123);
+    ConstantSP val4 = Util::createDecimal64(scale, -1.3);
+    ConstantSP val5 = Util::createDecimal64(scale, -0.3546299566546123);
+    ConstantSP val6 = Util::createDecimal64(scale, 3);
+    ConstantSP val_null = Util::createNullConstant(DT_DECIMAL64, scale);
+    VectorSP vec_null1 = Util::createVector(DT_DECIMAL64, 0, 1, true, scale);
+    vec_null1->append(val_null);
+    VectorSP vec_null2 = Util::createVector(DT_DECIMAL64, 1, 1, true, scale);
+    vec_null2->setNull(0);
+    // v1 -> [4, 1.3, NULL, 0.3546299566546123, NULL, -1.3, -0.3546299566546123, 3]
+    v1->append(val1);
+    v1->append(val2);
+    v1->append(val_null);
+    v1->append(val3);
+    v1->append(val_null);
+    v1->append(val4);
+    v1->append(val5);
+    v1->append(val6);
+    // v2 -> []
+    v2 = vec_null1;
+    // v3 -> []
+    v3 = vec_null2;
+    // v4 -> [1.3, 2, 0.3546299566546123, -1.3]
+    v4->append(val2);
+    v4->append(val1);
+    v4->append(val3);
+    v4->append(val4);
+
     av1->append(v1);
     av1->append(v2);
+    av1->append(v3);
+    av1->append(v4);
     conn.upload("av1",av1);
-    ConstantSP res = conn.run("index = 2 4;val = [decimal64(2.35123,11),decimal64(2.35123,11),decimal64(0.1,11),decimal64(0.1,11)];\
-                                ex=arrayVector(index,val);eqObj(ex,av1)");
+    ConstantSP res = conn.run("sca = "+to_string(scale)+";go;\
+                                ex = array(DECIMAL64(sca)[], 0, 4).append!([[4, 1.3, NULL, 0.3546299566546123, NULL, -1.3, -0.3546299566546123, 3], [], [00i], [1.3, 4, 0.3546299566546123, -1.3]]);\
+                                eqObj(ex,av1)");
     EXPECT_TRUE(res->getBool());
     ConstantSP ex = conn.run("ex");
     EXPECT_EQ(ex->getString(),av1->getString());
+
+}
+
+TEST_F(ArrayVectorTest,testDecimal64ArrayVector_null){
+    srand(time(NULL));
+    for(auto i =0;i<1000;i++){
+        int scale = rand()%10+6;
+        VectorSP av1 = Util::createArrayVector(DT_DECIMAL64_ARRAY, 0, 10, true, scale);
+        VectorSP v1 = Util::createVector(DT_DECIMAL64, 0, 2, true, scale);
+        VectorSP v2 = Util::createVector(DT_DECIMAL64, 0, 2, true, scale);
+        VectorSP v3 = Util::createVector(DT_DECIMAL64, 0, 2, true, scale);
+        ConstantSP null_val = Util::createNullConstant(DT_DECIMAL64, scale);
+        v1->append(null_val);
+        v2->append(null_val);
+        v2->append(null_val);
+        v3->append(null_val);
+        av1->append(v1);
+        av1->append(v2);
+        av1->append(v3);
+        conn.upload("av1",av1);
+        ConstantSP res = conn.run("sca = "+to_string(scale)+";go;\
+                                    m = array(DECIMAL64(sca)[], 0, 10).append!(decimal64([NULL, take(decimal64(NULL, sca),2), []],sca));\
+                                    eqObj(m,av1)");
+        EXPECT_TRUE(res->getBool());
+        ConstantSP ex = conn.run("m");
+        EXPECT_EQ(ex->getString(),av1->getString());
+    }
+}
+
+TEST_F(ArrayVectorTest,testDecimal128ArrayVector){
+    int scale = 26;
+    VectorSP av1 = Util::createArrayVector(DT_DECIMAL128_ARRAY, 0, 4, true, scale);
+    VectorSP v1 = Util::createVector(DT_DECIMAL128, 0, 8, true, scale);
+    VectorSP v2 = Util::createVector(DT_DECIMAL128, 0, 1, true, scale);
+    VectorSP v3 = Util::createVector(DT_DECIMAL128, 0, 1, true, scale);
+    VectorSP v4 = Util::createVector(DT_DECIMAL128, 0, 4, true, scale);
+    cout<<"123123\n";
+    ConstantSP val1 = Util::createDecimal128(scale, 4);
+    ConstantSP val2 = Util::createDecimal128(scale, 456789.2695);
+    ConstantSP val3 = Util::createDecimal128(scale, 0);
+    val3->setString("1.666666666666666666666666666666");
+    ConstantSP val4 = Util::createDecimal128(scale, -456789.2695);
+    ConstantSP val5 = Util::createDecimal128(scale, 0);
+    val5->setString("-1.666666666666666666666666666666");
+    ConstantSP val6 = Util::createDecimal128(scale, 3);
+    ConstantSP val_null = Util::createNullConstant(DT_DECIMAL128, scale);
+    VectorSP vec_null1 = Util::createVector(DT_DECIMAL128, 0, 1, true, scale);
+    vec_null1->append(val_null);
+    VectorSP vec_null2 = Util::createVector(DT_DECIMAL128, 1, 1, true, scale);
+    vec_null2->setNull(0);
+    // v1 -> [4, 456789.2695, NULL, 1.666666666666666666666666666666, NULL, -456789.2695, -1.666666666666666666666666666666, 3]
+    v1->append(val1);
+    v1->append(val2);
+    v1->append(val_null);
+    v1->append(val3);
+    v1->append(val_null);
+    v1->append(val4);
+    v1->append(val5);
+    v1->append(val6);
+    // v2 -> []
+    v2 = vec_null1;
+    // v3 -> []
+    v3 = vec_null2;
+    // v4 -> [456789.2695, 2, 1.666666666666666666666666666666, -456789.2695]
+    v4->append(val2);
+    v4->append(val1);
+    v4->append(Util::createDouble(1.666666666666666666666666666666));
+    v4->append(val4);
+
+    av1->append(v1);
+    av1->append(v2);
+    av1->append(v3);
+    av1->append(v4);
+    conn.upload("av1",av1);
+    ConstantSP res = conn.run("sca = "+to_string(scale)+";go;\
+                                ex = array(DECIMAL128(sca)[], 0, 4).append!([[4, 456789.2695, NULL, decimal128(`1.666666666666666666666666666666,sca), NULL, -456789.2695, decimal128('-1.666666666666666666666666666666',sca), 3], [], [00i], [456789.2695, 4, 1.666666666666666666666666666666, -456789.2695]]);\
+                                eqObj(ex,av1)");
+    EXPECT_TRUE(res->getBool());
+    ConstantSP ex = conn.run("ex");
+    EXPECT_EQ(ex->getString(),av1->getString());
+
+}
+
+TEST_F(ArrayVectorTest,testDecimal128ArrayVector_null){
+    srand(time(NULL));
+    for(auto i =0;i<1000;i++){
+        int scale = rand()%20+16;
+        VectorSP av1 = Util::createArrayVector(DT_DECIMAL128_ARRAY, 0, 10, true, scale);
+        VectorSP v1 = Util::createVector(DT_DECIMAL128, 0, 2, true, scale);
+        VectorSP v2 = Util::createVector(DT_DECIMAL128, 0, 2, true, scale);
+        VectorSP v3 = Util::createVector(DT_DECIMAL128, 0, 2, true, scale);
+        ConstantSP null_val = Util::createNullConstant(DT_DECIMAL128, scale);
+        v1->append(null_val);
+        v2->append(null_val);
+        v2->append(null_val);
+        v3->append(null_val);
+        av1->append(v1);
+        av1->append(v2);
+        av1->append(v3);
+        conn.upload("av1",av1);
+        ConstantSP res = conn.run("sca = "+to_string(scale)+";go;\
+                                    m = array(DECIMAL128(sca)[], 0, 10).append!(decimal128([NULL, take(decimal128(NULL, sca),2), []],sca));\
+                                    eqObj(m,av1)");
+        EXPECT_TRUE(res->getBool());
+        ConstantSP ex = conn.run("m");
+        EXPECT_EQ(ex->getString(),av1->getString());
+    }
 }
 
 TEST_F(ArrayVectorTest,testDecimal32ArrayVector_gt65535){
     VectorSP indV = conn.run("1..35000*2");
     VectorSP valV = Util::createVector(DT_DECIMAL32, 70000, 70000, true, 2);
     ConstantSP val1 = Util::createDecimal32(2, 2.35123);
-    ConstantSP val2 = Util::createDecimal32(2, 0.1);
+    ConstantSP val2 = Util::createNullConstant(DT_DECIMAL32, 2);
     for(auto i =0;i<valV->size() /2;i++){
         valV->set(2*i, val1);
         valV->set(2*i+1, val2);
@@ -4706,7 +4910,7 @@ TEST_F(ArrayVectorTest,testDecimal32ArrayVector_gt65535){
     VectorSP av1 = Util::createArrayVector(indV, valV);
     conn.upload("av1",av1);
 
-    ConstantSP res = conn.run("index = 1..35000*2;val = take([decimal32(2.35123,2),decimal32(0.1,2),decimal32(2.35123,2),decimal32(0.1,2)],70000);\
+    ConstantSP res = conn.run("index = 1..35000*2;val = take([decimal32(2.35123,2),decimal32(NULL,2),decimal32(2.35123,2),decimal32(NULL,2)],70000);\
                                 ex=arrayVector(index,val);eqObj(ex,av1)");
     EXPECT_TRUE(res->getBool());
 
@@ -4719,7 +4923,7 @@ TEST_F(ArrayVectorTest,testDecimal64ArrayVector_gt65535){
     VectorSP indV = conn.run("1..35000*2");
     VectorSP valV = Util::createVector(DT_DECIMAL64, 70000, 70000, true, 11);
     ConstantSP val1 = Util::createDecimal64(11, 2.35123);
-    ConstantSP val2 = Util::createDecimal64(11, 0.1);
+    ConstantSP val2 = Util::createNullConstant(DT_DECIMAL64, 11);
     for(auto i =0;i<valV->size() /2;i++){
         valV->set(2*i, val1);
         valV->set(2*i+1, val2);
@@ -4728,10 +4932,33 @@ TEST_F(ArrayVectorTest,testDecimal64ArrayVector_gt65535){
     VectorSP av1 = Util::createArrayVector(indV, valV);
     conn.upload("av1",av1);
 
-    ConstantSP res = conn.run("index = 1..35000*2;val = take([decimal64(2.35123,11),decimal64(0.1,11),decimal64(2.35123,11),decimal64(0.1,11)],70000);\
+    ConstantSP res = conn.run("index = 1..35000*2;val = take([decimal64(2.35123,11),decimal64(NULL,11),decimal64(2.35123,11),decimal64(NULL,11)],70000);\
                                 ex=arrayVector(index,val);eqObj(ex,av1)");
     EXPECT_TRUE(res->getBool());
-    
+
+    ConstantSP ex = conn.run("ex");
+    EXPECT_EQ(ex->getString(),av1->getString());
+
+}
+
+TEST_F(ArrayVectorTest,testDecimal128ArrayVector_gt65535){
+    VectorSP indV = conn.run("1..35000*2");
+    VectorSP valV = Util::createVector(DT_DECIMAL128, 70000, 70000, true, 26);
+    ConstantSP val1 = Util::createConstant(DT_DECIMAL128, 26);
+    val1->setString("2.1111111111111111111111111111111111111111111");
+    ConstantSP val2 = Util::createNullConstant(DT_DECIMAL128, 26);
+    for(auto i =0;i<valV->size() /2;i++){
+        valV->set(2*i, val1);
+        valV->set(2*i+1, val2);
+    }
+
+    VectorSP av1 = Util::createArrayVector(indV, valV);
+    conn.upload("av1",av1);
+
+    ConstantSP res = conn.run("index = 1..35000*2;val = take([decimal128('2.1111111111111111111111111111111111111111111',26),decimal128(NULL,26),decimal128('2.1111111111111111111111111111111111111111111',26),decimal128(NULL,26)],70000);\
+                                ex=arrayVector(index,val);eqObj(ex,av1)");
+    EXPECT_TRUE(res->getBool());
+
     ConstantSP ex = conn.run("ex");
     EXPECT_EQ(ex->getString(),av1->getString());
 

@@ -21,7 +21,14 @@ protected:
     virtual void SetUp()
     {
         cout<<"check connect...";
-		ConstantSP res = conn.run("1+1");
+		try
+		{
+			ConstantSP res = conn.run("1+1");
+		}
+		catch(const std::exception& e)
+		{
+			conn.connect(hostName, port, "admin", "123456");
+		}
 		
         cout<<"ok"<<endl;
     }
@@ -31,6 +38,10 @@ protected:
     }
 };
 
+TEST_F(DataformDictionaryTest,testBlobDictionary){
+	DictionarySP dict1 = Util::createDictionary(DT_BLOB, DT_BLOB);
+	EXPECT_TRUE(dict1.isNull());
+}
 
 TEST_F(DataformDictionaryTest,testStringDictionary){
 	DictionarySP dict1 = Util::createDictionary(DT_STRING, DT_STRING);
@@ -1647,6 +1658,204 @@ TEST_F(DataformDictionaryTest,testInt128AnyDictionary){
 	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
 }
 
+
+TEST_F(DataformDictionaryTest,testDecimal32Dictionary){
+	DictionarySP dict1 = Util::createDictionary(DT_INT, DT_DECIMAL32);
+	dict1->set(Util::createInt(1), Util::createDecimal32(6, 1.3));
+	string script = "a=int(1);b = decimal32(1.3, 6);c=dict(INT,DECIMAL32(6));c[a]=b;c";
+	DictionarySP res_d = conn.run(script);
+	conn.upload("dict1",{dict1});
+	string judgestr= "res=array(BOOL)\n\
+					res.append!(eqObj(c.keys()[0],dict1.keys()[0]))\n\
+					res.append!(eqObj(c.values()[0],dict1.values()[0]))\n\
+					eqObj(res, [true,true])";
+	EXPECT_EQ(conn.run(judgestr)->getBool(),true);
+	EXPECT_EQ(dict1->getString(), res_d->getString());
+	EXPECT_EQ(dict1->getType(), res_d->getType());
+	EXPECT_EQ(conn.run("dict1")->isDictionary(),true);
+
+	EXPECT_EQ(dict1->keys()->get(0)->getInt(), 1);
+	EXPECT_EQ(dict1->values()->get(0)->getString(),"1.300000");
+	EXPECT_EQ(dict1->keys()->get(0)->getType(),DT_INT);
+	EXPECT_EQ(dict1->values()->get(0)->getType(),DT_DECIMAL32);
+
+	dict1->set(Util::createInt(2), Util::createDecimal32(1, 1.34));
+	dict1->set(Util::createInt(3), Util::createDecimal32(0, -2));
+	cout<<dict1->getAllocatedMemory()<<endl;
+	VectorSP valVec2=Util::createVector(DT_INT,2,2);
+	valVec2->set(0,Util::createInt(3));
+	valVec2->setNull(1);
+
+	EXPECT_EQ(dict1->getMember(Util::createInt(2))->getString(),"1.3");
+	EXPECT_EQ(dict1->getMember(valVec2)->get(0)->getString(),"-2");
+	dict1->remove(Util::createInt(2));
+	dict1->remove(valVec2);
+
+	EXPECT_EQ(dict1->count(),1);
+	EXPECT_EQ(dict1->getValue()->getString(),"1->1.300000\n");
+	dict1->clear();
+	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+}
+
+TEST_F(DataformDictionaryTest,testDecimal32NullDictionary){
+	DictionarySP dict1 = Util::createDictionary(DT_INT, DT_DECIMAL32);
+	dict1->set(Util::createNullConstant(DT_INT), Util::createNullConstant(DT_DECIMAL32, 6));
+	string script = "a=int(NULL);b = decimal32(NULL, 6);c=dict(INT,DECIMAL32(6));c[a]=b;c";
+	DictionarySP res_d = conn.run(script);
+	conn.upload("dict1",{dict1});
+	string judgestr= "res=[true]\n\
+					res.append!(eqObj(c.keys()[0],dict1.keys()[0]))\n\
+					res.append!(eqObj(c.values()[0],dict1.values()[0]))\n\
+					eqObj(res, [true,true,true])";
+	EXPECT_EQ(conn.run(judgestr)->getBool(),true);
+	EXPECT_EQ(dict1->getString(), res_d->getString());
+	EXPECT_EQ(dict1->getType(), res_d->getType());
+	EXPECT_EQ(conn.run("dict1")->isDictionary(),true);
+
+	EXPECT_EQ(dict1->keys()->get(0)->getString(),"");
+	EXPECT_EQ(dict1->values()->get(0)->getString(),"");
+	EXPECT_EQ(dict1->keys()->get(0)->getType(),DT_INT);
+	EXPECT_EQ(dict1->values()->get(0)->getType(),DT_DECIMAL32);
+
+	EXPECT_EQ(dict1->count(),1);
+	EXPECT_EQ(dict1->getValue()->getString(),"->\n");
+	dict1->clear();
+	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+}
+
+
+TEST_F(DataformDictionaryTest,testDecimal64Dictionary){
+	DictionarySP dict1 = Util::createDictionary(DT_INT, DT_DECIMAL64);
+	dict1->set(Util::createInt(1), Util::createDecimal64(16, 1.3456));
+	string script = "a=int(1);b = decimal64(1.3456, 16);c=dict(INT,DECIMAL64(16));c[a]=b;c";
+	DictionarySP res_d = conn.run(script);
+	conn.upload("dict1",{dict1});
+	string judgestr= "res=array(BOOL)\n\
+					res.append!(eqObj(c.keys()[0],dict1.keys()[0]))\n\
+					res.append!(eqObj(c.values()[0],dict1.values()[0]))\n\
+					eqObj(res, [true,true])";
+	EXPECT_EQ(conn.run(judgestr)->getBool(),true);
+	EXPECT_EQ(dict1->getString(), res_d->getString());
+	EXPECT_EQ(dict1->getType(), res_d->getType());
+	EXPECT_EQ(conn.run("dict1")->isDictionary(),true);
+
+	EXPECT_EQ(dict1->keys()->get(0)->getInt(), 1);
+	EXPECT_EQ(dict1->values()->get(0)->getString(),"1.3456000000000000");
+	EXPECT_EQ(dict1->keys()->get(0)->getType(),DT_INT);
+	EXPECT_EQ(dict1->values()->get(0)->getType(),DT_DECIMAL64);
+
+	dict1->set(Util::createInt(2), Util::createDecimal64(1, 1.3456));
+	dict1->set(Util::createInt(3), Util::createDecimal64(0, -2));
+	cout<<dict1->getAllocatedMemory()<<endl;
+	VectorSP valVec2=Util::createVector(DT_INT,2,2);
+	valVec2->set(0,Util::createInt(3));
+	valVec2->setNull(1);
+
+	EXPECT_EQ(dict1->getMember(Util::createInt(2))->getString(),"1.3");
+	EXPECT_EQ(dict1->getMember(valVec2)->get(0)->getString(),"-2");
+	dict1->remove(Util::createInt(2));
+	dict1->remove(valVec2);
+
+	EXPECT_EQ(dict1->count(),1);
+	EXPECT_EQ(dict1->getValue()->getString(),"1->1.3456000000000000\n");
+	dict1->clear();
+	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+}
+
+TEST_F(DataformDictionaryTest,testDecimal64NullDictionary){
+	DictionarySP dict1 = Util::createDictionary(DT_INT, DT_DECIMAL64);
+	dict1->set(Util::createNullConstant(DT_INT), Util::createNullConstant(DT_DECIMAL64, 16));
+	string script = "a=int(NULL);b = decimal64(NULL, 16);c=dict(INT,DECIMAL64(16));c[a]=b;c";
+	DictionarySP res_d = conn.run(script);
+	conn.upload("dict1",{dict1});
+	string judgestr= "res=[true]\n\
+					res.append!(eqObj(c.keys()[0],dict1.keys()[0]))\n\
+					res.append!(eqObj(c.values()[0],dict1.values()[0]))\n\
+					eqObj(res, [true,true,true])";
+	EXPECT_EQ(conn.run(judgestr)->getBool(),true);
+	EXPECT_EQ(dict1->getString(), res_d->getString());
+	EXPECT_EQ(dict1->getType(), res_d->getType());
+	EXPECT_EQ(conn.run("dict1")->isDictionary(),true);
+
+	EXPECT_EQ(dict1->keys()->get(0)->getString(),"");
+	EXPECT_EQ(dict1->values()->get(0)->getString(),"");
+	EXPECT_EQ(dict1->keys()->get(0)->getType(),DT_INT);
+	EXPECT_EQ(dict1->values()->get(0)->getType(),DT_DECIMAL64);
+
+	EXPECT_EQ(dict1->count(),1);
+	EXPECT_EQ(dict1->getValue()->getString(),"->\n");
+	dict1->clear();
+	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+}
+
+
+TEST_F(DataformDictionaryTest,testDecimal128Dictionary){
+	DictionarySP dict1 = Util::createDictionary(DT_INT, DT_DECIMAL128);
+	ConstantSP dsm128val = Util::createNullConstant(DT_DECIMAL128, 26);
+	dsm128val->setString("1.12345678901");
+	dict1->set(Util::createInt(1), dsm128val);
+	string script = "a=int(1);b = decimal128('1.12345678901', 26);c=dict(INT,DECIMAL128(26));c[a]=b;c";
+	DictionarySP res_d = conn.run(script);
+	conn.upload("dict1",{dict1});
+	string judgestr= "res=array(BOOL)\n\
+					res.append!(eqObj(c.keys()[0],dict1.keys()[0]))\n\
+					res.append!(eqObj(c.values()[0],dict1.values()[0]))\n\
+					eqObj(res, [true,true])";
+	EXPECT_EQ(conn.run(judgestr)->getBool(),true);
+	EXPECT_EQ(dict1->getString(), res_d->getString());
+	EXPECT_EQ(dict1->getType(), res_d->getType());
+	EXPECT_EQ(conn.run("dict1")->isDictionary(),true);
+
+	EXPECT_EQ(dict1->keys()->get(0)->getInt(), 1);
+	EXPECT_EQ(dict1->values()->get(0)->getString(),"1.12345678901000000000000000");
+	EXPECT_EQ(dict1->keys()->get(0)->getType(),DT_INT);
+	EXPECT_EQ(dict1->values()->get(0)->getType(),DT_DECIMAL128);
+
+	dict1->set(Util::createInt(2), Util::createDecimal128(1, 1.3456));
+	dict1->set(Util::createInt(3), Util::createDecimal128(0, -2));
+	cout<<dict1->getAllocatedMemory()<<endl;
+	VectorSP valVec2=Util::createVector(DT_INT,2,2);
+	valVec2->set(0,Util::createInt(3));
+	valVec2->setNull(1);
+
+	EXPECT_EQ(dict1->getMember(Util::createInt(2))->getString(),"1.3");
+	EXPECT_EQ(dict1->getMember(valVec2)->get(0)->getString(),"-2");
+	dict1->remove(Util::createInt(2));
+	dict1->remove(valVec2);
+
+	EXPECT_EQ(dict1->count(),1);
+	EXPECT_EQ(dict1->getValue()->getString(),"1->1.12345678901000000000000000\n");
+	dict1->clear();
+	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+}
+
+TEST_F(DataformDictionaryTest,testDecimal128NullDictionary){
+	DictionarySP dict1 = Util::createDictionary(DT_INT, DT_DECIMAL128);
+	dict1->set(Util::createNullConstant(DT_INT), Util::createNullConstant(DT_DECIMAL128, 26));
+	string script = "a=int(NULL);b = decimal128(NULL, 26);c=dict(INT,DECIMAL128(26));c[a]=b;c";
+	DictionarySP res_d = conn.run(script);
+	conn.upload("dict1",{dict1});
+	string judgestr= "res=[true]\n\
+					res.append!(eqObj(c.keys()[0],dict1.keys()[0]))\n\
+					res.append!(eqObj(c.values()[0],dict1.values()[0]))\n\
+					eqObj(res, [true,true,true])";
+	EXPECT_EQ(conn.run(judgestr)->getBool(),true);
+	EXPECT_EQ(dict1->getString(), res_d->getString());
+	EXPECT_EQ(dict1->getType(), res_d->getType());
+	EXPECT_EQ(conn.run("dict1")->isDictionary(),true);
+
+	EXPECT_EQ(dict1->keys()->get(0)->getString(),"");
+	EXPECT_EQ(dict1->values()->get(0)->getString(),"");
+	EXPECT_EQ(dict1->keys()->get(0)->getType(),DT_INT);
+	EXPECT_EQ(dict1->values()->get(0)->getType(),DT_DECIMAL128);
+
+	EXPECT_EQ(dict1->count(),1);
+	EXPECT_EQ(dict1->getValue()->getString(),"->\n");
+	dict1->clear();
+	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+}
+
+
 TEST_F(DataformDictionaryTest,testDictionarywithValueAllTypes){
 	DictionarySP dict1 = Util::createDictionary(DT_STRING, DT_ANY);
 	vector<ConstantSP> vals = {Util::createChar(rand()%CHAR_MAX),Util::createBool(rand()%2),Util::createShort(rand()%SHRT_MAX),Util::createInt(rand()%INT_MAX),
@@ -1655,16 +1864,16 @@ TEST_F(DataformDictionaryTest,testDictionarywithValueAllTypes){
 								Util::createNanoTime(rand()%LLONG_MAX),Util::createNanoTimestamp(rand()%LLONG_MAX),Util::createFloat(rand()/float(RAND_MAX)),
 								Util::createDouble(rand()/double(RAND_MAX)),Util::createString("str"),Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"),
 								Util::parseConstant(DT_IP,"192.0.0."+to_string(rand()%255)),Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"),Util::createBlob("blob"),
-								Util::createDateHour(rand()%INT_MAX),Util::createDecimal32(rand()%10,rand()/float(RAND_MAX)),Util::createDecimal64(rand()%19,rand()/double(RAND_MAX))};
+								Util::createDateHour(rand()%INT_MAX),Util::createDecimal32(rand()%10,rand()/float(RAND_MAX)),Util::createDecimal64(rand()%19,rand()/double(RAND_MAX)),
+								Util::createDecimal128(rand()%38,rand()/double(RAND_MAX))};
+
+	vector<string> keynames;
 	for(int i=0; i<vals.size(); i++){
 		dict1->set(Util::createString("key"+to_string(i)), vals[i]);
+		keynames.push_back("val"+to_string(i));
 	}
 	conn.upload("dict1",{dict1});
-	int keyid = 0;
-	vector<string> keynames = {"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),
-		"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),
-		"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),
-		"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++),"val"+to_string(keyid++)};
+
 	conn.upload(keynames,vals);
 	// DictionarySP res_d = conn.run("dict1");
 	for(int i=0; i<vals.size(); i++)

@@ -63,36 +63,43 @@ public:
 
     ~MultithreadedTableWriter();
 
-	template<typename... TArgs>
-	bool insert(ErrorCodeInfo &errorInfo, TArgs... args) {
+    template<typename... TArgs>
+    bool insert(ErrorCodeInfo &errorInfo, TArgs... args) {
         RWLockGuard<RWLock> guard(&insertRWLock_, false);
-		if (hasError_.load()) {
-			throw RuntimeException("Thread is exiting.");
-		}
-		{
-			auto argSize = sizeof...(args);
-			if (argSize != colTypes_.size()) {
-				errorInfo.set(ErrorCodeInfo::EC_InvalidParameter, "Column counts don't match " + std::to_string(argSize));
-				return false;
-			}
-		}
-		{
-			errorInfo.clearError();
-			int colIndex1 = 0, colIndex2 = 0;
-			ConstantSP result[] = { Util::createObject(getColDataType(colIndex1++), args, &errorInfo, colExtras_[colIndex2++])... };
-			if (errorInfo.hasError())
-				return false;
-			std::vector<ConstantSP>* prow;
-			if (!unusedQueue_.pop(prow)) {
-				prow = new std::vector<ConstantSP>;
-			}
-			prow->resize(colIndex1);
-			for (int i = 0; i < colIndex1; i++) {
-				prow->at(i) = result[i];
-			}
-			return insert(&prow, 1, errorInfo);
-		}
-	}
+        if (hasError_.load()) {
+            throw RuntimeException("Thread is exiting.");
+        }
+        {
+            auto argSize = sizeof...(args);
+            if (argSize != colTypes_.size()) {
+                errorInfo.set(ErrorCodeInfo::EC_InvalidParameter, "Column counts don't match " + std::to_string(argSize));
+                return false;
+            }
+        }
+        {
+            errorInfo.clearError();
+            int colIndex1 = 0, colIndex2 = 0;
+            ConstantSP result[] = { Util::createObject(getColDataType(colIndex1++), args, &errorInfo, colExtras_[colIndex2++])... };
+            if (errorInfo.hasError()){
+                for(int i = colTypes_.size() - 1; i >= 0; --i){
+                    if(result[i].isNull()){
+                        errorInfo.errorInfo.append(" for col ").append(std::to_string(i + 1));
+                        return false;
+                    }
+                }
+                return false;
+            }
+            std::vector<ConstantSP>* prow;
+            if (!unusedQueue_.pop(prow)) {
+                prow = new std::vector<ConstantSP>;
+            }
+            prow->resize(colIndex1);
+            for (int i = 0; i < colIndex1; i++) {
+                prow->at(i) = result[i];
+            }
+            return insert(&prow, 1, errorInfo);
+        }
+    }
 
 	void waitForThreadCompletion();
     void getStatus(Status &status);

@@ -13,14 +13,9 @@
 #include <unordered_set>
 #include <ctime>
 #include <cassert>
-#ifdef _MSC_VER
-
-#elif defined MAC
-	#include <random>
-#else
-	#include <tr1/random>
-#endif
+#include <random>
 #include <chrono>
+#include <WideInteger.h>
 
 #ifdef _MSC_VER
 	#ifdef _DDBAPIDLL	
@@ -104,6 +99,7 @@ public:
 	static Constant* createDateHour(int year, int month, int day, int hour);
 	static Constant* createDecimal32(int scale, double value);
 	static Constant* createDecimal64(int scale, double value);
+	static Constant* createDecimal128(int scale, double value);
 
 	static bool isFlatDictionary(Dictionary* dict);
 	static Table* createTable(Dictionary* dict, int size);
@@ -242,6 +238,7 @@ public:
 	static ConstantSP createObject(DATA_TYPE dataType, std::string val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
 	static ConstantSP createObject(DATA_TYPE dataType, const unsigned char* val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
 	static ConstantSP createObject(DATA_TYPE dataType, unsigned char val[], ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
+	static ConstantSP createObject(DATA_TYPE dataType, char val[], ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
 	static ConstantSP createObject(DATA_TYPE dataType, long long val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
 	static ConstantSP createObject(DATA_TYPE dataType, long int val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
 	static ConstantSP createObject(DATA_TYPE dataType, int val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
@@ -337,6 +334,10 @@ public:
 	static void enumDecimal64Vector(const VectorSP &pVector, std::function<bool(const int64_t *pbuf, INDEX startIndex, int length)> func, INDEX offset = 0) {
 		enumBinaryVector<int64_t>(pVector, func, offset);
 	}
+	static void enumDecimal128Vector(const VectorSP &pVector, std::function<bool(const wide_integer::int128 *pbuf, INDEX startIndex, int length)> func, INDEX offset = 0) {
+		enumBinaryVector<wide_integer::int128>(pVector, func, offset);
+	}
+
 private:
 	template <class T>
 	static void enumBinaryVector(const VectorSP &pVector, std::function<bool(const T *pbuf, INDEX startIndex, int length)> func, INDEX offset = 0) {
@@ -475,6 +476,11 @@ public:
 					return (const int64_t*)pVector->getBinaryConst(position, len, sizeof(int64_t), (unsigned char*)buf);
 				});
 				break;
+			case DT_DECIMAL128:
+				column_[i].decimal128Col = new Column<wide_integer::int128>(pVector, [=](const VectorSP &pVector, INDEX position, int len, wide_integer::int128 *buf) {
+					return (const wide_integer::int128*)pVector->getBinaryConst(position, len, sizeof(wide_integer::int128), (unsigned char*)buf);
+				});
+				break;
 			default:
 				throw RuntimeException("ResultSet doesn't support data type " + Util::getDataTypeString(pVector->getType()));
 				break;
@@ -583,6 +589,8 @@ public:
 			return (unsigned char*)&column.decimal32Col->getValue(position_);
 		else if (column.decimal64Col != nullptr)
 			return (unsigned char*)&column.decimal64Col->getValue(position_);
+		else if (column.decimal128Col != nullptr)
+			return (unsigned char*)&column.decimal128Col->getValue(position_);
 		else {
 			throw RuntimeException("This instance doesn't support getBinary.");
 		}
@@ -641,6 +649,8 @@ private:
 		Column<Guid> *int128Col = nullptr;
 		Column<int32_t> *decimal32Col = nullptr;
 		Column<int64_t> *decimal64Col = nullptr;
+		Column<wide_integer::int128> *decimal128Col = nullptr;
+
 		~ColumnPointer() {
 			delete charCol;
 			delete shortCol;
@@ -652,6 +662,7 @@ private:
 			delete int128Col;
 			delete decimal32Col;
 			delete decimal64Col;
+			delete decimal128Col;
 		}
 	};
 	TableSP table_;

@@ -26,7 +26,14 @@ protected:
 	virtual void SetUp()
 	{
 		cout << "check connect...";
-		ConstantSP res = conn.run("1+1");
+		try
+		{
+			ConstantSP res = conn.run("1+1");
+		}
+		catch(const std::exception& e)
+		{
+			conn.connect(hostName, port, "admin", "123456");
+		}
 
 		cout << "ok" << endl;
 	}
@@ -998,6 +1005,152 @@ TEST_F(DataformVectorTest, testStringVector_assign)
 	EXPECT_EQ(v2->getString(1), "2");
 }
 
+
+TEST_F(DataformVectorTest, testBlobVector)
+{
+	VectorSP v1 = Util::createVector(DT_BLOB, 2, 2);
+	v1->set(0, Util::createBlob("asd123!@#"));
+	v1->set(1, Util::createBlob("中文！@￥#%……a"));
+	string script = "a=blob([\"asd123!@#\",\"中文！@￥#%……a\"]);a";
+	VectorSP res_v = conn.run(script);
+	conn.upload("v1", {v1});
+	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(), true);
+	EXPECT_EQ(v1->getScript(), res_v->getScript());
+	EXPECT_EQ(v1->getType(), res_v->getType());
+
+	EXPECT_ANY_THROW(v1->getBool());
+	EXPECT_ANY_THROW(v1->getChar());
+	EXPECT_ANY_THROW(v1->getShort());
+	EXPECT_ANY_THROW(v1->getLong());
+	EXPECT_ANY_THROW(v1->getFloat());
+	EXPECT_ANY_THROW(v1->getDouble());
+	EXPECT_ANY_THROW(v1->getIndex());
+	EXPECT_ANY_THROW(v1->neg());
+
+	EXPECT_EQ(v1->getUnitLength(), 0);
+	EXPECT_TRUE(v1->sizeable());
+	EXPECT_EQ(v1->compare(1, Util::createBlob("中文！@￥#%……a")), 0);
+	EXPECT_EQ(v1->getStringRef(), v1->get(0)->getString());
+	v1->setNull(); // nothing to do
+	EXPECT_FALSE(v1->hasNull());
+
+	v1->reverse();
+	EXPECT_EQ(v1->get(0)->getString(), Util::createBlob("中文！@￥#%……a")->getString());
+	EXPECT_EQ(v1->get(1)->getString(), Util::createBlob("asd123!@#")->getString());
+	v1->reverse(0, 1);
+	EXPECT_EQ(v1->get(1)->getString(), Util::createBlob("中文！@￥#%……a")->getString());
+	EXPECT_EQ(v1->get(0)->getString(), Util::createBlob("asd123!@#")->getString());
+
+	cout << v1->getDataArray() << endl;
+	cout << v1->getAllocatedMemory(1) << endl;
+
+	v1->upper();
+	EXPECT_EQ(v1->get(0)->getString(), "ASD123!@#");
+	v1->lower();
+	EXPECT_EQ(v1->get(0)->getString(), "asd123!@#");
+
+	v1->set(0, Util::createBlob(" 1 2 3      "));
+	v1->set(1, Util::createBlob(" \t\r\n 1 2 3 \t\n\r"));
+	v1->trim();
+	EXPECT_EQ(v1->get(0)->getString(), "1 2 3");
+	EXPECT_EQ(v1->get(1)->getString(), "\t\r\n 1 2 3 \t\n\r");
+	v1->strip();
+	EXPECT_EQ(v1->get(0)->getString(), "1 2 3");
+	EXPECT_EQ(v1->get(1)->getString(), "1 2 3");
+
+	v1->set(Util::createInt(1), Util::createInt(1));
+	EXPECT_EQ(v1->get(1)->getString(), "1");
+	v1->set(Util::createInt(0), Util::createNullConstant(DT_INT));
+	EXPECT_TRUE(v1->get(0)->isNull());
+	EXPECT_ANY_THROW(v1->set(Util::createInt(1), Util::createVector(DT_BLOB, 1, 1)));
+
+	EXPECT_FALSE(v1->assign(Util::createVector(DT_BLOB, 5, 5)));
+	v1->assign(Util::createString("5"));
+	EXPECT_EQ(v1->getString(), "[\"5\",\"5\"]");
+	v1->assign(Util::createNullConstant(DT_BLOB));
+	EXPECT_EQ(v1->getString(), "[,]");
+
+	v1->set(0, Util::createString("bcd"));
+	EXPECT_EQ(v1->getSubVector(0, -1, 2)->getString(), "[\"bcd\"]");
+
+	v1->append(Util::createString("efg"), 10);
+	EXPECT_EQ(v1->size(), 3);
+	VectorSP strVec = Util::createVector(DT_BLOB, 1, 1);
+	strVec->set(0, Util::createString("hij"));
+	strVec->append(Util::createString("klm"));
+	v1->append(strVec, 2);
+	EXPECT_EQ(v1->size(), 5);
+
+	VectorSP v2 = Util::createVector(DT_BLOB, 0, 0);
+	char *strbuf = (char *)"charstr";
+	char **str1 = &strbuf;
+	v2->appendString(str1, 1);
+	v2->appendString(str1, 1);
+	EXPECT_EQ(v2->getString(), "[\"charstr\",\"charstr\"]");
+	v2->append(Util::createNullConstant(DT_BLOB));
+	v2->append(Util::createString("str"));
+
+	// EXPECT_ANY_THROW(v2->next(-2));
+	// EXPECT_ANY_THROW(v2->prev(-2));
+	v2->next(1);
+	EXPECT_EQ(v2->size(), 4);
+	EXPECT_TRUE(v2->get(3)->isNull());
+
+	v2->prev(2);
+	EXPECT_EQ(v2->size(), 4);
+	EXPECT_TRUE(v2->get(0)->isNull());
+	EXPECT_TRUE(v2->get(1)->isNull());
+
+	v2->nullFill(Util::createString("filled"));
+	EXPECT_EQ(v2->getString(), "[\"filled\",\"filled\",\"charstr\",\"filled\"]");
+
+	v2->fill(0, 1, Util::createString("twicefilled"));
+	v2->fill(1, 1, Util::createNullConstant(DT_BLOB));
+	v2->fill(3, 1, Util::createInt(3));
+	EXPECT_EQ(v2->getString(), "[\"twicefilled\",,\"charstr\",\"3\"]");
+
+	char *buf = new char[2];
+	v2->isNull(1, 1, buf);
+	EXPECT_EQ((int)buf[0], 1);
+	buf[0] = '\0';
+	v2->nullFill(Util::createString("filled"));
+	v2->isNull(1, 1, buf);
+	EXPECT_EQ((int)buf[0], 0);
+	delete[] buf;
+
+	string **buf1 = new string *[2];
+	EXPECT_EQ(*v2->getStringConst(0, 1, buf1)[0], v2->get(0)->getString());
+	delete[] buf1;
+
+	v2->replace(Util::createString("3"), Util::createString("replaced"));
+	// cout<<v2->getString()<<endl;
+	EXPECT_EQ(v2->getString(), "[\"twicefilled\",\"filled\",\"charstr\",\"replaced\"]");
+
+	VectorSP indexVec = Util::createIndexVector(0, 10);
+	v2->remove(indexVec);
+	EXPECT_EQ(v2->getString(), "[]");
+
+	char **buf2 = new char *[v2->size()];
+	v2->getStringConst(0, v2->size(), buf2);
+	for (auto i = 0; i < v2->size(); i++)
+		EXPECT_EQ(buf2[i], v2->get(i)->getString());
+
+	delete[] buf2;
+}
+
+TEST_F(DataformVectorTest, testBlobNullVector)
+{
+	VectorSP v1 = Util::createVector(DT_BLOB, 2, 2);
+	v1->setNull(0);
+	v1->setNull(1);
+	string script = "a=[blob(string(NULL)),blob(string(NULL))];a";
+	VectorSP res_v = conn.run(script);
+	conn.upload("v1", {v1});
+	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(), true);
+	EXPECT_EQ(v1->getScript(), res_v->getScript());
+	EXPECT_EQ(v1->getType(), res_v->getType());
+}
+
 TEST_F(DataformVectorTest, testStringVector)
 {
 	VectorSP v1 = Util::createVector(DT_STRING, 2, 2);
@@ -1777,22 +1930,42 @@ TEST_F(DataformVectorTest, testIntVector)
 
 	v2->setBool(1);
 	EXPECT_EQ(v2->getBool(0), (bool)1);
-	v2->setChar(1);
-	EXPECT_EQ(v2->get(0)->getChar(), (char)1);
-	v2->setShort(1);
-	EXPECT_EQ(v2->get(0)->getShort(), (short)1);
-	v2->setInt(1);
-	EXPECT_EQ(v2->get(0)->getInt(), (int)1);
-	v2->setLong(1);
-	EXPECT_EQ(v2->get(0)->getLong(), (long long)1);
-	v2->setIndex(1);
-	EXPECT_EQ(v2->get(0)->getIndex(), (INDEX)1);
-	v2->setFloat(1);
-	EXPECT_EQ(v2->get(0)->getFloat(), (float)1);
-	v2->setDouble(1);
-	EXPECT_EQ(v2->get(0)->getDouble(), (double)1);
-	v2->setString("1");
-	EXPECT_EQ(v2->get(0)->getString(), "1");
+	v2->setChar('\2');
+	EXPECT_EQ(v2->get(0)->getChar(), (char)2);
+	v2->setShort(3);
+	EXPECT_EQ(v2->get(0)->getShort(), (short)3);
+	v2->setInt(4);
+	EXPECT_EQ(v2->get(0)->getInt(), (int)4);
+	v2->setLong(5);
+	EXPECT_EQ(v2->get(0)->getLong(), (long long)5);
+	v2->setIndex(6);
+	EXPECT_EQ(v2->get(0)->getIndex(), (INDEX)6);
+	v2->setFloat(7.11);
+	EXPECT_EQ(v2->get(0)->getFloat(), (float)7);
+	v2->setDouble(-8.1);
+	EXPECT_EQ(v2->get(0)->getDouble(), (double)-8);
+	v2->setString("9");
+	EXPECT_EQ(v2->get(0)->getString(), "-8"); // setString not effected
+
+	v2->setBool(0, 11);
+	EXPECT_EQ(v2->getBool(0), (bool)1);
+	v2->setChar(0, '\0');
+	EXPECT_EQ(v2->get(0)->getChar(), (char)0);
+	v2->setShort(0, 33);
+	EXPECT_EQ(v2->get(0)->getShort(), (short)33);
+	v2->setInt(0, 44);
+	EXPECT_EQ(v2->get(0)->getInt(), (int)44);
+	v2->setLong(0, 55);
+	EXPECT_EQ(v2->get(0)->getLong(), (long long)55);
+	v2->setIndex(0, 66);
+	EXPECT_EQ(v2->get(0)->getIndex(), (INDEX)66);
+	v2->setFloat(0, -7.11);
+	EXPECT_EQ(v2->get(0)->getFloat(), (float)-7);
+	v2->setDouble(0, 8.1);
+	EXPECT_EQ(v2->get(0)->getDouble(), (double)8);
+	v2->setString(0, "99");
+	EXPECT_EQ(v2->get(0)->getString(), "8"); // setString not effected
+
 
 	VectorSP v3 = Util::createVector(DT_INT, 2, 2);
 	v3->setNull(); // code nothing to do
@@ -3776,16 +3949,18 @@ TEST_F(DataformVectorTest, testInt128Vector)
 
 TEST_F(DataformVectorTest, testInt128nullVector)
 {
-	VectorSP v1 = Util::createVector(DT_INT128, 2, 2);
+	VectorSP v1 = Util::createVector(DT_INT128, 3, 3);
 	v1->setNull(0);
 	v1->setNull(1);
-	string script = "a=[int128(''),int128('')];a";
+	v1->set(2, Util::createNullConstant(DT_INT128));
+	v1->append(Util::createNullConstant(DT_INT128));
+	string script = "a=[int128(),int128(),int128(),int128()];a";
 	VectorSP res_v = conn.run(script);
 	conn.upload("v1", {v1});
 	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(), true);
 	EXPECT_EQ(v1->getScript(), res_v->getScript());
 	EXPECT_EQ(v1->getType(), res_v->getType());
-	for (int i = 0; i < 2; i++)
+	for (int i = 0; i < v1->size(); i++)
 		EXPECT_EQ(v1->getItem(i)->getString(), res_v->getItem(i)->getString());
 }
 
@@ -3873,16 +4048,18 @@ TEST_F(DataformVectorTest, testUuidVector)
 
 TEST_F(DataformVectorTest, testUuidnullVector)
 {
-	VectorSP v1 = Util::createVector(DT_UUID, 2, 2);
+	VectorSP v1 = Util::createVector(DT_UUID, 3, 3);
 	v1->setNull(0);
 	v1->setNull(1);
-	string script = "a=[uuid(''),uuid('')];a";
+	v1->set(2, Util::createNullConstant(DT_UUID));
+	v1->append(Util::createNullConstant(DT_UUID));
+	string script = "a=[uuid(),uuid(),uuid(),uuid()];a";
 	VectorSP res_v = conn.run(script);
 	conn.upload("v1", {v1});
 	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(), true);
 	EXPECT_EQ(v1->getScript(), res_v->getScript());
 	EXPECT_EQ(v1->getType(), res_v->getType());
-	for (int i = 0; i < 2; i++)
+	for (int i = 0; i < v1->size(); i++)
 		EXPECT_EQ(v1->getItem(i)->getString(), res_v->getItem(i)->getString());
 }
 
@@ -3970,16 +4147,18 @@ TEST_F(DataformVectorTest, testIpaddrVector)
 
 TEST_F(DataformVectorTest, testIpaddrnullVector)
 {
-	VectorSP v1 = Util::createVector(DT_IP, 2, 2);
+	VectorSP v1 = Util::createVector(DT_IP, 3, 3);
 	v1->setNull(0);
 	v1->setNull(1);
-	string script = "a=[ipaddr(''),ipaddr('')];a";
+	v1->set(2, Util::createNullConstant(DT_IP));
+	v1->append(Util::createNullConstant(DT_IP));
+	string script = "a=[ipaddr(),ipaddr(),ipaddr(),ipaddr()];a";
 	VectorSP res_v = conn.run(script);
 	conn.upload("v1", {v1});
 	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(), true);
 	EXPECT_EQ(v1->getScript(), res_v->getScript());
 	EXPECT_EQ(v1->getType(), res_v->getType());
-	for (int i = 0; i < 2; i++)
+	for (int i = 0; i < v1->size(); i++)
 		EXPECT_EQ(v1->getItem(i)->getString(), res_v->getItem(i)->getString());
 }
 
@@ -4177,28 +4356,28 @@ TEST_F(DataformVectorTest, testDecimal32Vector)
 
 	v1->append(Util::createDecimal32(2, 1.5));
 	v1->set(2, Util::createNullConstant(DT_DECIMAL32));
-	EXPECT_FALSE(v1->append(Util::createDecimal32(2, 1.5), 3));
+	v1->append(Util::createDecimal32(2, 1.5326), 3);
 	v1->append(Util::createDecimal32(2, 3.12123), 1);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,,3.12]");
+	EXPECT_EQ(v1->getString(), "[1.20,3.15,,1.53,1.53,1.53,3.12]");
 	v1->append(Util::createNullConstant(DT_DECIMAL32), 1);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,,3.12,]");
+	EXPECT_EQ(v1->getString(), "[1.20,3.15,,1.53,1.53,1.53,3.12,]");
 	EXPECT_ANY_THROW(v1->append(errTypevalV, 1));
 	v1->append(diffScalevalV, 2);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,,3.12,,1.00,]");
+	EXPECT_EQ(v1->getString(), "[1.20,3.15,,1.53,1.53,1.53,3.12,,1.00,]");
 	v1->append(valV, 2);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,,3.12,,1.00,,13.00,]");
-	EXPECT_ANY_THROW(v1->appendString(charerrbuf, 1));
+	EXPECT_EQ(v1->getString(), "[1.20,3.15,,1.53,1.53,1.53,3.12,,1.00,,13.00,]");
+	v1->appendString(charerrbuf, 1);
 	v1->appendString(charbuf, 3);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,,3.12,,1.00,,13.00,,9.48,84912.39,31945.10]");
-	EXPECT_ANY_THROW(v1->appendString(strerrbuf, 1));
+	EXPECT_EQ(v1->getString(), "[1.20,3.15,,1.53,1.53,1.53,3.12,,1.00,,13.00,,,9.49,84912.39,31945.10]");
+	v1->appendString(strerrbuf, 1);
 	v1->appendString(strbuf, 2);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,,3.12,,1.00,,13.00,,9.48,84912.39,31945.10,0.00,-1356.14]");
+	EXPECT_EQ(v1->getString(), "[1.20,3.15,,1.53,1.53,1.53,3.12,,1.00,,13.00,,,9.49,84912.39,31945.10,,0.00,-1356.15]");
 
 	conn.upload("v1", v1);
-	EXPECT_TRUE(conn.run("eqObj(v1,decimal32([1.20,3.15,NULL,3.12,NULL,1.00,NULL,13.00,NULL,9.48,84912.39,31945.10,0.00,-1356.14],2))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(v1,decimal32([1.20,3.15,NULL,1.53,1.53,1.53,3.12,NULL,1.00,NULL,13.00,NULL,NULL,9.49,84912.39,31945.10,NULL,0.00,-1356.15],2))")->getBool());
 
 	v1->nullFill(Util::createFloat(4.3335));
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,4.33,3.12,4.33,1.00,4.33,13.00,4.33,9.48,84912.39,31945.10,0.00,-1356.14]");
+	EXPECT_EQ(v1->getString(), "[1.20,3.15,4.33,1.53,1.53,1.53,3.12,4.33,1.00,4.33,13.00,4.33,4.33,9.49,84912.39,31945.10,4.33,0.00,-1356.15]");
 
 	VectorSP v2 = v1->getSubVector(0, 2, 10);
 	cout << v2->getString() << endl;
@@ -4263,18 +4442,18 @@ TEST_F(DataformVectorTest, testDecimal32NullVector)
 TEST_F(DataformVectorTest, testDecimal64Vector)
 {
 	EXPECT_ANY_THROW(VectorSP v0 = Util::createVector(DT_DECIMAL64, 2, 2, true, 19));
-	VectorSP v1 = Util::createVector(DT_DECIMAL64, 2, 2, true, 2);
-	v1->set(0, Util::createDecimal64(2, 0.315));
-	v1->set(1, Util::createDecimal64(2, 3.1));
+	VectorSP v1 = Util::createVector(DT_DECIMAL64, 2, 2, true, 16);
+	v1->set(0, Util::createDecimal64(16, 0.315));
+	v1->set(1, Util::createDecimal64(16, 3.1));
 
-	string script = "a=[decimal64(0.31,2),decimal64(3.10,2)];a";
+	string script = "a=[decimal64(0.315,16),decimal64(3.1,16)];a";
 	VectorSP res_v = conn.run(script);
 	conn.upload("v1", {v1});
 	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(), true);
 	EXPECT_EQ(v1->getString(), res_v->getString());
 	EXPECT_EQ(v1->getType(), res_v->getRawType());
 	EXPECT_EQ(Util::getCategoryString(v1->getCategory()), "DENARY");
-	EXPECT_EQ(v1->getExtraParamForType(), 2);
+	EXPECT_EQ(v1->getExtraParamForType(), 16);
 	EXPECT_EQ(v1->getString(1), res_v->get(1)->getString());
 
 	float buf1[1];
@@ -4288,65 +4467,68 @@ TEST_F(DataformVectorTest, testDecimal64Vector)
 
 	v1->setFloat(0, 0.999);
 	v1->setDouble(1, 2.5);
-	EXPECT_EQ(v1->getString(), "[0.99,2.50]");
+	EXPECT_EQ(v1->getString(), "[0.9990000514957312,2.5000000000000000]");
 	const float buf3[1] = {4.1};
 	const double buf4[1] = {5.6320001};
 	v1->setFloat(0, 1, buf3);
 	v1->setDouble(1, 1, buf4);
-	EXPECT_EQ(v1->getString(), "[4.10,5.63]");
+	EXPECT_EQ(v1->getString(), "[4.0999998325784576,5.6320001000000000]");
 
 	v1->set(0, Util::createDecimal64(1, 1.2322));
 	v1->set(1, Util::createDecimal64(5, 3.15));
 	EXPECT_EQ(v1->getType(), DT_DECIMAL64);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15]");
+	EXPECT_EQ(v1->getString(), "[1.2000000000000000,3.1500000000000000]");
 
 	VectorSP indexV = Util::createIndexVector(0, 2);
-	VectorSP valV = Util::createVector(DT_DECIMAL64, 2, 2);
+	VectorSP valV = Util::createVector(DT_DECIMAL64, 2, 2, true, 16);
 	VectorSP errTypevalV = Util::createVector(DT_NANOTIME, 1, 1);
 	VectorSP diffScalevalV = Util::createVector(DT_DECIMAL64, 2, 2); // default scale=0
-	valV->set(0, Util::createDecimal64(2, 13.0582));
+	ConstantSP strval = Util::createNullConstant(DT_DECIMAL64, 16);
+	strval->setString("1.146556453894532645");
+	valV->set(0, strval);
 	valV->setNull(1);
 	errTypevalV->set(0, Util::createNanoTime(1000000000000));
-	diffScalevalV->set(0, Util::createDecimal64(5, 1.5));
+	diffScalevalV->set(0, Util::createDecimal64(16, 1.5));
 	diffScalevalV->set(1, Util::createNullConstant(DT_DECIMAL64));
-	string strbuf[2] = {"0", "-1356.14655"};
+	string strbuf[2] = {"0", "-1.146556453894532645"};
 	string strerrbuf[1] = {"abcdefg"};
-	char *charbuf[3] = {(char *)"9.4856", (char *)"84912.39123", (char *)"31945.1"};
+	char *charbuf[3] = {(char *)"9.4856", (char *)"-0.135468384653648488", (char *)"99.1"};
 	char *charerrbuf[1] = {(char *)"abcdefg"};
 
 	v1->append(Util::createDecimal64(2, 1.5));
 	v1->set(2, Util::createNullConstant(DT_DECIMAL64));
-	EXPECT_FALSE(v1->append(Util::createDecimal64(2, 1.5), 3));
+	v1->append(Util::createDecimal64(2, 1.5), 3);
 	v1->append(Util::createDecimal64(2, 3.12123), 1);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,,3.12]");
+	EXPECT_EQ(v1->getString(), "[1.2000000000000000,3.1500000000000000,,1.5000000000000000,1.5000000000000000,1.5000000000000000,3.1200000000000000]");
 	v1->append(Util::createNullConstant(DT_DECIMAL64), 1);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,,3.12,]");
+	EXPECT_EQ(v1->getString(), "[1.2000000000000000,3.1500000000000000,,1.5000000000000000,1.5000000000000000,1.5000000000000000,3.1200000000000000,]");
 	EXPECT_ANY_THROW(v1->append(errTypevalV, 1));
 	v1->append(diffScalevalV, 2);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,,3.12,,1.00,]");
+	EXPECT_EQ(v1->getString(), "[1.2000000000000000,3.1500000000000000,,1.5000000000000000,1.5000000000000000,1.5000000000000000,3.1200000000000000,,1.0000000000000000,]");
 	v1->append(valV, 2);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,,3.12,,1.00,,13.00,]");
-	EXPECT_ANY_THROW(v1->appendString(charerrbuf, 1));
+	EXPECT_EQ(v1->getString(), "[1.2000000000000000,3.1500000000000000,,1.5000000000000000,1.5000000000000000,1.5000000000000000,3.1200000000000000,,1.0000000000000000,,1.1465564538945326,]");
+	v1->appendString(charerrbuf, 1);
 	v1->appendString(charbuf, 3);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,,3.12,,1.00,,13.00,,9.48,84912.39,31945.10]");
-	EXPECT_ANY_THROW(v1->appendString(strerrbuf, 1));
+
+	EXPECT_EQ(v1->getString(), "[1.2000000000000000,3.1500000000000000,,1.5000000000000000,1.5000000000000000,1.5000000000000000,3.1200000000000000,,1.0000000000000000,,1.1465564538945326,,,9.4856000000000000,-0.1354683846536485,99.1000000000000000]");
+	v1->appendString(strerrbuf, 1);
 	v1->appendString(strbuf, 2);
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,,3.12,,1.00,,13.00,,9.48,84912.39,31945.10,0.00,-1356.14]");
+
+	EXPECT_EQ(v1->getString(), "[1.2000000000000000,3.1500000000000000,,1.5000000000000000,1.5000000000000000,1.5000000000000000,3.1200000000000000,,1.0000000000000000,,1.1465564538945326,,,9.4856000000000000,-0.1354683846536485,99.1000000000000000,,0.0000000000000000,-1.1465564538945326]");
 
 	conn.upload("v1", v1);
-	EXPECT_TRUE(conn.run("eqObj(v1,decimal64([1.20,3.15,NULL,3.12,NULL,1.00,NULL,13.00,NULL,9.48,84912.39,31945.10,0.00,-1356.14],2))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(v1,decimal64(['1.2','3.15',string(NULL),'1.5','1.5','1.5','3.12',string(NULL),string(1),string(NULL),`1.146556453894532645,string(NULL),string(NULL),'9.4856','-0.135468384653648488',`99.1,string(NULL),string(0),'-1.146556453894532645'],16))")->getBool());
 
-	v1->nullFill(Util::createFloat(4.3335));
-	EXPECT_EQ(v1->getString(), "[1.20,3.15,4.33,3.12,4.33,1.00,4.33,13.00,4.33,9.48,84912.39,31945.10,0.00,-1356.14]");
+	v1->nullFill(Util::createFloat(0));
+	EXPECT_EQ(v1->getString(), "[1.2000000000000000,3.1500000000000000,0.0000000000000000,1.5000000000000000,1.5000000000000000,1.5000000000000000,3.1200000000000000,0.0000000000000000,1.0000000000000000,0.0000000000000000,1.1465564538945326,0.0000000000000000,0.0000000000000000,9.4856000000000000,-0.1354683846536485,99.1000000000000000,0.0000000000000000,0.0000000000000000,-1.1465564538945326]");
 
 	VectorSP v2 = v1->getSubVector(0, 2, 10);
-	cout << v2->getString() << endl;
 	EXPECT_TRUE(v2->set(Util::createInt(0), Util::createDecimal64(2, 2.7999)));
 	EXPECT_ANY_THROW(v2->set(Util::createIndexVector(1, 1), errTypevalV));
 	v2->set(Util::createIndexVector(1, 1), diffScalevalV);
-	EXPECT_EQ(v2->getString(), "[2.79,1.00]");
+	EXPECT_EQ(v2->getString(), "[2.7900000000000000,1.0000000000000000]");
 	v2->set(indexV, valV);
-	EXPECT_EQ(v2->getString(), "[13.00,]");
+	EXPECT_EQ(v2->getString(), "[1.1465564538945326,]");
 
 	EXPECT_TRUE(v2->get(1)->isNull());
 	// EXPECT_TRUE(v2->get(Util::createInt(1))->isNull());
@@ -4354,27 +4536,27 @@ TEST_F(DataformVectorTest, testDecimal64Vector)
 
 	EXPECT_ANY_THROW(v2->fill(1, 5, valV));
 	v2->fill(1, 1, Util::createDecimal64(5, 0));
-	EXPECT_EQ(v2->getString(), "[13.00,0.00]");
+	EXPECT_EQ(v2->getString(), "[1.1465564538945326,0.0000000000000000]");
 	v2->fill(0, 2, Util::createNullConstant(DT_DECIMAL64));
 	EXPECT_EQ(v2->getString(), "[,]");
 	EXPECT_ANY_THROW(v2->fill(1, 1, errTypevalV));
 	v2->fill(0, 2, diffScalevalV);
-	EXPECT_EQ(v2->getString(), "[1.00,]");
+	EXPECT_EQ(v2->getString(), "[1.0000000000000000,]");
 	v2->fill(0, 2, valV);
-	EXPECT_EQ(v2->getString(), "[13.00,]");
+	EXPECT_EQ(v2->getString(), "[1.1465564538945326,]");
 
 	EXPECT_FALSE(v2->validIndex(1));
 	v2->fill(1, 1, Util::createDecimal64(5, 0));
 	EXPECT_TRUE(v2->validIndex(-1));
 
-	EXPECT_EQ(v2->compare(0, Util::createInt(12)), 1);
+	EXPECT_EQ(v2->compare(0, Util::createInt(1.09)), 1);
 	EXPECT_EQ(v2->compare(1, Util::createInt(1)), -1);
 	EXPECT_EQ(v2->compare(1, Util::createInt(0)), 0);
-	EXPECT_EQ(v2->compare(0, Util::createDecimal32(3, 12.99)), 1);
-	EXPECT_EQ(v2->compare(0, Util::createDecimal32(2, 13.01)), -1);
+	EXPECT_EQ(v2->compare(0, Util::createDecimal32(3, 1.099)), 1);
+	EXPECT_EQ(v2->compare(0, Util::createDecimal32(2, 1.2)), -1);
 	EXPECT_EQ(v2->compare(1, Util::createDecimal32(1, 0)), 0);
-	EXPECT_EQ(v2->compare(0, Util::createDecimal64(8, 12.999999999)), 1);
-	EXPECT_EQ(v2->compare(0, Util::createDecimal64(10, 13.00001)), -1);
+	EXPECT_EQ(v2->compare(0, Util::createDecimal64(8, 1.09999999)), 1);
+	EXPECT_EQ(v2->compare(0, Util::createDecimal64(10, 1.2000000001)), -1);
 	EXPECT_EQ(v2->compare(1, Util::createDecimal64(1, 0)), 0);
 	EXPECT_ANY_THROW(v2->compare(0, Util::createBlob("blob1")));
 	v2->nullFill(Util::createInt(1));
@@ -4397,6 +4579,315 @@ TEST_F(DataformVectorTest, testDecimal64NullVector)
 		EXPECT_EQ(Util::getCategoryString(v1->getCategory()), "DENARY");
 		EXPECT_EQ(v1->getExtraParamForType(), i);
 	}
+}
+
+TEST_F(DataformVectorTest, testDecimal128Vector)
+{
+	EXPECT_ANY_THROW(VectorSP v0 = Util::createVector(DT_DECIMAL128, 2, 2, true, 39));
+	VectorSP v1 = Util::createVector(DT_DECIMAL128, 2, 2, true, 26);
+	ConstantSP val1 = Util::createConstant(DT_DECIMAL128, 26);
+	ConstantSP val2 = Util::createConstant(DT_DECIMAL128, 26);
+	val1->setString("0.195662");
+	val2->setString("-1.4566253625221653233545652333333");
+	v1->set(0, val1);
+	v1->set(1, val2);
+
+	string script = "a=decimal128('0.195662' '-1.4566253625221653233545652333333', 26);a";
+	VectorSP res_v = conn.run(script);
+	conn.upload("v1", {v1});
+	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(), true);
+	EXPECT_EQ(v1->getString(), res_v->getString());
+	EXPECT_EQ(v1->getType(), res_v->getRawType());
+	EXPECT_EQ(Util::getCategoryString(v1->getCategory()), "DENARY");
+	EXPECT_EQ(v1->getExtraParamForType(), 26);
+	EXPECT_EQ(v1->getString(1), res_v->get(1)->getString());
+
+	float buf1[1];
+	EXPECT_EQ(v1->getFloat(1), res_v->get(1)->getFloat());
+	v1->getFloat(0, 1, buf1);
+	EXPECT_EQ((float)buf1[0], res_v->get(0)->getFloat());
+	double buf2[1];
+	EXPECT_EQ(v1->getDouble(1), res_v->get(1)->getDouble());
+	v1->getDouble(0, 1, buf2);
+	EXPECT_EQ((double)buf2[0], res_v->get(0)->getDouble());
+
+	v1->setFloat(0, 0.999);
+	v1->setDouble(1, 2.5);
+	EXPECT_EQ(v1->getString(), "[0.99900002738140710636093440,2.50000000000000003321888768]");
+	const float buf3[1] = {4.1};
+	const double buf4[1] = {5.6320001};
+	v1->setFloat(0, 1, buf3);
+	v1->setDouble(1, 1, buf4);
+	EXPECT_EQ(v1->getString(), "[4.09999990113415108392648704,5.63200010000000053520891904]");
+
+	v1->set(0, Util::createDecimal128(1, 1.2322));
+	v1->set(1, Util::createDecimal128(5, 3.15));
+	EXPECT_EQ(v1->getType(), DT_DECIMAL128);
+	EXPECT_EQ(v1->getString(), "[1.20000000000000000000000000,3.15000000000000000000000000]");
+
+	VectorSP indexV = Util::createIndexVector(0, 2);
+	VectorSP valV = Util::createVector(DT_DECIMAL128, 2, 2, true, 26);
+	VectorSP errTypevalV = Util::createVector(DT_NANOTIME, 1, 1);
+	VectorSP diffScalevalV = Util::createVector(DT_DECIMAL128, 2, 2); // default scale=0
+	ConstantSP strval = Util::createNullConstant(DT_DECIMAL128, 26);
+
+	strval->setString("100000000.31624525345261230126453256");
+	valV->set(0, strval);
+	valV->setNull(1);
+
+	errTypevalV->set(0, Util::createNanoTime(1000000000000));
+	diffScalevalV->set(0, Util::createDecimal128(5, 1.5));
+	diffScalevalV->set(1, Util::createNullConstant(DT_DECIMAL128));
+	string strbuf[3] = {"0", "-1.6524349686135264535463213236", "0.000000000000000000000000000000001"};
+	string strerrbuf[1] = {"abcdefg"};
+	char *charbuf[3] = {(char *)"9.4856645683462645345624983524568", (char *)"0", (char *)"9999999999.123"};
+	char *charerrbuf[1] = {(char *)"abcdefg"};
+
+	v1->append(Util::createDecimal128(2, 1.5));
+	v1->set(2, Util::createNullConstant(DT_DECIMAL128));
+	cout << v1->getString() << endl;
+	v1->append(Util::createDecimal128(2, 1.5), 3);
+	v1->append(Util::createDecimal128(2, 3.12123), 1);
+	EXPECT_EQ(v1->getString(), "[1.20000000000000000000000000,3.15000000000000000000000000,,1.50000000000000000000000000,1.50000000000000000000000000,1.50000000000000000000000000,3.12000000000000000000000000]");
+
+	v1->append(Util::createNullConstant(DT_DECIMAL128), 1);
+	EXPECT_EQ(v1->getString(), "[1.20000000000000000000000000,3.15000000000000000000000000,,1.50000000000000000000000000,1.50000000000000000000000000,1.50000000000000000000000000,3.12000000000000000000000000,]");
+	v1->append(errTypevalV, 1);
+	v1->append(diffScalevalV, 2);
+
+	EXPECT_EQ(v1->getString(), "[1.20000000000000000000000000,3.15000000000000000000000000,,1.50000000000000000000000000,1.50000000000000000000000000,1.50000000000000000000000000,3.12000000000000000000000000,,1000000000000.00000000000000000000000000,1.00000000000000000000000000,]");
+	v1->append(valV, 2);
+
+	EXPECT_EQ(v1->getString(), "[1.20000000000000000000000000,3.15000000000000000000000000,,1.50000000000000000000000000,1.50000000000000000000000000,1.50000000000000000000000000,3.12000000000000000000000000,,1000000000000.00000000000000000000000000,1.00000000000000000000000000,,100000000.31624525345261230126453256,]");
+	v1->appendString(charerrbuf, 1);
+	v1->appendString(charbuf, 3);
+
+	EXPECT_EQ(v1->getString(), "[1.20000000000000000000000000,3.15000000000000000000000000,,1.50000000000000000000000000,1.50000000000000000000000000,1.50000000000000000000000000,3.12000000000000000000000000,,1000000000000.00000000000000000000000000,1.00000000000000000000000000,,100000000.31624525345261230126453256,,,9.48566456834626453456249835,0.00000000000000000000000000,9999999999.12300000000000000000000000]");
+	v1->appendString(strerrbuf, 1);
+	v1->appendString(strbuf, 3);
+
+	EXPECT_EQ(v1->getString(), "[1.20000000000000000000000000,3.15000000000000000000000000,,1.50000000000000000000000000,1.50000000000000000000000000,1.50000000000000000000000000,3.12000000000000000000000000,,1000000000000.00000000000000000000000000,1.00000000000000000000000000,,100000000.31624525345261230126453256,,,9.48566456834626453456249835,0.00000000000000000000000000,9999999999.12300000000000000000000000,,0.00000000000000000000000000,-1.65243496861352645354632132,0.00000000000000000000000000]");
+
+	conn.upload("v1", v1);
+	EXPECT_TRUE(conn.run("eqObj(v1,array(DECIMAL128(26)).append!(decimal128([`1.20000000000000000000000000,`3.15000000000000000000000000,NULL,`1.50000000000000000000000000,`1.50000000000000000000000000,`1.50000000000000000000000000,`3.12000000000000000000000000,NULL,1000000000000,`1.00000000000000000000000000,NULL,`100000000.31624525345261230126453256,NULL,NULL,`9.48566456834626453456249835,`0.00000000000000000000000000,`9999999999.12300000000000000000000000,NULL,`0.00000000000000000000000000,'-1.65243496861352645354632132',`0.00000000000000000000000000],26)))")->getBool());
+
+	v1->nullFill(Util::createString("0"));
+	EXPECT_EQ(v1->getString(), "[1.20000000000000000000000000,3.15000000000000000000000000,0.00000000000000000000000000,1.50000000000000000000000000,1.50000000000000000000000000,1.50000000000000000000000000,3.12000000000000000000000000,0.00000000000000000000000000,1000000000000.00000000000000000000000000,1.00000000000000000000000000,0.00000000000000000000000000,100000000.31624525345261230126453256,0.00000000000000000000000000,0.00000000000000000000000000,9.48566456834626453456249835,0.00000000000000000000000000,9999999999.12300000000000000000000000,0.00000000000000000000000000,0.00000000000000000000000000,-1.65243496861352645354632132,0.00000000000000000000000000]");
+
+	VectorSP v2 = v1->getSubVector(0, 2, 10);
+	EXPECT_TRUE(v2->set(Util::createInt(0), Util::createDecimal128(2, 2.7999)));
+	v2->set(Util::createIndexVector(1, 1), errTypevalV);
+	v2->set(Util::createIndexVector(1, 1), diffScalevalV);
+	EXPECT_EQ(v2->getString(), "[2.79000000000000000000000000,1.00000000000000000000000000]");
+	v2->set(indexV, valV);
+	EXPECT_EQ(v2->getString(), "[100000000.31624525345261230126453256,]");
+
+	EXPECT_TRUE(v2->get(1)->isNull());
+	// EXPECT_TRUE(v2->get(Util::createInt(1))->is8Null());
+	// EXPECT_TRUE(v2->get(Util::createIndexVector(1,1))->isNull());
+
+	EXPECT_ANY_THROW(v2->fill(1, 5, valV));
+	v2->fill(1, 1, Util::createDecimal128(5, 0));
+	EXPECT_EQ(v2->getString(), "[100000000.31624525345261230126453256,0.00000000000000000000000000]");
+	v2->fill(0, 2, Util::createNullConstant(DT_DECIMAL128));
+	EXPECT_EQ(v2->getString(), "[,]");
+	v2->fill(1, 1, errTypevalV);
+	v2->fill(0, 2, diffScalevalV);
+	EXPECT_EQ(v2->getString(), "[1.00000000000000000000000000,]");
+	v2->fill(0, 2, valV);
+	EXPECT_EQ(v2->getString(), "[100000000.31624525345261230126453256,]");
+
+	EXPECT_FALSE(v2->validIndex(1));
+	v2->fill(1, 1, Util::createDecimal128(5, 0));
+	EXPECT_TRUE(v2->validIndex(-1));
+
+	EXPECT_EQ(v2->compare(0, Util::createInt(99999999.0)), 1);
+	EXPECT_EQ(v2->compare(1, Util::createInt(1)), -1);
+	EXPECT_EQ(v2->compare(1, Util::createInt(0)), 0);
+	EXPECT_EQ(v2->compare(0, Util::createDecimal32(1, 99999999.0)), 1);
+	EXPECT_EQ(v2->compare(0, Util::createDecimal32(0, 100000001.0)), -1);
+	EXPECT_EQ(v2->compare(1, Util::createDecimal32(1, 0)), 0);
+	EXPECT_EQ(v2->compare(0, Util::createDecimal64(8, 99999999.0)), 1);
+	EXPECT_EQ(v2->compare(0, Util::createDecimal64(10, 100000001.0)), -1);
+	EXPECT_EQ(v2->compare(1, Util::createDecimal64(1, 0)), 0);
+	EXPECT_EQ(v2->compare(0, Util::createDecimal128(26, 99999999.0)), 1);
+	EXPECT_EQ(v2->compare(0, Util::createDecimal128(26, 100000001.0)), -1);
+	EXPECT_EQ(v2->compare(1, Util::createDecimal128(1, 0)), 0);
+	EXPECT_ANY_THROW(v2->compare(0, Util::createBlob("blob1")));
+	v2->nullFill(Util::createInt(1));
+	EXPECT_EQ(v2->getString(), "[100000000.31624525345261230126453256,0.00000000000000000000000000]");
+}
+
+TEST_F(DataformVectorTest, testDecimal128NullVector)
+{
+	for (int i = 0; i < 39; i++)
+	{
+		VectorSP v1 = Util::createVector(DT_DECIMAL128, 2, 2, true, i);
+		v1->set(0, Util::createNullConstant(DT_DECIMAL128));
+		v1->set(1, Util::createNullConstant(DT_DECIMAL128));
+
+		string script = "a=[decimal128(NULL," + to_string(i) + "),decimal128(NULL," + to_string(i) + ")];a";
+		VectorSP res_v = conn.run(script);
+		conn.upload("v1", {v1});
+		EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(), true);
+		EXPECT_EQ(v1->getString(), res_v->getString());
+		EXPECT_EQ(v1->getType(), res_v->getRawType());
+		EXPECT_EQ(Util::getCategoryString(v1->getCategory()), "DENARY");
+		EXPECT_EQ(v1->getExtraParamForType(), i);
+	}
+}
+
+
+TEST_F(DataformVectorTest, testDecimal32Vector_typeConvert){
+	VectorSP dsm32V = Util::createVector(DT_DECIMAL32, 13, 20, true, 6);
+	VectorSP v1 = conn.run("v1=array(DECIMAL32(6)).append!(decimal32(NULL -0.2345678 '999.1',6));v1");
+	EXPECT_EQ(v1->getString(), "[,-0.234567,999.100000]");
+
+	dsm32V->set(0, Util::createDecimal32(2, 0.234567));
+	VectorSP indexV = Util::createIndexVector(1, 3);
+	dsm32V->set(indexV, v1);
+	dsm32V->setBool(4, true);
+	dsm32V->setChar(5, '\2');
+	dsm32V->setDouble(6, -0.23559913);
+	dsm32V->setFloat(7, 1.1);
+	dsm32V->setInt(8, 100);
+	dsm32V->setLong(9, 6l);
+	dsm32V->setShort(10, 200);
+	ConstantSP dsm32strval = Util::createNullConstant(DT_DECIMAL32, 6);
+	dsm32strval->setString("3.4562987561");
+	dsm32V->set(11, dsm32strval);
+	dsm32V->setNull(12);
+	EXPECT_EQ(dsm32V->getString(), "[0.230000,,-0.234567,999.100000,1.000000,2.000000,-0.235599,1.100000,100.000000,6.000000,200.000000,3.456299,]");
+
+	VectorSP v2 = conn.run("take(decimal32(NULL, 9), 3)");
+	dsm32V->append(v2, 2);
+	char *boolbuf = new char(true);
+	char *charbuf = new char('\0');
+	double *doublebuf = new double(-1.2345);
+	float *floatbuf = new float(1.1);
+	int *intbuf = new int(100);
+	long long *longbuf = new long long(200);
+	short *shortbuf = new short(300);
+	string *stringbuf = new string("3.4562987561");
+	dsm32V->appendBool(boolbuf, 1);
+	dsm32V->appendChar(charbuf, 1);
+	dsm32V->appendDouble(doublebuf, 1);
+	dsm32V->appendFloat(floatbuf, 1);
+	dsm32V->appendInt(intbuf, 1);
+	dsm32V->appendLong(longbuf, 1);
+	dsm32V->appendShort(shortbuf, 1);
+	EXPECT_TRUE(dsm32V->appendString(stringbuf, 1));
+	dsm32V->append(Util::createNullConstant(DT_DECIMAL32, 6));
+	cout<< dsm32V->getString()<<endl;
+	EXPECT_EQ(dsm32V->getString(), "[0.230000,,-0.234567,999.100000,1.000000,2.000000,-0.235599,1.100000,100.000000,6.000000,200.000000,3.456299,,"
+									",,1.000000,0.000000,-1.234500,1.100000,100.000000,200.000000,300.000000,3.456299,]");
+	delete boolbuf, charbuf, doublebuf, floatbuf, intbuf, longbuf, shortbuf, stringbuf;
+
+
+}
+
+TEST_F(DataformVectorTest, testDecimal64Vector_typeConvert){
+	VectorSP dsm64V = Util::createVector(DT_DECIMAL64, 13, 20, true, 16);
+	VectorSP v1 = conn.run("v1=array(DECIMAL64(16)).append!(decimal64(NULL '-0.23456786523468213' '1.1',16));v1");
+	EXPECT_EQ(v1->getString(), "[,-0.2345678652346821,1.1000000000000000]");
+
+	dsm64V->set(0, Util::createDecimal64(6, 0.23456789));
+	VectorSP indexV = Util::createIndexVector(1, 3);
+	dsm64V->set(indexV, v1);
+	dsm64V->setBool(4, true);
+	dsm64V->setChar(5, '\2');
+	dsm64V->setDouble(6, -0.23559913);
+	dsm64V->setFloat(7, 1.1);
+	dsm64V->setInt(8, 100);
+	dsm64V->setLong(9, 6l);
+	dsm64V->setShort(10, 200);
+	ConstantSP dsm64strval = Util::createNullConstant(DT_DECIMAL64, 16);
+	dsm64strval->setString("3.4562987561654895642");
+	dsm64V->set(11, dsm64strval);
+	dsm64V->setNull(12);
+	EXPECT_EQ(dsm64V->getString(), "[0.2345670000000000,,-0.2345678652346821,1.1000000000000000,1.0000000000000000,2.0000000000000000"
+									",-0.2355991300000000,1.1000000729317376,100.0000000000000000,6.0000000000000000,200.0000000000000000,3.4562987561654896,]");
+
+	VectorSP v2 = conn.run("take(decimal64(NULL, 9), 3)");
+	dsm64V->append(v2, 2);
+	char *boolbuf = new char(true);
+	char *charbuf = new char('\0');
+	double *doublebuf = new double(-1.2345);
+	float *floatbuf = new float(1.1);
+	int *intbuf = new int(100);
+	long long *longbuf = new long long(200);
+	short *shortbuf = new short(300);
+	string *stringbuf = new string("3.4562987561654895642");
+	dsm64V->appendBool(boolbuf, 1);
+	dsm64V->appendChar(charbuf, 1);
+	dsm64V->appendDouble(doublebuf, 1);
+	dsm64V->appendFloat(floatbuf, 1);
+	dsm64V->appendInt(intbuf, 1);
+	dsm64V->appendLong(longbuf, 1);
+	dsm64V->appendShort(shortbuf, 1);
+	EXPECT_TRUE(dsm64V->appendString(stringbuf, 1));
+	dsm64V->append(Util::createNullConstant(DT_DECIMAL64, 17));
+	cout<< dsm64V->getString()<<endl;
+	EXPECT_EQ(dsm64V->getString(), "[0.2345670000000000,,-0.2345678652346821,1.1000000000000000,1.0000000000000000,2.0000000000000000,"
+									"-0.2355991300000000,1.1000000729317376,100.0000000000000000,6.0000000000000000,200.0000000000000000,3.4562987561654896,,,,"
+									"1.0000000000000000,0.0000000000000000,-1.2345000000000000,1.1000000729317376,100.0000000000000000,200.0000000000000000,300.0000000000000000,3.4562987561654896,]");
+	delete boolbuf, charbuf, doublebuf, floatbuf, intbuf, longbuf, shortbuf, stringbuf;
+
+
+}
+
+TEST_F(DataformVectorTest, testDecimal128Vector_typeConvert){
+	VectorSP dsm128V = Util::createVector(DT_DECIMAL128, 13, 20, true, 26);
+	VectorSP v1 = conn.run("v1=array(DECIMAL128(26)).append!(decimal128(NULL '-0.23456779999999999854247936123456' '999.1',26));v1");
+	EXPECT_EQ(v1->getString(), "[,-0.23456779999999999854247936,999.10000000000000000000000000]");
+
+	dsm128V->set(0, Util::createDecimal128(20, 0.234567));
+	VectorSP indexV = Util::createIndexVector(1, 3);
+	dsm128V->set(indexV, v1);
+	dsm128V->setBool(4, true);
+	dsm128V->setChar(5, '\2');
+	dsm128V->setDouble(6, -0.23559913);
+	dsm128V->setFloat(7, 1.1);
+	dsm128V->setInt(8, 100);
+	dsm128V->setLong(9, 6l);
+	dsm128V->setShort(10, 200);
+	ConstantSP dsm128strval = Util::createNullConstant(DT_DECIMAL128, 26);
+	dsm128strval->setString("3.1643352698353646483264836492356");
+	dsm128V->set(11, dsm128strval);
+	dsm128V->setNull(12);
+	EXPECT_EQ(dsm128V->getString(), "[0.23456700000000000000000000,,-0.23456779999999999854247936,999.10000000000000000000000000,"
+									"1.00000000000000000000000000,2.00000000000000000000000000,-0.23559913000000001845231616,1.10000000946866311755988992,100.00000000000000000000000000"
+									",6.00000000000000000000000000,200.00000000000000000000000000,3.16433526983536464832648365,]");
+
+	VectorSP v2 = conn.run("take(decimal128(NULL, 0), 3)");
+	dsm128V->append(v2, 2);
+	char *boolbuf = new char(true);
+	char *charbuf = new char('\0');
+	double *doublebuf = new double(-1.2345);
+	float *floatbuf = new float(1.1);
+	int *intbuf = new int(100);
+	long long *longbuf = new long long(200);
+	short *shortbuf = new short(300);
+	string *stringbuf = new string("3.1643352698353646483264836492356");
+	dsm128V->appendBool(boolbuf, 1);
+	dsm128V->appendChar(charbuf, 1);
+	dsm128V->appendDouble(doublebuf, 1);
+	dsm128V->appendFloat(floatbuf, 1);
+	dsm128V->appendInt(intbuf, 1);
+	dsm128V->appendLong(longbuf, 1);
+	dsm128V->appendShort(shortbuf, 1);
+	EXPECT_TRUE(dsm128V->appendString(stringbuf, 1));
+
+	dsm128V->append(Util::createNullConstant(DT_DECIMAL128, 30));
+	cout<< dsm128V->getString()<<endl;
+	EXPECT_EQ(dsm128V->getString(), "[0.23456700000000000000000000,,-0.23456779999999999854247936,999.10000000000000000000000000,"
+									"1.00000000000000000000000000,2.00000000000000000000000000,-0.23559913000000001845231616,1.10000000946866311755988992,100.00000000000000000000000000"
+									",6.00000000000000000000000000,200.00000000000000000000000000,3.16433526983536464832648365"
+									",,,,1.00000000000000000000000000,0.00000000000000000000000000,-1.23449999999999992748048384"
+									",1.10000000946866311755988992,100.00000000000000000000000000,200.00000000000000000000000000"
+									",300.00000000000000000000000000,3.16433526983536464832648365,]");
+	delete boolbuf, charbuf, doublebuf, floatbuf, intbuf, longbuf, shortbuf, stringbuf;
+
 }
 
 TEST_F(DataformVectorTest, testCreateStringVectorByDdbVector)
@@ -6575,4 +7066,817 @@ TEST_F(DataformVectorTest, testVectorFunction)
 	}
 
 	delete[] buf, buf1, buf2, buf3, buf4, buf5, buf6, buf9, buf10, buf00, buf0, buf8;
+}
+
+class initParaTest : public testing::Test, public ::testing::WithParamInterface<std::tuple<string, string, string>>
+{
+public:
+	// Suite
+	static void SetUpTestCase()
+	{
+		// DBConnection conn;
+		conn.initialize();
+		bool ret = conn.connect(hostName, port, "admin", "123456");
+		if (!ret)
+		{
+			cout << "Failed to connect to the server" << endl;
+		}
+		else
+		{
+			cout << "connect to " + hostName + ":" + std::to_string(port) << endl;
+			conn.run("CHAR_MIN = char(-(exp2(7)-1));"
+					 "CHAR_MAX = char(exp2(7)-1);"
+					 "INT_MIN = int(-(exp2(31)-1));"
+					 "INT_MAX = int(exp2(31)-1);"
+					 "SHRT_MIN = short(-(exp2(15)-1));"
+					 "SHRT_MAX = short(exp2(15)-1);"
+					 "LLONG_MIN = -9223372036854775807l;"
+					 "LLONG_MAX = 9223372036854775807l;");
+		}
+	}
+	static void TearDownTestCase()
+	{
+		conn.run("undef all;go;");
+		conn.close();
+	}
+
+	// Case
+	virtual void SetUp()
+	{
+		cout << "check connect...";
+		ConstantSP res = conn.run("1+1");
+
+		cout << "ok" << endl;
+	}
+	virtual void TearDown()
+	{
+	}
+};
+
+class BigArray_SomeNull : public initParaTest
+{
+};
+
+namespace BigArray1
+{
+	vector<std::tuple<string, string, string>> get_prepare()
+	{
+		vector<string> name = {"BOOL", "CHAR", "SHORT", "INT", "LONG", "DATE", "MONTH",
+							   "TIME", "MINUTE", "SECOND", "DATETIME", "TIMESTAMP", "NANOTIME",
+							   "NANOTIMESTAMP", "FLOAT", "DOUBLE", "SYMBOL", "UUID",
+							   "IPADDR", "INT128", "DATEHOUR", "DECIMAL32", "DECIMAL64", "BLOB"};
+		vector<string> script = {"x=bigarray(BOOL,0,10000000).append!(0..2).append!(CHAR_MAX).append!(CHAR_MIN).append!(NULL);x",
+								 "x=bigarray(CHAR,0,10000000).append!(0..2).append!(CHAR_MAX).append!(CHAR_MIN).append!(NULL);x",
+								 "x=bigarray(SHORT,0,10000000).append!(0..2).append!(SHRT_MAX).append!(SHRT_MIN).append!(NULL);x",
+								 "x=bigarray(INT,0,10000000).append!(0..2).append!(INT_MAX).append!(INT_MIN).append!(NULL);x",
+								 "x=bigarray(LONG,0,10000000).append!(0..2).append!(LLONG_MAX).append!(LLONG_MIN).append!(NULL);x",
+								 "x=bigarray(DATE,0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(MONTH,0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(TIME,0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(MINUTE,0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(SECOND,0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(DATETIME,0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(TIMESTAMP,0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(NANOTIME,0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(NANOTIMESTAMP,0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(FLOAT,0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(DOUBLE,0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(SYMBOL,0,10000000).append!(string(1..5)).append!('');x",
+								 "x=bigarray(UUID,0,10000000).append!(take(uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87'),5)).append!(uuid(''));x",
+								 "x=bigarray(IPADDR,0,10000000).append!(take(ipaddr('1.1.1.1'),5)).append!(ipaddr(''));x",
+								 "x=bigarray(INT128,0,10000000).append!(take(int128('e1671797c52e15f763380b45e841ec32'),5)).append!(int128(''));x",
+								 "x=bigarray(DATEHOUR,0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(DECIMAL32(2),0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(DECIMAL64(10),0,10000000).append!(1..5).append!(NULL);x",
+								 "x=bigarray(BLOB,0,10000000).append!(string(1..5)).append!('');x"};
+		vector<string> ex_val = {"[0,1,1,1,1,]", "[0,1,2,127,-127,]", "[0,1,2,32767,-32767,]",
+								 "[0,1,2,2147483647,-2147483647,]", "[0,1,2,9223372036854775807,-9223372036854775807,]",
+								 "[1970.01.02,1970.01.03,1970.01.04,1970.01.05,1970.01.06,]", "[0000.02M,0000.03M,0000.04M,0000.05M,0000.06M,]",
+								 "[00:00:00.001,00:00:00.002,00:00:00.003,00:00:00.004,00:00:00.005,]", "[00:01m,00:02m,00:03m,00:04m,00:05m,]",
+								 "[00:00:01,00:00:02,00:00:03,00:00:04,00:00:05,]",
+								 "[1970.01.01T00:00:01,1970.01.01T00:00:02,1970.01.01T00:00:03,1970.01.01T00:00:04,1970.01.01T00:00:05,]",
+								 "[1970.01.01T00:00:00.001,1970.01.01T00:00:00.002,1970.01.01T00:00:00.003,1970.01.01T00:00:00.004,1970.01.01T00:00:00.005,]",
+								 "[00:00:00.000000001,00:00:00.000000002,00:00:00.000000003,00:00:00.000000004,00:00:00.000000005,]",
+								 "[1970.01.01T00:00:00.000000001,1970.01.01T00:00:00.000000002,1970.01.01T00:00:00.000000003,1970.01.01T00:00:00.000000004,1970.01.01T00:00:00.000000005,]",
+								 "[1,2,3,4,5,]", "[1,2,3,4,5,]", "[\"1\",\"2\",\"3\",\"4\",\"5\",]",
+								 "[5d212a78-cc48-e3b1-4235-b4d91473ee87,5d212a78-cc48-e3b1-4235-b4d91473ee87,5d212a78-cc48-e3b1-4235-b4d91473ee87,5d212a78-cc48-e3b1-4235-b4d91473ee87,5d212a78-cc48-e3b1-4235-b4d91473ee87,]",
+								 "[1.1.1.1,1.1.1.1,1.1.1.1,1.1.1.1,1.1.1.1,]",
+								 "[e1671797c52e15f763380b45e841ec32,e1671797c52e15f763380b45e841ec32,e1671797c52e15f763380b45e841ec32,e1671797c52e15f763380b45e841ec32,e1671797c52e15f763380b45e841ec32,]",
+								 "[1970.01.01T01,1970.01.01T02,1970.01.01T03,1970.01.01T04,1970.01.01T05,]",
+								 "[1.00,2.00,3.00,4.00,5.00,]", "[1.0000000000,2.0000000000,3.0000000000,4.0000000000,5.0000000000,]", "[\"1\",\"2\",\"3\",\"4\",\"5\",]"};
+		vector<std::tuple<string, string, string>> prepare;
+		for (auto i = 0; i < int(name.size()); i++)
+		{
+			prepare.push_back(std::make_tuple(name[i], script[i], ex_val[i]));
+		}
+		return prepare;
+	}
+}
+
+INSTANTIATE_TEST_CASE_P(someNull_BigArray, BigArray_SomeNull, testing::ValuesIn(BigArray1::get_prepare()));
+TEST_P(BigArray_SomeNull, test_bigArray)
+{
+	string cur_type = std::get<0>(GetParam());
+	cout << "download bigarray type " << cur_type << endl;
+	VectorSP bigV = conn.run(std::get<1>(GetParam()));
+	int size = bigV->size();
+	EXPECT_EQ(size, 6);
+	EXPECT_EQ(bigV->getForm(), DF_VECTOR);
+	if (cur_type == "SYMBOL")
+	{
+		EXPECT_EQ(Util::getDataTypeString(bigV->getType()), "STRING");
+	}
+	else
+	{
+		EXPECT_EQ(Util::getDataTypeString(bigV->getType()), std::get<0>(GetParam()));
+	}
+	EXPECT_EQ(bigV->getString(), std::get<2>(GetParam()));
+	EXPECT_TRUE(bigV->get(5)->isNull());
+	conn.upload("res", {bigV});
+	EXPECT_TRUE(conn.run("eqObj(res,x)")->getBool());
+}
+
+class BigArray_AllNull : public initParaTest
+{
+};
+
+namespace BigArray2
+{
+	vector<std::tuple<string, string, string>> get_prepare()
+	{
+		vector<string> name = {"BOOL", "CHAR", "SHORT", "INT", "LONG", "DATE", "MONTH",
+							   "TIME", "MINUTE", "SECOND", "DATETIME", "TIMESTAMP", "NANOTIME",
+							   "NANOTIMESTAMP", "FLOAT", "DOUBLE", "SYMBOL", "UUID",
+							   "IPADDR", "INT128", "DATEHOUR", "DECIMAL32", "DECIMAL64", "BLOB"};
+		vector<string> script = {"x=bigarray(BOOL,0,10000000).append!(take(bool(NULL),6));x",
+								 "x=bigarray(CHAR,0,10000000).append!(take(char(NULL),6));x",
+								 "x=bigarray(SHORT,0,10000000).append!(take(short(NULL),6));x",
+								 "x=bigarray(INT,0,10000000).append!(take(int(NULL),6));x",
+								 "x=bigarray(LONG,0,10000000).append!(take(long(NULL),6));x",
+								 "x=bigarray(DATE,0,10000000).append!(take(date(NULL),6));x",
+								 "x=bigarray(MONTH,0,10000000).append!(take(month(NULL),6));x",
+								 "x=bigarray(TIME,0,10000000).append!(take(time(NULL),6));x",
+								 "x=bigarray(MINUTE,0,10000000).append!(take(minute(NULL),6));x",
+								 "x=bigarray(SECOND,0,10000000).append!(take(second(NULL),6));x",
+								 "x=bigarray(DATETIME,0,10000000).append!(take(datetime(NULL),6));x",
+								 "x=bigarray(TIMESTAMP,0,10000000).append!(take(timestamp(NULL),6));x",
+								 "x=bigarray(NANOTIME,0,10000000).append!(take(nanotime(NULL),6));x",
+								 "x=bigarray(NANOTIMESTAMP,0,10000000).append!(take(nanotimestamp(NULL),6));x",
+								 "x=bigarray(FLOAT,0,10000000).append!(take(float(NULL),6));x",
+								 "x=bigarray(DOUBLE,0,10000000).append!(take(double(NULL),6));x",
+								 "x=bigarray(SYMBOL,0,10000000).append!(symbol(take('',6)));x",
+								 "x=bigarray(UUID,0,10000000).append!(take(uuid(''),6));x",
+								 "x=bigarray(IPADDR,0,10000000).append!(take(ipaddr(''),6));x",
+								 "x=bigarray(INT128,0,10000000).append!(take(int128(''),6));x",
+								 "x=bigarray(DATEHOUR,0,10000000).append!(take(datehour(NULL),6));x",
+								 "x=bigarray(DECIMAL32(2),0,10000000).append!(take(decimal32(NULL,2),6));x",
+								 "x=bigarray(DECIMAL64(2),0,10000000).append!(take(decimal64(NULL,10),6));x",
+								 "x=bigarray(BLOB,0,10000000).append!(take(blob(''),6));x"};
+		vector<string> ex_val = {
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+		};
+		vector<std::tuple<string, string, string>> prepare;
+		for (auto i = 0; i < int(name.size()); i++)
+		{
+			prepare.push_back(std::make_tuple(name[i], script[i], ex_val[i]));
+		}
+		return prepare;
+	}
+}
+
+INSTANTIATE_TEST_CASE_P(allNull_BigArray, BigArray_AllNull, testing::ValuesIn(BigArray2::get_prepare()));
+TEST_P(BigArray_AllNull, test_bigArray)
+{
+	string cur_type = std::get<0>(GetParam());
+	cout << "download bigarray type " << cur_type << endl;
+	VectorSP bigV = conn.run(std::get<1>(GetParam()));
+	int size = bigV->size();
+	EXPECT_EQ(size, 6);
+	EXPECT_EQ(bigV->getForm(), DF_VECTOR);
+	EXPECT_EQ(Util::getDataTypeString(bigV->getType()), std::get<0>(GetParam()));
+	for (auto i = 0; i < size; i++)
+	{
+		EXPECT_TRUE(bigV->get(i)->isNull());
+	}
+
+	EXPECT_EQ(bigV->getString(), std::get<2>(GetParam()));
+	EXPECT_TRUE(bigV->get(5)->isNull());
+	conn.upload("res", {bigV});
+	EXPECT_TRUE(conn.run("eqObj(res,x)")->getBool());
+}
+
+class BigArray_gt1048576 : public initParaTest
+{
+};
+
+namespace BigArray3
+{
+	vector<std::tuple<string, string, string>> get_prepare()
+	{
+		vector<string> name = {"BOOL", "CHAR", "SHORT", "INT", "LONG", "DATE", "MONTH",
+							   "TIME", "MINUTE", "SECOND", "DATETIME", "TIMESTAMP", "NANOTIME",
+							   "NANOTIMESTAMP", "FLOAT", "DOUBLE", "SYMBOL", "UUID",
+							   "IPADDR", "INT128", "DATEHOUR", "DECIMAL32", "DECIMAL64", "BLOB"};
+		vector<string> script = {"x=bigarray(BOOL,0,10000000).append!(take(CHAR_MIN,200000)).append!(take(CHAR_MAX,200000)).append!(take(0,600000)).append!(take(bool(NULL),100000));x",
+								 "x=bigarray(CHAR,0,10000000).append!(take(CHAR_MIN,200000)).append!(take(CHAR_MAX,200000)).append!(take(0,600000)).append!(take(char(NULL),100000));x",
+								 "x=bigarray(SHORT,0,10000000).append!(take(SHRT_MIN,200000)).append!(take(SHRT_MAX,200000)).append!(take(0,600000)).append!(take(short(NULL),100000));x",
+								 "x=bigarray(INT,0,10000000).append!(take(INT_MIN,200000)).append!(take(INT_MAX,200000)).append!(take(0,600000)).append!(take(int(NULL),100000));x",
+								 "x=bigarray(LONG,0,10000000).append!(take(LLONG_MIN,200000)).append!(take(LLONG_MAX,200000)).append!(take(0,600000)).append!(take(long(NULL),100000));x",
+								 "x=bigarray(DATE,0,10000000).append!(take(INT_MIN,200000)).append!(take(INT_MAX,200000)).append!(take(0,600000)).append!(take(date(NULL),100000));x",
+								 "x=bigarray(MONTH,0,10000000).append!(take(INT_MIN,200000)).append!(take(INT_MAX,200000)).append!(take(0,600000)).append!(take(month(NULL),100000));x",
+								 "x=bigarray(TIME,0,10000000).append!(take(INT_MIN,200000)).append!(take(INT_MAX,200000)).append!(take(0,600000)).append!(take(time(NULL),100000));x",
+								 "x=bigarray(MINUTE,0,10000000).append!(take(INT_MIN,200000)).append!(take(INT_MAX,200000)).append!(take(0,600000)).append!(take(minute(NULL),100000));x",
+								 "x=bigarray(SECOND,0,10000000).append!(take(INT_MIN,200000)).append!(take(INT_MAX,200000)).append!(take(0,600000)).append!(take(second(NULL),100000));x",
+								 "x=bigarray(DATETIME,0,10000000).append!(take(INT_MIN,200000)).append!(take(INT_MAX,200000)).append!(take(0,600000)).append!(take(datetime(NULL),100000));x",
+								 "x=bigarray(TIMESTAMP,0,10000000).append!(take(LLONG_MIN,200000)).append!(take(LLONG_MAX,200000)).append!(take(0,600000)).append!(take(timestamp(NULL),100000));x",
+								 "x=bigarray(NANOTIME,0,10000000).append!(take(LLONG_MIN,200000)).append!(take(LLONG_MAX,200000)).append!(take(0,600000)).append!(take(nanotime(NULL),100000));x",
+								 "x=bigarray(NANOTIMESTAMP,0,10000000).append!(take(LLONG_MIN,200000)).append!(take(LLONG_MAX,200000)).append!(take(0,600000)).append!(take(nanotimestamp(NULL),100000));x",
+								 "x=bigarray(FLOAT,0,10000000).append!(take(-1.123456,1000000)).append!(take(float(NULL),100000));x",
+								 "x=bigarray(DOUBLE,0,10000000).append!(take(-1.123456,1000000)).append!(take(double(NULL),100000));x",
+								 "x=bigarray(SYMBOL,0,10000000).append!(symbol(take(`str,1000000))).append!(symbol(take('',100000)));x",
+								 "x=bigarray(UUID,0,10000000).append!(take(uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87'),1000000)).append!(take(uuid(''),100000));x",
+								 "x=bigarray(IPADDR,0,10000000).append!(take(ipaddr('1.1.1.1'),1000000)).append!(take(ipaddr(''),100000));x",
+								 "x=bigarray(INT128,0,10000000).append!(take(int128('e1671797c52e15f763380b45e841ec32'),1000000)).append!(take(int128(''),100000));x",
+								 "x=bigarray(DATEHOUR,0,10000000).append!(take(INT_MIN,200000)).append!(take(INT_MAX,200000)).append!(take(0,600000)).append!(take(datehour(NULL),100000));x",
+								 "x=bigarray(DECIMAL32(2),0,10000000).append!(take(decimal32(0.456789,2),1000000)).append!(take(decimal32(NULL,2),100000));x",
+								 "x=bigarray(DECIMAL64(10),0,10000000).append!(take(decimal64(-0.13,10),1000000)).append!(take(decimal64(NULL,10),100000));x",
+								 "x=bigarray(BLOB,0,10000000).append!(string(take(`blob,1000000))).append!(take(blob(''),100000));x"};
+		vector<string> ex_val = {
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+			"[,,,,,]",
+		};
+		vector<std::tuple<string, string, string>> prepare;
+		for (auto i = 0; i < int(name.size()); i++)
+		{
+			prepare.push_back(std::make_tuple(name[i], script[i], ex_val[i]));
+		}
+		return prepare;
+	}
+}
+
+INSTANTIATE_TEST_CASE_P(gt1048576_BigArray, BigArray_gt1048576, testing::ValuesIn(BigArray3::get_prepare()));
+TEST_P(BigArray_gt1048576, test_bigArray)
+{
+	string cur_type = std::get<0>(GetParam());
+	cout << "download bigarray type " << cur_type << endl;
+	VectorSP bigV = conn.run(std::get<1>(GetParam()));
+	int size = bigV->size();
+	EXPECT_EQ(size, 1100000);
+	EXPECT_EQ(bigV->getForm(), DF_VECTOR);
+	string ex_type = std::get<0>(GetParam());
+	EXPECT_EQ(Util::getDataTypeString(bigV->getType()), ex_type);
+	char char_min = conn.run("CHAR_MIN")->getChar();
+	char char_max = conn.run("CHAR_MAX")->getChar();
+	short short_min = conn.run("SHRT_MIN")->getShort();
+	short short_max = conn.run("SHRT_MAX")->getShort();
+	int int_min = conn.run("INT_MIN")->getInt();
+	int int_max = conn.run("INT_MAX")->getInt();
+	long long long_min = conn.run("LLONG_MIN")->getLong();
+	long long long_max = conn.run("LLONG_MAX")->getLong();
+
+	if (ex_type == "BOOL")
+	{
+		for (auto i = 0; i < 400000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getBool(), 1);
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getBool(), 0);
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "CHAR")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getChar(), char_min);
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getChar(), char_max);
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getChar(), (char)0);
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "SHORT")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getShort(), short_min);
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getShort(), short_max);
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getShort(), (short)0);
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "INT")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getInt(), int_min);
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getInt(), int_max);
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getInt(), (int)0);
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "LONG")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getLong(), long_min);
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getLong(), long_max);
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getLong(), (long long)0);
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "DATE")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), Util::createDate(int_min)->getString());
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getString(), Util::createDate(int_max)->getString());
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getString(), Util::createDate(0)->getString());
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "MONTH")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), Util::createMonth(int_min)->getString());
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getString(), Util::createMonth(int_max)->getString());
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getString(), Util::createMonth(0)->getString());
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "TIME")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), Util::createTime(int_min)->getString());
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getString(), Util::createTime(int_max)->getString());
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getString(), Util::createTime(0)->getString());
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "MINUTE")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), Util::createMinute(int_min)->getString());
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getString(), Util::createMinute(int_max)->getString());
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getString(), Util::createMinute(0)->getString());
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "SECOND")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), Util::createSecond(int_min)->getString());
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getString(), Util::createSecond(int_max)->getString());
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getString(), Util::createSecond(0)->getString());
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "DATETIME")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), Util::createDateTime(int_min)->getString());
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getString(), Util::createDateTime(int_max)->getString());
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getString(), Util::createDateTime(0)->getString());
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "TIMESTAMP")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), Util::createTimestamp(long_min)->getString());
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getString(), Util::createTimestamp(long_max)->getString());
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getString(), Util::createTimestamp(0)->getString());
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "NANOTIME")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), Util::createNanoTime(long_min)->getString());
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getString(), Util::createNanoTime(long_max)->getString());
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getString(), Util::createNanoTime(0)->getString());
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "NANOTIMESTAMP")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), Util::createNanoTimestamp(long_min)->getString());
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getString(), Util::createNanoTimestamp(long_max)->getString());
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getString(), Util::createNanoTimestamp(0)->getString());
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "DATEHOUR")
+	{
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), Util::createDateHour(int_min)->getString());
+		}
+		for (auto i = 0; i < 200000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 200000)->getString(), Util::createDateHour(int_max)->getString());
+		}
+		for (auto i = 0; i < 600000; i++)
+		{
+			ASSERT_EQ(bigV->get(i + 400000)->getString(), Util::createDateHour(0)->getString());
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "FLOAT")
+	{
+		for (auto i = 0; i < 1000000; i++)
+		{
+			EXPECT_FLOAT_EQ(bigV->get(i)->getFloat(), (float)-1.123456);
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "DOUBLE")
+	{
+		for (auto i = 0; i < 1000000; i++)
+		{
+			EXPECT_FLOAT_EQ(bigV->get(i)->getDouble(), (double)-1.123456);
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "SYMBOL")
+	{
+		for (auto i = 0; i < 1000000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), "str");
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "UUID")
+	{
+		for (auto i = 0; i < 1000000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), "5d212a78-cc48-e3b1-4235-b4d91473ee87");
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "IPADDR")
+	{
+		for (auto i = 0; i < 1000000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), "1.1.1.1");
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "INT128")
+	{
+		for (auto i = 0; i < 1000000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), "e1671797c52e15f763380b45e841ec32");
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "DECIMAL32")
+	{
+		for (auto i = 0; i < 1000000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), "0.45");
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "DECIMAL64")
+	{
+		for (auto i = 0; i < 1000000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), "-0.1300000000");
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+	else if (ex_type == "BLOB")
+	{
+		for (auto i = 0; i < 1000000; i++)
+		{
+			ASSERT_EQ(bigV->get(i)->getString(), "blob");
+		}
+		for (auto i = 0; i < 100000; i++)
+		{
+			EXPECT_TRUE(bigV->get(i + 1000000)->isNull());
+		}
+	}
+
+	conn.upload("res", {bigV});
+	EXPECT_TRUE(conn.run("eqObj(res,x)")->getBool());
+}
+
+TEST_F(DataformVectorTest, test_nocapacity_symbolvector_appendString)
+{
+	int batchSize = 1000;
+	string str = "a";
+	VectorSP vec = Util::createVector(DT_SYMBOL, 0, batchSize);
+	for (int i = 0; i < batchSize * 2; ++i)
+	{
+		vec->appendString(&str, 1);
+	}
+	int size = vec->size();
+	EXPECT_EQ(vec->getType(), DT_SYMBOL);
+	EXPECT_EQ(size, batchSize * 2);
+	for(auto i =0; i<size; i++){
+		EXPECT_EQ(vec->get(i)->getString(), str);
+	}
+}
+
+TEST_F(DataformVectorTest, test_nocapacity_stringvector_appendString)
+{
+	int batchSize = 1000;
+	string str = "a";
+	VectorSP vec = Util::createVector(DT_STRING, 0, batchSize);
+	for (int i = 0; i < batchSize * 2; ++i)
+	{
+		vec->appendString(&str, 1);
+	}
+	int size = vec->size();
+	EXPECT_EQ(vec->getType(), DT_STRING);
+	EXPECT_EQ(size, batchSize * 2);
+	for(auto i =0; i<size; i++){
+		EXPECT_EQ(vec->get(i)->getString(), str);
+	}
+}
+
+TEST_F(DataformVectorTest, test_nocapacity_blobvector_appendString)
+{
+	int batchSize = 1000;
+	string str = "a";
+	VectorSP vec = Util::createVector(DT_BLOB, 0, batchSize);
+	for (int i = 0; i < batchSize * 2; ++i)
+	{
+		vec->appendString(&str, 1);
+	}
+	int size = vec->size();
+	EXPECT_EQ(vec->getType(), DT_BLOB);
+	EXPECT_EQ(size, batchSize * 2);
+	for(auto i =0; i<size; i++){
+		EXPECT_EQ(vec->get(i)->getString(), str);
+	}
+}
+
+TEST_F(DataformVectorTest, test_upload_download_vector_with_huge_value_string)
+{
+	VectorSP v0 = conn.run("a = array(STRING).append!(string(concat(take(\"123&#@!^%;d《》中文\",100000))));a");
+	string ex0 = "[\"";
+	for (auto i = 0; i < 100000; i++){
+		ex0 += "123&#@!^%;d《》中文";
+	}
+	ex0 += "\"]";
+	EXPECT_EQ(v0->getString(), ex0);
+
+
+	VectorSP v1 = Util::createVector(DT_STRING, 0, 1);
+	string init = "1";
+	string val;
+	for (auto i = 0; i < 256 * 1024; i++){
+		val += init;
+	}
+	v1->append(Util::createString(val));
+	EXPECT_ANY_THROW(conn.upload("b", {v1}));
+
+}
+
+TEST_F(DataformVectorTest, test_upload_download_vector_with_huge_value_blob)
+{
+	VectorSP v0 = conn.run("a = array(BLOB).append!(string(concat(take(\"123&#@!^%;d《》中文\",100000))));a");
+	string ex0 = "[\"";
+	for (auto i = 0; i < 100000; i++){
+		ex0 += "123&#@!^%;d《》中文";
+	}
+	ex0 += "\"]";
+	EXPECT_EQ(v0->getString(), ex0);
+
+
+	VectorSP v1 = Util::createVector(DT_BLOB, 0, 1);
+	string init = "1";
+	string val;
+	for (auto i = 0; i < 256 * 1024; i++){
+		val += init;
+	}
+	v1->append(Util::createBlob(val));
+	conn.upload("b", {v1});
+	EXPECT_TRUE(conn.run("eqObj(b, blob([concat(take(`1, 256 * 1024))]))")->getBool());
+}
+
+TEST_F(DataformVectorTest, test_upload_download_vector_with_huge_value_symbol)
+{
+	VectorSP v0 = conn.run("a = array(SYMBOL).append!(string(concat(take(\"123&#@!^%;d《》中文\",100000))));a");
+	string ex0 = "[\"";
+	for (auto i = 0; i < 100000; i++){
+		ex0 += "123&#@!^%;d《》中文";
+	}
+	ex0 += "\"]";
+	EXPECT_EQ(v0->getString(), ex0);
+
+
+	VectorSP v1 = Util::createVector(DT_SYMBOL, 0, 1);
+	string init = "1";
+	string val;
+	for (auto i = 0; i < 256 * 1024; i++){
+		val += init;
+	}
+	v1->append(Util::createString(val));
+
+	EXPECT_ANY_THROW(conn.upload("b", {v1}));
 }

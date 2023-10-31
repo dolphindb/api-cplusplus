@@ -62,7 +62,8 @@ public:
 	virtual ConstantSP getSubTable(vector<int> indices) const = 0;
 	virtual COMPRESS_METHOD getColumnCompressMethod(INDEX index);
 	virtual void setColumnCompressMethods(const vector<COMPRESS_METHOD> &methods);
-
+	virtual bool clear()=0;
+	virtual void updateSize() = 0;
 protected:
 	ConstantSP getInternal(INDEX index) const;
 	ConstantSP getInternal(const ConstantSP& index) const;
@@ -108,8 +109,8 @@ public:
 	virtual TABLE_TYPE getTableType() const {return BASICTBL;}
 	virtual void drop(vector<int>& columns);
 	bool join(vector<ConstantSP>& columns);
-	bool clear();
-	void updateSize();
+	virtual bool clear();
+	virtual void updateSize();
 	virtual ConstantSP getSubTable(vector<int> indices) const;
 
 private:

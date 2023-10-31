@@ -22,7 +22,7 @@ protected:
 		else
 		{
 			cout<<"ok"<<endl;
-            
+
 		}
     }
     virtual void TearDown()
@@ -90,7 +90,7 @@ TEST_F(DBConnectionTest,test_connect_withStartupScript){
     ConstantSP resVec = conn_demo.run("tab1=table(`1`2`3 as col1,4 5 6 as col2);each(eqObj,tab1.values(),startup_tab.values())");
     for(auto i=0; i<resVec->size(); i++)
         EXPECT_TRUE(resVec->get(i)->getBool());
-    
+
     string res = conn_demo.getInitScript();
     EXPECT_EQ(script, res);
     conn_demo.close();
@@ -169,10 +169,10 @@ TEST_F(DBConnectionTest,test_connection_asyncTask){
     connReconn.run("records.append!(exec count(*) from tab)");
 
     EXPECT_TRUE(connReconn.run("a=records.pop!();eqObj(a,8)")->getBool());
-  
+
     connReconn.run("undef(`tab, SHARED)");
     conn_demo.close();
-    
+
 }
 
 TEST_F(DBConnectionTest,test_connection_function_login){
@@ -185,7 +185,7 @@ TEST_F(DBConnectionTest,test_connection_function_login){
     cout<<conn_demo.run("getRecentJobs()")->getString();
 
     conn_demo.close();
-    
+
 }
 
 TEST_F(DBConnectionTest,test_connection_python_script){
@@ -252,10 +252,10 @@ TEST_F(DBConnectionTest,test_connection_python_dataform){
         conn_demo.connect(hostName, port, "admin", "123456");
         conn_demo.run(script1);
 
-        EXPECT_EQ(conn_demo.run("type(a)")->getString(), "list"); 
-        EXPECT_EQ(conn_demo.run("type(b)")->getString(), "set"); 
-        EXPECT_EQ(conn_demo.run("type(c)")->getString(), "dict"); 
-        EXPECT_EQ(conn_demo.run("type(d)")->getString(), "tuple"); 
+        EXPECT_EQ(conn_demo.run("type(a)")->getString(), "list");
+        EXPECT_EQ(conn_demo.run("type(b)")->getString(), "set");
+        EXPECT_EQ(conn_demo.run("type(c)")->getString(), "dict");
+        EXPECT_EQ(conn_demo.run("type(d)")->getString(), "tuple");
 
         conn_demo.close();
     }
@@ -488,7 +488,7 @@ TEST_F(DBConnectionTest,test_DBconnectionPool){
 	connReconn.run(srcipt1);
 	EXPECT_ANY_THROW(pool_demo.run("for(i in 1..100){tableInsert(tmp,rand(100,1),rand(100,1),rand(100,1));};select * from tmp",-1));
 	pool_demo.run("for(i in 1..100){tableInsert(tmp,rand(100,1),rand(100,1),rand(100,1));};select * from tmp",ids[0]);
-	
+
 	while(!pool_demo.isFinished(ids[0])){
 		Util::sleep(1000);
 	};
@@ -524,7 +524,7 @@ TEST_F(DBConnectionTest,test_DBconnectionPoolwithFetchSize){
 	string srcipt1 = "tb = table(100:0,`col1`col2`col3,[INT,INT,INT]);share tb as tmp;";
 	connReconn.run(srcipt1);
 	pool_demo.run("for(i in 1..10000){tableInsert(tmp,rand(100,1),rand(100,1),rand(100,1));};select * from tmp",ids[1],4,2,2000); // fetchSize is useless
-	
+
 	while(!pool_demo.isFinished(ids[1])){
 		Util::sleep(1000);
 	};
@@ -554,4 +554,109 @@ TEST_F(DBConnectionTest,test_DBconnectionPoolwithFetchSize){
 
 	connReconn.run("undef(`tmp,SHARED);");
     pool_demo.shutDown();
+}
+
+TEST_F(DBConnectionTest, test_connection_concurrent_insert_datas){
+    srand(time(NULL));
+    string dbpath = "dfs://test_concurrent";
+    string tab = "pt";
+
+    connReconn.run("dbpath = '"+dbpath+
+        "';tab =`" +tab+
+        ";if(existsDatabase(dbpath))"
+        "    {dropDatabase(dbpath)};"
+        "t=table(1:0, `c1`c2`c3, [INT, SYMBOL, TIMESTAMP]);"
+        "db=database(dbpath, VALUE, 1..10, chunkGranularity='TABLE');"
+        "pt=db.createPartitionedTable(t,'pt','c1');"
+    );
+
+    string s = "t=table(rand(1..100,10) as c1, rand(`a`b`c`d`e`f`g, 10) as c2, rand(timestamp(10001..10100), 10) as c3);"
+            "loadTable('"+dbpath+"', `"+tab+").append!(t);"
+            "go;"
+            "exec count(*) from loadTable('"+dbpath+"', `"+tab+");";
+    auto query = [&s](){
+        DBConnection conn0(false, false);
+        conn0.connect(hostName, port, "admin", "123456");
+        bool success = false;
+        while (!success)
+        {
+            try
+            {
+                conn0.run(s);
+                success = true;
+            }
+            catch(const std::exception& e)
+            {
+                string err = e.what();
+                cout<< "err is "<<err<<endl;
+                ASSERT_TRUE(err.find("has been owned by transaction") != std::string::npos);
+            }
+        }
+        conn0.close();
+    };
+
+    vector<thread> threads;
+    for (int i = 0; i < 50; i++)
+        threads.emplace_back(query);
+
+    for (auto& thread : threads)
+        thread.join();
+
+    EXPECT_EQ(connReconn.run("exec count(*) from loadTable('dfs://test_concurrent', `pt)")->getInt(), 500);
+
+}
+
+
+TEST_F(DBConnectionTest, test_connectionPool_concurrent_insert_datas){
+    srand(time(NULL));
+    string dbpath = "dfs://test_concurrent";
+    string tab = "pt";
+    int maxConnections = connReconn.run("int(getConfig('maxConnections'))")->getInt();
+    connReconn.run("dbpath = '"+dbpath+
+        "';tab =`" +tab+
+        ";if(existsDatabase(dbpath))"
+        "    {dropDatabase(dbpath)};"
+        "t=table(1:0, `c1`c2`c3, [INT, SYMBOL, TIMESTAMP]);"
+        "db=database(dbpath, VALUE, 1..10, chunkGranularity='TABLE');"
+        "pt=db.createPartitionedTable(t,'pt','c1');"
+    );
+
+    string s = "t=table(rand(1..100,100) as c1, rand(`a`b`c`d`e`f`g, 100) as c2, rand(timestamp(10001..10100), 100) as c3);"
+            "loadTable('"+dbpath+"', `"+tab+").append!(t);"
+            "go;"
+            "exec count(*) from loadTable('"+dbpath+"', `"+tab+");";
+    auto query = [&s](){
+        DBConnectionPool pool(hostName, port, 10, "admin", "123456");
+        bool success = false;
+        int id = rand()%1000;
+        while (!success)
+        {
+            try
+            {
+                pool.run(s, id);
+                while (! pool.isFinished(id))
+                {
+                    Util:: sleep(500);
+                }
+                
+                success = true;
+            }
+            catch(const std::exception& e)
+            {
+                string err = e.what();
+                ASSERT_TRUE(err.find("has been owned by transaction") != std::string::npos);
+            }
+        }
+        pool.shutDown();
+    };
+
+    vector<thread> threads;
+    for (int i = 0; i < 10; i++)
+        threads.emplace_back(query);
+
+    for (auto& thread : threads)
+        thread.join();
+
+    EXPECT_EQ(connReconn.run("exec count(*) from loadTable('dfs://test_concurrent', `pt)")->getInt(), 1000);
+
 }

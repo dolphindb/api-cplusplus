@@ -21,7 +21,14 @@ protected:
     virtual void SetUp()
     {
         cout<<"check connect...";
-		ConstantSP res = conn.run("1+1");
+		try
+		{
+			ConstantSP res = conn.run("1+1");
+		}
+		catch(const std::exception& e)
+		{
+			conn.connect(hostName, port, "admin", "123456");
+		}
 		
         cout<<"ok"<<endl;
     }
@@ -37,6 +44,18 @@ TEST_F(DataformPairTest,testAnyPair){
 	EXPECT_EQ(v1.isNull(),true);
 }
 
+TEST_F(DataformPairTest,testBlobPair){
+	VectorSP v1 = Util::createPair(DT_BLOB);
+    v1->set(0, Util::createBlob("123abc"));
+    v1->set(1, Util::createBlob("中文*……%#￥#！a"));
+	string script = "a=pair(blob(`123abc), blob('中文*……%#￥#！a'));a";
+	VectorSP res_v = conn.run(script);
+	conn.upload("v1",{v1});
+	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(),true);
+	EXPECT_EQ(v1->getScript(), res_v->getScript());
+	EXPECT_EQ(v1->getType(), res_v->getType());
+	EXPECT_EQ(conn.run("v1")->isPair(),true);
+}
 
 TEST_F(DataformPairTest,testStringPair){
 	VectorSP v1 = Util::createPair(DT_STRING);
@@ -538,6 +557,36 @@ TEST_F(DataformPairTest,testDecimal64NullPair){
     v1->setNull(0);
     v1->setNull(1);
 	string script = "a=pair(decimal64(NULL,"+to_string(scale)+"),decimal64(NULL,"+to_string(scale)+"));a";
+	VectorSP res_v = conn.run(script);
+	conn.upload("v1",{v1});
+	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(),true);
+	EXPECT_EQ(v1->getScript(), res_v->getScript());
+	EXPECT_EQ(v1->getType(), res_v->getType());
+    EXPECT_EQ(conn.run("v1")->isPair(),true);
+}
+
+TEST_F(DataformPairTest,testDecimal128Pair){
+	srand((int)time(NULL));
+	int scale = rand()%38;
+	VectorSP v1 = Util::createPair(DT_DECIMAL128, scale);
+    v1->set(0, Util::createDecimal128(scale, 2.33));
+    v1->set(1, Util::createDecimal128(scale, 3.502));
+	string script = "a=pair(decimal128(2.33,"+to_string(scale)+"),decimal128(3.502,"+to_string(scale)+"));a";
+	VectorSP res_v = conn.run(script);
+	conn.upload("v1",{v1});
+	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(),true);
+	EXPECT_EQ(v1->getScript(), res_v->getScript());
+	EXPECT_EQ(v1->getType(), res_v->getType());
+    EXPECT_EQ(conn.run("v1")->isPair(),true);
+}
+
+TEST_F(DataformPairTest,testDecimal128NullPair){
+	srand((int)time(NULL));
+	int scale = rand()%38;
+	VectorSP v1 = Util::createPair(DT_DECIMAL128, scale);
+    v1->setNull(0);
+    v1->setNull(1);
+	string script = "a=pair(decimal128(NULL,"+to_string(scale)+"),decimal128(NULL,"+to_string(scale)+"));a";
 	VectorSP res_v = conn.run(script);
 	conn.upload("v1",{v1});
 	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(),true);

@@ -1,35 +1,45 @@
-class CompressTest:public testing::Test
+class CompressTest : public testing::Test
 {
 protected:
-    //Suite
-    static void SetUpTestCase() {
-        //DBConnection conn;
+    // Suite
+    static void SetUpTestCase()
+    {
+        // DBConnection conn;
         bool ret = conn_compress.connect(hostName, port, "admin", "123456");
-        if (!ret) {
+        if (!ret)
+        {
             cout << "Failed to connect to the server" << endl;
         }
-        else {
-            cout << "connect to " + hostName + ":" + std::to_string(port)<< endl;
+        else
+        {
+            cout << "connect to " + hostName + ":" + std::to_string(port) << endl;
         }
     }
-    static void TearDownTestCase(){
+    static void TearDownTestCase()
+    {
         conn_compress.close();
     }
 
-    //Case
+    // Case
     virtual void SetUp()
     {
-        cout<<"check connect...";
-		ConstantSP res = conn_compress.run("1+1");
-        
-        cout<<"ok"<<endl;
+        cout << "check connect...";
+        try
+        {
+            ConstantSP res = conn_compress.run("1+1");
+        }
+        catch (const std::exception &e)
+        {
+            conn_compress.connect(hostName, port, "admin", "123456");
+        }
+
+        cout << "ok" << endl;
     }
     virtual void TearDown()
     {
         conn_compress.run("undef all;");
     }
 };
-
 
 TEST_F(CompressTest,CompressLong){
     const int count = 60000;
@@ -62,9 +72,6 @@ TEST_F(CompressTest,CompressLong){
 
 }
 
-
-
-
 TEST_F(CompressTest,CompressVectorLongerThanTable){
     const int count = 60000;
     vector<string> colName={"time","value"};
@@ -86,9 +93,6 @@ TEST_F(CompressTest,CompressVectorLongerThanTable){
     vector<COMPRESS_METHOD> typeVec{COMPRESS_DELTA, COMPRESS_DELTA,COMPRESS_LZ4};
     EXPECT_ANY_THROW(table->setColumnCompressMethods(typeVec));
 }
-
-
-
 
 TEST_F(CompressTest,CompressVectorLessThanTable){
     const int count = 600000;
@@ -112,7 +116,6 @@ TEST_F(CompressTest,CompressVectorLessThanTable){
     //table->setColumnCompressTypes(typeVec);
     EXPECT_ANY_THROW(table->setColumnCompressMethods(typeVec));
 }
-
 
 TEST_F(CompressTest,CompressWithErrorDataType){
     const int count = 600000;
@@ -174,10 +177,9 @@ TEST_F(CompressTest,CompressIncludeNull){
     EXPECT_EQ(t1->getString(),table->getString());
 }
 
-
 TEST_F(CompressTest,insertTableCompressWithAllType){
     const int count = 600000;
-    const int scale32=rand()%9, scale64=rand()%18;
+    const int scale32=rand()%9, scale64=rand()%18, scale128=rand()%38;
 
     vector<int> time(count);
     vector<long long>value(count);
@@ -187,6 +189,7 @@ TEST_F(CompressTest,insertTableCompressWithAllType){
     vector<string> ipaddr(count);
     vector<double> decimal32(count);
     vector<double> decimal64(count);
+    vector<double> decimal128(count);
     int basetime = Util::countDays(2012,1,1);
     for(int i=0;i<count;i++){
         time[i] = basetime + (i%15);
@@ -197,6 +200,7 @@ TEST_F(CompressTest,insertTableCompressWithAllType){
         ipaddr[i] = "192.168.100." + to_string(i%255);
         decimal32[i] = 0.1231555;
         decimal64[i] = 2.454223387226;
+        decimal128[i] = (long double)2.454223387226111111111111111111;
     }
 
     VectorSP boolVector = Util::createVector(DT_BOOL,count, count);
@@ -220,6 +224,7 @@ TEST_F(CompressTest,insertTableCompressWithAllType){
     VectorSP blobVector = Util::createVector(DT_BLOB, count,count);
     VectorSP decimal32Vector = Util::createVector(DT_DECIMAL32, count,count, true, scale32);
     VectorSP decimal64Vector = Util::createVector(DT_DECIMAL64, count,count, true, scale64);
+    VectorSP decimal128Vector = Util::createVector(DT_DECIMAL128, count,count, true, scale64);
 
     boolVector->setInt(0,count,time.data());
     charVector->setInt(0,count,time.data());
@@ -242,23 +247,24 @@ TEST_F(CompressTest,insertTableCompressWithAllType){
     blobVector->setString(0,count,blob.data());
     decimal32Vector->setDouble(0,count,decimal32.data());
     decimal64Vector->setDouble(0,count,decimal64.data());
+    decimal128Vector->setDouble(0,count,decimal128.data());
 
     vector<string> colName={"cbool","cchar","cshort","cint","cdate","cmonth","ctime","cminute", "csecond","cdatetime","ctimestamp","cnanotime",
-                            "cnanotimestamp","cfloat","cdouble","csymbol","cstring","cipaddr","cblob","cdecimal32","cdecimal64"};
+                            "cnanotimestamp","cfloat","cdouble","csymbol","cstring","cipaddr","cblob","cdecimal32","cdecimal64", "cdecimal128"};
     vector<ConstantSP> colVector {boolVector,charVector,shortVector,intVector,dateVector,monthVector,timeVector,minuteVector,secondVector,
                                   datetimeVector,timestampVector,nanotimeVector,nanotimestampVector,floatVector,doubleVector,symbolVector,stringVector,
-                                  ipaddrVector,blobVector,decimal32Vector,decimal64Vector};
+                                  ipaddrVector,blobVector,decimal32Vector,decimal64Vector,decimal128Vector};
     TableSP table  = Util::createTable(colName,colVector);
     vector<COMPRESS_METHOD> typeVec{COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_DELTA,
                                     COMPRESS_DELTA,COMPRESS_DELTA,COMPRESS_DELTA,COMPRESS_DELTA,
                                     COMPRESS_DELTA,COMPRESS_DELTA,COMPRESS_DELTA,COMPRESS_DELTA,
                                     COMPRESS_DELTA,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,
-                                    COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4};
+                                    COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4, COMPRESS_LZ4};
     table->setColumnCompressMethods(typeVec);
 
     vector<ConstantSP> args{table};
-    string script = "colName =  `cbool`cchar`cshort`cint`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cfloat`cdouble`csymbol`cstring`cipaddr`cblob`cdecimal32`cdecimal64;\n"
-                    "colType = [BOOL, CHAR, SHORT, INT, DATE, MONTH, TIME, MINUTE, SECOND, DATETIME, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, SYMBOL, STRING,IPADDR,BLOB,DECIMAL32("+to_string(scale32)+"),DECIMAL64("+to_string(scale64)+")];\n"
+    string script = "colName =  `cbool`cchar`cshort`cint`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cfloat`cdouble`csymbol`cstring`cipaddr`cblob`cdecimal32`cdecimal64`cdecimal128;\n"
+                    "colType = [BOOL, CHAR, SHORT, INT, DATE, MONTH, TIME, MINUTE, SECOND, DATETIME, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, SYMBOL, STRING,IPADDR,BLOB,DECIMAL32("+to_string(scale32)+"),DECIMAL64("+to_string(scale64)+"),DECIMAL128("+to_string(scale128)+")];\n"
                     "share streamTable(1:0,colName,colType) as table1;";
     conn_compress.run(script);
     int success = conn_compress.run("tableInsert{table1}",args)->getInt();
@@ -272,7 +278,6 @@ TEST_F(CompressTest,insertTableCompressWithAllType){
 
     conn_compress.run("undef(`table1,SHARED)");
 }
-
 
 TEST_F(CompressTest,CompressLZ4WithAllType){
     const int count = 600000;
@@ -361,9 +366,6 @@ TEST_F(CompressTest,CompressLZ4WithAllType){
     conn_compress.run("undef(`table1,SHARED)");
 }
 
-
-
-
 TEST_F(CompressTest,CompressVectorWithDiffType){
     const int count = 600000;
     vector<string> colName={"time","value"};
@@ -431,14 +433,100 @@ TEST_F(CompressTest,CompressWithDiffIndfsTable){
     conn_compress.run("dropDatabase(dbName)");
 }
 
+TEST_F(CompressTest, uploadArrayVectorwithCompress)
+{
+    vector<string> colName(20);
+    for (int i = 0; i < 20; i++)
+    {
+        colName[i] = "factor" + to_string(i);
+    }
 
+    VectorSP Index = conn_compress.run("take(5 3 7 3,60000).cumsum().int()");
+    int count = 270000;
 
-TEST_F(CompressTest,CompressLongWithArrayVector){
+    VectorSP boolvector = Util::createVector(DT_BOOL, count, count);
+    VectorSP charvector = Util::createVector(DT_CHAR, count, count);
+    VectorSP shortvector = Util::createVector(dolphindb::DT_SHORT, count, count);
+    VectorSP intvector = Util::createVector(dolphindb::DT_INT, count, count);
+    VectorSP longvector = Util::createVector(DT_LONG, count, count);
+    VectorSP floatvector = Util::createVector(DT_FLOAT, count, count);
+    VectorSP doublevector = Util::createVector(DT_DOUBLE, count, count);
+    VectorSP datevector = Util::createVector(DT_DATE, count, count);
+    VectorSP timestampvector = Util::createVector(dolphindb::DT_TIMESTAMP, count, count);
+    VectorSP datehourvector = Util::createVector(dolphindb::DT_DATEHOUR, count, count);
+    VectorSP datetimevector = Util::createVector(DT_DATETIME, count, count);
+    VectorSP timevector = Util::createVector(DT_TIME, count, count);
+    VectorSP minutevector = Util::createVector(DT_MINUTE, count, count);
+    VectorSP monthvector = Util::createVector(DT_MONTH, count, count);
+    VectorSP secondvector = Util::createVector(DT_SECOND, count, count);
+    VectorSP nanotimevector = Util::createVector(dolphindb::DT_NANOTIME, count, count);
+    VectorSP nanotimestampVector = Util::createVector(dolphindb::DT_NANOTIMESTAMP, count, count);
+    VectorSP int128Vector = Util::createVector(DT_INT128, count, count);
+    VectorSP uuidVector = Util::createVector(DT_UUID, count, count);
+    VectorSP ipaddrVector = Util::createVector(DT_IP, count, count);
+
+    vector<int> arrayValues(count);
+    for (int i = 0; i < count; i++)
+    {
+        arrayValues[i] = i;
+    }
+    boolvector->setInt(0, count, arrayValues.data());
+    charvector->setInt(0, count, arrayValues.data());
+    shortvector->setInt(0, count, arrayValues.data());
+    intvector->setInt(0, count, arrayValues.data());
+    longvector->setInt(0, count, arrayValues.data());
+    floatvector->setInt(0, count, arrayValues.data());
+    doublevector->setInt(0, count, arrayValues.data());
+    datevector->setInt(0, count, arrayValues.data());
+    timestampvector->setInt(0, count, arrayValues.data());
+    datehourvector->setInt(0, count, arrayValues.data());
+    datetimevector->setInt(0, count, arrayValues.data());
+    timevector->setInt(0, count, arrayValues.data());
+    minutevector->setInt(0, count, arrayValues.data());
+    monthvector->setInt(0, count, arrayValues.data());
+    secondvector->setInt(0, count, arrayValues.data());
+    nanotimevector->setInt(0, count, arrayValues.data());
+    nanotimestampVector->setInt(0, count, arrayValues.data());
+    int128Vector->setString(0, count, (char **)"e1671797c52e15f763380b45e841ec32");
+    uuidVector->setString(0, count, (char **)"5d212a78-cc48-e3b1-4235-b4d91473ee87");
+    ipaddrVector->setString(0, count, (char **)"192.168.1.13");
+
+    VectorSP boolArray = Util::createArrayVector(Index, boolvector);
+    VectorSP charArray = Util::createArrayVector(Index, charvector);
+    VectorSP shortArray = Util::createArrayVector(Index, shortvector);
+    VectorSP longArray = Util::createArrayVector(Index, longvector);
+    VectorSP intArray = Util::createArrayVector(Index, intvector);
+    VectorSP floatArray = Util::createArrayVector(Index, floatvector);
+    VectorSP doubleArray = Util::createArrayVector(Index, doublevector);
+    VectorSP dateArray = Util::createArrayVector(Index, datevector);
+    VectorSP timestampArray = Util::createArrayVector(Index, timestampvector);
+    VectorSP datetimeArray = Util::createArrayVector(Index, datetimevector);
+    VectorSP datehourArray = Util::createArrayVector(Index, datehourvector);
+    VectorSP timeArray = Util::createArrayVector(Index, timevector);
+    VectorSP minuteArray = Util::createArrayVector(Index, minutevector);
+    VectorSP monthArray = Util::createArrayVector(Index, monthvector);
+    VectorSP secondeArray = Util::createArrayVector(Index, secondvector);
+    VectorSP nanotimeArray = Util::createArrayVector(Index, nanotimevector);
+    VectorSP nanotimestampArray = Util::createArrayVector(Index, nanotimestampVector);
+    VectorSP int128Array = Util::createArrayVector(Index, int128Vector);
+    VectorSP uuidArray = Util::createArrayVector(Index, uuidVector);
+    VectorSP ipaddrArray = Util::createArrayVector(Index, ipaddrVector);
+
+    vector<ConstantSP> colVector{boolArray, charArray, shortArray, longArray, intArray, floatArray, doubleArray,
+                                 dateArray, timestampArray, datetimeArray, datehourArray, timeArray, minuteArray, monthArray,
+                                 secondeArray, nanotimeArray, nanotimestampArray, int128Array, uuidArray, ipaddrArray};
+    conn_compress.upload(colName, colVector);
+    ConstantSP objs = conn_compress.run("exec * from objs() where name like 'factor%'");
+    EXPECT_EQ(objs->getColumn(1)->getString(), "[\"BOOL[]\",\"CHAR[]\",\"SHORT[]\",\"LONG[]\",\"INT[]\",\"FLOAT[]\",\"DOUBLE[]\",\"DATE[]\",\"TIMESTAMP[]\",\"DATETIME[]\",\"DATEHOUR[]\",\"TIME[]\",\"MINUTE[]\",\"MONTH[]\",\"SECOND[]\",\"NANOTIME[]\",\"NANOTIMESTAMP[]\",\"INT128[]\",\"UUID[]\",\"IPADDR[]\"]");
+
+}
+
+TEST_F(CompressTest,uploadArrayVectorTablewithCompress){
     int count = 60000;
-    vector<string> colName(19);
+    vector<string> colName(22);
     colName[0] = "time";
     colName[1] = "values";
-    for(int i=2;i<19;i++){
+    for(int i=2;i<22;i++){
         colName[i] = "factor"+ to_string(i);
     }
     vector<int> time(count);
@@ -475,6 +563,10 @@ TEST_F(CompressTest,CompressLongWithArrayVector){
     VectorSP secondvector = Util::createVector(DT_SECOND,count,count);
     VectorSP nanotimevector =  Util::createVector(dolphindb::DT_NANOTIME,count,count);
     VectorSP nanotimestampVector  =Util::createVector(dolphindb::DT_NANOTIMESTAMP,count,count);
+    VectorSP int128Vector = Util::createVector(DT_INT128, count, count);
+    VectorSP uuidVector = Util::createVector(DT_UUID, count, count);
+    VectorSP ipaddrVector = Util::createVector(DT_IP, count, count);
+
     vector<int> arrayValues(count);
     for(int i=0;i<count;i++){
         arrayValues[i] = i;
@@ -496,6 +588,9 @@ TEST_F(CompressTest,CompressLongWithArrayVector){
     secondvector->setInt(0,count,arrayValues.data());
     nanotimevector->setInt(0,count,arrayValues.data());
     nanotimestampVector->setInt(0,count,arrayValues.data());
+    int128Vector->setString(0, count, (char **)"e1671797c52e15f763380b45e841ec32");
+    uuidVector->setString(0, count, (char **)"5d212a78-cc48-e3b1-4235-b4d91473ee87");
+    ipaddrVector->setString(0, count, (char **)"192.168.1.13");
 
     VectorSP boolArray = Util::createArrayVector(Index, boolvector);
     VectorSP charArray = Util::createArrayVector(Index, charvector);
@@ -514,28 +609,30 @@ TEST_F(CompressTest,CompressLongWithArrayVector){
     VectorSP secondeArray = Util::createArrayVector(Index, secondvector);
     VectorSP nanotimeArray = Util::createArrayVector(Index, nanotimevector);
     VectorSP nanotimestampArray = Util::createArrayVector(Index, nanotimestampVector);
+    VectorSP int128Array = Util::createArrayVector(Index, int128Vector);
+    VectorSP uuidArray = Util::createArrayVector(Index, uuidVector);
+    VectorSP ipaddrArray = Util::createArrayVector(Index, ipaddrVector);
 
-    //table insert
-    vector<ConstantSP> colVector {timeVector,valueVector,boolArray, charArray, shortArray,longArray,intArray, floatArray, doubleArray,
-                                  dateArray, timestampArray,datetimeArray, datehourArray, timeArray, minuteArray, monthArray,
-                                  secondeArray,nanotimeArray, nanotimeArray};
+    vector<ConstantSP> colVector{timeVector, valueVector, boolArray, charArray, shortArray, longArray, intArray, floatArray, doubleArray,
+                                 dateArray, timestampArray, datetimeArray, datehourArray, timeArray, minuteArray, monthArray,
+                                 secondeArray, nanotimeArray, nanotimestampArray, int128Array, uuidArray, ipaddrArray};
     TableSP table  = Util::createTable(colName,colVector);
 
-    vector<COMPRESS_METHOD> typeVec(19);
+    vector<COMPRESS_METHOD> typeVec(22);
     typeVec[0] = COMPRESS_DELTA;
     typeVec[1] = COMPRESS_DELTA;
-    for(int i=0;i<17;i++){
+    for(int i=0;i<20;i++){
         typeVec[i+2] = COMPRESS_LZ4;
     }
     table->setColumnCompressMethods(typeVec);
 
     vector<ConstantSP> args{table};
     conn_compress.run("colName = `time`values\n"
-             "for(i in 2..18){\n"
+             "for(i in 2..21){\n"
              "\tcolName.append!(\"factor\"+string(i))\n"
              "}\n"
              "colType = [DATE,LONG,BOOL[],CHAR[],SHORT[],INT[],LONG[],FLOAT[],DOUBLE[],DATE[],TIMESTAMP[],DATEHOUR[],DATETIME[],\n"
-             "              TIME[],MINUTE[],MONTH[],SECOND[],NANOTIME[],NANOTIMESTAMP[]]\n"
+             "              TIME[],MINUTE[],MONTH[],SECOND[],NANOTIME[],NANOTIMESTAMP[], INT128[], UUID[], IPADDR[]]\n"
              "share streamTable(100:0,colName,colType) as table1");
     int success = conn_compress.run("tableInsert{table1}",args)->getInt();
     //cout << success;
@@ -546,7 +643,6 @@ TEST_F(CompressTest,CompressLongWithArrayVector){
 
     conn_compress.run("undef(`table1,SHARED)");
 }
-
 
 TEST_F(CompressTest,insertTableCompressWithDecimal32ArrayVector){
     int count = 600000;
@@ -589,7 +685,6 @@ TEST_F(CompressTest,insertTableCompressWithDecimal32ArrayVector){
     conn_compress.run("undef(`table1,SHARED)");
 }
 
-
 TEST_F(CompressTest,insertTableCompressWithDecimal64ArrayVector){
     int count = 600000;
     int scale64=rand()%18;
@@ -630,4 +725,71 @@ TEST_F(CompressTest,insertTableCompressWithDecimal64ArrayVector){
     }
 
     conn_compress.run("undef(`table1,SHARED)");
+}
+
+
+TEST_F(CompressTest,insertTableCompressWithDecimal128ArrayVector){
+    int count = 600000;
+    int scale128=rand()%38;
+
+    VectorSP indV = conn_compress.run("1..300000*2");
+    VectorSP valV = Util::createVector(DT_DECIMAL128, count, count, true, scale128);
+    ConstantSP val1 = Util::createDecimal128(scale128, 1.1054876666452);
+    cout << val1->getString() << endl;
+    for(auto i =0;i<valV->size();i++){
+        valV->set(i, val1);
+    }
+
+    VectorSP av1 = Util::createArrayVector(indV, valV);
+    vector<string> colName={"decimal128av"};
+    vector<ConstantSP> colVector {av1};
+    TableSP table  = Util::createTable(colName,colVector);
+    vector<COMPRESS_METHOD> typeVec{COMPRESS_LZ4};
+    table->setColumnCompressMethods(typeVec);
+
+    vector<ConstantSP> args{table};
+    string script = "colName =  [`decimal128av];"
+                    "colType = [DECIMAL128("+to_string(scale128)+")[]];"
+                    "share streamTable(1:0,colName,colType) as table1;";
+    conn_compress.run(script);
+    int success = conn_compress.run("tableInsert{table1}",args)->getInt();
+    EXPECT_EQ(success, count/2);
+
+    conn_compress.upload("table",table);
+
+    ConstantSP res = conn_compress.run("each(eqObj,table.values(),table1.values())");
+	for (int i = 0; i < res->size(); i++)
+		EXPECT_TRUE(res->get(i)->getBool());
+
+    TableSP ex = conn_compress.run("table1");
+    for(auto i=0;i<ex->columns();i++){
+        for(auto j=0;j<ex->rows();j++){
+            EXPECT_EQ(ex->getColumn(i)->get(j)->getString(), table->getColumn(i)->get(j)->getString());
+        }
+    }
+
+    conn_compress.run("undef(`table1,SHARED)");
+}
+
+TEST_F(CompressTest, upload_other_dataforms_with_compress)
+{
+    auto matrx = conn_compress.run("a = matrix(1 2, 3 4);a");
+    auto vec = conn_compress.run("b = 1 2 3 4;b");
+    auto par = conn_compress.run("c = 1:2;c");
+    auto st = conn_compress.run("d = set(1 1 2 3);d");
+    auto dt = conn_compress.run("ee = dict(int(1 2),int(3 4));ee");
+    vector<ConstantSP> vals{matrx, vec, par, st, dt};
+    for (auto i = 0; i < vals.size(); i++)
+    {
+        conn_compress.upload("val" + to_string(i), vals[i]);
+    }
+    EXPECT_TRUE(conn_compress.run("eqObj(val0, a)")->getBool());
+    EXPECT_TRUE(conn_compress.run("eqObj(val1, b)")->getBool());
+    EXPECT_TRUE(conn_compress.run("eqObj(val2, c)")->getBool());
+    conn_compress.run("assert 1, d.size() == val3.size();"
+                      "assert 2, 1 in d;"
+                      "assert 3, 2 in d;"
+                      "assert 4, 3 in d");
+    conn_compress.run("assert 5, each(eqObj, sort(val4.keys()), sort(ee.keys()));"
+                      "assert 6, each(eqObj, sort(val4.values()), sort(ee.values()));");
 }
