@@ -7,7 +7,7 @@ DolphinDB C++ API支持以下开发环境：
 * Windows GNU(MinGW)
 
 本教程介绍以下内容：
-- [1. 编译 API 动态库](#1-编译 API 动态库)
+- [1. 编译 API 动态库](#1-编译API动态库)
 - [2. 编译可执行文件](#2-编译可执行文件)
 - [3. 建立DolphinDB连接](#3-建立dolphindb连接)
 - [4. 运行DolphinDB脚本](#4-运行dolphindb脚本)
