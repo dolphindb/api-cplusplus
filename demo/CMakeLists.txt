@@ -1,64 +1,57 @@
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.6)
 set(ProjectName apiDemo)
-
 project(${ProjectName})
-
 set(SRC_LIST 
-	${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
 )
-if(UNIX)
-	add_compile_options(-std=c++11 -DLINUX -Wall -O0 -g -fPIC -Wl,-rpath,${CMAKE_CURRENT_SOURCE_DIR}:${CMAKE_CURRENT_SOURCE_DIR}/lib)
-	if(ABI EQUAL 0)
-		message("set _GLIBCXX_USE_CXX11_ABI to 0")
-		add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
-	elseif(ABI EQUAL 1)
-		message("set _GLIBCXX_USE_CXX11_ABI to 1")
-		add_definitions("-D_GLIBCXX_USE_CXX11_ABI=1")
-	endif()
-elseif(WIN32)
-	if(MSVC)
-		add_compile_options(-DWINDOWS -DNOMINMAX -D_DEBUG)
-		include_directories(
-			${SSL_LIBS}/include64
-		)
-	elseif(MINGW)
-		add_compile_options(-std=c++11 -DWINDOWS -Wall -O0 -g -fPIC -Wl,-rpath,${CMAKE_CURRENT_SOURCE_DIR}:${CMAKE_CURRENT_SOURCE_DIR}/lib)
-		if(ABI EQUAL 0)
-			message("set _GLIBCXX_USE_CXX11_ABI to 0")
-			add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
-		elseif(ABI EQUAL 1)
-			message("set _GLIBCXX_USE_CXX11_ABI to 1")
-			add_definitions("-D_GLIBCXX_USE_CXX11_ABI=1")
-		endif()
-	endif()
+set(LINK_LIBS)
+if(USE_OPENSSL)
+    add_definitions("-DUSE_OPENSSL=1")
+    if(OPENSSL_PATH)
+        set(ENV{OPENSSL_ROOT_DIR} ${OPENSSL_PATH})
+    endif()
+    find_package(OpenSSL REQUIRED)
+    include_directories(${OPENSSL_INCLUDE_DIR})
+    message("openssl include dir    : ${OPENSSL_INCLUDE_DIR}")
+    message("openssl ssl lib dir    : ${OPENSSL_SSL_LIBRARY}")
+    message("openssl crypto lib dir : ${OPENSSL_CRYPTO_LIBRARY}")
 endif()
-
+if(UNIX)
+    add_compile_options(-std=c++11 -DLINUX -Wall -O0 -g -fPIC -Wl,-rpath,${CMAKE_CURRENT_SOURCE_DIR}:${CMAKE_CURRENT_SOURCE_DIR}/lib)
+    if(ABI EQUAL 0)
+        message("set _GLIBCXX_USE_CXX11_ABI to 0")
+        add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
+    elseif(ABI EQUAL 1)
+        message("set _GLIBCXX_USE_CXX11_ABI to 1")
+        add_definitions("-D_GLIBCXX_USE_CXX11_ABI=1")
+    endif()
+    list(APPEND LINK_LIBS DolphinDBAPI rt pthread)
+elseif(WIN32)
+    if(MSVC)
+        add_compile_options(-DWINDOWS -DNOMINMAX -D_DEBUG)
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MDd")
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd")
+        list(APPEND LINK_LIBS DolphinDBAPI)
+    elseif(MINGW)
+        add_compile_options(-std=c++11 -DWINDOWS -Wall -O0 -g -fPIC -Wl,-rpath,${CMAKE_CURRENT_SOURCE_DIR}:${CMAKE_CURRENT_SOURCE_DIR}/lib)
+        if(ABI EQUAL 0)
+            message("set _GLIBCXX_USE_CXX11_ABI to 0")
+            add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
+        elseif(ABI EQUAL 1)
+            message("set _GLIBCXX_USE_CXX11_ABI to 1")
+            add_definitions("-D_GLIBCXX_USE_CXX11_ABI=1")
+        endif()
+        list(APPEND LINK_LIBS DolphinDBAPI pthread)
+    endif()
+endif()
 include_directories(
-	${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 link_directories(
-	${CMAKE_CURRENT_SOURCE_DIR}/lib/
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/
 )
 add_executable(${ProjectName} ${SRC_LIST})
-
-if(UNIX)
-	target_link_libraries(${ProjectName}
-		DolphinDBAPI
-		rt
-		pthread
-	)
-elseif(WIN32)
-	if(MSVC)
-		target_link_libraries(${ProjectName}
-			DolphinDBAPI
-		)
-	elseif(MINGW)
-		target_link_libraries(${ProjectName}
-			DolphinDBAPI
-			pthread
-		)
-	endif()
-endif()
-
-
+target_link_libraries(${ProjectName}
+    ${LINK_LIBS}
+)
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/bin/)

@@ -1,12 +1,23 @@
-cmake_minimum_required(VERSION 3.0)
-
+cmake_minimum_required(VERSION 3.6)
 set(CMAKE_CXX_STANDARD 11)
-
 project(DolphinDBAPI)
 
+set(LINK_LIBS)
+if(USE_OPENSSL)
+    add_definitions("-DUSE_OPENSSL=1")
+    if(OPENSSL_PATH)
+        set(ENV{OPENSSL_ROOT_DIR} ${OPENSSL_PATH})
+    endif()
+    find_package(OpenSSL REQUIRED)
+    list(APPEND LINK_LIBS ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
+    include_directories(${OPENSSL_INCLUDE_DIR})
+    message("openssl include dir    : ${OPENSSL_INCLUDE_DIR}")
+    message("openssl ssl lib dir    : ${OPENSSL_SSL_LIBRARY}")
+    message("openssl crypto lib dir : ${OPENSSL_CRYPTO_LIBRARY}")
+endif()
+
 if(UNIX)
-	add_definitions(-fPIC -DNDEBUG -O3 -Wall -fmessage-length=0 -std=gnu++11 -msse -msse2 -msse3 -funroll-loops)
-    add_definitions("-DLINUX")
+    add_definitions(-fPIC -DNDEBUG -DLINUX -O3 -Wall -fmessage-length=0 -std=gnu++11 -msse -msse2 -msse3 -funroll-loops)
     if(ABI EQUAL 0)
         message("set _GLIBCXX_USE_CXX11_ABI to 0")
         add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
@@ -14,38 +25,21 @@ if(UNIX)
         message("set _GLIBCXX_USE_CXX11_ABI to 1")
         add_definitions("-D_GLIBCXX_USE_CXX11_ABI=1")
     endif()
-    if(SSL_LIBS)
-        include_directories(${SSL_LIBS}/include)
-        set(LIBSSL "-Wl,--whole-archive ${SSL_LIBS}/lib/libssl.a -Wl,--no-whole-archive")
-        set(LIBCRYPTO "-Wl,--whole-archive ${SSL_LIBS}/lib/libcrypto.a -Wl,--no-whole-archive")
-    else()
-        set(LIBSSL ssl)
-        set(LIBCRYPTO crypto)
+    if(UUID_PATH)
+        include_directories(${UUID_PATH}/include)
+        link_directories(${UUID_PATH}/lib)
     endif()
-
-    if(UUID_LIBS)
-        include_directories(${UUID_LIBS}/include)
-        set(LIBUUID "-Wl,--whole-archive ${UUID_LIBS}/lib/libuuid.a -Wl,--no-whole-archive")
-    else()
-        set(LIBUUID uuid)
-    endif()
-
+    list(APPEND LINK_LIBS pthread uuid dl)
 elseif(WIN32)
-	if(MSVC)
-		message("MSVC Compiling")
-	    add_definitions("-DWINDOWS -DWIN32_LEAN_AND_MEAN -D_DDBAPIDLL -DNOMINMAX")
-		if(SSL_LIBS)
-			include_directories(${SSL_LIBS}/include64)
-			set(LIBSSL ${SSL_LIBS}/lib64/ssleay32MD.lib)
-			set(LIBCRYPTO ${SSL_LIBS}/lib64/libeay32MD.lib)
-		else()
-			set(LIBSSL ssleay32MD.lib)
-			set(LIBCRYPTO libeay32MD.lib)
-		endif()
-	elseif(MINGW)
-		message("MINGW Compiling")
-		add_definitions(-fPIC -DNDEBUG -O3 -Wall -fmessage-length=0 -std=gnu++11 -msse -msse2 -msse3 -funroll-loops)
-		add_definitions("-DWINDOWS -D_WIN32_WINNT=0x0600")
+    if(MSVC)
+        message("MSVC Compiling")
+        add_definitions("-DWINDOWS -DWIN32_LEAN_AND_MEAN -D_DDBAPIDLL -DNOMINMAX")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MDd")
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd")
+    elseif(MINGW)
+        message("MINGW Compiling")
+        add_definitions(-fPIC -DNDEBUG -O3 -Wall -fmessage-length=0 -std=gnu++11 -msse -msse2 -msse3 -funroll-loops)
+        add_definitions("-DWINDOWS -D_WIN32_WINNT=0x0600")
         if(ABI EQUAL 0)
             message("set _GLIBCXX_USE_CXX11_ABI to 0")
             add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
@@ -53,37 +47,14 @@ elseif(WIN32)
             message("set _GLIBCXX_USE_CXX11_ABI to 1")
             add_definitions("-D_GLIBCXX_USE_CXX11_ABI=1")
         endif()
-	    if(SSL_LIBS)
-			include_directories(${SSL_LIBS}/include)
-			set(LIBSSL ${SSL_LIBS}/lib/libssl.a)
-			set(LIBCRYPTO ${SSL_LIBS}/lib/libcrypto.a)
-		else()
-			set(LIBSSL ssl)
-			set(LIBCRYPTO crypto)
-		endif()
-	endif()
-
-     
+    endif()
+    list(APPEND LINK_LIBS ws2_32)
 endif()
 
 AUX_SOURCE_DIRECTORY(src DIR_SRCS)
 include_directories(include)
 ADD_LIBRARY(DolphinDBAPI SHARED ${DIR_SRCS})
-
-if(UNIX)
-    target_link_libraries(
-        DolphinDBAPI
-        pthread 
-        ${LIBSSL}
-        ${LIBCRYPTO}
-        ${LIBUUID}
-        dl
-    )
-elseif(WIN32)
-    target_link_libraries(
-        DolphinDBAPI
-        ${LIBSSL}
-        ${LIBCRYPTO}
-        ws2_32
-    )
-endif()
+target_link_libraries(
+    DolphinDBAPI
+    ${LINK_LIBS}
+)
