@@ -7,8 +7,8 @@ DolphinDB C++ API支持以下开发环境：
 * Windows GNU(MinGW)
 
 本教程介绍以下内容：
-- [1. 编译libDolphinDBAPI](#1-编译libdolphindbapi)
-- [2. 项目编译](#2-项目编译)
+- [1. 编译 API 动态库](#1-编译 API 动态库)
+- [2. 编译可执行文件](#2-编译可执行文件)
 - [3. 建立DolphinDB连接](#3-建立dolphindb连接)
 - [4. 运行DolphinDB脚本](#4-运行dolphindb脚本)
 - [5. 运行DolphinDB函数](#5-运行dolphindb函数)
@@ -18,185 +18,181 @@ DolphinDB C++ API支持以下开发环境：
 - [9. C++ Streaming API](#9-c-streaming-api)
 - [10. openssl 1.0.2版本源码安装](#10-openssl-102版本源码安装)
 
+## 1. 编译 API 动态库
 
+本小节讲解如何在 Windows 环境下使用 Visual Studio 2022、在 Linux 环境（以 RedHat 为例），以及在 Windows 环境下使用 MinGW 编译出 API 动态库。
 
-## 1. 编译libDolphinDBAPI
+### 1.1 Windows 环境下使用 Visual Studio 2022编译
 
-用户可以使用bin目录下已编译的libDolphinDBAPI, 也可以通过如下方法自己编译libDolphinDBAPI。 
+#### 环境准备
 
-### 1.1 在Linux环境下编译API
+1. 安装软件 [Visual Studio 2022](https://visualstudio.microsoft.com/zh-hans/downloads/)，[Git](https://git-scm.com/downloads)，[CMake](https://cmake.org/download/)。
+2. 下载 [OpenSSL 库](https://www.npcglib.org/~stathis/blog/precompiled-openssl)。本文中的下载目录是 `D:/temp/openssl-1.0.2l-vs2017`。
 
-#### 编译libuuid
+#### 代码准备
 
-DolphinDB API会用到libuuid，所以要先编译libuuid的静态库。编译方法如下:
-
-* 下载 [libuuid-1.0.3.tar.gz](https://sourceforge.net/projects/libuuid/files/)
-
-* 解压：tar -xvf libuuid-1.0.3.tar.gz
-
-* cd libuuid-1.0.3 && ./configure CFLAGS="-fPIC" CPPFLAGS="-fPIC" && make
-
-* 如果编译成功， libuuid.a 会生成在目录 '.libs'下
-
-* 将libuuid.a拷贝到目录DolphinDBAPI
-
-#### 编译libDolphinDBAPI
-
-编译命令：
-
-``` 
-cd api-cplusplus
-mkdir build && cd build
-cmake .. && make
-```
-
-如果编译成功，会自动生成libDolphinDBAPI.so 
-
-
-### 1.2 在Windows环境下用MinGW编译API
-
-编译命令：
+在 Gitee 的 [api-cplusplus](https://gitee.com/dolphindb/api-cplusplus) 项目中下载代码，并切换至预期分支。以 main 分支为例，在 Git Bash 中执行如下命令：
 
 ```
-cd api-cplusplus
-mingw32-make -f makefile.win32
+git clone git@gitee.com:dolphindb/api-cplusplus.git
+git checkout -b main origin/main
 ```
-
-
-### 1.3 在Windows环境下，用Visual Studio 2017编译API
-
-
-
-#### 创建项目 libDolphinDBAPI
-
-Windows Desktop->Dynamic Link Library (DLL) 
-
-#### 配置属性
-
-配置属性 -> 常规 -> 项目默认值 -> 配置类型 -> 动态库(.dll)
-
-#### 下载并将 [Openssl](https://www.npcglib.org/~stathis/blog/precompiled-openssl/)加入include和lib路径：
-
-
-1. 配置属性页->VC++ 目录 -> 包含目录 ->C:\openssl-1.0.2l-vs2017\include64;
-2. 配置属性页->VC++ 目录 -> 库目录 -> C:\openssl-1.0.2l-vs2017\lib64;
-
-#### 添加下面的宏定义
-
-C/C++ -> 预处理器 -> 预处理器定义 ->WIN32_LEAN_AND_MEAN; _WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;WINDOWS;NOMINMAX;NDEBUG;_WINDOWS;_DDBAPIDLL;
-
-
-
-#### 预编译选项（Precompiled header）
-C/C++ -> 预编译头 -> 预编译头-> 不使用预编译头
-
-
-#### 链接（Linker）: 
-
-连接器 -> 输入 -> 附加依赖项
-ws2_32.lib
-ssleay32MD.lib
-libeay32MD.lib
-
-#### 添加源码：
-
-移除项目中代码，并添加src目录的源码到项目中。
 
 #### 编译
 
-编译的时候选择release和x64.如果编译成功，在/username/source/repos/libDolphinDBPAI/x64/Release目录下会生成：libDolphinDBAPI.lib和libDolphinDBAPI.dll。
+在 PowerShell 中执行如下命令，即可成功编译出 DolphinDBAPI.dll 和 DolphinDBAPI.lib：
 
-> 更详细的介绍请参阅[用VS2017编译DolphinDB C++ API动态库](https://github.com/dolphindb/Tutorials_CN/blob/master/cpp_api_vs2017_tutorial.md)
-
-## 2. 项目编译
-
-### 2.1 在Linux环境下编译项目
-
-#### 2.1.1 环境配置
-
-C++ API需要使用g++ 4.8.5及以上版本。
-
-#### 2.1.2 下载bin文件和头文件
-
-从本GitHub项目中下载以下文件：
-
-- [bin](./bin) (libDolphinDBAPI.so)
-- [include](./include) (DolphinDB.h, Exceptions.h, SmartPointer.h, SysIO.h, Types.h, Util.h)
-
-#### 2.1.3 编译main.cpp
-
-在bin和include的同级目录中创建project目录。进入project目录，并创建文件main.cpp：
-
-```cpp
-#include "DolphinDB.h"
-#include "Util.h"
-#include <iostream>
-#include <string>
-using namespace dolphindb; 
-using namespace std; 
-
-int main(int argc, char *argv[]){
-
-    DBConnection conn;
-    bool ret = conn.connect("111.222.3.44", 8503);
-    if(!ret){
-        cout<<"Failed to connect to the server"<<endl;
-        return 0;
-    }
-    ConstantSP vector = conn.run("`IBM`GOOG`YHOO");
-    int size = vector->rows();
-    for(int i=0; i<size; ++i)
-        cout<<vector->getString(i)<<endl;
-    return 0;
-}
+```
+cd path/to/api-cplusplus
+mkdir build && cd build
+cmake .. -G "Visual Studio 17 2022" -A x64 -DUSE_OPENSSL=1 -DOPENSSL_PATH=D:/temp/openssl-1.0.2l-vs2017 -DCMAKE_CONFIGURATION_TYPES="Release;Debug"
+cmake --build . --config Release
 ```
 
-#### 2.1.4 编译
+`cmake` 参数说明：
 
-为了兼容旧的编译器，libDolphinDBAPI.so提供了2个版本，一个版本在编译时使用了-D_GLIBCXX_USE_CXX11_ABI=0的选项，放在[bin/linux_x64/ABI0](./bin/linux_x64/ABI0)目录下，另一个版本未使用-D_GLIBCXX_USE_CXX11_ABI=0，放在[bin/linux_x64/ABI1](./bin/linux_x64/ABI1)目录下。
+- -G：用来指定编译器。如果安装为其它版本的 Visual Studio，则此处须对应修改。
+- -A：x64指定生成64位的动态库，x86指定生成32位的动态库。
+- -DUSE_OPENSSL=1：如果想使用 OpenSSL 来加密 API 和 DolphinDB 之间的通信，则必须指定该参数。指定后编译 API 动态库时会去链接 SSL 以及 Crypto 动态库。
+- -DOPENSSL_PATH=/path/to/openssl：如果系统中没有安装 OpenSSL，则可以通过该参数来指定路径。
+- -DCMAKE_CONFIGURATION_TYPES="Release;Debug"：生成的 Visual Studio 项目文件支持编译 Release 或 Debug 类型的动态库。
+- --config Release：生成 Release 类型的目标文件，也可以改为 Debug。
 
-另外由于DolphinDB添加了(Linux64 稳定版>=1.10.17,最新版>=1.20.6) SSL的支持， 所以编译前需要安装openssl。
+**注意事项**
 
->注：当前需要openssl版本为1.0.2，高版本的1.1版本会报错。如果系统自带的openssl版本不是1.0.2的话，可以参考[openssl源码安装](#10-openssl-102版本源码安装)，或者使用已有的二进制包安装。查看openssl版本的命令为：```openssl version```
+如果使用的是从上述网址下载的 OpenSSL 库，并且想编译64位的动态库，那么需要在执行 `cmake` 命令之前，删除该下载的 OpenSSL 库目录中的 bin，include，以及 lib 文件夹，并将 bin64，include64以及 lib64文件夹重命名为 bin、include 以及 lib，因为 CMake 会在这些目录中寻找头文件以及库。
 
-以下是使用第一个动态库版本的g++编译命令：
+### 1.2 Linux 环境下编译（以 RedHat 为例）
+
+#### 环境准备
+
+1. 安装 [gcc/g++](https://gcc.gnu.org/)(version >= 4.8.5)，Git，CMake。
+2. 安装 [Openssl-devel](https://pkgs.org/download/openssl-devel) 以及 [Uuid-devel](https://pkgs.org/download/uuid-devel)。
+
 ```
-g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=0 -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -lssl -lrt -L../bin/linux_x64/ABI0  -Wl,-rpath,.:../bin/linux_x64/ABI0 -o main
+yum install openssl-devel
+yum install libuuid-devel
 ```
 
-以下是使用另一个动态库版本的g++编译命令：
+#### 代码准备
+
+在 Gitee 的 [api-cplusplus](https://gitee.com/dolphindb/api-cplusplus) 项目中下载代码，并切换至预期分支。以 main 分支为例，在终端中执行如下命令：
+
+```linux
+git clone git@gitee.com:dolphindb/api-cplusplus.git
+git checkout -b main origin/main
 ```
-g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=1 -DLOGGING_LEVEL_2 -O2 -I../include   -lDolphinDBAPI -lpthread -lssl -lrt -L../bin/linux_x64/ABI1  -Wl,-rpath,.:../bin/linux_x64/ABI1 -o main@
+
+#### 编译
+
+在终端中执行如下命令，即可成功编译出 libDolphinDBAPI.so：
+
+```
+cd path/to/api-cplusplus
+mkdir build && cd build
+cmake .. -DABI=0 -DUUID_PATH=/home/uuid/ -DUSE_OPENSSL=1 -DOPENSSL_PATH=/home/openssl/
+make -j4
 ```
 
-#### 2.1.5 运行
+`cmake` 参数说明：
 
-编译成功后，启动DolphinDB，运行main程序并连接到DolphinDB，连接时需要指定IP地址和端口号，如以上程序中的111.222.3.44:8503。
+- -DABI=0：用来指定编译时` _GLIBCXX_USE_CXX11_ABI` 的值，可以设置为1或者0。
+- -DUUID_PATH=/path/to/uuid：如果系统中没有安装 uuid，则可以通过该参数来指定 UUID 路径，编译时会在\${UUID_PATH}/include目录下寻找头文件，在\${UUID_PATH}/lib目录下寻找 uuid 库
+- -DUSE_OPENSSL=1：如果想使用 OpenSSL 来加密 API 和 DolphinDB 之间的通信，则必须指定该参数。指定后编译 API 动态库时会去链接 SSL 以及 Crypto 动态库。
+- -DOPENSSL_PATH=/path/to/openssl：如果系统中没有安装 OpenSSL，则可以通过该参数来指定 OPENSSL 路径。
 
-### 2.2 Windows环境下编译
-本节将简要介绍在windows上如何使用C++ API,更详细的介绍请参阅[用VS2017编译DolphinDB C++ API动态库](https://github.com/dolphindb/Tutorials_CN/blob/master/cpp_api_vs2017_tutorial.md#4-%E6%A1%88%E4%BE%8B%E9%AA%8C%E8%AF%81)第4节。
+### 1.3 Windows 环境下使用 MinGW 编译
 
-#### 2.2.1 环境配置
+#### 环境准备
 
-本教程使用了Visual Studio 2017 64位版本。
+1. 安装软件 [MinGW](https://www.mingw-w64.org/downloads/)，Git，CMake。
+2. OpenSSL 库使用的是 API 源码中 lib 目录下的 openssl-1.0.2u。
 
-#### 2.2.2 下载bin文件和头文件
+#### 代码准备
 
-将本GitHub项目下载到本地。
+在 Gitee 的 [api-cplusplus](https://gitee.com/dolphindb/api-cplusplus) 项目中下载代码，并切换至预期分支。以main分支为例，在 Git Bash 中执行如下命令：
 
-#### 2.2.3 创建Visual Studio项目
+```
+git clone git@gitee.com:dolphindb/api-cplusplus.git
+git checkout -b main origin/main
+```
 
-创建windows console project，导入[include](./include)目录下头文件，创建1.1.3节中的main.cpp文件，导入libDolphinDBAPI.lib，并且配置lib目录。
+#### 编译
 
-请注意：
-> 由于VS里默认定义了min/max两个宏，会与头文件中 `min` 和 `max` 函数冲突。为了解决这个问题，在预处理宏定义中需要加入 __NOMINMAX__。
-> API源代码中用宏定义LINUX、WINDOWS等区分不同平台，因此在预处理宏定义中需要加入 WINDOWS。
+在 Power Shell 中执行如下命令，即可成功编译出 libDolphinDBAPI.dll：
 
-#### 2.2.4 编译和运行
+```
+cd path/to/api-cplusplus
+mkdir build && cd build
+cmake .. -G "MinGW Makefiles" -DUSE_OPENSSL=1 -DOPENSSL_PATH=D:/workspace/testCode/api-cplusplus/lib/openssl-1.0.2u/openssl-1.0.2u/static
+cmake --build .
+```
 
-启动编译，将对应的libDolphinDBAPI.dll拷贝到可执行程序的输出目录，即可运行。
+`cmake` 参数说明：
 
-Windows gnu开发环境与Linux相似，可以参考上一章的Linux编译。
+- -G：用来指定编译器。
+- -DUSE_OPENSSL=1：如果想使用 OpenSSL 来加密 API 和 DolphinDB 之间的通信，则必须指定该参数。指定后编译 API 动态库时会去链接 SSL 以及 Crypto 动态库。
+- -DOPENSSL_PATH=/path/to/openssl：如果系统中没有安装 OpenSSL，则可以通过该参数来指定路径。
+
+## 2. 编译可执行文件
+
+本小节主要讲解如何在 Windows 环境下使用 Visual Studio 2022、在 Linux 环境（以 RedHat 为例），以及在 Windows 环境下使用 MinGW 编译一个可执行文件，并链接上一对应小节生成的 API 动态库以连接数据库。
+
+注：这部分的工程存在于 API 源码中的 demo 文件夹内。
+
+### 2.1 Windows 环境下使用 Visual Studio 2022编译
+
+1. 将1.1节生成的 DolphinDBAPI.lib 拷贝到 `demo/lib` 目录下。
+2. 在 PowerShell 中执行下述命令：
+
+```
+cd path/to/api-cplusplus/demo
+mkdir build && cd build
+cmake .. -G "Visual Studio 17 2022" -A x64 -DUSE_OPENSSL=1 -DOPENSSL_PATH=D:/temp/openssl-1.0.2l-vs2017 -DCMAKE_CONFIGURATION_TYPES="Release;Debug"
+cmake --build . --config Release
+```
+
+`cmake` 各项参数含义与1.1 编译中的相同。
+
+1. 生成的可执行文件 apiDemo.exe 在 `demo\bin\Debug` 目录下。
+2. 将所依赖的动态库（DolphinDBAPI.dll libeay32MD.dll ssleay32MD.dll）拷贝到 .exe 文件同目录下即可执行。
+
+### 2.2 Linux 环境下编译（以 RedHat 为例）
+
+1. 将1.2节生成的 libDolphinDBAPI.so 拷贝到 demo/lib 目录下.
+2. 在终端中执行下述命令：
+
+```
+cd path/to/api-cplusplus/demo
+mkdir build && cd build
+cmake .. -DABI=0 -DUSE_OPENSSL=1 -DOPENSSL_PATH=/home/openssl/
+cmake --build .
+```
+
+`cmake` 各项参数说明如下所示，注意 *ABI* 的值必须相同:
+
+- -DABI=0：用来指定编译时 _GLIBCXX_USE_CXX11_ABI 的值，可以设置为1或者0。
+- -DUSE_OPENSSL=1：如果想使用 OpenSSL 来加密 API 和 DolphinDB 之间的通信，则必须指定该参数。指定后编译 API 动态库时会去链接 SSL 以及 Crypto 动态库。
+- -DOPENSSL_PATH=/path/to/openssl：如果系统中没有安装 OpenSSL，则可以通过该参数来指定路径。
+
+1. 生成的可执行文件 apiDemo 在 `demo\bin` 目录下。
+
+### 2.3 Windows 环境下使用 MinGW 编译
+
+1. 将1.3节生成的 libDolphinDBAPI.dll 拷贝到 `demo/lib `目录下。
+2. 在 PowerShell 中执行下述命令：
+
+```
+cd path/to/api-cplusplus/demo
+mkdir build && cd build
+cmake .. -G "MinGW Makefiles" -DUSE_OPENSSL=1 -DOPENSSL_PATH=D:/workspace/testCode/api-cplusplus/lib/openssl-1.0.2u/openssl-1.0.2u/static
+cmake --build .
+```
+
+`cmake` 各项参数含义与1.3中的相同。
+
+1. 生成的可执行文件 apiDemo.exe 在 `demo\bin` 目录下。
+2. 将所依赖的动态库（libDolphinDBAPI.dll，libeay32.dll，ssleay32.dll）拷贝到 .exe文件同目录下即可执行。
 
 ## 3. 建立DolphinDB连接
 
