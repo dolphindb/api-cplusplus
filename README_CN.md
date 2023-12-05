@@ -256,6 +256,15 @@ cout<<v->getString()<<endl;
 
 > ["IBM", "GOOG", "YHOO"]
 
+注意：使用 `run(script)` 方法时，不建议用户在 script 中使用 DolphinDB 的 for 循环以进行表的写入操作。若使用，则可能因为去重操作而丢失数据。
+
+建议操作方法如下：
+
+* 以外部 for 循环调用 `run("tableInsert(…)")`的方式一行行插入数据；
+* 把数据构造为一个 table 对象，然后调用 API 表写入接口（`AutoFitTableAppender`、`AutoFitTableUpsert`、`PartitionedTableAppender`等）进行写入；
+* 调用 `MultithreadedTableWriter` 接口的 `insert()` 方法一行行写入数据。
+
+
 ## 5. 运行DolphinDB函数
 
 除了运行脚本之外，run命令还可以直接在远程DolphinDB服务器上执行DolphinDB内置或用户自定义函数。若 `run` 方法只有一个参数，则该参数为脚本；若 `run` 方法有两个参数，则第一个参数为DolphinDB中的函数名，第二个参数是该函数的参数，为ConstantSP类型的向量。
@@ -578,18 +587,20 @@ cout<<table->getString()<<endl;
 对于表的各列，我们可以通过`getString()`方法获得每一列的字符串类型数组，再通过C++的数据类型转换函数将数值类型的数据转换成对应的数据类型，从而进行计算。对于时间类型的数据，则需要以字符串的形式存储。
 
 ```cpp
-vector<VectorSP> columnVecs;
-int qty[200],sum[200];
-double price[200];
-for(int i=0; i<200;++i){
-    qty[i]=atoi(columnVecs[2]->getString(i).c_str());
-    price[i]=atof(columnVecs[3]->getString(i).c_str());
-    sum[i]=qty[i]*price[i];
-}
+    vector<VectorSP> columnVecs;
+    for(int i = 0; i < table->columns(); ++i){
+        columnVecs.push_back(table->getColumn(i));
+    }
+    int qty[200],sum[200];
+    double price[200];
+    for(int i=0; i<200;++i){
+        qty[i]=atoi(columnVecs[2]->getString(i).c_str());
+        price[i]=atof(columnVecs[3]->getString(i).c_str());
+        sum[i]=qty[i]*price[i];
+    }
 
-for(int i = 0; i < 200; ++i){
-    cout<<columnVecs[0]->getString(i)<<", "<<columnVecs[1]->getString(i)<<", "<<sum[i]<<endl;
-}
+    for(int i = 0; i < 200; ++i){
+        cout<<columnVecs[0]->getString(i)<<", "<<columnVecs[1]->getString(i)<<", "<<sum[i]<<endl;
 ```
 
 #### 7.5.3 `getRow()`方法按照行获取表的内容
