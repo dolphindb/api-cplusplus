@@ -1526,7 +1526,7 @@ MessageQueueSP PollingClient::subscribe(string host, int port, string tableName,
 示例：
 
 ```cpp 
-auto queue = client.subscribe(host, port, handler, tableName);
+auto queue = client.subscribe(host, port, tableName);
 Message msg;
 while(true) {
     if(queue->poll(msg, 1000)) {
