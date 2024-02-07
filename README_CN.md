@@ -1359,8 +1359,7 @@ count
 
 ## 9. C++ Streaming API
 
-C++ API处理流数据的方式有三种：ThreadedClient, ThreadPooledClient 和 PollingClient。这三种实现方式的细节请见[test/StreamingThreadedClientTester.cpp](./test/StreamingThreadedClientTester.cpp), [test/StreamingThreadPooledClientTester.cpp](./test/StreamingThreadPooledClientTester.cpp) 和 [test/StreamingPollingClientTester.cpp](./test/StreamingPollingClientTester.cpp)。
-
+C++ API处理流数据的方式有三种：ThreadedClient, ThreadPooledClient 和 PollingClient。
 ### 9.1 API
 
 #### 9.1.1 ThreadedClient
