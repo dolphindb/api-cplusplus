@@ -269,7 +269,7 @@ cout<<v->getString()<<endl;
 
 除了运行脚本之外，run命令还可以直接在远程DolphinDB服务器上执行DolphinDB内置或用户自定义函数。若 `run` 方法只有一个参数，则该参数为脚本；若 `run` 方法有两个参数，则第一个参数为DolphinDB中的函数名，第二个参数是该函数的参数，为ConstantSP类型的向量。
 
-下面的示例展示C++程序通过 `run` 调用DolphinDB内置的 [`add`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/add.html) 函数。[`add`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/add.html) 函数有两个参数 x 和 y。参数的存储位置不同，也会导致调用方式的不同。可能有以下三种情况：
+下面的示例展示C++程序通过 `run` 调用DolphinDB内置的 [add](https://docs.dolphindb.cn/zh/funcs/a/add.html?hl=add) 函数。`add` 函数有两个参数 x 和 y。参数的存储位置不同，也会导致调用方式的不同。可能有以下三种情况：
 
 * 所有参数都在DolphinDB server端
 
@@ -298,7 +298,7 @@ cout<<result->getString()<<endl;
 conn.run("x = [1, 3, 5]"); 
 ```
 
-而参数 y 要在C++客户端生成，这时就需要使用“部分应用”方式，把参数 x 固化在 [`add`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/add.html) 函数内。具体请参考[部分应用文档](https://www.dolphindb.cn/cn/help/Functionalprogramming/PartialApplication.html)。
+而参数 y 要在C++客户端生成，这时就需要使用“部分应用”方式，把参数 x 固化在 [add](https://docs.dolphindb.cn/zh/funcs/a/add.html?hl=add) 函数内。具体请参考：[部分应用](https://docs.dolphindb.cn/zh/progr/partial_app.html)。
 
 ```cpp
 vector<ConstantSP> args;
@@ -584,7 +584,7 @@ cout<<table->getString()<<endl;
 
 下面的脚本中，首先定义一个VectorSP类型的动态数组columnVecs，用于存放从表中获取的列，然后依次访问columnVecs处理数据。
 
-对于表的各列，我们可以通过`getString()`方法获得每一列的字符串类型数组，再通过C++的数据类型转换函数将数值类型的数据转换成对应的数据类型，从而进行计算。对于时间类型的数据，则需要以字符串的形式存储。
+对于表的各列，我们可以通过`getString()`方法获得每一列的字符串类型数组，再通过 C++ 的数据类型转换函数将数值类型的数据转换成对应的数据类型，从而进行计算。对于时间类型的数据，则需要以字符串的形式存储。
 
 ```cpp
     vector<VectorSP> columnVecs;
@@ -685,9 +685,9 @@ DolphinDB数据表按存储方式分为两种:
 
 DolphinDB提供多种方式来保存数据到内存表：
 
-* 通过[insert into](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/i/insertInto.html)语句保存单条数据
-* 通过[tableInsert](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/t/tableInsert.html)函数批量保存多条数据
-* 通过[tableInsert](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/t/tableInsert.html)函数保存数据表
+* 通过 [insert into](https://docs.dolphindb.cn/zh/progr/sql/insertInto.html?hl=insert%2Cinto) 语句保存单条数据
+* 通过 [tableInsert](https://docs.dolphindb.cn/zh/funcs/t/tableInsert.html) 函数批量保存多条数据
+* 通过 [tableInsert](https://docs.dolphindb.cn/zh/funcs/t/tableInsert.html) 函数保存数据表
 
 下面分别介绍三种方式保存数据的实例，在例子中使用到的数据表有3列，分别是STRING, DATE, DOUBLE类型，列名分别为name, date和price。
 在DolphinDB中执行以下脚本创建内存表：
@@ -697,7 +697,7 @@ t = table(100:0, `name` date`price, [STRING, DATE, DOUBLE]);
 share t as tglobal; 
 ```
 
-上面的例子中，我们通过[`table`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/t/table.html)函数来创建表，指定了表的容量和初始大小、列名和数据类型。由于内存表是会话隔离的，所以普通内存表只有当前会话可见。为了让多个客户端可以同时访问t，我们使用[`share`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/CommandsReferences/share.html)在会话间共享内存表。
+上面的例子中，我们通过 [table](https://docs.dolphindb.cn/zh/funcs/t/table.html?hl=table) 函数来创建表，指定了表的容量和初始大小、列名和数据类型。由于内存表是会话隔离的，所以普通内存表只有当前会话可见。为了让多个客户端可以同时访问t，我们使用 [share](https://docs.dolphindb.cn/zh/funcs/s/share.html?hl=share) 在会话间共享内存表。
 
 #### 8.1.1 使用insert into语句保存数据
 
@@ -709,7 +709,7 @@ sprintf(script, "insert into tglobal values(%s, date(timestamp(%ld)), %lf)", "`a
 conn.run(script);
 ```
 
-也可以使用[insert into](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/i/insertInto.html) 语句保存多条数据:
+也可以使用[insert into](https://docs.dolphindb.cn/zh/progr/sql/insertInto.html?hl=insert%2Cinto) 语句保存多条数据:
 
 ```cpp
 string script; 
@@ -770,7 +770,7 @@ args.push_back(table);
 conn.run("tableInsert{tglobal}", args); 
 ```
 
-把数据保存到内存表，还可以使用[append!](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)函数，它可以把一张表追加到另一张表。但是，一般不建议通过[append!](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)函数保存数据，因为[append!](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)函数会返回一个空表，不必要地增加通信量。
+把数据保存到内存表，还可以使用 [append!](https://docs.dolphindb.cn/zh/funcs/a/append!.html?hl=append) 函数，它可以把一张表追加到另一张表。但是，一般不建议通过该函数保存数据，因为该函数会返回一个空表，不必要地增加通信量。
 
 ```cpp
 vector<ConstantSP> args;
@@ -785,8 +785,8 @@ conn.run("append!(tglobal);", args);
 
 #### 8.2.1 使用tableInsert函数保存TableSP对象
 
-在DolphinDB中使用以下脚本创建分布式表。[`database`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/d/database.html)函数用于创建数据库。分布式数据库地路径必须以"dfs://"
-开头。[`createPartitionedTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/c/createPartitionedTable.html)函数用于创建分区表。
+在DolphinDB中使用以下脚本创建分布式表。[database](https://docs.dolphindb.cn/zh/funcs/d/database.html?hl=database) 函数用于创建数据库。分布式数据库地路径必须以"dfs://"
+开头。[createPartitionedTable](https://docs.dolphindb.cn/zh/funcs/c/createPartitionedTable.html?hl=createpartitionedtable) 函数用于创建分区表。
 ``` 
 login( `admin, ` 123456)
 dbPath = "dfs://SAMPLE_TRDDB";
@@ -795,7 +795,7 @@ db = database(dbPath, VALUE, 2010.01.01..2010.01.30)
 pt=db.createPartitionedTable(table(1000000:0, `name` date `price, [STRING,DATE,DOUBLE]), tableName, ` date)
 ```
 
-使用[`loadTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/l/loadTable.html)方法加载分布式表，通过[`tableInsert`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/t/tableInsert.html)方式追加数据：
+使用 [loadTable](https://docs.dolphindb.cn/zh/funcs/l/loadTable.html?hl=loadtable) 方法加载分布式表，通过 [tableInsert](https://docs.dolphindb.cn/zh/funcs/t/tableInsert.html?hl=tableinsert) 方式追加数据：
 
 ```cpp
 TableSP table = createDemoTable(); 
@@ -804,7 +804,7 @@ args.push_back(table);
 conn.run("tableInsert{loadTable('dfs://SAMPLE_TRDDB', `demoTable)}", args); 
 ```
 
-[`append!`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)函数也能向分布式表追加数据，但是性能与[`tableInsert`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/t/tableInsert.html)相比要差，建议不要轻易使用：
+[append!](https://docs.dolphindb.cn/zh/funcs/a/append!.html?hl=append) 函数也能向分布式表追加数据，但是性能与 [tableInsert](https://docs.dolphindb.cn/zh/funcs/t/tableInsert.html?hl=tableinsert) 相比要差，建议不要轻易使用：
 
 ```cpp
 TableSP table = createDemoTable();
@@ -977,8 +977,8 @@ conn.run(script);
 
 注意：
 
-1. 对于本地磁盘表，[`append!`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)函数只把数据追加到内存，如果要保存到磁盘上，必须再次执行[`saveTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/CommandsReferences/saveTable.html)函数。
-2. 除了使用[`share`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/CommandsReferences/share.html)让表在其他会话中可见，也可以在C++ API中使用[`loadTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/l/loadTable.html)来加载磁盘表，使用[`append!`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html)来追加数据。但是，我们不推荐这种方法，因为[`loadTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/l/loadTable.html)函数从磁盘加载数据，会消耗大量时间。如果有多个客户端都使用[`loadTable`](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/l/loadTable.html) ，内存中会有多个表的副本，造成数据不一致。
+1. 对于本地磁盘表，[append!](https://docs.dolphindb.cn/zh/funcs/a/append!.html?hl=append) 函数只把数据追加到内存，如果要保存到磁盘上，必须再次执行 [saveTable](https://docs.dolphindb.cn/zh/funcs/s/saveTable.html?hl=savetable) 函数。
+2. 除了使用 [share](https://docs.dolphindb.cn/zh/funcs/s/share.html?hl=share) 让表在其他会话中可见，也可以在C++ API中使用 [loadTable](https://docs.dolphindb.cn/zh/funcs/l/loadTable.html?hl=loadtable) 来加载磁盘表，使用 [append!](https://docs.dolphindb.cn/zh/funcs/a/append!.html?hl=append) 来追加数据。但是，我们不推荐这种方法，因为 [loadTable](https://docs.dolphindb.cn/zh/funcs/l/loadTable.html?hl=loadtable) 函数从磁盘加载数据，会消耗大量时间。如果有多个客户端都使用 [loadTable](https://docs.dolphindb.cn/zh/funcs/l/loadTable.html?hl=loadtable)，内存中会有多个表的副本，造成数据不一致。
 
 关于C++ API的更多信息，可以参考C++ API 头文件[dolphindb.h](./include/DolphinDB.h)。
 -->
@@ -1140,8 +1140,8 @@ MultithreadedTableWriter(const std::string& host, int port, const std::string& u
 * **pCompressMethods** 列表类型，用于指定每一列采用的压缩传输方式，为空表示不压缩。每一列可选的压缩方式包括：
   * COMPRESS_LZ4: LZ4 压缩
   * COMPRESS_DELTA: DELTAOFDELTA 压缩
-* **mode** 表示数据写入的方式，可选值为：M_Append 或 M_Upsert。M_Upsert 表示以 [upsert!](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/u/upsert!.html) 方式追加或更新表数据；M_Append 表示以 [append!](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/a/append!.html) 方式追加表数据。
-* **modeOption** 字符串数组，表示不同模式下的扩展选项，目前，仅当 *mode* 指定为 M_Upsert 时有效，表示由 [upsert!](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/u/upsert!.html) 可选参数组成的字符串数组。
+* **mode** 表示数据写入的方式，可选值为：M_Append 或 M_Upsert。M_Upsert 表示以 [upsert!](https://docs.dolphindb.cn/zh/funcs/u/upsert_.html) 方式追加或更新表数据；M_Append 表示以 [append!](https://docs.dolphindb.cn/zh/funcs/a/append!.html) 方式追加表数据。
+* **modeOption** 字符串数组，表示不同模式下的扩展选项，目前，仅当 *mode* 指定为 M_Upsert 时有效，表示由 [upsert!](https://docs.dolphindb.cn/zh/funcs/u/upsert_.html) 可选参数组成的字符串数组。
 
 以下是 `MultithreadedTableWriter` 对象包含的函数方法介绍：
 
@@ -1361,49 +1361,13 @@ count
 
 C++ API处理流数据的方式有三种：ThreadedClient, ThreadPooledClient 和 PollingClient。这三种实现方式的细节请见[test/StreamingThreadedClientTester.cpp](./test/StreamingThreadedClientTester.cpp), [test/StreamingThreadPooledClientTester.cpp](./test/StreamingThreadPooledClientTester.cpp) 和 [test/StreamingPollingClientTester.cpp](./test/StreamingPollingClientTester.cpp)。
 
-### 9.1 编译
+### 9.1 API
 
-#### 9.1.1 Linux 64位
-
-安装cmake：
-
-``` bash
-sudo apt-get install cmake
-```
-
-编译：
-
-``` bash
-mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ../path_to_api-cplusplus/
-make -j `nproc` 
-```
-
-编译成功后，会生成三个可执行文件。
-
-#### 9.1.2 在Windows中使用MinGW编译
-
-安装[MinGW](http://www.mingw.org/)和[cmake](https://cmake.org/):
-
-``` bash
-mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release `path_to_api-cplusplus` -G "MinGW Makefiles"
-mingw32-make -j `nproc` 
-```
-
-编译成功后，会生成三个可执行文件。
-
-注意：
-- 1. 编译前，需要把libDolphinDBAPI.dll复制到编译目录。
-- 2. 执行例子前，需要把libDolphinDBAPI.dll和libgcc_s_seh-1.dll复制到可执行文件的相同目录下。
-
-### 9.2 API
-
-#### 9.2.1 ThreadedClient
+#### 9.1.1 ThreadedClient
 
 ThreadedClient 产生一个线程。每次新数据从流数据表发布时，该线程去获取和处理数据。
 
-##### 9.2.1.1 定义线程客户端
+##### 9.1.1.1 定义线程客户端
 
 ``` 
 ThreadedClient::ThreadClient(int listeningPort);
@@ -1411,7 +1375,7 @@ ThreadedClient::ThreadClient(int listeningPort);
 
 * listeningPort 是单线程客户端的订阅端口号。
 
-##### 9.2.1.2 调用订阅函数
+##### 9.1.1.2 调用订阅函数
 
 ``` 
 ThreadSP ThreadedClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr, bool msgAsTable = false, bool allowExists = false, int batchSize = 1, double throttle = 1, string userName="", string password="", const StreamDeserializerSP blobDeserializer = nullptr);
@@ -1444,7 +1408,7 @@ auto t = client.subscribe(host, port, [](Message msg) {
 t->join();
 ```
 
-##### 9.2.1.3 取消订阅
+##### 9.1.1.3 取消订阅
 
 ```cpp
 void ThreadClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
@@ -1460,11 +1424,11 @@ void ThreadClient::unsubscribe(string host, int port, string tableName, string a
 
 该函数用于停止向发布者订阅数据。
 
-#### 9.2.2 ThreadPooledClient
+#### 9.1.2 ThreadPooledClient
 
 ThreadPooledClient 产生用户指定数量的多个线程。每次新数据从流数据表发布时，这些线程同时去获取和处理数据。当数据到达速度超过单个线程所能处理的限度时，ThreadPooledClient 比 ThreadedClient 有优势。
 
-##### 9.2.2.1 定义多线程客户端
+##### 9.1.2.1 定义多线程客户端
 
 ```cpp 
 ThreadPooledClient::ThreadPooledClient(int listeningPort, int threadCount);
@@ -1472,13 +1436,13 @@ ThreadPooledClient::ThreadPooledClient(int listeningPort, int threadCount);
 * listeningPort 是多线程客户端节点的订阅端口号。
 * threadCount 是线程池的大小。
 
-##### 9.2.2.2 调用订阅函数
+##### 9.1.2.2 调用订阅函数
 
 ```cpp 
 vector<ThreadSP> ThreadPooledClient::subscribe(string host, int port, MessageHandler handler, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true, VectorSP filter = nullptr);
 ```
 
-参数参见9.2.1.2节。
+参数参见 9.1.1.2节。
 
 返回一个指针向量，每个指针指向循环调用handler的线程。这些线程在此topic被取消订阅后会退出。
 
@@ -1493,19 +1457,19 @@ for(auto& t : vec) {
 }
 ```
 
-##### 9.2.2.3 取消订阅
+##### 9.1.2.3 取消订阅
 
 ```cpp 
 void ThreadPooledClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 ```
 
-参数参见9.2.1.3节。
+参数参见 9.1.1.3节。
 
-#### 9.2.3 PollingClient
+#### 9.1.3 PollingClient
 
 订阅数据时，会返回一个消息队列。用户可以从其中获取和处理数据。
 
-##### 9.2.3.1 定义客户端
+##### 9.1.3.1 定义客户端
 
 ```cpp 
 PollingClient::PollingClient(int listeningPort);
@@ -1519,7 +1483,7 @@ PollingClient::PollingClient(int listeningPort);
 MessageQueueSP PollingClient::subscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1);
 ```
 
-参数参见9.2.1.2节。
+参数参见 9.1.1.2节。
 
 该函数返回指向消息队列的指针。
 
@@ -1536,18 +1500,18 @@ while(true) {
 }
 ```
 
-##### 9.2.3.3 取消订阅
+##### 9.1.3.3 取消订阅
 
 ```cpp 
 void PollingClient::unsubscribe(string host, int port, string tableName, string actionName = DEFAULT_ACTION_NAME);
 ```
 
-参数参见9.2.1.3节。
+参数参见 9.1.1.3节。
 
 注意，对于这种订阅模式，若返回一个空指针，说明已取消订阅。
 
-#### 9.2.4 异构流表反序列化器
-DolphinDB server 自 1.30.17 及 2.00.5 版本开始，支持通过 [replay](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/r/replay.html) 函数将多个结构不同的流数据表，回放（序列化）到一个流表里，这个流表被称为异构流表。C++ API 自 1.30.19 版本开始，新增 `StreamDeserializer` 类，用于构造异构流表反序列化器，以实现对异构流表的订阅和反序列化操作。
+#### 9.1.4 异构流表反序列化器
+DolphinDB server 自 1.30.17 及 2.00.5 版本开始，支持通过 [replay](https://docs.dolphindb.cn/zh/funcs/r/replay.html) 函数将多个结构不同的流数据表，回放（序列化）到一个流表里，这个流表被称为异构流表。C++ API 自 1.30.19 版本开始，新增 `StreamDeserializer` 类，用于构造异构流表反序列化器，以实现对异构流表的订阅和反序列化操作。
 
 C++ API 支持通过两种方式构造异构流表反序列化器：
 
@@ -1562,7 +1526,7 @@ StreamDeserializerSP StreamDeserializer(sym2schema, [conn])
 * sym2table 是一个字典对象，其结构与 replay 回放到异构流表的输入表结构保持一致。`StreamDeserializer` 将根据 *sym2table* 指定的结构对注入的数据进行反序列化。
 * conn 是已经连接 DolphinDB server 的 DBConnection 对象。若不指定该参数，则 sym2table 中的指定的表必须是 dfs 表或者共享内存表。
 
-##### 9.2.4.1 订阅异构流表
+##### 9.1.4.1 订阅异构流表
 
 订阅示例：
 
@@ -1592,8 +1556,8 @@ StreamDeserializerSP sdsp;
 //ThreadedClient threadedClient(listenport);
 //auto thread1 = threadedClient.subscribe(hostName, port, onehandler, "outTables", "mutiSchemaOne", 0, true, nullptr, false, false, "admin", "123456", sdsp);
 ```
-#### 9.2.5 订阅跨进程共享内存表
-DolphinDB server 自2.00.7/1.30.19版本开始支持创建跨进程共享内存表（[createIPCInMemoryTable](https://www.dolphindb.cn/cn/help/FunctionsandCommands/FunctionReferences/c/createIPCInMemoryTable.html)）。C++ API 提供订阅函数 `subscribe` 以实现订阅跨进程共享内存表的功能，来满足对订阅数据时延性要求较高的场景需求。通过订阅跨进程共享内存表，API 端可以直接通过共享内存获取由 server 端发布的流数据，极大地减少了网络传输的延时。因为进程间会访问同一个共享内存，所以要求发布端和订阅端必须位于同一台服务器。本节主要介绍如何通过 C++ API 提供的 `IPCInMemoryStreamClient` 类实现订阅共享内存表的功能。
+#### 9.1.5 订阅跨进程共享内存表
+DolphinDB server 自2.00.7/1.30.19版本开始支持创建跨进程共享内存表（[createIPCInMemoryTable](https://docs.dolphindb.cn/zh/funcs/c/createIPCInMemoryTable.html)）。C++ API 提供订阅函数 `subscribe` 以实现订阅跨进程共享内存表的功能，来满足对订阅数据时延性要求较高的场景需求。通过订阅跨进程共享内存表，API 端可以直接通过共享内存获取由 server 端发布的流数据，极大地减少了网络传输的延时。因为进程间会访问同一个共享内存，所以要求发布端和订阅端必须位于同一台服务器。本节主要介绍如何通过 C++ API 提供的 `IPCInMemoryStreamClient` 类实现订阅共享内存表的功能。
 
 
 示例：
