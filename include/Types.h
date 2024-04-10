@@ -47,7 +47,6 @@ namespace dolphindb {
 
 const double MC_PI = 3.1415926535897932384626433832795028841971693994L;
 const double MC_E = 2.7182818284590452353602874713526624977572470937L;
-const float FLT_ONE_LIMIT=0.9999999;
 const double DBL_ONE_LIMIT=0.9999999999999;
 const float FLT_NMIN=-FLT_MAX;
 const double DBL_NMIN=-DBL_MAX;
@@ -94,7 +93,7 @@ enum class VECTOR_TYPE {ARRAY, BIGARRAY, SUBVECTOR, INDEXVECTOR, REPVECTOR, IOTV
  *
  * In case we have to change the value, please review the constructor of Constant, Vector, Set, Dictionary, and Table.
  */
-enum DATA_FORM {DF_SCALAR,DF_VECTOR,DF_PAIR,DF_MATRIX,DF_SET,DF_DICTIONARY,DF_TABLE,DF_CHART,DF_CHUNK};
+enum DATA_FORM {DF_SCALAR,DF_VECTOR,DF_PAIR,DF_MATRIX,DF_SET,DF_DICTIONARY,DF_TABLE,DF_CHART,DF_CHUNK,DF_SYSOBJ,MAX_DATA_FORMS};
 
 enum WORD_TYPE {KEYWORD,ENUM,CONSTANT,VARIABLE,FUNCNAME,GLOBALVARIABLE,OPERATOR,FUNCPATTERN,ASSIGNMENT,REFERENCE,BRACKET,DELIMITOR,COMMA,NAMESPACE,UNKNOWN};
 
@@ -157,23 +156,8 @@ typedef union {
 	double doubleVal;
 	float floatVal;
 	char* pointer;
-	int intArray[2];
-	float floatArray[2];
-	short shortArray[4];
-	char charArray[8];
 } U8;
 
-typedef union {
-	float floatVal;
-	int intVal;
-#ifdef BIT32
-	char* pointer;
-#endif
-	short shortVal;
-	char charVal;
-	short shortArray[2];
-	char charArray[4];
-} U4;
 
 };
 #endif /* TYPES_H_ */

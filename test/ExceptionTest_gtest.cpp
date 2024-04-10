@@ -1,3 +1,5 @@
+#include "config.h"
+
 class ExceptionTest:public testing::Test
 {
 protected:

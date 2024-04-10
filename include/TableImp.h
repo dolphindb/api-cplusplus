@@ -10,18 +10,13 @@
 
 #include <atomic>
 
-#include "DolphinDB.h"
-
+#include "Table.h"
 namespace dolphindb {
-
-class BasicTable;
-
-typedef SmartPointer<BasicTable> BasicTableSP;
 
 class AbstractTable : public Table {
 public:
-	AbstractTable(const SmartPointer<vector<string>>& colNames);
-	AbstractTable(const SmartPointer<vector<string>>& colNames, SmartPointer<unordered_map<string,int>> colMap);
+	AbstractTable(const SmartPointer<std::vector<string>>& colNames);
+	AbstractTable(const SmartPointer<std::vector<string>>& colNames, SmartPointer<std::unordered_map<string,int>> colMap);
 	virtual ~AbstractTable(){}
 	virtual ConstantSP getColumn(const string& name) const;
 	virtual ConstantSP getColumn(const string& qualifier, const string& name) const;
@@ -30,7 +25,7 @@ public:
 	virtual ConstantSP getColumn(INDEX index, const ConstantSP& rowFilter) const;
 	virtual ConstantSP getColumn(INDEX index) const = 0;
 	virtual ConstantSP get(INDEX col, INDEX row) const = 0;
-	virtual INDEX columns() const {return colNames_->size();}
+	virtual INDEX columns() const {return static_cast<INDEX>(colNames_->size());}
 	virtual const string& getColumnName(int index) const {return colNames_->at(index);}
 	virtual const string& getColumnQualifier(int index) const {return name_;}
 	virtual void setColumnName(int index, const string& name);
@@ -56,12 +51,12 @@ public:
 	virtual ConstantSP getInstance(int size) const;
 	virtual ConstantSP getValue() const;
 	virtual ConstantSP getValue(INDEX capacity) const;
-	virtual bool append(vector<ConstantSP>& values, INDEX& insertedRows, string& errMsg);
-	virtual bool update(vector<ConstantSP>& values, const ConstantSP& indexSP, vector<string>& colNames, string& errMsg);
+	virtual bool append(std::vector<ConstantSP>& values, INDEX& insertedRows, string& errMsg);
+	virtual bool update(std::vector<ConstantSP>& values, const ConstantSP& indexSP, std::vector<string>& colNames, string& errMsg);
 	virtual bool remove(const ConstantSP& indexSP, string& errMsg);
-	virtual ConstantSP getSubTable(vector<int> indices) const = 0;
+	virtual ConstantSP getSubTable(std::vector<int> indices) const = 0;
 	virtual COMPRESS_METHOD getColumnCompressMethod(INDEX index);
-	virtual void setColumnCompressMethods(const vector<COMPRESS_METHOD> &methods);
+	virtual void setColumnCompressMethods(const std::vector<COMPRESS_METHOD> &methods);
 	virtual bool clear()=0;
 	virtual void updateSize() = 0;
 protected:
@@ -75,17 +70,17 @@ private:
 	string getTableTypeName() const;
 
 protected:
-	SmartPointer<vector<string>> colNames_;
-	SmartPointer<unordered_map<string,int>> colMap_;
+	SmartPointer<std::vector<string>> colNames_;
+	SmartPointer<std::unordered_map<string,int>> colMap_;
 	string name_;
-	vector<COMPRESS_METHOD> colCompresses_;
+	std::vector<COMPRESS_METHOD> colCompresses_;
 };
 
 
 class BasicTable: public AbstractTable{
 public:
-	BasicTable(const vector<ConstantSP>& cols, const vector<string>& colNames, const vector<int>& keys);
-	BasicTable(const vector<ConstantSP>& cols, const vector<string>& colNames);
+	BasicTable(const std::vector<ConstantSP>& cols, const std::vector<string>& colNames, const std::vector<int>& keys);
+	BasicTable(const std::vector<ConstantSP>& cols, const std::vector<string>& colNames);
 	virtual ~BasicTable();
 	virtual bool isBasicTable() const {return true;}
 	virtual ConstantSP getColumn(INDEX index) const;
@@ -102,31 +97,33 @@ public:
 	virtual ConstantSP getInstance(int size) const;
 	virtual ConstantSP getValue() const;
 	virtual ConstantSP getValue(INDEX capacity) const;
-	virtual bool append(vector<ConstantSP>& values, INDEX& insertedRows, string& errMsg);
-	virtual bool update(vector<ConstantSP>& values, const ConstantSP& indexSP, vector<string>& colNames, string& errMsg);
+	virtual bool append(std::vector<ConstantSP>& values, INDEX& insertedRows, string& errMsg);
+	virtual bool update(std::vector<ConstantSP>& values, const ConstantSP& indexSP, std::vector<string>& colNames, string& errMsg);
 	virtual bool remove(const ConstantSP& indexSP, string& errMsg);
 	virtual long long getAllocatedMemory() const;
 	virtual TABLE_TYPE getTableType() const {return BASICTBL;}
-	virtual void drop(vector<int>& columns);
-	bool join(vector<ConstantSP>& columns);
+	virtual void drop(std::vector<int>& columns);
+	bool join(std::vector<ConstantSP>& columns);
 	virtual bool clear();
 	virtual void updateSize();
-	virtual ConstantSP getSubTable(vector<int> indices) const;
+	virtual ConstantSP getSubTable(std::vector<int> indices) const;
 
 private:
 	bool increaseCapacity(long long newCapacity, string& errMsg);
-	void initData(const vector<ConstantSP>& cols, const vector<string>& colNames);
-	//bool internalAppend(vector<ConstantSP>& values, string& errMsg);
+	void initData(const std::vector<ConstantSP>& cols, const std::vector<string>& colNames);
+	//bool internalAppend(std::vector<ConstantSP>& values, string& errMsg);
 	bool internalRemove(const ConstantSP& indexSP, string& errMsg);
-	void internalDrop(vector<int>& columns);
-	bool internalUpdate(vector<ConstantSP>& values, const ConstantSP& indexSP, vector<string>& colNames, string& errMsg);
+	void internalDrop(std::vector<int>& columns);
+	bool internalUpdate(std::vector<ConstantSP>& values, const ConstantSP& indexSP, std::vector<string>& colNames, string& errMsg);
 
 private:
-	vector<ConstantSP> cols_;
+	std::vector<ConstantSP> cols_;
 	//bool readOnly_;
 	INDEX size_;
 	INDEX capacity_;
 };
+
+typedef SmartPointer<BasicTable> BasicTableSP;
 
 };
 

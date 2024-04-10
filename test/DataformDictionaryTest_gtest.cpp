@@ -1,3 +1,5 @@
+#include "config.h"
+
 class DataformDictionaryTest:public testing::Test
 {
 protected:
@@ -40,7 +42,50 @@ protected:
 
 TEST_F(DataformDictionaryTest,testBlobDictionary){
 	DictionarySP dict1 = Util::createDictionary(DT_BLOB, DT_BLOB);
-	EXPECT_TRUE(dict1.isNull());
+	dict1->set(Util::createBlob("zzz123中文a"), Util::createBlob("*-/%**%#~！#“》（a"));
+	string script = "a=blob(\"zzz123中文a\");b=blob(\"*-/%**%#~！#“》（a\");c=dict(BLOB,BLOB);c[a]=b;c";
+	DictionarySP res_d = conn.run(script);
+	conn.upload("dict1",{dict1});
+	string judgestr= "res=[true]\n\
+					res.append!(eqObj(c.keys()[0],dict1.keys()[0]))\n\
+					res.append!(eqObj(c.values()[0],dict1.values()[0]))\n\
+					eqObj(res, [true,true,true])";
+	EXPECT_EQ(conn.run(judgestr)->getBool(),true);
+	EXPECT_EQ(dict1->getScript(), res_d->getScript());
+	EXPECT_EQ(dict1->getType(), res_d->getType());
+	EXPECT_EQ(conn.run("dict1")->isDictionary(),true);
+
+	EXPECT_EQ(dict1->keys()->get(0)->getString(),"zzz123中文a");
+	EXPECT_EQ(dict1->values()->get(0)->getString(),"*-/%**%#~！#“》（a");
+	EXPECT_EQ(dict1->keys()->get(0)->getType(),DT_BLOB);
+	EXPECT_EQ(dict1->values()->get(0)->getType(),DT_BLOB);
+
+	ConstantSP res1=Util::createConstant(DT_BOOL);
+	VectorSP valVec=Util::createVector(DT_BLOB,0,2);
+	valVec->append(Util::createBlob("*-/%**%#~！#“》（a"));
+	dict1->contain(Util::createBlob("zzz123中文a"),res1);
+	EXPECT_TRUE(res1->getBool());
+
+	ConstantSP res2=Util::createConstant(DT_BOOL);
+	dict1->contain(valVec,res2);
+	EXPECT_FALSE(res2->getBool());
+
+	dict1->set(Util::createBlob("demo1"), Util::createBlob("value1"));
+	dict1->set(Util::createBlob("demo2"), Util::createBlob("value2"));
+	cout<<dict1->getAllocatedMemory()<<endl;
+	VectorSP valVec2=Util::createVector(DT_STRING,2,2);
+	valVec2->set(0,Util::createBlob("demo2"));
+	valVec2->setNull(1);
+
+	EXPECT_EQ(dict1->getMember(Util::createBlob("zzz123中文a"))->getString(),"*-/%**%#~！#“》（a");
+	EXPECT_EQ(dict1->getMember(valVec2)->get(0)->getString(),"value2");
+	dict1->remove(Util::createBlob("demo1"));
+	dict1->remove(valVec2);
+
+	EXPECT_EQ(dict1->count(),1);
+	EXPECT_EQ(dict1->getValue()->getString(),"zzz123中文a->*-/%**%#~！#“》（a\n");
+	dict1->clear();
+	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
 }
 
 TEST_F(DataformDictionaryTest,testStringDictionary){
@@ -93,8 +138,6 @@ TEST_F(DataformDictionaryTest,testStringDictionary){
 
 
 TEST_F(DataformDictionaryTest,testStringAnyDictionary){
-	DictionarySP dict0 = Util::createDictionary(DT_ANY, DT_INT);
-	EXPECT_TRUE(dict0.isNull());
 	DictionarySP dict1 = Util::createDictionary(DT_STRING, DT_ANY);
 	EXPECT_ANY_THROW(dict1->set(Util::createInt(1), Util::createDateTime(10000)));
 	dict1->set(Util::createString("key_str"), Util::createDateTime(10000));
@@ -159,8 +202,7 @@ TEST_F(DataformDictionaryTest,testStringAnyDictionary){
 
 
 TEST_F(DataformDictionaryTest,testIntAnyDictionary){
-	DictionarySP dict0 = Util::createDictionary(DT_ANY, DT_INT);
-	EXPECT_TRUE(dict0.isNull());
+	EXPECT_ANY_THROW(Util::createDictionary(DT_ANY, DT_INT));
 	DictionarySP dict1 = Util::createDictionary(DT_INT, DT_ANY);
 	dict1->set(Util::createInt(123), Util::createBool(1));
 	string script = "a=int(123);b = bool(1);c=dict(INT,ANY);c[a]=b;c";
@@ -275,13 +317,11 @@ TEST_F(DataformDictionaryTest,testLongAnyDictionary){
 
 
 TEST_F(DataformDictionaryTest,testSymbolDictionary){
-	DictionarySP dict1 = Util::createDictionary(DT_SYMBOL, DT_STRING);
-	EXPECT_EQ(dict1.isNull(),true);
+	EXPECT_ANY_THROW(Util::createDictionary(DT_SYMBOL, DT_STRING));
 }
 
 TEST_F(DataformDictionaryTest,testBoolDictionary){
-	DictionarySP dict1 = Util::createDictionary(DT_BOOL, DT_BOOL);
-	EXPECT_EQ(dict1.isNull(),true);
+	EXPECT_ANY_THROW(Util::createDictionary(DT_BOOL, DT_STRING));
 }
 
 TEST_F(DataformDictionaryTest,testCharDictionary){
@@ -1549,20 +1589,23 @@ TEST_F(DataformDictionaryTest,testtimenullDictionary){
 
 TEST_F(DataformDictionaryTest,testInt128Dictionary){
 	DictionarySP dict0 = Util::createDictionary(DT_INT128, DT_INT128);
-	EXPECT_TRUE(dict0.isNull());
 	DictionarySP dict1 = Util::createDictionary(DT_INT128, DT_STRING);
 	ConstantSP int128val=Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32");
+	dict0->set(int128val, int128val);
 	dict1->set(int128val, Util::createString("0"));
+
 	string script = "a=int128(\"e1671797c52e15f763380b45e841ec32\");b = string(0);c=dict(INT128,STRING);c[a]=b;c";
 	DictionarySP res_d = conn.run(script);
+	conn.run("c0 = dict(INT128,INT128);c0[a]=a");
 	conn.upload("dict1",{dict1});
-	// cout<<dict1->getString();
-	// cout<<conn.run("dict1")->getString();
-	// cout<<conn.run("c")->getString();
-	string judgestr= "res=[true]\n\
+	conn.upload("dict0",{dict0});
+
+	string judgestr= "res=array(BOOL)\n\
 					res.append!(eqObj(c.keys()[0],dict1.keys()[0]))\n\
 					res.append!(eqObj(c.values()[0],dict1.values()[0]))\n\
-					eqObj(res, [true,true,true])";
+					res.append!(eqObj(c0.keys()[0],dict0.keys()[0]))\n\
+					res.append!(eqObj(c0.values()[0],dict0.values()[0]))\n\
+					eqObj(res, [true,true,true,true])";
 	EXPECT_EQ(conn.run(judgestr)->getBool(),true);
 	EXPECT_EQ(dict1->getString(), res_d->getString());
 	EXPECT_EQ(dict1->getType(), res_d->getType());
@@ -1857,27 +1900,44 @@ TEST_F(DataformDictionaryTest,testDecimal128NullDictionary){
 
 
 TEST_F(DataformDictionaryTest,testDictionarywithValueAllTypes){
-	DictionarySP dict1 = Util::createDictionary(DT_STRING, DT_ANY);
-	vector<ConstantSP> vals = {Util::createChar(rand()%CHAR_MAX),Util::createBool(rand()%2),Util::createShort(rand()%SHRT_MAX),Util::createInt(rand()%INT_MAX),
-								Util::createLong(rand()%LLONG_MAX),Util::createDate(rand()%INT_MAX),Util::createMonth(rand()%INT_MAX),Util::createTime(rand()%INT_MAX),
-								Util::createMinute(rand()%1440),Util::createDateTime(rand()%INT_MAX),Util::createSecond(rand()%86400),Util::createTimestamp(rand()%LLONG_MAX),
-								Util::createNanoTime(rand()%LLONG_MAX),Util::createNanoTimestamp(rand()%LLONG_MAX),Util::createFloat(rand()/float(RAND_MAX)),
-								Util::createDouble(rand()/double(RAND_MAX)),Util::createString("str"),Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"),
-								Util::parseConstant(DT_IP,"192.0.0."+to_string(rand()%255)),Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"),Util::createBlob("blob"),
-								Util::createDateHour(rand()%INT_MAX),Util::createDecimal32(rand()%10,rand()/float(RAND_MAX)),Util::createDecimal64(rand()%19,rand()/double(RAND_MAX)),
-								Util::createDecimal128(rand()%38,rand()/double(RAND_MAX))};
+	vector<ConstantSP> items = {
+		Util::createChar('\1'),Util::createBool(true),
+		Util::createShort(1),Util::createInt(1),
+		Util::createLong(1),Util::createDate(1),Util::createMonth(1),Util::createTime(1),
+		Util::createMinute(1),Util::createDateTime(1),Util::createSecond(1),Util::createTimestamp(1),
+		Util::createNanoTime(1),Util::createNanoTimestamp(1),Util::createFloat(1),
+		Util::createDouble(1),Util::createString("1"),Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"),
+		Util::parseConstant(DT_IP,"1:1:1:1:1:1:1:1"),Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"),Util::createBlob("1"),
+		Util::createDateHour(1),Util::createDecimal32(6,1.0),Util::createDecimal64(16,1.0),
+		Util::createDecimal128(26,1.0)};
 
-	vector<string> keynames;
-	for(int i=0; i<vals.size(); i++){
-		dict1->set(Util::createString("key"+to_string(i)), vals[i]);
-		keynames.push_back("val"+to_string(i));
+	VectorSP values = Util::createVector(DT_ANY,0,items.size());
+	for(int i=0; i<items.size(); i++) values->append(items[i]);
+
+	conn.run("items = [1c,true,1h,1,1l,date(1),month(1),time(1),minute(1),datetime(1),second(1),timestamp(1),nanotime(1),nanotimestamp(1),1f,1.0,`1,\
+				uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87'),ipaddr('1:1:1:1:1:1:1:1'),int128('e1671797c52e15f763380b45e841ec32'),\
+				blob(`1),datehour(1),decimal32(1,6),decimal64(1,16),decimal128(1,26)]");
+
+	for (auto i=0; i< items.size();i++){
+		ConstantSP key = items[i];
+		if (key->getType() == DT_BOOL || key->getType() == DT_DECIMAL32 || key->getType() == DT_DECIMAL64 || key->getType() == DT_DECIMAL128) continue;
+
+		for(auto j=0; j< items.size();j++){
+			ConstantSP val = items[j];
+			// cout << "keyType:" << Util::getDataTypeString(key->getType()) << ", valType:" << Util::getDataTypeString(val->getType()) << endl;
+			DictionarySP dict1 = Util::createDictionary(key->getType(), val->getType());
+			dict1->set(key, val);
+			conn.upload("dict1",dict1);
+			conn.upload("key", key);
+
+			conn.run(
+				"ex = dict([key], [items["+to_string(j)+"]]);"
+				"assert eqObj(ex[key], dict1[key])");
+			ConstantSP ex = conn.run("ex");
+			EXPECT_EQ(dict1->get(key)->getType(), ex->get(key)->getType());
+			EXPECT_EQ(dict1->get(key)->getString(), ex->get(key)->getString());
+		}
 	}
-	conn.upload("dict1",{dict1});
-
-	conn.upload(keynames,vals);
-	// DictionarySP res_d = conn.run("dict1");
-	for(int i=0; i<vals.size(); i++)
-		EXPECT_TRUE(conn.run("eqObj(dict1[`"+("key"+to_string(i))+"],"+("val"+to_string(i))+")")->getBool());
 
 }
 

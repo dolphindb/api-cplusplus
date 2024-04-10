@@ -1,3 +1,5 @@
+#include "config.h"
+
 class AutoFitTableUpsertTest:public testing::Test
 {
 protected:
@@ -29,7 +31,7 @@ protected:
 		{
 			conn.connect(hostName, port, "admin", "123456");
 		}
-		
+
         cout<<"ok"<<endl;
     }
     virtual void TearDown()
@@ -86,8 +88,8 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertWithNullKeyColNames)
 
 TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesToindexedTable){
 	srand((int)time(NULL));
-	int colNum = 24, rowNum = 1000;
-	int scale32 = rand()%9, scale64 = rand()%18;
+	int colNum = 25, rowNum = 1000;
+	int scale32 = rand()%9, scale64 = rand()%18, scale128 = rand()%38;
 	vector<string> colNamesVec1;
 	for (int i = 0; i < colNum; i++){
 		colNamesVec1.emplace_back("col"+to_string(i));
@@ -117,6 +119,7 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesToindexe
 	colTypesVec1.emplace_back(DT_DATEHOUR);
 	colTypesVec1.emplace_back(DT_DECIMAL32);
 	colTypesVec1.emplace_back(DT_DECIMAL64);
+	colTypesVec1.emplace_back(DT_DECIMAL128);
 
 	TableSP tab1 = Util::createTable(colNamesVec1, colTypesVec1, rowNum, rowNum);
 	vector<VectorSP> columnVecs;
@@ -143,13 +146,14 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesToindexe
 		columnVecs[14]->set(i, Util::createFloat(rand()/float(RAND_MAX)));
 		columnVecs[15]->set(i, Util::createDouble(rand()/double(RAND_MAX)));
 		columnVecs[16]->set(i, Util::createString("str"+to_string(i)));
-		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));	
+		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));
 		columnVecs[18]->set(i, Util::parseConstant(DT_IP,"192.0.0."+to_string(rand()%255)));
 		columnVecs[19]->set(i, Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"));
 		columnVecs[20]->set(i, Util::createBlob("blob"+to_string(i)));
 		columnVecs[21]->set(i, Util::createDateHour(rand()%INT_MAX));
 		columnVecs[22]->set(i, Util::createDecimal32(scale32,rand()/float(RAND_MAX)));
 		columnVecs[23]->set(i, Util::createDecimal64(scale64,rand()/double(RAND_MAX)));
+		columnVecs[24]->set(i, Util::createDecimal128(scale128,rand()/double(RAND_MAX)));
 	}
 	for (int j = 0; j < colNum; j++)
 		columnVecs[j]->setNull(rowNum-1);
@@ -157,8 +161,8 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesToindexe
 	string script1;
 	script1 += "login('admin', '123456');";
 	script1 += "try{undef(`st1, SHARED)}catch(ex){};go;";
-	script1 += "temp = table(100:0, take(`col,24)+string(take(0..23,24)), \
-	[CHAR, BOOL, SHORT, INT, LONG, DATE, MONTH, TIME, MINUTE, DATETIME, SECOND, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, STRING, UUID, IPADDR, INT128, BLOB, DATEHOUR, DECIMAL32("+to_string(scale32)+"), DECIMAL64("+to_string(scale64)+")]);";
+	script1 += "temp = table(100:0, take(`col,25)+string(take(0..24,25)), \
+	[CHAR, BOOL, SHORT, INT, LONG, DATE, MONTH, TIME, MINUTE, DATETIME, SECOND, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, STRING, UUID, IPADDR, INT128, BLOB, DATEHOUR, DECIMAL32("+to_string(scale32)+"), DECIMAL64("+to_string(scale64)+"), DECIMAL128("+to_string(scale128)+")]);";
 	script1 += "st1 = indexedTable(`col16,temp);";
 	conn.run(script1);
     vector<string> keycolName = {"col16"};
@@ -177,8 +181,8 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesToindexe
 
 TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesTokeyedTable){
 	srand((int)time(NULL));
-	int colNum = 24, rowNum = 1000;
-	int scale32 = rand()%9, scale64 = rand()%18;
+	int colNum = 25, rowNum = 1000;
+	int scale32 = rand()%9, scale64 = rand()%18, scale128 = rand()%38;
 	vector<string> colNamesVec1;
 	for (int i = 0; i < colNum; i++){
 		colNamesVec1.emplace_back("col"+to_string(i));
@@ -208,6 +212,7 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesTokeyedT
 	colTypesVec1.emplace_back(DT_DATEHOUR);
 	colTypesVec1.emplace_back(DT_DECIMAL32);
 	colTypesVec1.emplace_back(DT_DECIMAL64);
+	colTypesVec1.emplace_back(DT_DECIMAL128);
 
 	TableSP tab1 = Util::createTable(colNamesVec1, colTypesVec1, rowNum, rowNum);
 	vector<VectorSP> columnVecs;
@@ -234,13 +239,14 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesTokeyedT
 		columnVecs[14]->set(i, Util::createFloat(rand()/float(RAND_MAX)));
 		columnVecs[15]->set(i, Util::createDouble(rand()/double(RAND_MAX)));
 		columnVecs[16]->set(i, Util::createString("str"+to_string(i)));
-		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));	
+		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));
 		columnVecs[18]->set(i, Util::parseConstant(DT_IP,"192.0.0."+to_string(rand()%255)));
 		columnVecs[19]->set(i, Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"));
 		columnVecs[20]->set(i, Util::createBlob("blob"+to_string(i)));
 		columnVecs[21]->set(i, Util::createDateHour(rand()%INT_MAX));
 		columnVecs[22]->set(i, Util::createDecimal32(scale32,rand()/float(RAND_MAX)));
 		columnVecs[23]->set(i, Util::createDecimal64(scale64,rand()/double(RAND_MAX)));
+		columnVecs[24]->set(i, Util::createDecimal128(scale128,rand()/double(RAND_MAX)));
 	}
 	for (int j = 0; j < colNum; j++)
 		columnVecs[j]->setNull(rowNum-1);
@@ -248,8 +254,8 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesTokeyedT
 	string script1;
 	script1 += "login('admin', '123456');";
 	script1 += "try{undef(`st1, SHARED)}catch(ex){};go;";
-	script1 += "temp = table(100:0, take(`col,24)+string(take(0..23,24)), \
-	[CHAR, BOOL, SHORT, INT, LONG, DATE, MONTH, TIME, MINUTE, DATETIME, SECOND, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, STRING, UUID, IPADDR, INT128, BLOB, DATEHOUR, DECIMAL32("+to_string(scale32)+"), DECIMAL64("+to_string(scale64)+")]);";
+	script1 += "temp = table(100:0, take(`col,25)+string(take(0..24,25)), \
+	[CHAR, BOOL, SHORT, INT, LONG, DATE, MONTH, TIME, MINUTE, DATETIME, SECOND, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, STRING, UUID, IPADDR, INT128, BLOB, DATEHOUR, DECIMAL32("+to_string(scale32)+"), DECIMAL64("+to_string(scale64)+"), DECIMAL128("+to_string(scale128)+")]);";
 	script1 += "st1 = keyedTable(`col16,temp);";
 	conn.run(script1);
     vector<string> keycolName = {"col16"};
@@ -269,8 +275,8 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesTokeyedT
 
 TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesTopartitionedTableOLAP){// OLAP not support datatype blob
 	srand((int)time(NULL));
-	int colNum = 23, rowNum = 1000;
-	int scale32 = rand()%9, scale64 = rand()%18;
+	int colNum = 24, rowNum = 1000;
+	int scale32 = rand()%9, scale64 = rand()%18, scale128 = rand()%38;
 	vector<string> colNamesVec1;
 	for (int i = 0; i < colNum; i++){
 		colNamesVec1.emplace_back("col"+to_string(i));
@@ -299,6 +305,7 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesTopartit
 	colTypesVec1.emplace_back(DT_DATEHOUR);
 	colTypesVec1.emplace_back(DT_DECIMAL32);
 	colTypesVec1.emplace_back(DT_DECIMAL64);
+	colTypesVec1.emplace_back(DT_DECIMAL128);
 
 	TableSP tab1 = Util::createTable(colNamesVec1, colTypesVec1, rowNum, rowNum);
 	vector<VectorSP> columnVecs;
@@ -325,12 +332,13 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesTopartit
 		columnVecs[14]->set(i, Util::createFloat(rand()/float(RAND_MAX)));
 		columnVecs[15]->set(i, Util::createDouble(rand()/double(RAND_MAX)));
 		columnVecs[16]->set(i, Util::createString("str"+to_string(i)));
-		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));	
+		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));
 		columnVecs[18]->set(i, Util::parseConstant(DT_IP,"192.0.0."+to_string(rand()%255)));
 		columnVecs[19]->set(i, Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"));
 		columnVecs[20]->set(i, Util::createDateHour(rand()%INT_MAX));
 		columnVecs[21]->set(i, Util::createDecimal32(scale32,rand()/float(RAND_MAX)));
 		columnVecs[22]->set(i, Util::createDecimal64(scale64,rand()/double(RAND_MAX)));
+		columnVecs[23]->set(i, Util::createDecimal128(scale128,rand()/double(RAND_MAX)));
 	}
 
 	for (int j = 0; j < colNum; j++){
@@ -345,8 +353,8 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesTopartit
 	string script = "dbName = \"dfs://test_AutoFitTableUpsert_upsertAllDataTypesTopartitionedTable\";"
 			"if(exists(dbName)){dropDatabase(dbName)};"
 			"db  = database(dbName, HASH,[INT,1]);"
-			"temp = table(1000:0, take(`col,23)+string(take(0..22,23)), \
-			[CHAR, BOOL, SHORT, INT, LONG, DATE, MONTH, TIME, MINUTE, DATETIME, SECOND, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, STRING, UUID, IPADDR, INT128, DATEHOUR, DECIMAL32("+to_string(scale32)+"), DECIMAL64("+to_string(scale64)+")]);"
+			"temp = table(1000:0, take(`col,24)+string(take(0..23,24)), \
+			[CHAR, BOOL, SHORT, INT, LONG, DATE, MONTH, TIME, MINUTE, DATETIME, SECOND, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, STRING, UUID, IPADDR, INT128, DATEHOUR, DECIMAL32("+to_string(scale32)+"), DECIMAL64("+to_string(scale64)+"), DECIMAL128("+to_string(scale128)+")]);"
 			"pt = createPartitionedTable(db,temp,`pt,`col3);";
 	conn.run(script);
     vector<string> keycolName = {"col16"};
@@ -365,103 +373,105 @@ TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesTopartit
 	// conn.run("undef(`st1, SHARED)");
 }
 
-// TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesTopartitionedTableTSDB){
-// 	int colNum = 24, rowNum = 1000;
-// 	int scale32 = rand()%9, scale64 = rand()%18;
-// 	vector<string> colNamesVec1;
-// 	for (int i = 0; i < colNum; i++){
-// 		colNamesVec1.emplace_back("col"+to_string(i));
-// 	}
-// 	vector<DATA_TYPE> colTypesVec1;
-// 	colTypesVec1.emplace_back(DT_CHAR);
-// 	colTypesVec1.emplace_back(DT_BOOL);
-// 	colTypesVec1.emplace_back(DT_SHORT);
-// 	colTypesVec1.emplace_back(DT_INT);
-// 	colTypesVec1.emplace_back(DT_LONG);
-// 	colTypesVec1.emplace_back(DT_DATE);
-// 	colTypesVec1.emplace_back(DT_MONTH);
-// 	colTypesVec1.emplace_back(DT_TIME);
-// 	colTypesVec1.emplace_back(DT_MINUTE);
-// 	colTypesVec1.emplace_back(DT_DATETIME);
-// 	colTypesVec1.emplace_back(DT_SECOND);
-// 	colTypesVec1.emplace_back(DT_TIMESTAMP);
-// 	colTypesVec1.emplace_back(DT_NANOTIME);
-// 	colTypesVec1.emplace_back(DT_NANOTIMESTAMP);
-// 	colTypesVec1.emplace_back(DT_FLOAT);
-// 	colTypesVec1.emplace_back(DT_DOUBLE);
-// 	colTypesVec1.emplace_back(DT_STRING);
-// 	colTypesVec1.emplace_back(DT_UUID);
-// 	colTypesVec1.emplace_back(DT_IP);
-// 	colTypesVec1.emplace_back(DT_INT128);
-// 	colTypesVec1.emplace_back(DT_BLOB);
-// 	colTypesVec1.emplace_back(DT_DATEHOUR);
-// 	colTypesVec1.emplace_back(DT_DECIMAL32);
-// 	colTypesVec1.emplace_back(DT_DECIMAL64);
+TEST_F(AutoFitTableUpsertTest,test_AutoFitTableUpsert_upsertAllDataTypesTopartitionedTableTSDB){
+	int colNum = 25, rowNum = 1000;
+	int scale32 = rand()%9, scale64 = rand()%18, scale128 = rand()%38;
+	vector<string> colNamesVec1;
+	for (int i = 0; i < colNum; i++){
+		colNamesVec1.emplace_back("col"+to_string(i));
+	}
+	vector<DATA_TYPE> colTypesVec1;
+	colTypesVec1.emplace_back(DT_CHAR);
+	colTypesVec1.emplace_back(DT_BOOL);
+	colTypesVec1.emplace_back(DT_SHORT);
+	colTypesVec1.emplace_back(DT_INT);
+	colTypesVec1.emplace_back(DT_LONG);
+	colTypesVec1.emplace_back(DT_DATE);
+	colTypesVec1.emplace_back(DT_MONTH);
+	colTypesVec1.emplace_back(DT_TIME);
+	colTypesVec1.emplace_back(DT_MINUTE);
+	colTypesVec1.emplace_back(DT_DATETIME);
+	colTypesVec1.emplace_back(DT_SECOND);
+	colTypesVec1.emplace_back(DT_TIMESTAMP);
+	colTypesVec1.emplace_back(DT_NANOTIME);
+	colTypesVec1.emplace_back(DT_NANOTIMESTAMP);
+	colTypesVec1.emplace_back(DT_FLOAT);
+	colTypesVec1.emplace_back(DT_DOUBLE);
+	colTypesVec1.emplace_back(DT_STRING);
+	colTypesVec1.emplace_back(DT_UUID);
+	colTypesVec1.emplace_back(DT_IP);
+	colTypesVec1.emplace_back(DT_INT128);
+	colTypesVec1.emplace_back(DT_BLOB);
+	colTypesVec1.emplace_back(DT_DATEHOUR);
+	colTypesVec1.emplace_back(DT_DECIMAL32);
+	colTypesVec1.emplace_back(DT_DECIMAL64);
+	colTypesVec1.emplace_back(DT_DECIMAL128);
 
-// 	srand((int)time(NULL));
-// 	TableSP tab1 = Util::createTable(colNamesVec1, colTypesVec1, rowNum, rowNum);
-// 	vector<VectorSP> columnVecs;
-// 	columnVecs.reserve(colNum);
-// 	for (int i = 0; i < colNum; i++){
-// 		columnVecs.emplace_back(tab1->getColumn(i));
+	srand((int)time(NULL));
+	TableSP tab1 = Util::createTable(colNamesVec1, colTypesVec1, rowNum, rowNum);
+	vector<VectorSP> columnVecs;
+	columnVecs.reserve(colNum);
+	for (int i = 0; i < colNum; i++){
+		columnVecs.emplace_back(tab1->getColumn(i));
 
-// 	}
-// 	for (int i = 0; i < rowNum-1; i++){
-// 		columnVecs[0]->set(i, Util::createChar(rand()%CHAR_MAX));
-// 		columnVecs[1]->set(i, Util::createBool(rand()%2));
-// 		columnVecs[2]->set(i, Util::createShort(rand()%SHRT_MAX));
-// 		columnVecs[3]->set(i, Util::createInt(rand()%INT_MAX));
-// 		columnVecs[4]->set(i, Util::createLong(rand()%LLONG_MAX));
-// 		columnVecs[5]->set(i, Util::createDate(rand()%INT_MAX));
-// 		columnVecs[6]->set(i, Util::createMonth(rand()%INT_MAX));
-// 		columnVecs[7]->set(i, Util::createTime(rand()%INT_MAX));
-// 		columnVecs[8]->set(i, Util::createMinute(rand()%1440));
-// 		columnVecs[9]->set(i, Util::createDateTime(rand()%INT_MAX));
-// 		columnVecs[10]->set(i, Util::createSecond(rand()%86400));
-// 		columnVecs[11]->set(i, Util::createTimestamp(rand()%LLONG_MAX));
-// 		columnVecs[12]->set(i, Util::createNanoTime(rand()%LLONG_MAX));
-// 		columnVecs[13]->set(i, Util::createNanoTimestamp(rand()%LLONG_MAX));
-// 		columnVecs[14]->set(i, Util::createFloat(rand()/float(RAND_MAX)));
-// 		columnVecs[15]->set(i, Util::createDouble(rand()/double(RAND_MAX)));
-// 		columnVecs[16]->set(i, Util::createString("str"+to_string(i)));
-// 		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));	
-// 		columnVecs[18]->set(i, Util::parseConstant(DT_IP,"192.0.0."+to_string(rand()%255)));
-// 		columnVecs[19]->set(i, Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"));
-// 		columnVecs[20]->set(i, Util::createBlob("blob"+to_string(i)));
-// 		columnVecs[21]->set(i, Util::createDateHour(rand()%INT_MAX));
-// 		columnVecs[22]->set(i, Util::createDecimal32(scale32,rand()/float(RAND_MAX)));
-// 		columnVecs[23]->set(i, Util::createDecimal64(scale64,rand()/double(RAND_MAX)));
-// 	}
-	// for (int j = 0; j < colNum; j++){
-	// 	if(j == 3)
-	// 		columnVecs[3]->set(rowNum-1, Util::createInt(rand()%INT_MAX));  //partition-column's value must be not null
-	// 	else
-	// 		columnVecs[j]->setNull(rowNum-1);
-	// }
-//     string dbName ="dfs://test_AutoFitTableUpsert_upsertAllDataTypesTopartitionedTable";
-//     string tableName = "pt";
-// 	string script = "dbName = \"dfs://test_AutoFitTableUpsert_upsertAllDataTypesTopartitionedTable\";"
-// 			"if(exists(dbName)){dropDatabase(dbName)};"
-// 			"db  = database(dbName, HASH,[STRING,1],,'TSDB');"
-// 			"temp = table(100:0, take(`col,24)+string(take(0..23,24)), \
-// 			[CHAR, BOOL, SHORT, INT, LONG, DATE, MONTH, TIME, MINUTE, DATETIME, SECOND, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, STRING, UUID, IPADDR, INT128, BLOB, DATEHOUR, DECIMAL32("+to_string(scale32)+"), DECIMAL64("+to_string(scale64)+")]);"
-// 			"pt = db.createPartitionedTable(temp,`pt,`col16,,`col16);";
-// 	conn.run(script);
-//     vector<string> keycolName = {"col16"};
-//     AutoFitTableUpsert aftu(dbName, tableName, conn, false, &keycolName);
-// 	aftu.upsert(tab1);
+	}
+	for (int i = 0; i < rowNum-1; i++){
+		columnVecs[0]->set(i, Util::createChar(rand()%CHAR_MAX));
+		columnVecs[1]->set(i, Util::createBool(rand()%2));
+		columnVecs[2]->set(i, Util::createShort(rand()%SHRT_MAX));
+		columnVecs[3]->set(i, Util::createInt(i));
+		columnVecs[4]->set(i, Util::createLong(rand()%LLONG_MAX));
+		columnVecs[5]->set(i, Util::createDate(rand()%INT_MAX));
+		columnVecs[6]->set(i, Util::createMonth(rand()%INT_MAX));
+		columnVecs[7]->set(i, Util::createTime(rand()%INT_MAX));
+		columnVecs[8]->set(i, Util::createMinute(rand()%1440));
+		columnVecs[9]->set(i, Util::createDateTime(rand()%INT_MAX));
+		columnVecs[10]->set(i, Util::createSecond(rand()%86400));
+		columnVecs[11]->set(i, Util::createTimestamp(rand()%LLONG_MAX));
+		columnVecs[12]->set(i, Util::createNanoTime(rand()%LLONG_MAX));
+		columnVecs[13]->set(i, Util::createNanoTimestamp(rand()%LLONG_MAX));
+		columnVecs[14]->set(i, Util::createFloat(rand()/float(RAND_MAX)));
+		columnVecs[15]->set(i, Util::createDouble(rand()/double(RAND_MAX)));
+		columnVecs[16]->set(i, Util::createString("str"+to_string(i)));
+		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));
+		columnVecs[18]->set(i, Util::parseConstant(DT_IP,"192.0.0."+to_string(rand()%255)));
+		columnVecs[19]->set(i, Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"));
+		columnVecs[20]->set(i, Util::createBlob("blob"+to_string(i)));
+		columnVecs[21]->set(i, Util::createDateHour(rand()%INT_MAX));
+		columnVecs[22]->set(i, Util::createDecimal32(scale32,rand()/float(RAND_MAX)));
+		columnVecs[23]->set(i, Util::createDecimal64(scale64,rand()/double(RAND_MAX)));
+		columnVecs[24]->set(i, Util::createDecimal128(scale128,rand()/double(RAND_MAX)));
+	}
+	for (int j = 0; j < colNum; j++){
+		if(j == 3)
+			columnVecs[3]->set(rowNum-1, Util::createInt(rand()%INT_MAX));  //partition-column's value must be not null
+		else
+			columnVecs[j]->setNull(rowNum-1);
+	}
+    string dbName ="dfs://test_AutoFitTableUpsert_upsertAllDataTypesTopartitionedTable";
+    string tableName = "pt";
+	string script = "dbName = \"dfs://test_AutoFitTableUpsert_upsertAllDataTypesTopartitionedTable\";"
+			"if(exists(dbName)){dropDatabase(dbName)};"
+			"db  = database(dbName, HASH,[STRING,1],,'TSDB');"
+			"temp = table(100:0, take(`col,25)+string(take(0..24,25)), \
+			[CHAR, BOOL, SHORT, INT, LONG, DATE, MONTH, TIME, MINUTE, DATETIME, SECOND, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, STRING, UUID, IPADDR, INT128, BLOB, DATEHOUR, DECIMAL32("+to_string(scale32)+"), DECIMAL64("+to_string(scale64)+"), DECIMAL128("+to_string(scale128)+")]);"
+			"pt = db.createPartitionedTable(temp,`pt,`col16,,`col16);";
+	conn.run(script);
+    vector<string> keycolName = {"col16"};
+    AutoFitTableUpsert aftu(dbName, tableName, conn, false, &keycolName);
+	aftu.upsert(tab1);
 
-// 	conn.upload("tab1",tab1);
-// 	string script3;
-// 	script3 += "st1 = select * from pt;";
-// 	script3 += "each(eqObj, tab1.values(), st1.values());";
-// 	ConstantSP result2 = conn.run(script3);
-// 	// cout<<conn.run("st1")->getString();
-// 	for (int i = 0; i<result2->size(); i++)
-// 		EXPECT_TRUE(result2->get(i)->getBool());
+	conn.upload("tab1",tab1);
+	string script3;
+	script3 += "st1 = select * from pt order by col3;res = select * from tab1 order by col3;";
+	script3 += "each(eqObj, res.values(), st1.values());";
+	ConstantSP result2 = conn.run(script3);
+	// cout<<conn.run("st1")->getString();
+	for (int i = 0; i<result2->size(); i++)
+		EXPECT_TRUE(result2->get(i)->getBool());
 
-// 	// conn.run("undef(`st1, SHARED)");
-// }
+	// conn.run("undef(`st1, SHARED)");
+}
 
 TEST_F(AutoFitTableUpsertTest, test_upsertToPartitionTableRangeType){
     string script1;
@@ -565,7 +575,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertToPartitionTableRangeTypeIgnoreNull){
     EXPECT_EQ(res->getRow(0)->getMember(Util::createString("value"))->getInt(), 10);
 	EXPECT_EQ(res->getRow(0)->getMember(Util::createString("symbol"))->getString(), "D");
 	EXPECT_EQ(res->getRow(0)->getMember(Util::createString("id"))->getInt(), 0);
-    
+
     for (int i = 1; i < rowNum; i++) {
         // cout<<tmp1->getColumn(0)->getRow(i)->getString()<<" "<<res->getColumn(0)->getRow(i)->getString()<<endl;
         EXPECT_EQ(tmp1->getColumn(0)->getRow(i)->getString(), res->getColumn(0)->getRow(i)->getString());
@@ -661,7 +671,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertToKeyedTableIgnoreNull){
     EXPECT_EQ(res->getRow(0)->getMember(Util::createString("value"))->getInt(), 10);
 	EXPECT_EQ(res->getRow(0)->getMember(Util::createString("symbol"))->getString(), "D");
 	EXPECT_EQ(res->getRow(0)->getMember(Util::createString("id"))->getInt(), 0);
-    
+
     for (int i = 1; i < rowNum; i++) {
         // cout<<tmp1->getColumn(0)->getRow(i)->getString()<<" "<<res->getColumn(0)->getRow(i)->getString()<<endl;
         EXPECT_EQ(tmp1->getColumn(0)->getRow(i)->getString(), res->getColumn(0)->getRow(i)->getString());
@@ -757,7 +767,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertToindexedTableIgnoreNull){
     EXPECT_EQ(res->getRow(0)->getMember(Util::createString("value"))->getInt(), 10);
 	EXPECT_EQ(res->getRow(0)->getMember(Util::createString("symbol"))->getString(), "D");
 	EXPECT_EQ(res->getRow(0)->getMember(Util::createString("id"))->getInt(), 0);
-    
+
     for (int i = 1; i < rowNum; i++) {
         // cout<<tmp1->getColumn(0)->getRow(i)->getString()<<" "<<res->getColumn(0)->getRow(i)->getString()<<endl;
         EXPECT_EQ(tmp1->getColumn(0)->getRow(i)->getString(), res->getColumn(0)->getRow(i)->getString());
@@ -783,7 +793,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertToPartitionTableRangeTypeWithsortColum
                "pt = db.createPartitionedTable(t,tableName,`id);";
     //cout<<script1<<endl;
     conn.run(script1);
-	
+
 	int colNum = 3;
     int rowNum = 1000;
     vector<VectorSP> columnVecs;
@@ -816,7 +826,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertToPartitionTableRangeTypeWithsortColum
 	int rowNum2 = 1;
 
     TableSP tmp2 = Util::createTable(colNames, colTypes, rowNum2, rowNum2);
-    
+
 	columnVecs2.reserve(colNum);
 	for (int i = 0; i < colNum; i++){
 		columnVecs2.emplace_back(tmp2->getColumn(i));
@@ -833,7 +843,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertToPartitionTableRangeTypeWithsortColum
 	EXPECT_EQ((res->getColumnType(0)==18 || res->getColumnType(0)==17),true);
     EXPECT_EQ(res->getColumnType(1), 4);
     EXPECT_EQ(res->getColumnType(2), 4);
-    
+
     for (int i = 1; i < rowNum; i++){
         // cout<<res->getColumn(2)->getRow(i-1)->getInt()<<" "<<res->getColumn(2)->getRow(i)->getString()<<endl;
         EXPECT_EQ((res->getColumn(2)->getRow(i)->getInt() > res->getColumn(2)->getRow(i-1)->getInt()), true);
@@ -904,7 +914,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertTablewithIntArrayVectorNullToPartition
 	v1->setInt(2, 9999);
 	v2->setNull(0);
 	v2->setNull(1);
-	v2->setNull(2);	
+	v2->setNull(2);
 
 	VectorSP av1 = Util::createArrayVector(DT_INT_ARRAY, 0, 3);
 	av1->append(v2);
@@ -1046,7 +1056,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertTablewithCharArrayVectorNullToPartitio
 	v1->setInt(2, 9999);
 	v2->setNull(0);
 	v2->setNull(1);
-	v2->setNull(2);	
+	v2->setNull(2);
 
 	VectorSP av1 = Util::createArrayVector(DT_CHAR_ARRAY, 0, 3);
 	av1->append(v2);
@@ -1188,7 +1198,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertTablewithFloatArrayVectorNullToPartiti
 	v1->setInt(2, 9999);
 	v2->setNull(0);
 	v2->setNull(1);
-	v2->setNull(2);	
+	v2->setNull(2);
 
 	VectorSP av1 = Util::createArrayVector(DT_FLOAT_ARRAY, 0, 3);
 	av1->append(v2);
@@ -1330,7 +1340,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertTablewithDateArrayVectorNullToPartitio
 	v1->setInt(2, 9999);
 	v2->setNull(0);
 	v2->setNull(1);
-	v2->setNull(2);	
+	v2->setNull(2);
 
 	VectorSP av1 = Util::createArrayVector(DT_DATE_ARRAY, 0, 3);
 	av1->append(v2);
@@ -1472,7 +1482,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertTablewithMonthArrayVectorNullToPartiti
 	v1->setInt(2, 9999);
 	v2->setNull(0);
 	v2->setNull(1);
-	v2->setNull(2);	
+	v2->setNull(2);
 
 	VectorSP av1 = Util::createArrayVector(DT_MONTH_ARRAY, 0, 3);
 	av1->append(v2);
@@ -1614,7 +1624,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertTablewithTimeArrayVectorNullToPartitio
 	v1->setInt(2, 9999);
 	v2->setNull(0);
 	v2->setNull(1);
-	v2->setNull(2);	
+	v2->setNull(2);
 
 	VectorSP av1 = Util::createArrayVector(DT_TIME_ARRAY, 0, 3);
 	av1->append(v2);
@@ -1756,7 +1766,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertTablewithSecondArrayVectorNullToPartit
 	v1->setInt(2, 9999);
 	v2->setNull(0);
 	v2->setNull(1);
-	v2->setNull(2);	
+	v2->setNull(2);
 
 	VectorSP av1 = Util::createArrayVector(DT_SECOND_ARRAY, 0, 3);
 	av1->append(v2);
@@ -1898,7 +1908,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertTablewithDatehourArrayVectorNullToPart
 	v1->setInt(2, 9999);
 	v2->setNull(0);
 	v2->setNull(1);
-	v2->setNull(2);	
+	v2->setNull(2);
 
 	VectorSP av1 = Util::createArrayVector(DT_DATEHOUR_ARRAY, 0, 3);
 	av1->append(v2);
@@ -2040,7 +2050,7 @@ TEST_F(AutoFitTableUpsertTest, test_upsertTablewithUuidArrayVectorNullToPartitio
 	v1->setInt(2, 9999);
 	v2->setNull(0);
 	v2->setNull(1);
-	v2->setNull(2);	
+	v2->setNull(2);
 
 	VectorSP av1 = Util::createArrayVector(DT_UUID_ARRAY, 0, 3);
 	av1->append(v2);
@@ -2113,4 +2123,54 @@ TEST_F(AutoFitTableUpsertTest, test_upsertTablewithUuidArrayVectorToPartitionTab
     EXPECT_EQ(tab->getColumn(0)->getType(), res->getColumn(0)->getType());
     EXPECT_EQ(tab->getColumn(1)->getType(), res->getColumn(1)->getType());
 
+}
+
+class AFTU_append_null : public AutoFitTableUpsertTest, public testing::WithParamInterface<tuple<string, DATA_TYPE>>
+{
+public:
+	static vector<tuple<string, DATA_TYPE>> data_prepare()
+	{
+		vector<string> testTypes = {"BOOL", "CHAR", "SHORT", "INT", "LONG", "DATE", "MONTH", "TIME", "MINUTE", "SECOND", "DATETIME", "TIMESTAMP", "NANOTIME", "NANOTIMESTAMP", "DATEHOUR", "FLOAT", "DOUBLE", "STRING", "SYMBOL", "BLOB", "IPADDR", "UUID", "INT128", "DECIMAL32(8)", "DECIMAL64(15)", "DECIMAL128(28)",
+				"BOOL[]", "CHAR[]", "SHORT[]", "INT[]", "LONG[]", "DATE[]", "MONTH[]", "TIME[]", "MINUTE[]", "SECOND[]", "DATETIME[]", "TIMESTAMP[]", "NANOTIME[]", "NANOTIMESTAMP[]", "DATEHOUR[]", "FLOAT[]", "DOUBLE[]", "IPADDR[]", "UUID[]", "INT128[]", "DECIMAL32(8)[]", "DECIMAL64(15)[]", "DECIMAL128(25)[]"};
+		vector<DATA_TYPE> dataTypes = {DT_BOOL, DT_CHAR, DT_SHORT, DT_INT, DT_LONG, DT_DATE, DT_MONTH, DT_TIME, DT_MINUTE, DT_SECOND, DT_DATETIME, DT_TIMESTAMP, DT_NANOTIME, DT_NANOTIMESTAMP, DT_DATEHOUR, DT_FLOAT, DT_DOUBLE, DT_STRING,DT_SYMBOL,DT_BLOB, DT_IP, DT_UUID, DT_INT128, DT_DECIMAL32, DT_DECIMAL64, DT_DECIMAL128,
+		DT_BOOL_ARRAY, DT_CHAR_ARRAY, DT_SHORT_ARRAY, DT_INT_ARRAY, DT_LONG_ARRAY, DT_DATE_ARRAY, DT_MONTH_ARRAY, DT_TIME_ARRAY, DT_MINUTE_ARRAY, DT_SECOND_ARRAY, DT_DATETIME_ARRAY, DT_TIMESTAMP_ARRAY, DT_NANOTIME_ARRAY, DT_NANOTIMESTAMP_ARRAY, DT_DATEHOUR_ARRAY, DT_FLOAT_ARRAY, DT_DOUBLE_ARRAY, DT_IP_ARRAY, DT_UUID_ARRAY, DT_INT128_ARRAY, DT_DECIMAL32_ARRAY, DT_DECIMAL64_ARRAY, DT_DECIMAL128_ARRAY};
+		vector<tuple<string, DATA_TYPE>> data;
+		for	(auto i = 0; i < testTypes.size(); i++)
+			data.push_back(make_tuple(testTypes[i], dataTypes[i]));
+		return data;
+	}
+
+};
+INSTANTIATE_TEST_SUITE_P(, AFTU_append_null, testing::ValuesIn(AFTU_append_null::data_prepare()));
+
+TEST_P(AFTU_append_null, test_append_empty_table)
+{
+	string type = std::get<0>(GetParam());
+	DATA_TYPE dataType = std::get<1>(GetParam());
+	cout << "test type: " << type << endl;
+	string colName = "c1";
+	string script1 =
+		"colName = [`ind,`time, `" + colName + "];"
+		"colType = [INT, DATETIME, " + type + "];"
+		"t=table(1:0, colName, colType);"
+		"if(existsDatabase('dfs://test_append_empty')) dropDatabase('dfs://test_append_empty');go;"
+		"db = database('dfs://test_append_empty', VALUE, 1..10,,'TSDB');"
+		"db.createPartitionedTable(t, `pt, `ind,,`ind`time)";
+
+	conn.run(script1);
+	VectorSP col0 = Util::createVector(DT_INT, 0);
+	VectorSP col1 = Util::createVector(DT_DATETIME, 0);
+	VectorSP col2 = Util::createVector(dataType, 0);
+	vector<string> colNames = { "ind", "time", "c1"};
+	vector<ConstantSP> cols = { col0, col1, col2};
+	TableSP empty2 = Util::createTable(colNames, cols);
+
+	vector<string>* kcols = new vector<string>{"ind", "time"};
+    AutoFitTableUpsert upsert("dfs://test_append_empty", "pt", conn, true, kcols);
+	upsert.upsert(empty2);
+
+	auto res = conn.run("exec * from loadTable('dfs://test_append_empty', `pt)");
+	EXPECT_EQ(res->rows(), 0);
+	conn.run("dropDatabase('dfs://test_append_empty');go");
+	delete kcols;
 }

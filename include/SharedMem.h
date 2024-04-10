@@ -16,11 +16,11 @@
 #include <iostream>
 #include <errno.h>
 #include <chrono>
+#include <memory>
 // #include "CoreConcept.h"
 #include "Types.h"
 #include "TableImp.h"
 #include "ScalarImp.h"
-#include "DolphinDB.h"
 
 
 #define META_SIZE       1024000

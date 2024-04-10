@@ -1,5 +1,5 @@
-// #pragma once
-
+#pragma once
+#include "gtest/gtest.h"
 #include "DolphinDB.h"
 #include "Util.h"
 #include "BatchTableWriter.h"
@@ -10,6 +10,12 @@
 #include "TableImp.h"
 #include "ConstantFactory.h"
 #include "Format.h"
+#include "DFSChunkMeta.h"
+#include "Logger.h"
+// #include "Database.h"
+// #include "Utility.h"
+// #include "DBTable.h"
+// #include "QueryWrapper.h"
 #include <vector>
 #include <string>
 #include <climits>
@@ -17,8 +23,7 @@
 #include <atomic>
 #include <cstdio>
 #include <random>
-// #include <sys/time.h>
-// #include <bits/stl_vector.h>
+#include <fstream>
 #include "ctime"
 #include <cstdlib>
 #include <stdexcept>
@@ -38,60 +43,23 @@ extern string alphas;
 extern int pass, fail;
 extern bool assertObj;
 extern int vecSize;
-extern vector<int> usedPorts;
+extern unordered_set<int> usedPorts;
 
 extern int const INDEX_MAX_1;
 extern int const INDEX_MIN_2;
 
 extern vector<string> sites;
+extern vector<string> backupSites;
 extern string raftsGroup;
 extern vector<string> nodeNames;
 
-string hostName = "192.168.0.200";
-string errCode = "0";
-int port = 20003;
-int ctl_port = 20000;
-string table = "trades";
-vector<int> listenPorts = {18901, 18902, 18903, 18904, 18905, 18906, 18907, 18908, 18909, 18910};
-vector<int> usedPorts = {};
-string alphas = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-int pass, fail;
-bool assertObj = true;
-int vecSize = 20;
-
-int const INDEX_MAX_1 = 1;
-int const INDEX_MIN_2 = -1;
-
-vector<string> sites = {"192.168.0.200:20002:P1_node1", "192.168.0.200:20012:P2_node1", "192.168.0.200:20022:P3_node1"};
-string raftsGroup = "11";
-vector<string> nodeNames = {"P1_node1", "P2_node1", "P3_node1"};
-
-static DBConnection conn(false, false);
-static DBConnection connReconn(false, false);
-static DBConnection conn_compress(false, false, 7200, true);
+extern DBConnection conn;
+extern DBConnection connReconn;
+extern DBConnection conn_compress;
+extern DBConnectionSP connsp;
 
 // check server version
-bool isNewVersion = true;
+bool isNewServer(DBConnection &conn, const int &major, const int &minor, const int &revision);
 
-void checkAPIVersion()
-{
-    const char* api_version = std::getenv("API_VERSION");
-    if(api_version == nullptr){
-        cout<<"API_VERSION is not set, skip version check\n";
-        return;
-    }
-    
-    if (string(api_version) == ""){
-        cout << "API_VERSION is not set, skip version check\n";
-        return;
-    }
-
-    string actual_version = Util::VER;
-    if (string(api_version) == actual_version)
-    {
-        cout << "version check successfully" << endl;
-    }
-    else{
-        throw std::runtime_error("API_VERSION is not match to the env");
-    }
-}
+void checkAPIVersion();
+string getRandString(int len);

@@ -9,6 +9,8 @@
 #include "DictionaryImp.h"
 #include "ConstantImp.h"
 
+using std::unordered_map;
+
 namespace dolphindb {
 
 void stringU8VectorReader(const ConstantSP& value, int start, int count, U8* output){
@@ -19,7 +21,7 @@ void stringU8VectorReader(const ConstantSP& value, int start, int count, U8* out
 	char** buf=(char**)output;
 #endif
 	char** pbuf;
-	int len;
+	std::size_t len;
 	pbuf=value->getStringConst(start,count,buf);
 	for(int i=0;i<count;++i){
 		len=strlen(pbuf[i])+1;
@@ -200,62 +202,70 @@ void boolU8ScalarWriter(const U8& value, const ConstantSP& output){
 
 
 void AbstractDictionary::init(){
-	if(internalType_==DT_LONG){
-		vreader_=&longU8VectorReader;
-		sreader_=&longU8ScalarReader;
-		vwriter_=&longU8VectorWriter;
-		swriter_=&longU8ScalarWriter;
-		nullVal_.longVal=Constant::void_->getLong();
-	}
-	else if(internalType_==DT_INT){
-		vreader_=&intU8VectorReader;
-		sreader_=&intU8ScalarReader;
-		vwriter_=&intU8VectorWriter;
-		swriter_=&intU8ScalarWriter;
-		nullVal_.intVal=Constant::void_->getInt();
-	}
-	else if(internalType_==DT_DOUBLE){
-		vreader_=&doubleU8VectorReader;
-		sreader_=&doubleU8ScalarReader;
-		vwriter_=&doubleU8VectorWriter;
-		swriter_=&doubleU8ScalarWriter;
-		nullVal_.doubleVal=Constant::void_->getDouble();
-	}
-	else if(internalType_==DT_FLOAT){
-		vreader_=&floatU8VectorReader;
-		sreader_=&floatU8ScalarReader;
-		vwriter_=&floatU8VectorWriter;
-		swriter_=&floatU8ScalarWriter;
-		nullVal_.floatVal=Constant::void_->getFloat();
-	}
-	else if(internalType_==DT_STRING){
-		vreader_=&stringU8VectorReader;
-		sreader_=&stringU8ScalarReader;
-		vwriter_=&stringU8VectorWriter;
-		swriter_=&stringU8ScalarWriter;
-		nullVal_.pointer=(char*)(Constant::EMPTY.c_str());
-	}
-	else if(internalType_==DT_SHORT){
-		vreader_=&shortU8VectorReader;
-		sreader_=&shortU8ScalarReader;
-		vwriter_=&shortU8VectorWriter;
-		swriter_=&shortU8ScalarWriter;
-		nullVal_.shortVal=Constant::void_->getShort();
-	}
-	else if(internalType_==DT_CHAR){
-		vreader_=&charU8VectorReader;
-		sreader_=&charU8ScalarReader;
-		vwriter_=&charU8VectorWriter;
-		swriter_=&charU8ScalarWriter;
-		nullVal_.charVal=Constant::void_->getChar();
-	}
-	else if(internalType_==DT_BOOL){
-		vreader_=&boolU8VectorReader;
-		sreader_=&boolU8ScalarReader;
-		vwriter_=&boolU8VectorWriter;
-		swriter_=&boolU8ScalarWriter;
-		nullVal_.charVal=Constant::void_->getBool();
-	}
+    switch (internalType_)
+    {
+    case DT_BOOL:
+        vreader_=&boolU8VectorReader;
+        sreader_=&boolU8ScalarReader;
+        vwriter_=&boolU8VectorWriter;
+        swriter_=&boolU8ScalarWriter;
+        nullVal_.charVal=Constant::void_->getBool();
+        break;
+    case DT_CHAR:
+        vreader_=&charU8VectorReader;
+        sreader_=&charU8ScalarReader;
+        vwriter_=&charU8VectorWriter;
+        swriter_=&charU8ScalarWriter;
+        nullVal_.charVal=Constant::void_->getChar();
+        break;
+    case DT_SHORT:
+        vreader_=&shortU8VectorReader;
+        sreader_=&shortU8ScalarReader;
+        vwriter_=&shortU8VectorWriter;
+        swriter_=&shortU8ScalarWriter;
+        nullVal_.shortVal=Constant::void_->getShort();
+        break;
+    case DT_INT:
+        vreader_=&intU8VectorReader;
+        sreader_=&intU8ScalarReader;
+        vwriter_=&intU8VectorWriter;
+        swriter_=&intU8ScalarWriter;
+        nullVal_.intVal=Constant::void_->getInt();
+        break;
+    case DT_LONG:
+        vreader_=&longU8VectorReader;
+        sreader_=&longU8ScalarReader;
+        vwriter_=&longU8VectorWriter;
+        swriter_=&longU8ScalarWriter;
+        nullVal_.longVal=Constant::void_->getLong();
+        break;
+    case DT_FLOAT:
+        vreader_=&floatU8VectorReader;
+        sreader_=&floatU8ScalarReader;
+        vwriter_=&floatU8VectorWriter;
+        swriter_=&floatU8ScalarWriter;
+        nullVal_.floatVal=Constant::void_->getFloat();
+        break;
+    case DT_DOUBLE:
+        vreader_=&doubleU8VectorReader;
+        sreader_=&doubleU8ScalarReader;
+        vwriter_=&doubleU8VectorWriter;
+        swriter_=&doubleU8ScalarWriter;
+        nullVal_.doubleVal=Constant::void_->getDouble();
+        break;
+    case DT_STRING:
+    case DT_BLOB:
+        vreader_=&stringU8VectorReader;
+        sreader_=&stringU8ScalarReader;
+        vwriter_=&stringU8VectorWriter;
+        swriter_=&stringU8ScalarWriter;
+        nullVal_.pointer=(char*)(Constant::EMPTY.c_str());
+        break;
+    case DT_ANY:
+        break;
+    default:
+        throw RuntimeException("Not Support create this internalType dictionary " + Util::getDataTypeString(internalType_));
+    }
 }
 
 ConstantSP AbstractDictionary::createValues(const ConstantSP& keys) const{
@@ -340,7 +350,7 @@ bool IntDictionary::set(const ConstantSP& key, const ConstantSP& value){
 		U8 tmp[bufSize];
 		int start=0;
 		int count;
-		unsigned int dictSize=dict_.size();
+		std::size_t dictSize=dict_.size();
 		while(start<len){
 			count=((std::min))(len-start,bufSize);
 			pbuf=newKey->getIntConst(start,count,buf);
@@ -582,7 +592,7 @@ bool CharDictionary::set(const ConstantSP& key, const ConstantSP& value){
 		U8 tmp[bufSize];
 		int start=0;
 		int count;
-		unsigned int dictSize=dict_.size();
+		std::size_t dictSize=dict_.size();
 		while(start<len){
 			count=((std::min))(len-start,bufSize);
 			pbuf=key->getCharConst(start,count,buf);
@@ -818,7 +828,7 @@ bool ShortDictionary::set(const ConstantSP& key, const ConstantSP& value){
 		U8 tmp[bufSize];
 		int start=0;
 		int count;
-		unsigned int dictSize=dict_.size();
+		std::size_t dictSize=dict_.size();
 		while(start<len){
 			count=((std::min))(len-start,bufSize);
 			pbuf=key->getShortConst(start,count,buf);
@@ -1060,7 +1070,7 @@ bool LongDictionary::set(const ConstantSP& key, const ConstantSP& value){
 		U8 tmp[bufSize];
 		int start=0;
 		int count;
-		unsigned int dictSize=dict_.size();
+		std::size_t dictSize=dict_.size();
 		while(start<len){
 			count=(std::min)(len-start,bufSize);
 			pbuf=newKey->getLongConst(start,count,buf);
@@ -1302,7 +1312,7 @@ bool FloatDictionary::set(const ConstantSP& key, const ConstantSP& value){
 		U8 tmp[bufSize];
 		int start=0;
 		int count;
-		unsigned int dictSize=dict_.size();
+		std::size_t dictSize=dict_.size();
 		while(start<len){
 			count=(std::min)(len-start,bufSize);
 			pbuf=key->getFloatConst(start,count,buf);
@@ -1538,7 +1548,7 @@ bool DoubleDictionary::set(const ConstantSP& key, const ConstantSP& value){
 		U8 tmp[bufSize];
 		int start=0;
 		int count;
-		unsigned int dictSize=dict_.size();
+		std::size_t dictSize=dict_.size();
 		while(start<len){
 			count=(std::min)(len-start,bufSize);
 			pbuf=key->getDoubleConst(start,count,buf);
@@ -1734,8 +1744,8 @@ StringDictionary::~StringDictionary(){
 }
 
 bool StringDictionary::remove(const ConstantSP& key){
-	if(key->getCategory()!=LITERAL)
-		throw RuntimeException("Key data type incompatible. Expecting literal data");
+	if(key->getCategory() != LITERAL && key->getType() != DT_BLOB)
+		throw RuntimeException("Key data type incompatible. Expecting literal/BLOB data");
 	if(key->isScalar())
 		dict_.erase(key->getString());
 	else{
@@ -1764,8 +1774,8 @@ bool StringDictionary::set(const string& key, const ConstantSP& value){
 }
 
 bool StringDictionary::set(const ConstantSP& key, const ConstantSP& value){
-	if(key->getCategory()!=LITERAL)
-		throw RuntimeException("Key data type incompatible. Expecting literal data");
+	if(key->getCategory() != LITERAL && key->getType() != DT_BLOB)
+		throw RuntimeException("Key data type incompatible. Expecting literal/BLOB data");
 	if(key->isScalar()){
 		U8 tmp;
 		(*sreader_)(value,tmp);
@@ -1785,7 +1795,7 @@ bool StringDictionary::set(const ConstantSP& key, const ConstantSP& value){
 		U8 tmp[bufSize];
 		int start=0;
 		int count;
-		unsigned int dictSize=dict_.size();
+		std::size_t dictSize=dict_.size();
 		while(start<len){
 			count=(std::min)(len-start,bufSize);
 			pbuf=key->getStringConst(start,count,buf);
@@ -1821,8 +1831,8 @@ ConstantSP StringDictionary::getMember(const string& key) const {
 }
 
 ConstantSP StringDictionary::getMember(const ConstantSP& key) const {
-	if(key->getCategory()!=LITERAL)
-		throw RuntimeException("Key data type incompatible. Expecting literal data");
+	if(key->getCategory() != LITERAL && key->getType() != DT_BLOB)
+		throw RuntimeException("Key data type incompatible. Expecting literal/BLOB data");
 	ConstantSP result=createValues(key);
 	if(key->isScalar()){
 		unordered_map<string,U8>::const_iterator it=dict_.find(key->getStringRef());
@@ -1857,8 +1867,8 @@ ConstantSP StringDictionary::getMember(const ConstantSP& key) const {
 }
 
 void StringDictionary::contain(const ConstantSP& target, const ConstantSP& resultSP) const{
-	if(target->getCategory()!=LITERAL)
-		throw RuntimeException("Key data type incompatible. Expecting literal data");
+	if(target->getCategory() != LITERAL && target->getType() != DT_BLOB)
+		throw RuntimeException("target data type incompatible. Expecting literal/BLOB data");
 	if(target->isScalar()){
 		resultSP->setBool(dict_.find(target->getStringRef())!=dict_.end());
 	}
@@ -1970,8 +1980,8 @@ long long StringDictionary::getAllocatedMemory() const {
 }
 
 bool AnyDictionary::remove(const ConstantSP& key){
-	if(key->getCategory()!=LITERAL)
-		throw RuntimeException("Key data type incompatible. Expecting literal data");
+	if(key->getCategory() != LITERAL && key->getType() != DT_BLOB)
+		throw RuntimeException("Key data type incompatible. Expecting literal/BLOB data");
 	if(key->isScalar())
 		dict_.erase(key->getString());
 	else{
@@ -2000,7 +2010,7 @@ bool AnyDictionary::set(const string& key, const ConstantSP& value){
 }
 
 bool AnyDictionary::set(const ConstantSP& key, const ConstantSP& value){
-	if(key->getCategory()!=LITERAL)
+	if(key->getCategory() != LITERAL && key->getCategory() != BINARY)
 		throw RuntimeException("Dictionary with 'ANY' data type must use string or integer as key");
 	else if(key->isScalar()){
 		dict_[key->getString()]=value;
@@ -2112,8 +2122,8 @@ ConstantSP AnyDictionary::values() const {
 }
 
 void AnyDictionary::contain(const ConstantSP& target, const ConstantSP& resultSP) const{
-	if(target->getCategory()!=LITERAL)
-		throw RuntimeException("Key data type incompatible. Expecting string/symbol");
+	if(target->getCategory() != LITERAL && target->getType() != DT_BLOB)
+		throw RuntimeException("Key data type incompatible. Expecting literal/BLOB data");
 	if(target->isScalar()){
 		resultSP->setBool(dict_.find(target->getStringRef())!=dict_.end());
 	}
@@ -2400,6 +2410,407 @@ bool IntAnyDictionary::containNotMarshallableObject() const{
 	return false;
 }
 
+bool FloatAnyDictionary::set(const ConstantSP& key, const ConstantSP& value){
+    if(key->getRawType() != DT_FLOAT)
+        throw RuntimeException("Key data type incompatible. Expecting Float");
+    else if(key->isScalar()){
+        dict_[key->getFloat()] = value;
+        value->setIndependent(false);
+        value->setTemporary(false);
+    }
+    else{
+        int len = key->size();
+        if(len != value->size() && value->size() != 1)
+            return false;
+
+        if(dict_.empty())
+            dict_.reserve((std::size_t)(len*1.33));
+        int bufSize = std::min(len, Util::BUF_SIZE);
+        std::unique_ptr<float> buf(new float[bufSize]);
+        const float* pbuf;
+        int start = 0, count = 0;
+        while(start < len){
+            count = std::min(len - start, bufSize);
+            pbuf = key->getFloatConst(start,count, buf.get());
+            for(int i = 0; i < count; ++i){
+                ConstantSP obj = value->get(start + i);
+                obj->setIndependent(false);
+                obj->setTemporary(false);
+                dict_[pbuf[i]] = obj;
+            }
+            start += count;
+        }
+    }
+    return true;
+}
+
+bool FloatAnyDictionary::remove(const ConstantSP& key){
+    if(key->isScalar())
+        dict_.erase(key->getFloat());
+    else{
+        int len = key->size();
+        int bufSize = std::min(len, Util::BUF_SIZE);
+        std::unique_ptr<float> buf(new float[bufSize]);
+        const float* pbuf = nullptr;
+        int count = 0, start = 0;
+        while(start < len){
+            count = std::min(len - start, bufSize);
+            pbuf = key->getFloatConst(start, count, buf.get());
+            for(int i = 0; i < count; ++i)
+                dict_.erase(pbuf[i]);
+            start += count;
+        }
+    }
+    return true;
+}
+
+ConstantSP FloatAnyDictionary::getMember(const ConstantSP& key) const{
+    if(key->getRawType() != DT_FLOAT)
+        throw RuntimeException("Key data type incompatible. Expecting Float");
+    else if(key->isScalar()){
+        auto it = dict_.find(key->getFloat());
+        if(it == dict_.end())
+            return Constant::void_;
+        else
+            return it->second;
+    }
+    else{
+        ConstantSP result = Util::createVector(DT_ANY, key->size());
+        int len = key->size();
+        int bufSize = std::min(len, Util::BUF_SIZE);
+        std::unique_ptr<float> buf(new float[bufSize]);
+        const float* pbuf = nullptr;
+        int start = 0, count = 0;
+        unordered_map<float, ConstantSP>::const_iterator it;
+        unordered_map<float, ConstantSP>::const_iterator end = dict_.end();
+        while(start < len){
+            count =  std::min(len - start,bufSize);
+            pbuf = key->getFloatConst(start, count, buf.get());
+            for(int i = 0; i < count; ++i){
+                it=dict_.find(pbuf[i]);
+                result->set(start + i, it==end ? Constant::void_ : it->second);
+            }
+            start+=count;
+        }
+        result->setNullFlag(result->hasNull());
+        return result;
+    }
+}
+
+ConstantSP FloatAnyDictionary::keys() const{
+    auto it = dict_.begin();
+    int len = size();
+    ConstantSP resultSP = Util::createVector(keyType_, len);
+    int start = 0, count = 0;
+    int bufSize = std::min(len, Util::BUF_SIZE);
+    std::unique_ptr<float> buf(new float[bufSize]);
+    float* pbuf = nullptr;
+
+    while(start < len){
+        count = std::min(len - start, bufSize);
+        pbuf = resultSP->getFloatBuffer(start, count, buf.get());
+        for(int i = 0; i < count; ++i){
+            pbuf[i] = it->first;
+            ++it;
+        }
+        resultSP->setFloat(start, count, pbuf);
+        start += count;
+    }
+    return resultSP;
+}
+
+ConstantSP FloatAnyDictionary::values() const{
+    auto it = dict_.begin();
+    int len = size();
+    ConstantSP result = Util::createVector(DT_ANY, len);
+
+    int count = 0;
+    while(it != dict_.end()){
+        result->set(count, it->second);
+        ++it;
+        ++count;
+    }
+    return result;
+}
+
+void FloatAnyDictionary::contain(const ConstantSP& target, const ConstantSP& resultSP) const{
+    if(target->getRawType() != DT_FLOAT)
+        throw RuntimeException("Key data type incompatible. Expecting Float");
+    if(target->isScalar()){
+        resultSP->setBool(dict_.find(target->getFloat()) != dict_.end());
+    }
+    else{
+        int len = target->size();
+        int bufSize = std::min(len, Util::BUF_SIZE);
+        std::unique_ptr<char> ret(new char[bufSize]);
+        char* pret = nullptr;
+        std::unique_ptr<float> buf(new float[bufSize]);
+        const float* pbuf = nullptr;
+        int start = 0, count = 0;
+
+        unordered_map<float, ConstantSP>::const_iterator end = dict_.end();
+        while(start < len){
+            count = std::min(len-start, bufSize);
+            pbuf = target->getFloatConst(start, count, buf.get());
+            pret= resultSP->getBoolBuffer(start, count, ret.get());
+            for(int i = 0; i < count; ++i)
+                pret[i] = dict_.find(pbuf[i]) != end;
+            resultSP->setBool(start, count, pret);
+            start += count;
+        }
+    }
+}
+
+string FloatAnyDictionary::getString() const{
+    string content;
+    int len=std::min(Util::DISPLAY_ROWS, (int)dict_.size());
+    int count = 0;
+    ConstantSP key=Util::createConstant(keyType_);
+    auto it = dict_.begin();
+    while(count < len){
+        key->setFloat(it->first);
+        content.append(key->getString());
+        content.append("->");
+        DATA_FORM form = it->second->getForm();
+        if(form == DF_MATRIX || form == DF_TABLE)
+            content.append("\n");
+        else if(form == DF_DICTIONARY)
+            content.append("{\n");
+        content.append(it->second->getString());
+        if(form == DF_DICTIONARY)
+            content.append("}");
+        content.append(1,'\n');
+        ++count;
+        ++it;
+    }
+    if(len<(int)dict_.size())
+        content.append("...\n");
+    return content;
+}
+
+long long FloatAnyDictionary::getAllocatedMemory() const{
+    long long bytes= sizeof(FloatAnyDictionary) + size() * (sizeof(ConstantSP) + 8);
+    auto it = dict_.begin();
+    auto end = dict_.end();
+    while(it != end){
+        if(it->second.count() == 1)
+            bytes += it->second->getAllocatedMemory();
+        ++it;
+    }
+    return bytes;
+}
+
+bool FloatAnyDictionary::containNotMarshallableObject() const{
+    auto it = dict_.begin();
+    auto end = dict_.end();
+    while(it != end){
+        if((*it).second->containNotMarshallableObject())
+            return true;
+        ++it;
+    }
+    return false;
+}
+
+bool DoubleAnyDictionary::set(const ConstantSP& key, const ConstantSP& value){
+    if(key->getRawType() != DT_DOUBLE)
+        throw RuntimeException("Key data type incompatible. Expecting Double");
+    else if(key->isScalar()){
+        dict_[key->getDouble()] = value;
+        value->setIndependent(false);
+        value->setTemporary(false);
+    }
+    else{
+        int len = key->size();
+        if(len != value->size() && value->size() != 1)
+            return false;
+
+        if(dict_.empty())
+            dict_.reserve((std::size_t)(len*1.33));
+        int bufSize = std::min(len, Util::BUF_SIZE);
+        std::unique_ptr<double> buf(new double[bufSize]);
+        const double* pbuf = nullptr;
+        int start = 0, count = 0;
+        while(start < len){
+            count = std::min(len - start, bufSize);
+            pbuf = key->getDoubleConst(start, count, buf.get());
+            for(int i = 0; i < count; ++i){
+                ConstantSP obj = value->get(start + i);
+                obj->setIndependent(false);
+                obj->setTemporary(false);
+                dict_[pbuf[i]] = obj;
+            }
+            start += count;
+        }
+    }
+    return true;
+}
+
+bool DoubleAnyDictionary::remove(const ConstantSP& key){
+    if(key->isScalar())
+        dict_.erase(key->getDouble());
+    else{
+        int len = key->size();
+        int bufSize = std::min(len, Util::BUF_SIZE);
+        std::unique_ptr<double> buf(new double[bufSize]);
+        const double* pbuf = nullptr;
+        int count = 0, start = 0;
+        while(start < len){
+            count = std::min(len - start, bufSize);
+            pbuf = key->getDoubleConst(start, count, buf.get());
+            for(int i = 0; i < count; ++i)
+                dict_.erase(pbuf[i]);
+            start += count;
+        }
+    }
+    return true;
+}
+
+ConstantSP DoubleAnyDictionary::getMember(const ConstantSP& key) const{
+    if(key->getRawType() != DT_DOUBLE)
+        throw RuntimeException("Key data type incompatible. Expecting Double");
+    else if(key->isScalar()){
+        auto it = dict_.find(key->getDouble());
+        if(it == dict_.end())
+            return Constant::void_;
+        else
+            return it->second;
+    }
+    else{
+        ConstantSP result = Util::createVector(DT_ANY, key->size());
+        int len = key->size();
+        int bufSize = std::min(len, Util::BUF_SIZE);
+        std::unique_ptr<double> buf(new double[bufSize]);
+        const double* pbuf = nullptr;
+        int start = 0, count = 0;
+        unordered_map<double, ConstantSP>::const_iterator it;
+        unordered_map<double, ConstantSP>::const_iterator end = dict_.end();
+        while(start < len){
+            count =  std::min(len - start,bufSize);
+            pbuf = key->getDoubleConst(start, count, buf.get());
+            for(int i = 0; i < count; ++i){
+                it=dict_.find(pbuf[i]);
+                result->set(start + i, it==end ? Constant::void_ : it->second);
+            }
+            start+=count;
+        }
+        result->setNullFlag(result->hasNull());
+        return result;
+    }
+}
+
+ConstantSP DoubleAnyDictionary::keys() const{
+    auto it = dict_.begin();
+    int len = size();
+    ConstantSP resultSP = Util::createVector(keyType_, len);
+    int start = 0, count = 0;
+    int bufSize = std::min(len, Util::BUF_SIZE);
+    std::unique_ptr<double> buf(new double[bufSize]);
+    double* pbuf = nullptr;
+
+    while(start < len){
+        count = std::min(len - start, bufSize);
+        pbuf = resultSP->getDoubleBuffer(start, count, buf.get());
+        for(int i = 0; i < count; ++i){
+            pbuf[i] = it->first;
+            ++it;
+        }
+        resultSP->setDouble(start, count, pbuf);
+        start += count;
+    }
+    return resultSP;
+}
+
+ConstantSP DoubleAnyDictionary::values() const{
+    auto it = dict_.begin();
+    int len = size();
+    ConstantSP result = Util::createVector(DT_ANY, len);
+
+    int count = 0;
+    while(it != dict_.end()){
+        result->set(count, it->second);
+        ++it;
+        ++count;
+    }
+    return result;
+}
+
+void DoubleAnyDictionary::contain(const ConstantSP& target, const ConstantSP& resultSP) const{
+    if(target->getRawType() != DT_DOUBLE)
+        throw RuntimeException("Key data type incompatible. Expecting Double");
+    if(target->isScalar()){
+        resultSP->setBool(dict_.find(target->getDouble()) != dict_.end());
+    }
+    else{
+        int len = target->size();
+        int bufSize = std::min(len, Util::BUF_SIZE);
+        std::unique_ptr<char> ret(new char[bufSize]);
+        char* pret = nullptr;
+        std::unique_ptr<double> buf(new double[bufSize]);
+        const double* pbuf = nullptr;
+        int start = 0, count = 0;
+
+        auto end = dict_.end();
+        while(start < len){
+            count = std::min(len-start, bufSize);
+            pbuf = target->getDoubleConst(start, count, buf.get());
+            pret= resultSP->getBoolBuffer(start, count, ret.get());
+            for(int i = 0; i < count; ++i)
+                pret[i] = dict_.find(pbuf[i]) != end;
+            resultSP->setBool(start, count, pret);
+            start += count;
+        }
+    }
+}
+
+string DoubleAnyDictionary::getString() const{
+    string content;
+    int len=std::min(Util::DISPLAY_ROWS, (int)dict_.size());
+    int count = 0;
+    ConstantSP key=Util::createConstant(keyType_);
+    auto it = dict_.begin();
+    while(count < len){
+        key->setDouble(it->first);
+        content.append(key->getString());
+        content.append("->");
+        DATA_FORM form = it->second->getForm();
+        if(form == DF_MATRIX || form == DF_TABLE)
+            content.append("\n");
+        else if(form == DF_DICTIONARY)
+            content.append("{\n");
+        content.append(it->second->getString());
+        if(form == DF_DICTIONARY)
+            content.append("}");
+        content.append(1,'\n');
+        ++count;
+        ++it;
+    }
+    if(len<(int)dict_.size())
+        content.append("...\n");
+    return content;
+}
+
+long long DoubleAnyDictionary::getAllocatedMemory() const{
+    long long bytes= sizeof(DoubleAnyDictionary) + size() * (sizeof(ConstantSP) + 8);
+    auto it = dict_.begin();
+    auto end = dict_.end();
+    while(it != end){
+        if(it->second.count() == 1)
+            bytes += it->second->getAllocatedMemory();
+        ++it;
+    }
+    return bytes;
+}
+
+bool DoubleAnyDictionary::containNotMarshallableObject() const{
+    auto it = dict_.begin();
+    auto end = dict_.end();
+    while(it != end){
+        if((*it).second->containNotMarshallableObject())
+            return true;
+        ++it;
+    }
+    return false;
+}
 
 bool LongAnyDictionary::remove(const ConstantSP& key){
 	if(key->isScalar())
@@ -2683,7 +3094,7 @@ bool Int128Dictionary::set(const ConstantSP& key, const ConstantSP& value){
 		std::unique_ptr<U8> tmp(new U8[bufSize]); //U8 tmp[bufSize];
 		int start=0;
 		int count;
-		unsigned int dictSize=dict_.size();
+		std::size_t dictSize=dict_.size();
 		while(start<len){
 			count=std::min(len-start,bufSize);
 			pbuf=(const Guid*)key->getBinaryConst(start,count,16,buf.get());

@@ -8,18 +8,8 @@
 #ifndef CONSTANTMARSHALL_H_
 #define CONSTANTMARSHALL_H_
 
-#include "DolphinDB.h"
 #include "SysIO.h"
-#ifdef _MSC_VER
-	#ifdef _DDBAPIDLL	
-		#define EXPORT_DECL _declspec(dllexport)
-	#else
-		#define EXPORT_DECL __declspec(dllimport)
-	#endif
-#else
-	#define EXPORT_DECL 
-#endif
-
+#include "Constant.h"
 #define MARSHALL_BUFFER_SIZE 4096
 
 namespace dolphindb {
@@ -37,6 +27,29 @@ typedef SmartPointer<ConstantMarshallFactory> ConstantMarshallFactorySP;
 typedef SmartPointer<ConstantUnmarshallFactory> ConstantUnmarshallFactorySP;
 typedef SmartPointer<SymbolBaseUnmarshall> SymbolBaseUnmarshallSP;
 typedef SmartPointer<SymbolBaseMarshall> SymbolBaseMarshallSP;
+
+class EXPORT_DECL ConstantMarshall {
+public:
+	virtual ~ConstantMarshall(){}
+	virtual bool start(const ConstantSP& target, bool blocking, bool compress, IO_ERR& ret)=0;
+	virtual bool start(const char* requestHeader, size_t headerSize, const ConstantSP& target, bool blocking, bool compress, IO_ERR& ret)=0;
+	virtual void reset() = 0;
+	virtual IO_ERR flush() = 0;
+};
+
+class EXPORT_DECL ConstantUnmarshall{
+public:
+	virtual ~ConstantUnmarshall(){}
+	virtual bool start(short flag, bool blocking, IO_ERR& ret)=0;
+	virtual void reset() = 0;
+	ConstantSP getConstant(){return obj_;}
+	
+protected:
+	ConstantSP obj_;
+};
+
+typedef SmartPointer<ConstantMarshall> ConstantMarshallSP;
+typedef SmartPointer<ConstantUnmarshall> ConstantUnmarshallSP;
 
 class EXPORT_DECL ConstantMarshallImp : public ConstantMarshall {
 public:
@@ -215,7 +228,7 @@ private:
 	int size_;
 	DataInputStreamSP in_;
 	SymbolBaseSP obj_;
-	unordered_map<int, SymbolBaseSP> dict_;
+	std::unordered_map<int, SymbolBaseSP> dict_;
 };
 
 class EXPORT_DECL VectorUnmarshall: public ConstantUnmarshallImp{
@@ -225,7 +238,6 @@ public:
 	virtual bool start(short flag, bool blocking, IO_ERR& ret);
 	virtual void reset();
 	void resetSymbolBaseUnmarshall(DataInputStreamSP in, bool createIfNotExist);
-	void setNotify(std::function<void(const ConstantSP &vector, INDEX validSize)> notify) { notify_ = notify; }
 private:
 	short flag_;
 	int rows_;
@@ -234,7 +246,6 @@ private:
 	ConstantUnmarshallSP unmarshall_;
 	SymbolBaseUnmarshallSP symbaseUnmarshall_;
 	int scale_;
-	std::function<void(const ConstantSP &vector, INDEX validSize)> notify_;
 };
 
 class EXPORT_DECL MatrixUnmarshall: public ConstantUnmarshallImp{
@@ -261,7 +272,6 @@ public:
 	virtual ~TableUnmarshall(){}
 	virtual bool start(short flag, bool blocking, IO_ERR& ret);
 	virtual void reset();
-	void setNotify(std::function<void(const ConstantSP &vector, INDEX validSize)> notify) { vectorUnmarshall_.setNotify(notify); }
 private:
 	TABLE_TYPE type_;
 	bool tableNameReceived_;
@@ -271,8 +281,8 @@ private:
 	int rows_;
 	int columns_;
 	string tableName_;
-	vector<string> colNames_;
-	vector<ConstantSP> colObjs_;
+	std::vector<string> colNames_;
+	std::vector<ConstantSP> colObjs_;
 	VectorUnmarshall vectorUnmarshall_;
 };
 

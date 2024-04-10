@@ -83,7 +83,7 @@ public:
 	}
 
 	DATA_TYPE getDataType(const string& type) const {
-		unordered_map<string,DATA_TYPE>::const_iterator it=typeMap_.find(type);
+		std::unordered_map<string,DATA_TYPE>::const_iterator it=typeMap_.find(type);
 		if(it==typeMap_.end())
 			return DT_VOID;
 		else
@@ -91,7 +91,7 @@ public:
 	}
 
 	DATA_FORM getDataForm(const string& form) const {
-		unordered_map<string,DATA_FORM>::const_iterator it=formMap_.find(form);
+		std::unordered_map<string,DATA_FORM>::const_iterator it=formMap_.find(form);
 		if(it==formMap_.end())
 			return (DATA_FORM)-1;
 		else
@@ -107,7 +107,7 @@ public:
 		if(type >= 0 && type < TYPE_COUNT)
 			return arrTypeStr[type];
 		else if(type >= ARRAY_TYPE_BASE){
-			return "["+getDataTypeString((DATA_TYPE)(type-ARRAY_TYPE_BASE))+"]";
+			return getDataTypeString((DATA_TYPE)(type-ARRAY_TYPE_BASE))+"[]";
 		}else{
 			return "UknownType"+std::to_string(type);
 		}
@@ -128,8 +128,7 @@ public:
 	}
 
 	Dictionary* createDictionary(DATA_TYPE keyInternalType, DATA_TYPE keyType, DATA_TYPE valueType){
-		if (valueType > DT_STRING
-			&& (valueType != DT_UUID && valueType != DT_IP && valueType != DT_INT128 && valueType!= DT_BLOB && valueType != DT_DATEHOUR && valueType != DT_DATEMINUTE)) {
+		if (valueType > DT_STRING && (valueType!= DT_BLOB && valueType != DT_DATEHOUR && valueType != DT_DATEMINUTE)) {
 			valueType = DT_ANY;
 		}
 		if(valueType != DT_ANY){
@@ -140,12 +139,10 @@ public:
 				case DT_LONG : return new LongDictionary(keyType,valueType);
 				case DT_FLOAT : return new FloatDictionary(valueType);
 				case DT_DOUBLE : return new DoubleDictionary(valueType);
-				case DT_INT128 :
-					if (valueType == DT_INT128)
-						return NULL;
-					return new Int128Dictionary(keyType,valueType);
-				case DT_STRING : return new StringDictionary(keyType,valueType);
-				default : return NULL;
+				case DT_INT128 : return new Int128Dictionary(keyType,valueType);
+				case DT_STRING :
+				case DT_BLOB : return new StringDictionary(keyType,valueType);
+				default : throw RuntimeException("Not allowed to create Dictionary for the key type " + Util::getDataTypeString(keyType));
 			}
 		}
 		else{
@@ -154,9 +151,12 @@ public:
 				case DT_SHORT :
 				case DT_INT : return new IntAnyDictionary(keyType);
 				case DT_LONG : return new LongAnyDictionary(keyType);
+				case DT_FLOAT: return new FloatAnyDictionary(keyType);
+				case DT_DOUBLE: return new DoubleAnyDictionary(keyType);
 				case DT_INT128 : return new Int128AnyDictionary(keyType);
-				case DT_STRING : return new AnyDictionary();
-				default : return NULL;
+				case DT_STRING :
+				case DT_BLOB : return new AnyDictionary();
+				default : throw RuntimeException("Not allowed to create Dictionary for this key type " + Util::getDataTypeString(keyType));
 			}
 		}
 	}
@@ -911,44 +911,44 @@ private:
 		arrConstMatrixFactory[DT_DICTIONARY]=NULL;
 		arrConstMatrixFactory[DT_ANY]=NULL;
 
-		typeMap_.insert(pair<string,DATA_TYPE>("void",DT_VOID));
-		typeMap_.insert(pair<string,DATA_TYPE>("bool",DT_BOOL));
-		typeMap_.insert(pair<string,DATA_TYPE>("char",DT_CHAR));
-		typeMap_.insert(pair<string,DATA_TYPE>("short",DT_SHORT));
-		typeMap_.insert(pair<string,DATA_TYPE>("int",DT_INT));
-		typeMap_.insert(pair<string,DATA_TYPE>("long",DT_LONG));
-		typeMap_.insert(pair<string,DATA_TYPE>("float",DT_FLOAT));
-		typeMap_.insert(pair<string,DATA_TYPE>("double",DT_DOUBLE));
-		typeMap_.insert(pair<string,DATA_TYPE>("date",DT_DATE));
-		typeMap_.insert(pair<string,DATA_TYPE>("month",DT_MONTH));
-		typeMap_.insert(pair<string,DATA_TYPE>("datetime",DT_DATETIME));
-		typeMap_.insert(pair<string,DATA_TYPE>("datehour",DT_DATEHOUR));
-		typeMap_.insert(pair<string,DATA_TYPE>("time",DT_TIME));
-		typeMap_.insert(pair<string,DATA_TYPE>("nanotime",DT_NANOTIME));
-		typeMap_.insert(pair<string,DATA_TYPE>("timestamp",DT_TIMESTAMP));
-		typeMap_.insert(pair<string,DATA_TYPE>("nanotimestamp",DT_NANOTIMESTAMP));
-		typeMap_.insert(pair<string,DATA_TYPE>("minute",DT_MINUTE));
-		typeMap_.insert(pair<string,DATA_TYPE>("second",DT_SECOND));
-		typeMap_.insert(pair<string,DATA_TYPE>("symbol",DT_SYMBOL));
-		typeMap_.insert(pair<string,DATA_TYPE>("string",DT_STRING));
-		typeMap_.insert(pair<string,DATA_TYPE>("any",DT_ANY));
-		typeMap_.insert(pair<string,DATA_TYPE>("int128",DT_INT128));
-		typeMap_.insert(pair<string,DATA_TYPE>("uuid",DT_UUID));
-		typeMap_.insert(pair<string,DATA_TYPE>("ipaddr",DT_IP));
-		typeMap_.insert(pair<string,DATA_TYPE>("dictionary",DT_DICTIONARY));
-		typeMap_.insert(pair<string,DATA_TYPE>("decimal32", DT_DECIMAL32));
-		typeMap_.insert(pair<string, DATA_TYPE>("decimal64", DT_DECIMAL64));
-		typeMap_.insert(pair<string, DATA_TYPE>("decimal128", DT_DECIMAL128));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("void",DT_VOID));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("bool",DT_BOOL));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("char",DT_CHAR));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("short",DT_SHORT));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("int",DT_INT));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("long",DT_LONG));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("float",DT_FLOAT));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("double",DT_DOUBLE));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("date",DT_DATE));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("month",DT_MONTH));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("datetime",DT_DATETIME));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("datehour",DT_DATEHOUR));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("time",DT_TIME));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("nanotime",DT_NANOTIME));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("timestamp",DT_TIMESTAMP));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("nanotimestamp",DT_NANOTIMESTAMP));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("minute",DT_MINUTE));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("second",DT_SECOND));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("symbol",DT_SYMBOL));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("string",DT_STRING));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("any",DT_ANY));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("int128",DT_INT128));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("uuid",DT_UUID));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("ipaddr",DT_IP));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("dictionary",DT_DICTIONARY));
+		typeMap_.insert(std::pair<string,DATA_TYPE>("decimal32", DT_DECIMAL32));
+		typeMap_.insert(std::pair<string, DATA_TYPE>("decimal64", DT_DECIMAL64));
+		typeMap_.insert(std::pair<string, DATA_TYPE>("decimal128", DT_DECIMAL128));
 
-		formMap_.insert(pair<string,DATA_FORM>("scalar",DF_SCALAR));
-		formMap_.insert(pair<string,DATA_FORM>("pair",DF_PAIR));
-		formMap_.insert(pair<string,DATA_FORM>("vector",DF_VECTOR));
-		formMap_.insert(pair<string,DATA_FORM>("matrix",DF_MATRIX));
-		formMap_.insert(pair<string,DATA_FORM>("set",DF_SET));
-		formMap_.insert(pair<string,DATA_FORM>("dictionary",DF_DICTIONARY));
-		formMap_.insert(pair<string,DATA_FORM>("table",DF_TABLE));
-		formMap_.insert(pair<string,DATA_FORM>("chart",DF_CHART));
-		formMap_.insert(pair<string,DATA_FORM>("chunk",DF_CHUNK));
+		formMap_.insert(std::pair<string,DATA_FORM>("scalar",DF_SCALAR));
+		formMap_.insert(std::pair<string,DATA_FORM>("pair",DF_PAIR));
+		formMap_.insert(std::pair<string,DATA_FORM>("vector",DF_VECTOR));
+		formMap_.insert(std::pair<string,DATA_FORM>("matrix",DF_MATRIX));
+		formMap_.insert(std::pair<string,DATA_FORM>("set",DF_SET));
+		formMap_.insert(std::pair<string,DATA_FORM>("dictionary",DF_DICTIONARY));
+		formMap_.insert(std::pair<string,DATA_FORM>("table",DF_TABLE));
+		formMap_.insert(std::pair<string,DATA_FORM>("chart",DF_CHART));
+		formMap_.insert(std::pair<string,DATA_FORM>("chunk",DF_CHUNK));
 
 		arrTypeSymbol[DT_VOID]=' ';
 		arrTypeSymbol[DT_BOOL]='b';
@@ -1068,8 +1068,8 @@ private:
 	ConstantVectorFunc arrConstVectorFactory[TYPE_COUNT];
 	ConstantArrayVectorFunc arrConstArrayVectorFactory[TYPE_COUNT];
 	ConstantMatrixFunc arrConstMatrixFactory[TYPE_COUNT];
-	unordered_map<string,DATA_TYPE> typeMap_;
-	unordered_map<string,DATA_FORM> formMap_;
+	std::unordered_map<string,DATA_TYPE> typeMap_;
+	std::unordered_map<string,DATA_FORM> formMap_;
 	char arrTypeSymbol[TYPE_COUNT];
 	string arrTypeStr[TYPE_COUNT];
 	string arrFormStr[9];

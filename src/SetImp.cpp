@@ -6,6 +6,8 @@
  */
 
 #include "SetImp.h"
+#include <memory>
+using std::unordered_set;
 
 namespace dolphindb {
 

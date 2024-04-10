@@ -1,3 +1,5 @@
+#include "config.h"
+
 class FunctionTest:public testing::Test
 {
 protected:
@@ -72,27 +74,29 @@ protected:
 TEST_F(FunctionTest,test_function_get){
     TableSP tab1=conn.run("u");
     ConstantSP intval=conn.run("a");
-    VectorSP vec1= conn.run("vec");
-    VectorSP av1=conn.run("v");
-    SetSP set1=conn.run("w");
-    DictionarySP dict1=conn.run("y");
-    ConstantSP voidval=conn.run("d");
+    VectorSP vec1= conn.run("vec"); // 1 2 3
+    VectorSP av1=conn.run("v"); // 1 2 3 9 9 9
+    SetSP set1=conn.run("w"); // set(1 2 3)
+    DictionarySP dict1=conn.run("y"); // {"sym":123}
+    ConstantSP voidval=conn.run("d"); // NULL
     ConstantSP uuidval=conn.run("s");
-    ConstantSP symval=conn.run("sym");
+    ConstantSP symval=conn.run("sym"); // symbol(`a`b`c`d)
 
-    // cout<<symval->getSymbolBase()->getID();
-    cout<<tab1->getObjectType()<<endl;
-    cout<<tab1->getString()<<endl;
-    cout<<Util::getTableTypeString(tab1->getTableType())<<endl;
-    cout<<vec1->getInstance()->getString()<<endl;
-    cout<<vec1->get(0,0,0)->getString()<<endl;
-    cout<<vec1->getWindow(0,1,0,1)->getString()<<endl;
-    cout<<vec1->getSubVector(0,3,3)->getString()<<endl;
-    cout<<vec1->getSubVector(0,3)->getString()<<endl;
+    // const vector<string> ex_sym = {"a", "b", "c", "d"};
+    // for(auto i=0;i<symval->getSymbolBase()->size();i++)
+    //     EXPECT_EQ(symval->getSymbolBase()->getSymbol(i), ex_sym[i]);
+    EXPECT_EQ(tab1->getObjectType(), CONSTOBJ);
+    EXPECT_EQ(Util::getTableTypeString(tab1->getTableType()), "BASIC");
+    EXPECT_EQ(vec1->getInstance()->getString(), Util::createVector(DT_INT, 3)->getString());
+    EXPECT_EQ(vec1->get(0,0,1)->getString(), "[1]");
+    EXPECT_EQ(vec1->getWindow(0,1,0,1)->getString(), "[1]");
+    EXPECT_EQ(vec1->getSubVector(0,2,3)->getString(), "[1,2]");
+    EXPECT_EQ(vec1->getSubVector(0,3)->getString(), "[1,2,3]");
+
     cout<<vec1->getAllocatedMemory(3)<<endl;
-    cout<<Util::getDataTypeString(dict1->getRawType())<<endl;
-    cout<<Util::getCategoryString(dict1->getCategory())<<endl;
-    cout<<Util::getDataTypeString(dict1->getKeyType())<<endl;
+    EXPECT_EQ(Util::getDataTypeString(dict1->getRawType()), "ANY");
+    EXPECT_EQ(Util::getCategoryString(dict1->getCategory()), "MIXED");
+    EXPECT_EQ(Util::getDataTypeString(dict1->getKeyType()), "STRING");
     cout<<"----------------------------------------------"<<endl;
 
     EXPECT_THROW(dict1->getString(0),RuntimeException);
@@ -247,6 +251,7 @@ TEST_F(FunctionTest,test_function_get){
     cout<<tab1->getInstance(tab1->size())->getColumn(1)->getString()<<endl;
 
 }
+
 TEST_F(FunctionTest,test_function_is){
     TableSP tab1=conn.run("u");
     ConstantSP intval=conn.run("a");
@@ -532,7 +537,7 @@ TEST_F(FunctionTest,test_Util_functions){
     EXPECT_EQ(Util::getMonthStart(1),0);
     EXPECT_EQ(Util::getMonthStart(60),59);
 
-    char *buf = Util::allocateMemory(10);
+    const char *buf = Util::allocateMemory(10);
     buf="0123456789";
     EXPECT_TRUE(Util::allocateMemory(-1,false)==NULL);
     EXPECT_ANY_THROW(Util::allocateMemory(-1));
@@ -1298,7 +1303,8 @@ TEST_F(FunctionTest, DLogger){
         Util::sleep(200);
     }
     char workDir[256]{};
-    getcwd(workDir, sizeof(workDir));
+    const char* path = getcwd(workDir, sizeof(workDir));
+    printf("%s\n", path);
     std::string file = std::string(workDir).append("/tempFile123");
     DLogger::SetLogFilePath(file);
     auto level = DLogger::GetMinLevel();

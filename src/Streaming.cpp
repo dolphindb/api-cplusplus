@@ -5,17 +5,14 @@
 #include "Util.h"
 #include "TableImp.h"
 #include "ScalarImp.h"
+#include "Logger.h"
+#include "DolphinDB.h"
 #include <list>
 #ifndef WINDOWS
 #include <arpa/inet.h>
-#endif
-
-#if defined(__GNUC__) && __GNUC__ >= 4
-#define LIKELY(x) (__builtin_expect((x), 1))
-#define UNLIKELY(x) (__builtin_expect((x), 0))
 #else
-#define LIKELY(x) (x)
-#define UNLIKELY(x) (x)
+#include <ws2tcpip.h>
+#include <map>
 #endif
 
 #ifdef WINDOWS
@@ -46,6 +43,9 @@ int startWSA() {
 using std::cerr;
 using std::cout;
 using std::endl;
+using std::pair;
+using std::set;
+using std::unordered_map;
 
 constexpr int DEFAULT_QUEUE_CAPACITY = 65536;
 class Executor : public dolphindb::Runnable {
@@ -221,7 +221,7 @@ private:
 };
 
 ConstantSP convertTupleToTable(const vector<string>& colLabels, const ConstantSP& msg) {
-    int colCount = colLabels.size();
+    int colCount = static_cast<int>(colLabels.size());
     vector<ConstantSP> cols(colCount);
     for(int i=0; i<colCount; ++i){
         cols[i] = msg->get(i);
@@ -290,30 +290,50 @@ bool StreamDeserializer::parseBlob(const ConstantSP &src, vector<VectorSP> &rows
 	INDEX rowSize = symbolVec->rows();
 	rows.resize(rowSize);
 	symbols.resize(rowSize);
-	unordered_map<string, vector<DATA_TYPE>>::iterator iter;
+	unordered_map<string, vector<DATA_TYPE>>::iterator colTypeIter;
+    unordered_map<string, vector<int>>::iterator colScaleIter;
 	for (INDEX rowIndex = 0; rowIndex < rowSize; rowIndex++) {
 		string symbol = symbolVec->getString(rowIndex);
 		{
 			LockGuard<Mutex> lock(&mutex_);
-			iter = symbol2col_.find(symbol);
-			if (iter == symbol2col_.end()) {
-				errorInfo.set(ErrorCodeInfo::EC_InvalidParameter, string("Unknow symbol ") + symbol);
+            colTypeIter = symbol2col_.find(symbol);
+            colScaleIter = symbol2scale_.find(symbol);
+			if (colTypeIter == symbol2col_.end()) {
+				errorInfo.set(ErrorCodeInfo::EC_InvalidParameter, string("Unknown symbol ") + symbol);
 				return false;
 			}
 		}
 		symbols[rowIndex] = std::move(symbol);
-		vector<DATA_TYPE> &cols = iter->second;
+
+		vector<DATA_TYPE> &cols = colTypeIter->second;
+        vector<int> scales;
+        if (colScaleIter != symbol2scale_.end()) {
+            scales = colScaleIter->second;
+        }
+
 		const string &blob = blobVec->getStringRef(rowIndex);
 		DataInputStreamSP dis = new DataInputStream(blob.data(), blob.size(), false);
 		INDEX num;
 		IO_ERR ioError;
 		ConstantSP value;
 		int colIndex = 0;
-		VectorSP rowVec = Util::createVector(DT_ANY, cols.size());
-		for (auto &colOne : cols) {
+		VectorSP rowVec = Util::createVector(DT_ANY, static_cast<INDEX>(cols.size()));
+        for (auto i = 0; i < (int)cols.size(); i++) {
+            auto &colOne = cols[i];
 			num = 0;
+
+            // scale for decimal scalar and decimal array
+            auto scale = 0;
+            if (Util::getCategory(colOne) == DENARY || colOne == DT_DECIMAL32_ARRAY || colOne == DT_DECIMAL64_ARRAY || colOne == DT_DECIMAL128_ARRAY) {
+                if (scales.empty()) {
+                    errorInfo.set(ErrorCodeInfo::EC_InvalidParameter, string("Unknown scale for decimal. StreamDeserializer should be initialized with sym2schema"));
+                    return false;
+                }
+                scale = scales[i];
+            }
+
 			if (colOne < ARRAY_TYPE_BASE) {
-				value = Util::createConstant(colOne);
+				value = Util::createConstant(colOne, scale);
 				ioError = value->deserialize(dis.get(), 0, 1, num);
 				if (ioError != OK) {
 					errorInfo.set(ErrorCodeInfo::EC_InvalidObject, "Deserialize blob error " + std::to_string(ioError));
@@ -322,7 +342,7 @@ bool StreamDeserializer::parseBlob(const ConstantSP &src, vector<VectorSP> &rows
 				rowVec->set(colIndex, value);
 			}
 			else {
-				value = Util::createArrayVector(colOne, 1);
+                value = Util::createArrayVector(colOne, 1, 1, true, scale);
 				ioError = value->deserialize(dis.get(), 0, 1, num);
 				if (ioError != OK) {
 					errorInfo.set(ErrorCodeInfo::EC_InvalidObject, "Deserialize blob error " + std::to_string(ioError));
@@ -337,22 +357,31 @@ bool StreamDeserializer::parseBlob(const ConstantSP &src, vector<VectorSP> &rows
 	return true;
 }
 void StreamDeserializer::parseSchema(const unordered_map<string, DictionarySP> &sym2schema) {
+
+    LockGuard<Mutex> lock(&mutex_);
+
 	for (auto &one : sym2schema) {
 		const DictionarySP &schema = one.second;
 		TableSP colDefs = schema->getMember("colDefs");
-		ConstantSP colDefsTypeInt = colDefs->getColumn("typeInt");
-		ConstantSP colDefsTypeString = colDefs->getColumn("typeString");
 		size_t columnSize = colDefs->size();
-			
-		vector<DATA_TYPE> colTypes;
-		//tableInfo.colNames.resize(columnSize);
-		colTypes.resize(columnSize);
-		for (size_t i = 0; i < columnSize; i++) {
-			colTypes[i] = (DATA_TYPE)colDefsTypeInt->getInt(i);
-			//tableInfo.colNames[i] = colDefsTypeString->getString(i);
-		}
-		LockGuard<Mutex> lock(&mutex_);
-		symbol2col_[one.first] = colTypes;
+
+        // types
+        ConstantSP colDefsTypeInt = colDefs->getColumn("typeInt");
+        vector<DATA_TYPE> colTypes(columnSize);
+        for (auto i = 0; i < (int)columnSize; i++) {
+            colTypes[i] = (DATA_TYPE)colDefsTypeInt->getInt(i);
+        }
+        symbol2col_[one.first] = colTypes;
+
+        // scales for decimals (server 130 doesn't have this column)
+        if (colDefs->contain("extra")) {
+            ConstantSP colDefsScales = colDefs->getColumn("extra");
+            vector<int> colScales(columnSize);
+            for (auto i = 0; i < (int)columnSize; i++) {
+                colScales[i] = colDefsScales->getInt(i);
+            }
+            symbol2scale_[one.first] = colScales;
+        }
 	}
 }
 
@@ -367,7 +396,8 @@ class StreamingClientImpl {
     };
     struct SubscribeInfo {
         SubscribeInfo()
-            : host("INVAILD"),
+            : ID("INVALID"),
+              host("INVAILD"),
               port(-1),
               tableName("INVALID"),
               actionName("INVALID"),
@@ -380,11 +410,17 @@ class StreamingClientImpl {
               queue(nullptr),
 			  userName(""),
 			  password(""),
-			  streamDeserializer(nullptr) {}
-        explicit SubscribeInfo(const string &host, int port, const string &tableName, const string &actionName, long long offset, bool resub,
+			  streamDeserializer(nullptr),
+              currentSiteIndex(-1),
+              isEvent_(false),
+              resubTimeout(100),
+              subOnce(false),
+              lastSiteIndex(-1) {}
+        explicit SubscribeInfo(const string& id, const string &host, int port, const string &tableName, const string &actionName, long long offset, bool resub,
                                const VectorSP &filter, bool msgAsTable, bool allowExists, int batchSize,
-								const string &userName, const string &password, const StreamDeserializerSP &blobDeserializer)
-            : host(move(host)),
+								const string &userName, const string &password, const StreamDeserializerSP &blobDeserializer, bool isEvent, int resubTimeout, bool subOnce)
+            : ID(move(id)),
+              host(move(host)),
               port(port),
               tableName(move(tableName)),
               actionName(move(actionName)),
@@ -398,9 +434,15 @@ class StreamingClientImpl {
               queue(new MessageQueue(std::max(DEFAULT_QUEUE_CAPACITY, batchSize), batchSize)),
 			  userName(move(userName)),
 			  password(move(password)),
-			  streamDeserializer(blobDeserializer){
+			  streamDeserializer(blobDeserializer),
+			  currentSiteIndex(-1),
+			  isEvent_(isEvent),
+			  resubTimeout(resubTimeout),
+			  subOnce(subOnce),
+			  lastSiteIndex(-1){
 		}
 
+        string ID;
         string host;
         int port;
         string tableName;
@@ -416,8 +458,14 @@ class StreamingClientImpl {
 		string userName, password;
 		StreamDeserializerSP streamDeserializer;
 		SocketSP socket;
-		
         vector<ThreadSP> handleThread;
+        vector<pair<string, int>> availableSites;
+        int currentSiteIndex;
+        bool isEvent_;
+        int resubTimeout;
+        bool subOnce;
+        int lastSiteIndex;
+
 		void setExitFlag() {
 			queue->push(Message());
 		}
@@ -432,6 +480,23 @@ class StreamingClientImpl {
 				one->join();
 			}
 			handleThread.clear();
+		}
+
+		void updateByReconnect(int currentReconnSiteIndex, const string& topic) {
+            auto thisTopicLastSuccessfulNode = this->lastSiteIndex;
+
+            if (this->subOnce && thisTopicLastSuccessfulNode != currentReconnSiteIndex) {
+                        // update currentSiteIndex
+                        if (thisTopicLastSuccessfulNode < currentReconnSiteIndex){
+                            currentReconnSiteIndex --;
+                        }
+                        // update info
+                        this->availableSites.erase(this->availableSites.begin() + thisTopicLastSuccessfulNode);
+                        this->currentSiteIndex = currentReconnSiteIndex;
+
+                        // update lastSuccessfulNode
+                        this->lastSiteIndex = currentReconnSiteIndex;
+            }
 		}
     };
 	class ActivePublisher {
@@ -532,7 +597,7 @@ public:
                                      bool resubscribe = true, const VectorSP &filter = nullptr, bool msgAsTable = false,
                                      bool allowExists = false, int batchSize  = 1,
 									const string &userName="", const string &password="",
-									const StreamDeserializerSP &sdsp = nullptr);
+									const StreamDeserializerSP &sdsp = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(), bool isEvent = false, int resubTimeout = 100, bool subOnce = false);
     string subscribeInternal(DBConnection &conn, SubscribeInfo &info);
     void insertMeta(SubscribeInfo &info, const string &topic);
     bool delMeta(const string &topic, bool exitFlag);
@@ -549,7 +614,7 @@ public:
 			DLogger::Error("can't find message queue in exist topic.");
 		});
 	}
-	long getQueueDepth(const ThreadSP &thread) {
+	std::size_t getQueueDepth(const ThreadSP &thread) {
 		MessageQueueSP queue=findMessageQueue(thread);
 		if (queue.isNull()) {
 			return 0;
@@ -573,7 +638,7 @@ public:
 private:
     //if server support reverse connect, set the port to 0
     //if server Not support reverse connect and the port is 0, throw a RuntimeException
-    void checkServerVersion(std::string host, int port);
+    void checkServerVersion(std::string host, int port, const std::vector<std::string>& backupSites);
     void init();
 	bool isListenMode() {
 		return listeningPort_ > 0;
@@ -685,7 +750,10 @@ private:
 
                 ServerAddr.sin_family = AF_INET;
                 ServerAddr.sin_port = htons(remotePort);
-                ServerAddr.sin_addr.s_addr = inet_addr(remoteHost.c_str());
+                int ret = inet_pton(AF_INET, remoteHost.c_str(), &ServerAddr.sin_addr);
+                if(ret <= 0){
+                    throw RuntimeException("Couldn't convert ip address from string to num, ret " + std::to_string(ret));
+                }
                 if (connect(SendingSocket, (SOCKADDR *)&ServerAddr, sizeof(ServerAddr)) != 0) {
                     throw RuntimeException("Client: connect() failed!");
                 }
@@ -698,7 +766,12 @@ private:
                 }
                 shutdown(SendingSocket, SD_SEND);
                 closesocket(SendingSocket);
-                return string(inet_ntoa(ThisSenderInfo.sin_addr));
+
+                char myIP[16]{};
+                if(nullptr == inet_ntop(AF_INET, &ThisSenderInfo.sin_addr, myIP, sizeof(myIP))){
+                    throw RuntimeException("convert ip address to string fail");
+                }
+                return string(myIP);
 #endif
             } catch (RuntimeException &e) {
                 if (attempt++ == 10) throw;
@@ -722,6 +795,18 @@ private:
     string getLocalIP() {
         if (localIP_.empty()) localIP_ = "localhost";
         return localIP_;
+    }
+
+    void parseIpPort(const string &ipport, string &ip, int &port) {
+        auto v = Util::split(ipport, ':');
+        if (v.size() < 2) {
+            throw RuntimeException("The format of backupSite " + ipport + " is incorrect, should be host:port, e.g. 192.168.1.1:8848");
+        }
+        ip = v[0];
+        port = std::stoi(v[1]);
+        if (port <= 0 || port > 65535) {
+            throw RuntimeException("The format of backupSite " + ipport + " is incorrect, port should be a positive integer less or equal to 65535");
+        }
     }
 
     bool getNewLeader(const string& s, string &host, int &port) {
@@ -755,7 +840,6 @@ private:
     Hashmap<string, SubscribeInfo> topicSubInfos_;
     Hashmap<string, int> actionCntOnTable_;
     Hashmap<string, set<string>> liveSubsOnSite_;  // living site -> topic
-    Hashmap<string, pair<long long, long long>> siteReconn_;
     Hashmap<string, pair<long long, long long>> topicReconn_;
 	BlockingQueue<ActivePublisherSP> publishers_;
     Mutex mtx_;
@@ -764,6 +848,7 @@ private:
 	Mutex readyMutex_;
     std::list<HAStreamTableInfo> haStreamTableInfo_;
     bool isInitialized_;
+    std::map<std::string, std::string> topics_;     //ID -> current topic
 #ifdef WINDOWS
     static bool WSAStarted_;
     static void WSAStart();
@@ -794,15 +879,30 @@ void StreamingClientImpl::init(){
     daemonThread_->start();
 }
 
-void StreamingClientImpl::checkServerVersion(std::string host, int port){
-    DBConnection conn = buildConn(host, port);
+void StreamingClientImpl::checkServerVersion(std::string host, int port, const std::vector<std::string>& backupSites){
+    DBConnection conn;
+    unsigned index = 0;
+    while(true){
+        try{
+            conn = buildConn(host, port);
+            break;
+        }
+        catch(const std::exception& e){
+            if(index == backupSites.size()){
+                throw e;
+            }
+            parseIpPort(backupSites[index], host, port);
+            index++;
+        }
+    }
+     
     auto versionStr = conn.run("version()")->getString();
     auto _ = Util::split(Util::split(versionStr, ' ')[0], '.');
     auto v0 = std::stoi(_[0]);
     auto v1 = std::stoi(_[1]);
     auto v2 = std::stoi(_[2]);
     
-    if ((v0 == 2 && v1 == 0 && v2 >= 9) || (v0 == 2 && v1 == 10)) {
+    if (v0 == 3 || (v0 == 2 && v1 == 0 && v2 >= 9) || (v0 == 2 && v1 == 10)) {
         //server only support reverse connection
         if(listeningPort_ != 0){
             DLogger::Warn("The server only supports subscription through reverse connection (connection initiated by the subscriber). The specified port will not take effect.");
@@ -817,108 +917,149 @@ void StreamingClientImpl::checkServerVersion(std::string host, int port){
 }
 
 void StreamingClientImpl::reconnect() {
-	DLOG("reconnect start.");
-    const int reconnect_timeout = 3000;  // reconn every 3s
-    while (isExit()==false) {
-		if(isListenMode()){
-			siteReconn_.op([&](unordered_map<string, pair<long long, long long>> &mp) {
-				for (auto &p : mp) {
-					if (isExit()) {
-						DLOG("reconnect exit by flag.");
-						return;
-					}
-					if (Util::getEpochTime() - p.second.first <= reconnect_timeout) continue;
+    DLOG("reconnect start.");
 
-					auto v = Util::split(p.first, ':');
-					string host = v[0];
-					int port = std::stoi(v[1]);
-
-					try {
-						DBConnection conn(buildConn(host, port));
-
-						auto versionStr = conn.run("version()")->getString();
-						auto _ = Util::split(Util::split(versionStr, ' ')[0], '.');
-						auto v0 = std::stoi(_[0]);
-						auto v1 = std::stoi(_[1]);
-						auto v2 = std::stoi(_[2]);
-
-						if (v0 > 1 || (v1 >= 99 && v2 >= 5)) {
-							run(conn, "activeClosePublishConnection", getLocalIP(), listeningPort_, true);
-						} else {
-							run(conn, "activeClosePublishConnection", getLocalIP(), listeningPort_);
-						}
-
-					} catch (exception &e) {
-						cerr << "#attempt= " << p.second.first << "activeClosePublishConnection on site got an exception "
-							<< e.what() << ", site: " << host << ":" << port << endl;
-					}
-					p.second.first = Util::getEpochTime();
-					++p.second.second;
-				}
-			});
-		}
-		if (isExit()) {
-			DLOG("reconnect exit by flag.");
-			return;
-		}
+    while (!isExit()) {
+        if (isExit()) {
+            DLOG("reconnect exit by flag.");
+            return;
+        }
 
         topicReconn_.op([&](unordered_map<string, pair<long long, long long>> &mp) {
             for (auto &p : mp) {
-				if (Util::getEpochTime() - p.second.first <= reconnect_timeout) continue;
                 SubscribeInfo info;
                 if (!topicSubInfos_.find(p.first, info)) continue;
                 if (!info.resub) continue;
-//                cout << "resub offset: " << info.offset << " " << &info.offset << endl;
-				string topic = p.first;
+                string topic = p.first;
                 string host = info.host;
                 int port = info.port;
                 string newTopic = topic;
-                for (int i = 0; i < 3; ++i) {
-					if (isExit()) {
-						DLOG("reconnect exit by flag.");
-						return;
-					}
-					DLOG("reconnect", host,"for", topic);
-                    try {
-                        auto conn = buildConn(host, port);
-                        LockGuard<Mutex> lock(&readyMutex_);
-                        newTopic = subscribeInternal(conn, info);
-                        if (newTopic != topic) {
-                            delMeta(topic, false);
-                            insertMeta(info, newTopic);
+                bool isReconnected = false;
+
+                // reconn every info.resubTimeout ms
+                if (Util::getEpochTime() - p.second.first <= info.resubTimeout) continue;
+
+                if(info.availableSites.empty()){
+                    for (int i = 0; i < 3; ++i) {
+                        if (isExit()) {
+                            DLOG("reconnect exit by flag.");
+                            return;
                         }
-                        break;
-                    } catch (exception &e) {
-                        string msg = e.what();
-                        if (getNewLeader(e.what(), host, port)) {
-                            cerr << "In reconnect: Got NotLeaderException, switch to leader node [" << host << ":" << port << "] for subscription"  << endl;
-                            HAStreamTableInfo haInfo{info.host, info.port, info.tableName, info.actionName, host, port};
-                            haStreamTableInfo_.push_back(haInfo);
-                            info.host = host;
-                            info.port = port;
-                        } else {
-                            cerr << "#attempt=" << p.second.second++ << ", failed to resubscribe, exception:{"
-                                 << e.what() << "}";
-                            if (!info.haSites.empty()) {
-                                int k = rand() % info.haSites.size();
-                                host = info.haSites[k].first;
-                                port = info.haSites[k].second;
-                                cerr << ", will retry site: " << host << ":" << port << endl;
+                        DLOG("reconnect", host,"for", topic);
+                        try {
+                            auto conn = buildConn(host, port);
+                            LockGuard<Mutex> lock(&readyMutex_);
+                            newTopic = subscribeInternal(conn, info);
+                            if (newTopic != topic) {
+                                delMeta(topic, false);
+                                insertMeta(info, newTopic);
+                            }
+                            break;
+                        } catch (exception &e) {
+                            string msg = e.what();
+                            if (getNewLeader(e.what(), host, port)) {
+                                cerr << "In reconnect: Got NotLeaderException, switch to leader node [" << host << ":" << port << "] for subscription"  << endl;
+                                HAStreamTableInfo haInfo{info.host, info.port, info.tableName, info.actionName, host, port};
+                                haStreamTableInfo_.push_back(haInfo);
+                                info.host = host;
+                                info.port = port;
                             } else {
-                                cerr << endl;
+                                cerr << "#attempt=" << p.second.second++ << ", failed to resubscribe, exception:{"
+                                    << e.what() << "}";
+                                if (!info.haSites.empty()) {
+                                    int k = rand() % info.haSites.size();
+                                    host = info.haSites[k].first;
+                                    port = info.haSites[k].second;
+                                    cerr << ", will retry site: " << host << ":" << port << endl;
+                                } else {
+                                    cerr << endl;
+                                }
                             }
                         }
                     }
                 }
+                else{
+                    // if current node needs to reconnect for the first time, it will be recorded
+                    if (info.lastSiteIndex == -1) {
+                        info.lastSiteIndex = info.currentSiteIndex;
+                    }
 
+                    // try every site twice
+                    int currentSiteIndex = info.currentSiteIndex;
+                    for (unsigned i = 0; i < info.availableSites.size() && !isReconnected; ++i) {
+                        // info.availableSites.size is not empty
+                        // init new currentSite
+                        info.currentSiteIndex = currentSiteIndex;
+                        info.host = info.availableSites[info.currentSiteIndex].first;
+                        info.port = info.availableSites[info.currentSiteIndex].second;
+                        host = info.host;
+                        port = info.port;
+                        topicSubInfos_.upsert(p.first, [&](SubscribeInfo &_info) { _info = info; }, info);
+
+                        // currentSite will be reconnected twice
+                        for (int j = 0; j < 2 && !isReconnected; ++ j) {
+                            if (isExit()) {
+                                DLOG("reconnect exit by flag.");
+                                return;
+                            }
+                            DLOG("reconnect", host,"for", topic);
+                            try {
+                                auto conn = buildConn(host, port);
+                                LockGuard<Mutex> lock(&readyMutex_);
+                                newTopic = subscribeInternal(conn, info);
+                                if (newTopic != topic) {
+                                    delMeta(topic, false);
+                                    insertMeta(info, newTopic);
+                                }
+
+                                // set status flag
+                                isReconnected = true;
+                                // update info data
+                                info.updateByReconnect(currentSiteIndex, topic);
+                                topicSubInfos_.upsert(newTopic, [&](SubscribeInfo &_info) { _info = info; }, info);
+                                break;
+                            } catch (exception &e) {
+                                string msg = e.what();
+                                if(!info.availableSites.empty()){
+                                    cerr << "#attempt=" << p.second.second++ << ", failed to resubscribe, exception:{" << e.what() << "}\n";
+                                }
+                                else if (getNewLeader(e.what(), host, port)) {
+                                    cerr << "In reconnect: Got NotLeaderException, switch to leader node [" << host << ":" << port << "] for subscription"  << endl;
+                                    HAStreamTableInfo haInfo{info.host, info.port, info.tableName, info.actionName, host, port};
+                                    haStreamTableInfo_.push_back(haInfo);
+                                    info.host = host;
+                                    info.port = port;
+                                } else {
+                                    cerr << "#attempt=" << p.second.second++ << ", failed to resubscribe, exception:{"
+                                        << e.what() << "}";
+                                    if (!info.haSites.empty()) {
+                                        int k = rand() % info.haSites.size();
+                                        host = info.haSites[k].first;
+                                        port = info.haSites[k].second;
+                                        cerr << ", will retry site: " << host << ":" << port << endl;
+                                    } else {
+                                        cerr << endl;
+                                    }
+                                }
+                            }
+                        }
+                        currentSiteIndex = (currentSiteIndex + 1) % info.availableSites.size();
+                    }
+
+                    // clear currentSite
+                    if (!isReconnected) {
+                        info.currentSiteIndex = 0;
+                    }
+                }
                 p.second.first = Util::getEpochTime();
             }
         });
-		if (isExit()) {
-			DLOG("reconnect exit by flag.");
-			return;
-		}
+        if (isExit()) {
+            DLOG("reconnect exit by flag.");
+            return;
+        }
 
+        // if init unsuccessfully
         {
             LockGuard<Mutex> _(&mtx_);
             vector<SubscribeInfo> v;
@@ -928,12 +1069,20 @@ void StreamingClientImpl::reconnect() {
                 int _port = 0;
                 initResub_.pop();
                 try {
+                    if(!info.availableSites.empty()){
+                        info.currentSiteIndex = (info.currentSiteIndex + 1) % info.availableSites.size();
+                        info.host = info.availableSites[info.currentSiteIndex].first;
+                        info.port = info.availableSites[info.currentSiteIndex].second;
+                    }
                     DBConnection conn = buildConn(info.host, info.port);
                     LockGuard<Mutex> lock(&readyMutex_);
                     auto topic = subscribeInternal(conn, info);
                     insertMeta(info, topic);
                 } catch (exception &e) {
-                    if (getNewLeader(e.what(), _host, _port)) {
+                    if (!info.availableSites.empty()){
+                        cerr << "failed to resub with exception: " << e.what() << endl;
+                    }
+                    else if (getNewLeader(e.what(), _host, _port)) {
                         cerr << "when handle initResub_, Got NotLeaderException, switch to leader node [" << _host << ":" << _port << "] for subscription"  << endl;
                         HAStreamTableInfo haInfo{info.host, info.port, info.tableName, info.actionName, _host, _port};
                         haStreamTableInfo_.push_back(haInfo);
@@ -945,19 +1094,20 @@ void StreamingClientImpl::reconnect() {
                     v.emplace_back(info);
                 }
             }
-			if (isExit()) {
-				DLOG("reconnect exit by flag.");
-				return;
-			}
+            if (isExit()) {
+                DLOG("reconnect exit by flag.");
+                return;
+            }
 
             for (auto &i : v) {
                 initResub_.push(i);
             }
         }
 
-        Util::sleep(1000);
+        // check reconnected interval time
+        Util::sleep(10);
     }
-	DLOG("reconnect exit.");
+    DLOG("reconnect exit.");
 }
 
 void StreamingClientImpl::parseMessage(DataInputStreamSP in, ActivePublisherSP publisher) {
@@ -993,9 +1143,6 @@ void StreamingClientImpl::parseMessage(DataInputStreamSP in, ActivePublisherSP p
 			auto site = getSite(topics[0]);
             set<string> ts;
             if (liveSubsOnSite_.find(site, ts)) {
-				if(isListenMode()){
-                	siteReconn_.insert(site, {Util::getEpochTime() + 3000, 0});
-				}
                 for (auto &t : ts) {
                     topicReconn_.insert(t, {Util::getEpochTime(), 0});
                 }
@@ -1049,9 +1196,6 @@ void StreamingClientImpl::parseMessage(DataInputStreamSP in, ActivePublisherSP p
                 cerr << "[ERROR] schema table shuold have zero rows, stopping this parse thread." << endl;
                 return;
             }
-			if(isListenMode()){
-            	siteReconn_.erase(getSite(topics[0]));
-			}
             for (auto &t : topics) {
                 topicReconn_.erase(t);
             }
@@ -1083,7 +1227,10 @@ void StreamingClientImpl::parseMessage(DataInputStreamSP in, ActivePublisherSP p
                 SubscribeInfo info;
                 if (topicSubInfos_.find(t, info)) {
                     if (info.queue.isNull()) continue;
-					if (info.streamDeserializer.isNull()==false) {
+                    if (info.isEvent_){
+                        info.queue->push(Message(obj));
+                    }
+					else if (info.streamDeserializer.isNull()==false) {
 						if (rows.empty()) {
 							if (!info.streamDeserializer->parseBlob(obj, rows, symbols, errorInfo)) {
 								cerr << "[ERROR] parse BLOB field failed: " << errorInfo.errorInfo << ", stopping this parse thread." << endl;
@@ -1196,12 +1343,12 @@ string StreamingClientImpl::subscribeInternal(DBConnection &conn, SubscribeInfo 
 }
 
 void StreamingClientImpl::insertMeta(SubscribeInfo &info, const string &topic) {
-    if (!info.haSites.empty()) info.resub = true;
     topicSubInfos_.upsert(
         topic, [&](SubscribeInfo &_info) { _info = info; }, info);
     liveSubsOnSite_.upsert(getSite(topic), [&](set<string> &s) { s.insert(topic); }, {topic});
     actionCntOnTable_.upsert(
         stripActionName(topic), [&](int &cnt) { ++cnt; }, 1);
+    topics_[info.ID] = topic;
 }
 
 bool StreamingClientImpl::delMeta(const string &topic, bool exitFlag) {
@@ -1212,6 +1359,7 @@ bool StreamingClientImpl::delMeta(const string &topic, bool exitFlag) {
 		oldinfo=mp[topic];
 		mp.erase(topic);
 	});
+    topics_.erase(oldinfo.ID);
     liveSubsOnSite_.upsert(getSite(topic), [&](set<string> &s) { s.erase(topic); }, {});
     actionCntOnTable_.upsert(
         stripActionName(topic), [&](int &cnt) { --cnt; }, 0);
@@ -1224,21 +1372,32 @@ MessageQueueSP StreamingClientImpl::subscribeInternal(const string &host, int po
                                                       const string &actionName, int64_t offset, bool resubscribe,
                                                       const VectorSP &filter, bool msgAsTable, bool allowExists, int batchSize,
 													  const string &userName, const string &password,
-													  const StreamDeserializerSP &blobDeserializer) {
+													  const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, bool isEvent, int resubTimeout, bool subOnce) {
+
 	if (msgAsTable && !blobDeserializer.isNull()) {
 		throw RuntimeException("msgAsTable must be false when StreamDeserializer is set.");
 	}
     string topic;
     int attempt = 0;
     string _host = host;
+    string _id = host + std::to_string(port) + tableName + actionName;
     int _port = port;
-    //when server release 2.00.9 and 1.30.21 uncomment next line
-    checkServerVersion(host, port);
+    checkServerVersion(host, port, backupSites);
     init();
     while (isExit()==false) {
         ++attempt;
-        SubscribeInfo info(_host, _port, tableName, actionName, offset, resubscribe, filter, msgAsTable, allowExists,
-			batchSize, userName,password,blobDeserializer);
+        SubscribeInfo info(_id, _host, _port, tableName, actionName, offset, resubscribe, filter, msgAsTable, allowExists,
+			batchSize, userName,password,blobDeserializer, isEvent, resubTimeout, subOnce);
+        if(!backupSites.empty()){
+            info.availableSites.push_back({host, port});
+            info.currentSiteIndex = 0;
+            std::string backupIP;
+            int         backupPort;
+            for(const auto& backupSite : backupSites){
+                parseIpPort(backupSite, backupIP, backupPort);
+                info.availableSites.push_back({backupIP, backupPort});
+            }
+        }
         try {
             DBConnection conn = buildConn(_host, _port);
 			LockGuard<Mutex> lock(&readyMutex_);
@@ -1246,7 +1405,13 @@ MessageQueueSP StreamingClientImpl::subscribeInternal(const string &host, int po
 			insertMeta(info, topic);
             return info.queue;
         } catch (exception &e) {
-            if (attempt <= 10 && getNewLeader(e.what(), _host, _port)) {
+            if(!backupSites.empty()){
+                LockGuard<Mutex> _(&mtx_);
+                initResub_.push(info);
+                insertMeta(info, topic);
+                return info.queue;
+            }
+            else if (attempt <= 10 && getNewLeader(e.what(), _host, _port)) {
                 cerr << "Got NotLeaderException, switch to leader node [" << _host << ":" << _port << "] for subscription"  << endl;
                 HAStreamTableInfo info{host, port, tableName, actionName, _host, _port};
                 haStreamTableInfo_.push_back(info);
@@ -1267,29 +1432,48 @@ void StreamingClientImpl::unsubscribeInternal(const string &host, int port, cons
                                               const string &actionName) {
     std::string host_ = host;
     int port_ = port;
-    //when unsubscribe using the follow node, get the leader node info from haStreamTableInfo_
-    auto iter1 = std::find_if(haStreamTableInfo_.begin(), haStreamTableInfo_.end(), [=](const HAStreamTableInfo& info){
-        return info.followIp == host && info.followPort == port && info.tableName == tableName && info.action == actionName;
-    });
-    if(iter1 != haStreamTableInfo_.end()){
-        host_ = iter1->leaderIp;
-        port_ = iter1->leaderPort;
-        haStreamTableInfo_.erase(iter1);
+    string topic;
+    string _id = host + std::to_string(port) + tableName + actionName;
+    DBConnection conn;
+    auto iter = topics_.find(_id);
+    if(iter != topics_.end()){
+        topic = iter->second;
+        SubscribeInfo info;
+        if (!topicSubInfos_.find(topic, info)) {
+            cerr << "[WARN] subscription of topic " << topic << " not existed" << endl;
+            return;
+        }
+        if(!info.availableSites.empty()){
+            host_ = info.availableSites[info.currentSiteIndex].first;
+            port_ = info.availableSites[info.currentSiteIndex].second;
+        }
+        conn = buildConn(host_, port_);
     }
     else{
-        //in case unsubscribe using the leader node and subscribe using the follow node
-        auto iter2 = std::find_if(haStreamTableInfo_.begin(), haStreamTableInfo_.end(), [=](const HAStreamTableInfo& info){
-            return info.leaderIp == host && info.leaderPort == port && info.tableName == tableName && info.action == actionName;
+        //when unsubscribe using the follow node, get the leader node info from haStreamTableInfo_
+        auto iter1 = std::find_if(haStreamTableInfo_.begin(), haStreamTableInfo_.end(), [=](const HAStreamTableInfo& info){
+            return info.followIp == host && info.followPort == port && info.tableName == tableName && info.action == actionName;
         });
-        if(iter2 != haStreamTableInfo_.end()){
-            haStreamTableInfo_.erase(iter2);
+        if(iter1 != haStreamTableInfo_.end()){
+            host_ = iter1->leaderIp;
+            port_ = iter1->leaderPort;
+            haStreamTableInfo_.erase(iter1);
         }
-    }
-	DBConnection conn = buildConn(host_, port_);
-    string topic = run(conn, "getSubscriptionTopic", tableName, actionName)->get(0)->getString();
-    if (!topicSubInfos_.count(topic)) {
-        cerr << "[WARN] subscription of topic " << topic << " not existed" << endl;
-        return;
+        else{
+            //in case unsubscribe using the leader node and subscribe using the follow node
+            auto iter2 = std::find_if(haStreamTableInfo_.begin(), haStreamTableInfo_.end(), [=](const HAStreamTableInfo& info){
+                return info.leaderIp == host && info.leaderPort == port && info.tableName == tableName && info.action == actionName;
+            });
+            if(iter2 != haStreamTableInfo_.end()){
+                haStreamTableInfo_.erase(iter2);
+            }
+        }
+        conn = buildConn(host_, port_);
+        topic = run(conn, "getSubscriptionTopic", tableName, actionName)->get(0)->getString();
+        if (!topicSubInfos_.count(topic)) {
+            cerr << "[WARN] subscription of topic " << topic << " not existed" << endl;
+            return;
+        }
     }
 	delMeta(topic, true);
 	if (isListenMode()) {
@@ -1315,11 +1499,11 @@ MessageQueueSP StreamingClient::subscribeInternal(string host, int port, string 
                                                   int64_t offset, bool resubscribe, const dolphindb::VectorSP &filter,
                                                   bool msgAsTable, bool allowExists, int batchSize,
 												  string userName, string password,
-												  const StreamDeserializerSP &blobDeserializer) {
+												  const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, bool isEvent, int resubTimeout, bool subOnce) {
     return impl_->subscribeInternal(host, port, tableName, actionName, offset, resubscribe, filter, msgAsTable,
                                     allowExists, batchSize,
 									userName,password,
-									blobDeserializer);
+									blobDeserializer, backupSites, isEvent, resubTimeout, subOnce);
 }
 
 void StreamingClient::unsubscribeInternal(string host, int port, string tableName, string actionName) {
@@ -1337,9 +1521,11 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageBatchHand
                                    string actionName, int64_t offset, bool resub, const VectorSP &filter,
                                    bool allowExists, int batchSize, double throttle, bool msgAsTable,
 									string userName, string password,
-								   const StreamDeserializerSP &blobDeserializer) {
-    MessageQueueSP queue = subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset,
-                                             resub, filter, msgAsTable, allowExists, batchSize, userName, password, blobDeserializer);
+								   const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubTimeout, bool subOnce) {
+    MessageQueueSP queue;
+    queue = subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset,
+                              resub, filter, msgAsTable, allowExists, batchSize, userName, password, blobDeserializer,
+                              backupSites, false, resubTimeout, subOnce);
     if (queue.isNull()) {
         cerr << "Subscription already made, handler loop not created." << endl;
         ThreadSP t = new Thread(new Executor([]() {}));
@@ -1406,9 +1592,9 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageHandler &
                                    string actionName, int64_t offset, bool resub, const VectorSP &filter,
                                    bool msgAsTable, bool allowExists, 
 									string userName, string password,
-									const StreamDeserializerSP &blobDeserializer) {
+									const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubTimeout, bool subOnce) {
     MessageQueueSP queue = subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset,
-                                             resub, filter, msgAsTable, false,1, userName, password, blobDeserializer);
+                                             resub, filter, msgAsTable, false,1, userName, password, blobDeserializer, backupSites, false, resubTimeout, subOnce);
     if (queue.isNull()) {
         cerr << "Subscription already made, handler loop not created." << endl;
         ThreadSP t = new Thread(new Executor([]() {}));
@@ -1431,9 +1617,9 @@ PollingClient::PollingClient(int listeningPort) : StreamingClient(listeningPort)
 MessageQueueSP PollingClient::subscribe(string host, int port, string tableName, string actionName, int64_t offset,
                                         bool resub, const VectorSP &filter, bool msgAsTable, bool allowExists,
 										string userName, string password,
-										const StreamDeserializerSP &blobDeserializer) {
+										const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubTimeout, bool subOnce) {
     return subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset, resub, filter,
-                             msgAsTable, allowExists,1, userName, password, blobDeserializer);
+                             msgAsTable, allowExists,1, userName, password, blobDeserializer, backupSites, false, resubTimeout, subOnce);
 }
 
 void PollingClient::unsubscribe(string host, int port, string tableName, string actionName) {
@@ -1456,9 +1642,9 @@ vector<ThreadSP> ThreadPooledClient::subscribe(string host, int port, const Mess
                                                string actionName, int64_t offset, bool resub, const VectorSP &filter,
                                                bool msgAsTable, bool allowExists,
 												string userName, string password,
-												const StreamDeserializerSP &blobDeserializer) {
+												const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubTimeout, bool subOnce) {
     auto queue = subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset, resub,
-                                   filter, msgAsTable, allowExists,1, userName,password, blobDeserializer);
+                                   filter, msgAsTable, allowExists,1, userName,password, blobDeserializer, backupSites, false, resubTimeout, subOnce);
     vector<ThreadSP> ret;
     for (int i = 0; i < threadCount_ && isExit() == false; ++i) {
 		ThreadSP t = newHandleThread(handler, queue, msgAsTable, impl_);
@@ -1466,6 +1652,75 @@ vector<ThreadSP> ThreadPooledClient::subscribe(string host, int port, const Mess
         ret.emplace_back(t);
     }
     return ret;
+}
+
+EventClient::EventClient(const std::vector<EventSchema>& eventSchemas, const std::vector<std::string>& eventTimeKeys, const std::vector<std::string>& commonKeys)
+    : StreamingClient(0), eventHandler_(eventSchemas, eventTimeKeys, commonKeys)
+{
+
+}
+
+ThreadSP EventClient::subscribe(const string& host, int port, const EventMessageHandler &handler, const string& tableName, const string& actionName, int64_t offset, bool resub, const string& userName, const string& password){
+    if(tableName.empty()){
+        throw RuntimeException("tableName must not be empty.");
+    }
+
+    DBConnection tempConn;
+    if(!tempConn.connect(host, port, userName, password)){
+        throw RuntimeException("Subscribe Fail, cannot connect to " + host + " : " + std::to_string(port));
+    }
+    std::string sql = "select top 0 * from " + tableName;
+    std::string errMsg;
+    ConstantSP outputTable = tempConn.run(sql);
+    if(!eventHandler_.checkOutputTable(outputTable, errMsg)){
+        throw RuntimeException(errMsg);
+    }
+    tempConn.close();
+
+    MessageQueueSP queue = subscribeInternal(host, port, tableName, actionName, offset, resub, nullptr, false, false, 1, userName, password, nullptr, std::vector<std::string>(), true, 100, false);
+    if (queue.isNull()) {
+        cerr << "Subscription already made, handler loop not created." << endl;
+        return nullptr;
+    }
+
+    SmartPointer<StreamingClientImpl> impl = impl_;
+    ThreadSP thread = new Thread(new Executor([this, handler, queue, impl]() {
+		DLOG("nht handle start.");
+		Message msg;
+		vector<Message> tables;
+		bool foundnull = false;
+        std::vector<std::string> eventTypes;
+        std::vector<std::vector<ConstantSP>> attributes;
+        ErrorCodeInfo errorInfo;
+		while (foundnull == false && impl->isExit() == false) {
+			queue->pop(msg);
+			// quit handler loop if msg is nullptr
+			if (UNLIKELY(msg.isNull())){
+				foundnull = true;
+				break;
+			}
+            eventTypes.clear();
+            attributes.clear();
+            if(!eventHandler_.deserializeEvent(msg, eventTypes, attributes, errorInfo)){
+                std::cout << "deserialize fail " << errorInfo.errorInfo << std::endl;
+                continue;
+            }
+            unsigned rowSize = eventTypes.size();
+            for(unsigned i = 0; i < rowSize; ++i){
+                handler(eventTypes[i], attributes[i]);
+            }
+			//handler(msg);
+		}
+		queue->push(Message());
+		DLOG("nht handle exit.");
+	}));
+	impl_->addHandleThread(queue,thread);
+	thread->start();
+    return thread;
+}
+
+void EventClient::unsubscribe(const string& host, int port, const string& tableName, const string& actionName){
+    unsubscribeInternal(host, port, tableName, actionName);
 }
 
 #ifdef LINUX

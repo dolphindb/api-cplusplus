@@ -1,3 +1,5 @@
+#include "config.h"
+
 class DataformTableTest : public testing::Test
 {
 protected:

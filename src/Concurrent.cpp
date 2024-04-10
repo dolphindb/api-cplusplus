@@ -231,7 +231,7 @@ bool CountDownLatch::wait(int milliseconds){
 	int remaining = milliseconds;
 	while (count_ > 0 && remaining > 0){
 		condition_.wait(mutex_, remaining);
-		remaining = (expire - std::chrono::steady_clock::now().time_since_epoch()/std::chrono::nanoseconds(1) + 500000) / 1000000;
+		remaining = static_cast<int>((expire - std::chrono::steady_clock::now().time_since_epoch()/std::chrono::nanoseconds(1) + 500000) / 1000000);
 	}
 	return count_ == 0;
 }
@@ -442,10 +442,10 @@ void Thread::setAffinity(int id) {
 #ifdef WINDOWS
 	SYSTEM_INFO SystemInfo;
 	GetSystemInfo(&SystemInfo);
-	if (id >= SystemInfo.dwNumberOfProcessors) {
+	if (static_cast<DWORD>(id) >= SystemInfo.dwNumberOfProcessors) {
 		throw RuntimeException("Core id exceed limit " + std::to_string(SystemInfo.dwNumberOfProcessors));
 	}
-	if (SetThreadAffinityMask(thread_, 1 << id) == 0) {
+	if (SetThreadAffinityMask(thread_, 1ll << id) == 0) {
 		throw RuntimeException("BindCore failed, error code "+GetLastError());
 	}
 #elif defined MAC

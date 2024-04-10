@@ -10,7 +10,6 @@
 
 #include <iostream>
 #include <string>
-
 #include "SmartPointer.h"
 #include "Types.h"
 #include "Concurrent.h"
@@ -33,16 +32,6 @@
 #ifdef USE_OPENSSL
 #include <openssl/err.h>
 #include <openssl/ssl.h>
-#endif
-
-#ifdef _MSC_VER
-	#ifdef _DDBAPIDLL	
-		#define EXPORT_DECL _declspec(dllexport)
-	#else
-		#define EXPORT_DECL __declspec(dllimport)
-	#endif
-#else
-	#define EXPORT_DECL 
 #endif
 
 using std::string;
@@ -151,10 +140,10 @@ private:
 
 class EXPORT_DECL DataInputStream{
 public:
-	DataInputStream(STREAM_TYPE type, int bufSize = 2048);
-	DataInputStream(const char* data, int size, bool copy = true);
-	DataInputStream(const SocketSP& socket, int bufSize = 2048);
-	DataInputStream(FILE* file, int bufSize = 2048);
+	DataInputStream(STREAM_TYPE type, std::size_t bufSize = 2048);
+	DataInputStream(const char* data, std::size_t size, bool copy = true);
+	DataInputStream(const SocketSP& socket, std::size_t bufSize = 2048);
+	DataInputStream(FILE* file, std::size_t bufSize = 2048);
 	DataInputStream(DataQueueSP dataQueue);
 	virtual ~DataInputStream();
 	IO_ERR close();
@@ -209,7 +198,7 @@ public:
 	long long getPosition() const;
 
 
-	INDEX getDataSizeInArray() const { return size_;}
+	std::size_t getDataSizeInArray() const { return size_;}
 	bool isIntegerReversed() const {return reverseOrder_;}
 
 	/**
@@ -306,8 +295,8 @@ public:
 	Buffer(char* buf, size_t capacity) : buf_(buf), capacity_(capacity), size_(0), external_(true){}
 	Buffer(char* buf, size_t offset, size_t capacity, bool external = true) : buf_(buf), capacity_(capacity), size_(offset), external_(external){}
 	~Buffer() { if(!external_) delete[] buf_;}
-	IO_ERR write(const char* buffer, int length, int& actualLength);
-	IO_ERR write(const char* buffer, int length);
+	IO_ERR write(const char* buffer, size_t length, size_t& actualLength);
+	IO_ERR write(const char* buffer, size_t length);
 	inline IO_ERR write(const string& buffer){ return write(buffer.c_str(), buffer.length() + 1);}
 	inline IO_ERR writeData(const string& buffer){ return write(buffer.data(), buffer.length());}
 	inline IO_ERR write(bool val){ return write((const char*)&val, 1);}
@@ -391,7 +380,7 @@ public:
 	bool isWritable() const;
 	void isWritable(bool option);
 	IO_ERR clearReadBuffer();
-	IO_ERR write(const char* buf, int length, int& sent);
+	IO_ERR write(const char* buf, std::size_t length, std::size_t& sent);
 	IO_ERR writeLine(const char* obj, const char* newline);
 	IO_ERR seek(long long offset, int mode, long long& newPosition);
 	string getDescription() const;

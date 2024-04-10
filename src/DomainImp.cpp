@@ -1,6 +1,6 @@
 #include "DomainImp.h"
 #include "Util.h"
-
+#include "ConstantImp.h"
 
 namespace dolphindb{
 

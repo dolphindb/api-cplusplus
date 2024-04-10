@@ -1,3 +1,5 @@
+#include "config.h"
+
 namespace{
 	class BatchTableWriterTest:public testing::Test
 	{

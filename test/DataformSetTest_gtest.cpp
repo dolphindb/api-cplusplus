@@ -1,3 +1,5 @@
+#include "config.h"
+
 class DataformSetTest:public testing::Test
 {
 protected:

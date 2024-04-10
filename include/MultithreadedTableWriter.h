@@ -1,8 +1,8 @@
 #ifndef MUTITHREADEDTABLEWRITER_H_
 #define MUTITHREADEDTABLEWRITER_H_
 
+#include "Exports.h"
 #include "Concurrent.h"
-#include "DolphinDB.h"
 #include "Util.h"
 #include "Types.h"
 #include "Exceptions.h"
@@ -15,20 +15,13 @@
 #include <cassert>
 #include <unordered_map>
 
-#ifdef _MSC_VER
-	#ifdef _DDBAPIDLL	
-		#define EXPORT_DECL _declspec(dllexport)
-	#else
-		#define EXPORT_DECL __declspec(dllimport)
-	#endif
-#else
-	#define EXPORT_DECL 
-#endif
 
 namespace dolphindb{
 
+class DBConnection;
+
 class PytoDdbRowPool;
-class EXPORT_DECL  MultithreadedTableWriter {
+class EXPORT_DECL MultithreadedTableWriter {
 public:
     enum Mode{
         M_Append,
@@ -59,9 +52,9 @@ public:
                             const string& dbPath, const string& tableName, bool useSSL, bool enableHighAvailability = false, const vector<string> *pHighAvailabilitySites = nullptr,
 							int batchSize = 1, float throttle = 0.01f,int threadCount = 1, const string& partitionCol ="",
 							const vector<COMPRESS_METHOD> *pCompressMethods = nullptr, Mode mode = M_Append,
-                            vector<string> *pModeOption = nullptr, const std::function<void(ConstantSP)> &callbackFunc = nullptr);
+                            vector<string> *pModeOption = nullptr, const std::function<void(ConstantSP)> &callbackFunc = nullptr, bool enableStreamTableTimestamp = false);
 
-    ~MultithreadedTableWriter();
+    virtual ~MultithreadedTableWriter();
 
     template<typename... TArgs>
     bool insert(ErrorCodeInfo &errorInfo, TArgs... args) {
@@ -81,7 +74,7 @@ public:
             int colIndex1 = 0, colIndex2 = 0;
             ConstantSP result[] = { Util::createObject(getColDataType(colIndex1++), args, &errorInfo, colExtras_[colIndex2++])... };
             if (errorInfo.hasError()){
-                for(int i = colTypes_.size() - 1; i >= 0; --i){
+                for(int i = static_cast<int>(colTypes_.size() - 1); i >= 0; --i){
                     if(result[i].isNull()){
                         errorInfo.errorInfo.append(" for col ").append(std::to_string(i + 1));
                         return false;
@@ -104,7 +97,7 @@ public:
 	void waitForThreadCompletion();
     void getStatus(Status &status);
     void getUnwrittenData(std::vector<std::vector<ConstantSP>*> &unwrittenData);
-	bool insertUnwrittenData(std::vector<std::vector<ConstantSP>*> &records, ErrorCodeInfo &errorInfo) { return insert(records.data(), records.size(), errorInfo); }
+	bool insertUnwrittenData(std::vector<std::vector<ConstantSP>*> &records, ErrorCodeInfo &errorInfo) { return insert(records.data(), static_cast<int>(records.size()), errorInfo); }
     
 	//bool isExit(){ return hasError_; }
     //const DATA_TYPE* getColType(){ return colTypes_.data(); }
@@ -184,6 +177,8 @@ private:
     Mode mode_;
     std::function<void(ConstantSP)> callbackFunc_;
     RWLock insertRWLock_;
+
+    bool enableStreamTableTimestamp_;
 public:
     PytoDdbRowPool * getPytoDdb(){ return pytoDdb_;}
 };

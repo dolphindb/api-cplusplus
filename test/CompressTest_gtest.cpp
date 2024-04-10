@@ -1,3 +1,5 @@
+#include "config.h"
+
 class CompressTest : public testing::Test
 {
 protected:

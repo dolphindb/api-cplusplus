@@ -1,3 +1,5 @@
+#include "config.h"
+
 class DataformPairTest:public testing::Test
 {
 protected:
@@ -506,9 +508,13 @@ TEST_F(DataformPairTest,testDecimal32Pair){
 	srand((int)time(NULL));
 	int scale = rand()%9;
 	VectorSP v1 = Util::createPair(DT_DECIMAL32, scale);
-    v1->set(0, Util::createDecimal32(scale,2.33));
-    v1->set(1, Util::createDecimal32(scale,3.502));
-	string script = "a=pair(decimal32(2.33,"+to_string(scale)+"),decimal32(3.502,"+to_string(scale)+"));a";
+	ConstantSP val0 = Util::createConstant(DT_DECIMAL32, scale);
+	ConstantSP val1 = Util::createConstant(DT_DECIMAL32, scale);
+	val0->setString("1.1111111111111111111111111111");
+	val1->setString("-3.1111111111111111111111111111");
+    v1->set(0, val0);
+    v1->set(1, val1);
+	string script = "a=pair(decimal32(`1.1111111111111111111111111111,"+to_string(scale)+"),decimal32('-3.1111111111111111111111111111',"+to_string(scale)+"));a";
 	VectorSP res_v = conn.run(script);
 	conn.upload("v1",{v1});
 	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(),true);
@@ -536,14 +542,16 @@ TEST_F(DataformPairTest,testDecimal64Pair){
 	srand((int)time(NULL));
 	int scale = rand()%18;
 	VectorSP v1 = Util::createPair(DT_DECIMAL64, scale);
-    v1->set(0, Util::createDecimal64(scale,2.33));
-    v1->set(1, Util::createDecimal64(scale,3.502));
-	string script = "a=pair(decimal64(2.33,"+to_string(scale)+"),decimal64(3.502,"+to_string(scale)+"));a";
+	ConstantSP val0 = Util::createConstant(DT_DECIMAL64, scale);
+	ConstantSP val1 = Util::createConstant(DT_DECIMAL64, scale);
+	val0->setString("1.1111111111111111111111111111");
+	val1->setString("-3.1111111111111111111111111111");
+    v1->set(0, val0);
+    v1->set(1, val1);
+	string script = "a=pair(decimal64(`1.1111111111111111111111111111,"+to_string(scale)+"),decimal64('-3.1111111111111111111111111111',"+to_string(scale)+"));a";
 	VectorSP res_v = conn.run(script);
 	conn.upload("v1",{v1});
 
-	cout<<conn.run("v1")->getString()<<endl;
-	cout<<conn.run("a")->getString()<<endl;
 	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(),true);
 	EXPECT_EQ(v1->getScript(), res_v->getScript());
 	EXPECT_EQ(v1->getType(), res_v->getType());
@@ -569,9 +577,13 @@ TEST_F(DataformPairTest,testDecimal128Pair){
 	srand((int)time(NULL));
 	int scale = rand()%38;
 	VectorSP v1 = Util::createPair(DT_DECIMAL128, scale);
-    v1->set(0, Util::createDecimal128(scale, 2.33));
-    v1->set(1, Util::createDecimal128(scale, 3.502));
-	string script = "a=pair(decimal128(2.33,"+to_string(scale)+"),decimal128(3.502,"+to_string(scale)+"));a";
+	ConstantSP val0 = Util::createConstant(DT_DECIMAL128, scale);
+	ConstantSP val1 = Util::createConstant(DT_DECIMAL128, scale);
+	val0->setString("1.1111111111111111111111111111");
+	val1->setString("-3.1111111111111111111111111111");
+    v1->set(0, val0);
+    v1->set(1, val1);
+	string script = "a=pair(decimal128(`1.1111111111111111111111111111,"+to_string(scale)+"),decimal128('-3.1111111111111111111111111111',"+to_string(scale)+"));a";
 	VectorSP res_v = conn.run(script);
 	conn.upload("v1",{v1});
 	EXPECT_EQ(conn.run("eqObj(v1,a)")->getBool(),true);

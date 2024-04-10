@@ -10,6 +10,7 @@
 #include "Format.h"
 #include "Exceptions.h"
 #include "Util.h"
+#include <algorithm>
 
 namespace dolphindb {
 const string TemporalFormat::pmString = "PM";
@@ -62,7 +63,7 @@ void NumberFormat::initialize(const string& format) {
 		throw RuntimeException("The format string can't be empty.");
 	int firstSymPos = -1;
 	int lastSymPos = 0;
-	int len = format.size();
+	int len = static_cast<int>(format.size());
 
 	int scienceCount = 0, dotCount = 0, commaCount = 0, percentCount = 0, digitCount = 0;
 	int sciencePos = -1, pointPos = -1, commaPos = -1;
@@ -359,7 +360,7 @@ TemporalFormat::TemporalFormat(const string& format) : quickFormat_(false), segm
 void TemporalFormat::initialize(const string& format) {
 	if(formatMap.empty())
 		formatMap = std::move(TemporalFormat::initFormatMap());
-	int len = format.length();
+	int len = static_cast<int>(format.length());
 	if(len == 0)
 		throw RuntimeException("The format string can't be empty.");
 	else if(len > 128)
@@ -389,7 +390,7 @@ void TemporalFormat::initialize(const string& format) {
 	quickFormat_ = true;
 	len = cursor;
 
-	for (int i = 0; i <= len; ++i) {
+	for (i = 0; i <= len; ++i) {
 		if (i == len || (i != 0 && (format_[i] != format_[i - 1] || escape[i] != escape[i - 1]))) {
 			char ch = format_[i - 1];
 			if (ch >= 0 && !escape[i - 1] && formatMap[ch].first != -1) {
@@ -416,7 +417,7 @@ string TemporalFormat::format(long long nowtime, DATA_TYPE dtype) const{
 	timeNumber[2] = 1;
 	switch (dtype) {
 		case DT_MINUTE: {
-			timeNumber[4] = nowtime / 60;
+			timeNumber[4] = static_cast<int>(nowtime / 60);
 			timeNumber[6] = nowtime % 60;
 			timeNumber[5] = timeNumber[4] / 12;
 			timeNumber[3] = timeNumber[4] % 12;
@@ -426,7 +427,7 @@ string TemporalFormat::format(long long nowtime, DATA_TYPE dtype) const{
 			timeNumber[7] = nowtime % 60;
 			nowtime = nowtime / 60;
 			timeNumber[6] = nowtime % 60;
-			timeNumber[4] = nowtime / 60;
+			timeNumber[4] = static_cast<int>(nowtime / 60);
 			timeNumber[5] = timeNumber[4] / 12;
 			timeNumber[3] = timeNumber[4] % 12;
 			break;
@@ -437,7 +438,7 @@ string TemporalFormat::format(long long nowtime, DATA_TYPE dtype) const{
 			timeNumber[7] = nowtime % 60;
 			nowtime = nowtime / 60;
 			timeNumber[6] = nowtime % 60;
-			timeNumber[4] = nowtime / 60;
+			timeNumber[4] = static_cast<int>(nowtime / 60);
 			timeNumber[5] = timeNumber[4] / 12;
 			timeNumber[3] = timeNumber[4] % 12;
 			break;
@@ -448,13 +449,13 @@ string TemporalFormat::format(long long nowtime, DATA_TYPE dtype) const{
 			timeNumber[7] = nowtime % 60;
 			nowtime = nowtime / 60;
 			timeNumber[6] = nowtime % 60;
-			timeNumber[4] = nowtime / 60;
+			timeNumber[4] = static_cast<int>(nowtime / 60);
 			timeNumber[5] = timeNumber[4] / 12;
 			timeNumber[3] = timeNumber[4] % 12;
 			break;
 		}
 		case DT_MONTH: {
-			timeNumber[0] = nowtime / 12;
+			timeNumber[0] = static_cast<int>(nowtime / 12);
 			timeNumber[1] = nowtime % 12 + 1;
 			break;
 		}
@@ -463,32 +464,32 @@ string TemporalFormat::format(long long nowtime, DATA_TYPE dtype) const{
 			break;
 		}
 		case DT_DATETIME: {
-			int tmp = nowtime / 86400ll;
+			int tmp = static_cast<int>(nowtime / 86400ll);
 			nowtime = nowtime % 86400ll;
 			Util::parseDate(tmp, timeNumber[0], timeNumber[1], timeNumber[2]);
 			timeNumber[7] = nowtime % 60;
 			nowtime = nowtime / 60;
 			timeNumber[6] = nowtime % 60;
-			timeNumber[4] = nowtime / 60;
+			timeNumber[4] = static_cast<int>(nowtime / 60);
 			timeNumber[5] = timeNumber[4] / 12;
 			timeNumber[3] = timeNumber[4] % 12;
 			break;
 		}
 		case DT_DATEHOUR: {
-			int tmp = nowtime / 24;
+			int tmp = static_cast<int>(nowtime / 24);
 			nowtime = nowtime % 24;
 			if(nowtime < 0){
 				--tmp;
 				nowtime += 24;
 			}
 			Util::parseDate(tmp, timeNumber[0], timeNumber[1], timeNumber[2]);
-			timeNumber[4] = nowtime;
+			timeNumber[4] = static_cast<int>(nowtime);
 			timeNumber[5] = timeNumber[4] / 12;
 			timeNumber[3] = timeNumber[4] % 12;
             break;
 		}
 		case DT_TIMESTAMP: {
-			int tmp = nowtime / 86400000ll;
+			int tmp = static_cast<int>(nowtime / 86400000ll);
 			nowtime = nowtime % 86400000ll;
 			if(nowtime < 0){
 				--tmp;
@@ -500,13 +501,13 @@ string TemporalFormat::format(long long nowtime, DATA_TYPE dtype) const{
 			timeNumber[7] = nowtime % 60;
 			nowtime = nowtime / 60;
 			timeNumber[6] = nowtime % 60;
-			timeNumber[4] = nowtime / 60;
+			timeNumber[4] = static_cast<int>(nowtime / 60);
 			timeNumber[5] = timeNumber[4] / 12;
 			timeNumber[3] = timeNumber[4] % 12;
 			break;
 		}
 		default: {
-			int tmp = nowtime / 86400000000000ll;
+			int tmp = static_cast<int>(nowtime / 86400000000000ll);
 			nowtime = nowtime % 86400000000000ll;
 			Util::parseDate(tmp, timeNumber[0], timeNumber[1], timeNumber[2]);
 			timeNumber[9] = nowtime % 1000000000;
@@ -514,7 +515,7 @@ string TemporalFormat::format(long long nowtime, DATA_TYPE dtype) const{
 			timeNumber[7] = nowtime % 60;
 			nowtime = nowtime / 60;
 			timeNumber[6] = nowtime % 60;
-			timeNumber[4] = nowtime / 60;
+			timeNumber[4] = static_cast<int>(nowtime / 60);
 			timeNumber[5] = timeNumber[4] / 12;
 			timeNumber[3] = timeNumber[4] % 12;
 			break;
@@ -583,7 +584,7 @@ string TemporalFormat::format(long long nowtime, DATA_TYPE dtype) const{
 				}
 				for (int i = 0; i < formatDemandLength - cntDigits; ++i)
 					tmpString += '0';
-				reverse(tmpString.begin(), tmpString.end());
+				std::reverse(tmpString.begin(), tmpString.end());
 			}
 			resultString += tmpString;
 			prePos = rightPos + 1;

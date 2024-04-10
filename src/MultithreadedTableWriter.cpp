@@ -1,29 +1,31 @@
 #include "MultithreadedTableWriter.h"
 #include "ScalarImp.h"
+#include "Domain.h"
+#include "Logger.h"
+#include "DolphinDB.h"
 #include <thread>
 //#include "DdbPythonUtil.h"
 
 namespace dolphindb {
-
-#define DLOG true?DLogger::GetMinLevel() : DLogger::Info
 
 MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, int port, const std::string& userId, const std::string& password,
     const string& dbName, const string& tableName, bool useSSL,
     bool enableHighAvailability, const vector<string>* pHighAvailabilitySites,
     int batchSize, float throttle, int threadCount, const string& partitionCol,
     const vector<COMPRESS_METHOD>* pCompressMethods, MultithreadedTableWriter::Mode mode,
-    vector<string>* pModeOption, const std::function<void(ConstantSP)>& callbackFunc) :
+    vector<string>* pModeOption, const std::function<void(ConstantSP)>& callbackFunc, bool enableStreamTableTimestamp) :
     dbName_(dbName),
     tableName_(tableName),
     batchSize_(batchSize),
-    throttleMilsecond_(throttle * 1000),
+    throttleMilsecond_(static_cast<int>(throttle * 1000)),
     exited_(false),
     hasError_(false),
     partitionColumnIdx_(-1),
-    threadByColIndexForNonPartion_(-1)
+    threadByColIndexForNonPartion_(-1),
     //,pytoDdb_(new PytoDdbRowPool(*this))
-    , mode_(mode)
-    , callbackFunc_(callbackFunc)
+    mode_(mode),
+    callbackFunc_(callbackFunc),
+    enableStreamTableTimestamp_(enableStreamTableTimestamp)
 {
     if (threadCount < 1) {
         throw RuntimeException("The parameter threadCount must be greater than or equal to 1");
@@ -77,11 +79,10 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
         }
         isPartionedTable_ = false;
     }
-
     TableSP colDefs = schema->getMember("colDefs");
 
     ConstantSP colDefsTypeInt = colDefs->getColumn("typeInt");
-    size_t columnSize = colDefs->size();
+    size_t columnSize = colDefs->size() - enableStreamTableTimestamp_;
     if (saveCompressMethods_.size() > 0 && saveCompressMethods_.size() != columnSize) {
         throw RuntimeException("The number of elements in parameter compressMethods does not match the column size " + std::to_string(columnSize));
     }
@@ -89,14 +90,14 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
     int colIndex = colDefs->getColumnIndex("extra");
     if (colIndex >= 0) {
         ConstantSP colExtra = colDefs->getColumn(colIndex);
-        for (int i = 0; i < colExtra->size(); i++) {
+        for (int i = 0; i < static_cast<int>(colExtras_.size()); i++) {
             colExtras_[i] = colExtra->getInt(i);
         }
     }
 
     ConstantSP colDefsName = colDefs->getColumn("name");
     ConstantSP colDefsTypeString = colDefs->getColumn("typeString");
-    for (size_t i = 0; i < columnSize; i++) {
+    for (INDEX i = 0; i < static_cast<INDEX>(columnSize); i++) {
         colNames_.push_back(colDefsName->getString(i));
         colTypes_.push_back(static_cast<DATA_TYPE>(colDefsTypeInt->getInt(i)));
         colTypeString_.push_back(colDefsTypeString->getString(i));
@@ -318,7 +319,7 @@ bool MultithreadedTableWriter::insert(std::vector<ConstantSP>** records, int rec
         else {
             int threadindex;
             for (int i = 0; i < recordCount; i++) {
-                threadindex = records[i]->at(threadByColIndexForNonPartion_)->getHash(threads_.size());
+                threadindex = records[i]->at(threadByColIndexForNonPartion_)->getHash(static_cast<int>(threads_.size()));
                 insertThreadWrite(threadindex, records[i]);
             }
         }
@@ -344,8 +345,8 @@ void MultithreadedTableWriter::getStatus(Status& status) {
         LockGuard<Mutex> _(&writeThread.mutex_);
         threadStatus.threadId = writeThread.threadId;
         threadStatus.sentRows = writeThread.sentRows;
-        threadStatus.unsentRows = writeThread.writeQueue.size() + writeThread.sendingRows;
-        threadStatus.sendFailedRows = writeThread.failedQueue.size();
+        threadStatus.unsentRows = static_cast<long>(writeThread.writeQueue.size() + writeThread.sendingRows);
+        threadStatus.sendFailedRows = static_cast<long>(writeThread.failedQueue.size());
         status.plus(threadStatus);
     }
 }
@@ -380,7 +381,7 @@ void MultithreadedTableWriter::insertThreadWrite(int threadhashkey, std::vector<
 void MultithreadedTableWriter::callBack(std::function<void(ConstantSP)> callbackFunc,bool result,vector<vector<ConstantSP>*> &queue1) {
     if (callbackFunc == nullptr)
         return;
-    INDEX size = queue1.size();
+    INDEX size = static_cast<INDEX>(queue1.size());
     if (size < 1)
         return;
     VectorSP callbackIds = Util::createVector(DT_STRING, 0, size);
@@ -399,7 +400,7 @@ void MultithreadedTableWriter::SendExecutor::run(){
     if(init()==false){
         return;
     }
-    long batchWaitTimeout = 0, diff;
+    long long batchWaitTimeout = 0, diff;
     while(isExit() == false){
         {
             if(writeThread_.writeQueue.size() < 1){//Wait for first data
@@ -413,7 +414,7 @@ void MultithreadedTableWriter::SendExecutor::run(){
                 while (isExit() == false && writeThread_.writeQueue.size() < static_cast<std::size_t>(tableWriter_.batchSize_)) {//check batchsize
                     diff = batchWaitTimeout - Util::getEpochTime();
                     if (diff > 0) {
-                        writeThread_.nonemptySignal.tryWait(diff);
+                        writeThread_.nonemptySignal.tryWait(static_cast<int>(diff));
                     }
                     else {
                         break;
@@ -439,14 +440,14 @@ bool MultithreadedTableWriter::SendExecutor::writeAllData(){
     std::vector<std::vector<ConstantSP>*> items;
     {
         LockGuard<Mutex> _(&writeThread_.writeQueueMutex_);
-        long size = writeThread_.writeQueue.size();
+        std::size_t size = writeThread_.writeQueue.size();
         if (size < 1){
             return false;
         }
         items = writeThread_.writeQueue;
         writeThread_.writeQueue.clear();
     }
-    int size = items.size();
+    int size = static_cast<int>(items.size());
     if(size < 1){
         return false;
     }
@@ -464,7 +465,7 @@ bool MultithreadedTableWriter::SendExecutor::writeAllData(){
             if (tableWriter_.callbackFunc_ != nullptr) {//skip first callback id
                 itemStartColIndex = 1;
             }
-            INDEX colSize= tableWriter_.saveColTypes_.size();
+            INDEX colSize= static_cast<INDEX>(tableWriter_.saveColTypes_.size());
 			for (INDEX saveCol = 0; saveCol < colSize; saveCol++) {
 				Vector *pcol = (Vector*) writeTable->getColumn(saveCol).get();
                 INDEX itemColIndex = saveCol + itemStartColIndex;

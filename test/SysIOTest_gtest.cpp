@@ -1,3 +1,5 @@
+#include "config.h"
+
 class SysIOTest:public testing::Test
 {
 protected:
@@ -1235,7 +1237,7 @@ TEST_F(SysIOTest, test_DataStream_scalar_uuid)
 
 }
 
-INSTANTIATE_TEST_CASE_P(test_DataStream_scalar_Temporal_Null, SysIOTest_Parameterized, testing::Values(DT_DATE,DT_MONTH,DT_TIME,DT_MINUTE,DT_SECOND,DT_DATETIME,DT_TIMESTAMP,DT_NANOTIME,DT_NANOTIMESTAMP,DT_DATEHOUR));
+INSTANTIATE_TEST_SUITE_P(test_DataStream_scalar_Temporal_Null, SysIOTest_Parameterized, testing::Values(DT_DATE,DT_MONTH,DT_TIME,DT_MINUTE,DT_SECOND,DT_DATETIME,DT_TIMESTAMP,DT_NANOTIME,DT_NANOTIMESTAMP,DT_DATEHOUR));
 TEST_P(SysIOTest_Parameterized, test_DataStream_scalar_Temporal_Null){
     DATA_TYPE test_type =  GetParam();
     { // DDB scalar
@@ -1270,7 +1272,7 @@ TEST_P(SysIOTest_Parameterized, test_DataStream_scalar_Temporal_Null){
 }
 
 
-INSTANTIATE_TEST_CASE_P(test_DataStream_scalar_Integral_Null, SysIOTest_Parameterized, testing::Values(DT_UUID, DT_IP, DT_INT128));
+INSTANTIATE_TEST_SUITE_P(test_DataStream_scalar_Integral_Null, SysIOTest_Parameterized, testing::Values(DT_UUID, DT_IP, DT_INT128));
 TEST_P(SysIOTest_Parameterized, test_DataStream_scalar_Integral_Null){
     DATA_TYPE test_type =  GetParam();
     { // DDB scalar
@@ -1994,7 +1996,7 @@ TEST_F(SysIOTest, test_DataStream_vector_int128)
 }
 
 
-INSTANTIATE_TEST_CASE_P(test_DataStream_vector_Null, SysIOTest_Parameterized, testing::Values(DT_BOOL,DT_CHAR,DT_SHORT,DT_INT,DT_LONG,DT_DATE,DT_MONTH,DT_TIME,DT_MINUTE,DT_SECOND,DT_DATETIME,DT_TIMESTAMP,DT_NANOTIME,DT_NANOTIMESTAMP,
+INSTANTIATE_TEST_SUITE_P(test_DataStream_vector_Null, SysIOTest_Parameterized, testing::Values(DT_BOOL,DT_CHAR,DT_SHORT,DT_INT,DT_LONG,DT_DATE,DT_MONTH,DT_TIME,DT_MINUTE,DT_SECOND,DT_DATETIME,DT_TIMESTAMP,DT_NANOTIME,DT_NANOTIMESTAMP,
     DT_FLOAT,DT_DOUBLE,DT_SYMBOL,DT_STRING,DT_UUID,DT_DATEHOUR,
     DT_IP,DT_INT128,DT_BLOB, DT_DECIMAL32, DT_DECIMAL64));
 TEST_P(SysIOTest_Parameterized, test_DataStream_vector_Null){
@@ -2853,7 +2855,7 @@ TEST_F(SysIOTest, test_DataStream_table_int128)
 }
 
 
-INSTANTIATE_TEST_CASE_P(test_DataStream_table_Null, SysIOTest_Parameterized, testing::Values(DT_BOOL,DT_CHAR,DT_SHORT,DT_INT,DT_LONG,DT_DATE,DT_MONTH,DT_TIME,DT_MINUTE,DT_SECOND,DT_DATETIME,DT_TIMESTAMP,DT_NANOTIME,DT_NANOTIMESTAMP,
+INSTANTIATE_TEST_SUITE_P(test_DataStream_table_Null, SysIOTest_Parameterized, testing::Values(DT_BOOL,DT_CHAR,DT_SHORT,DT_INT,DT_LONG,DT_DATE,DT_MONTH,DT_TIME,DT_MINUTE,DT_SECOND,DT_DATETIME,DT_TIMESTAMP,DT_NANOTIME,DT_NANOTIMESTAMP,
     DT_FLOAT,DT_DOUBLE,DT_SYMBOL,DT_STRING,DT_UUID,DT_DATEHOUR,
     DT_IP,DT_INT128,DT_BLOB, DT_DECIMAL32, DT_DECIMAL64));
 TEST_P(SysIOTest_Parameterized, test_DataStream_table_Null){
@@ -3008,7 +3010,7 @@ TEST_F(SysIOTest, test_class_Buffer)
     Buffer* bf2 = new Buffer(256);
     Buffer* bf3 = new Buffer(buf1, 256);
     Buffer* bf4 = new Buffer(buf2, -1, 256);
-    int actlen;
+    std::size_t actlen;
     bf1->write(buf1,10,actlen);
     EXPECT_EQ((string)bf1->getBuffer(), buf1);
 
@@ -3069,7 +3071,7 @@ TEST_F(SysIOTest, test_DataStream_File){
         ASSERT_NE(f, nullptr);
         DataStreamSP stream = new DataStream(f, true, true);
         char buf1[] = "Hello!\r\n";
-        int sent = 0;
+        std::size_t sent = 0;
         stream->write(buf1, strlen(buf1), sent);
         char buf2[] = "My Name is";
         stream->writeLine(buf2, "\r\n");

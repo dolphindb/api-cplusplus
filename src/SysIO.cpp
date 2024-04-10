@@ -13,6 +13,7 @@
 	#include <arpa/inet.h>
 	#include <fcntl.h>
 	#include <error.h>
+	#include <netinet/tcp.h>
 	#define closesocket(s) ::close(s)
 #elif defined MAC
 	#include <unistd.h>
@@ -35,6 +36,7 @@
 
 #include "SysIO.h"
 #include "Util.h"
+#include "Logger.h"
 
 #ifdef _MSC_VER
 	#define ftello64 _ftelli64
@@ -128,7 +130,7 @@ IO_ERR Socket::read(char* buffer, size_t length, size_t& actualLength, bool msgP
 	//RecordTime record("Socket.read");
 	if (!enableSSL_) {
 #ifdef WINDOWS
-		actualLength = recv(handle_, buffer, length, msgPeek ? MSG_PEEK : 0);
+		actualLength = recv(handle_, buffer, static_cast<int>(length), msgPeek ? MSG_PEEK : 0);
 		RECORD_READ(buffer, actualLength);
 		if (actualLength < 0) {
 			DLogger::Error("socket read error", actualLength);
@@ -189,7 +191,7 @@ IO_ERR Socket::write(const char* buffer, size_t length, size_t& actualLength){
 	//RecordTime record("Socket.write");
 	if(!enableSSL_){
 #ifdef WINDOWS
-		actualLength=send(handle_, buffer, length, 0);
+		actualLength=send(handle_, buffer, static_cast<int>(length), 0);
 		RECORD_WRITE(buffer, actualLength);
 		if(actualLength != (size_t)SOCKET_ERROR)
 			return OK;
@@ -362,7 +364,7 @@ IO_ERR Socket::connect(){
 			LOG_ERR("Failed to set SO_REUSEADDR with error: " + std::to_string(getErrorCode()));
 		}
 		
-		if(::connect(handle_, p->ai_addr, p->ai_addrlen) == SOCKET_ERROR) {
+		if(::connect(handle_, p->ai_addr, static_cast<int>(p->ai_addrlen)) == SOCKET_ERROR) {
 			if(!blocking_){
 #ifdef WINDOWS
 				if(WSAGetLastError () == WSAEWOULDBLOCK){
@@ -654,7 +656,10 @@ UdpSocket::UdpSocket(const string& remoteHost, int remotePort ) : port_(0), remo
     else{
 		memset(&addrRemote_, 0 , sizeof(struct sockaddr_in));
 		addrRemote_.sin_family=AF_INET;
-		addrRemote_.sin_addr.s_addr=inet_addr(remoteHost.c_str());
+		int ret = inet_pton(AF_INET, remoteHost.c_str(), &addrRemote_.sin_addr);
+		if(ret <= 0){
+			throw RuntimeException("Couldn't convert ip address from string to num, ret " + std::to_string(ret));
+		}
 		addrRemote_.sin_port=htons(remotePort_);
     }
 }
@@ -685,7 +690,7 @@ IO_ERR UdpSocket::bind(){
 }
 
 IO_ERR UdpSocket::recv(char* buffer, size_t length, size_t& actualLength){
-    int ret=recvfrom(handle_, buffer, length, 0, NULL,NULL);
+    int ret=recvfrom(handle_, buffer, static_cast<int>(length), 0, NULL,NULL);
     if(ret < 0 ){
         LOG_ERR("UdpSocket::recv error code " + std::to_string(getErrorCode()));
         return OTHERERR;
@@ -697,7 +702,7 @@ IO_ERR UdpSocket::recv(char* buffer, size_t length, size_t& actualLength){
 }
 
 IO_ERR UdpSocket::send(const char* buffer, size_t length){
-    int ret=sendto(handle_, buffer, length, 0, (sockaddr*)&addrRemote_, sizeof(addrRemote_));
+    int ret=sendto(handle_, buffer, static_cast<int>(length), 0, (sockaddr*)&addrRemote_, sizeof(addrRemote_));
     if(ret<0){
         LOG_ERR("UdpSocket::send error code " + std::to_string(getErrorCode()));
         return OTHERERR;
@@ -714,19 +719,19 @@ int UdpSocket::getErrorCode(){
 #endif
 }
 
-DataInputStream::DataInputStream(STREAM_TYPE type, int bufSize) : file_(0), buf_(new char[bufSize]), source_(type), reverseOrder_(false), externalBuf_(false),
+DataInputStream::DataInputStream(STREAM_TYPE type, std::size_t bufSize) : file_(0), buf_(new char[bufSize]), source_(type), reverseOrder_(false), externalBuf_(false),
 		closed_(false), capacity_(bufSize), size_(0), cursor_(0){
 }
 
-DataInputStream::DataInputStream(const SocketSP& socket, int bufSize) : socket_(socket), file_(0), buf_(new char[bufSize]), source_(SOCKET_STREAM), reverseOrder_(false),
+DataInputStream::DataInputStream(const SocketSP& socket, std::size_t bufSize) : socket_(socket), file_(0), buf_(new char[bufSize]), source_(SOCKET_STREAM), reverseOrder_(false),
 		externalBuf_(false), closed_(false), capacity_(bufSize), size_(0), cursor_(0){
 }
 
-DataInputStream::DataInputStream(FILE* file, int bufSize) : file_(file), buf_(new char[bufSize]), source_(FILE_STREAM), reverseOrder_(false), externalBuf_(false),
+DataInputStream::DataInputStream(FILE* file, std::size_t bufSize) : file_(file), buf_(new char[bufSize]), source_(FILE_STREAM), reverseOrder_(false), externalBuf_(false),
 		closed_(false), capacity_(bufSize), size_(0), cursor_(0){
 }
 
-DataInputStream::DataInputStream(const char* data, int size, bool copy) : file_(0), source_(ARRAY_STREAM), reverseOrder_(false), externalBuf_(!copy), closed_(false),
+DataInputStream::DataInputStream(const char* data, std::size_t size, bool copy) : file_(0), source_(ARRAY_STREAM), reverseOrder_(false), externalBuf_(!copy), closed_(false),
 		capacity_(size), size_(size), cursor_(0){
 	if(copy){
 		buf_ = new char[size];
@@ -923,7 +928,7 @@ IO_ERR DataInputStream::readString(string& value, size_t length){
 		while(left > 0){
 			result = prepareData();
 			if(result != OK) return result;
-			int num = std::min(size_, left);
+			std::size_t num = std::min(size_, left);
 			value.append(buf_ + cursor_, num);
 			size_ -= num;
 			cursor_ += num;
@@ -1031,7 +1036,7 @@ IO_ERR DataInputStream::readBytes(char* buf, size_t length, bool reverseOrder){
 		while(left > 0){
 			result = prepareData();
 			if(result != OK) return result;
-			int num = std::min(size_, left);
+			std::size_t num = std::min(size_, left);
 			if(reverseOrder){
 				char* dst = buf + left - 1;
 				char* src = buf_ + cursor_ ;
@@ -1083,7 +1088,7 @@ IO_ERR DataInputStream::readBytes(char* buf, size_t length, size_t& actualLength
 		while(left > 0){
 			result = prepareData();
 			if(result != OK) return result;
-			int num = std::min(size_, left);
+			std::size_t num = std::min(size_, left);
 			memcpy(buf, buf_ + cursor_, num);
 			buf += num;
 			actualLength += num;
@@ -1127,10 +1132,7 @@ IO_ERR DataInputStream::readBytes(char* buf, size_t length, size_t& actualLength
     		return OK;
     }
     else if(source_ == ARRAY_STREAM){
-    	if(actualLength == 0)
-    		return END_OF_STREAM;
-    	else
-    		return OK;
+    	return END_OF_STREAM;
     }
     else{
     	size_t readCount;
@@ -1145,7 +1147,7 @@ IO_ERR DataInputStream::readBytes(char* buf, size_t unitLength, size_t length, s
 		return readBytes(buf, length, actualLength);
 
 	IO_ERR ret = readBytes(buf, length * unitLength, actualLength);
-	int remainder = actualLength % unitLength;
+	std::size_t remainder = actualLength % unitLength;
 	actualLength = actualLength / unitLength;
 	if(remainder > 0 && source_ != QUEUE_STREAM){
 		cursor_ = 0;
@@ -1237,7 +1239,7 @@ bool DataInputStream::isHaveBytesEndWith(char endChar, size_t& endPos){
 		return false;
 	}
 	char* cur = buf_ + cursor_;
-	int count = size_;
+	std::size_t count = size_;
 	while(count && *cur != endChar){
 		--count;
 		++cur;
@@ -1255,7 +1257,7 @@ IO_ERR DataInputStream::prepareBytesEndWith(char endChar, size_t& endPos){
 
 	while(!found){
 		char* cur = buf_ + cursor_ + searchedSize;
-		int count = size_ - searchedSize;
+		std::size_t count = size_ - searchedSize;
 		while(count && *cur != endChar){
 			--count;
 			++cur;
@@ -1422,14 +1424,14 @@ IO_ERR DataOutputStream::write(const char* buffer, size_t length, size_t& actual
 
 		actualWritten = 0;
 		if(size_ > 0){
-			int count = ((std::min))(flushThreshold_ - size_, length);
+			std::size_t count = std::min(flushThreshold_ - size_, length);
 			if(count > 0){
 				memcpy(buf_ + size_, buffer, count);
 				size_ += count;
 				actualWritten += count;
 			}
 
-			int cursor = 0;
+			std::size_t cursor = 0;
 			while(size_ > 0 && (ret = socket_->write(buf_ + cursor, size_, sent)) == OK){
 				cursor += sent;
 				size_ -= sent;
@@ -1681,7 +1683,7 @@ IO_ERR DataStream::clearReadBuffer(){
 	return OK;
 }
 
-IO_ERR DataStream::write(const char* buf, int length, int& sent){
+IO_ERR DataStream::write(const char* buf, std::size_t length, std::size_t& sent){
 
 	if(source_ == FILE_STREAM){
 		if(size_ >0){
@@ -1792,7 +1794,7 @@ string DataStream::getDescription() const {
 		return "ArrayStream";
 }
 
-IO_ERR Buffer::write(const char* buffer, int length, int& actualLength){
+IO_ERR Buffer::write(const char* buffer, size_t length, size_t& actualLength){
 	actualLength = 0;
 	if(size_ + length > capacity_){
 		//if(external_ || capacity_ >= MAX_ARRAY_BUFFER)
@@ -1812,7 +1814,7 @@ IO_ERR Buffer::write(const char* buffer, int length, int& actualLength){
 	return OK;
 }
 
-IO_ERR Buffer::write(const char* buffer, int length){
+IO_ERR Buffer::write(const char* buffer, size_t length){
 	if(size_ + length > capacity_){
 		//if(external_ || capacity_ >= MAX_ARRAY_BUFFER)
 		//	return TOO_LARGE_DATA;

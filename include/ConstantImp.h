@@ -16,15 +16,17 @@
 #include <iostream>
 #include <unordered_set>
 #include <typeinfo>
+#include <sstream>
+#include <iomanip>
+#include <map>
+#include <deque>
 
 #include "Util.h"
 #include "ScalarImp.h"
 #include "Types.h"
 #include "WideInteger.h"
-#include <sstream>
-#include <iomanip>
-#include <map>
-
+#include "SysIO.h"
+#include "Matrix.h"
 
 
 namespace dolphindb {
@@ -32,8 +34,8 @@ namespace dolphindb {
 class AnyVector:public Vector{
 public:
 	AnyVector(int size):data_(size, Constant::void_), containNull_(false){}
-	AnyVector(const deque<ConstantSP>& data, bool containNull):data_(data), containNull_(containNull){}
-	AnyVector(const vector<ConstantSP>& data, bool containNull):data_(data.begin(), data.end()), containNull_(containNull){}
+	AnyVector(const std::deque<ConstantSP>& data, bool containNull):data_(data), containNull_(containNull){}
+	AnyVector(const std::vector<ConstantSP>& data, bool containNull):data_(data.begin(), data.end()), containNull_(containNull){}
 	virtual ~AnyVector(){}
 	virtual bool containNotMarshallableObject() const;
 	virtual bool isLargeConstant() const {return !containNotMarshallableObject();}
@@ -54,7 +56,7 @@ public:
 	virtual bool assign(const ConstantSP& value);
 	virtual ConstantSP get(INDEX index) const {return data_[index];}
 	virtual ConstantSP get(const ConstantSP& index) const;
-	virtual bool hasNull(){return  hasNull(0, data_.size());}
+	virtual bool hasNull(){return  hasNull(0, static_cast<INDEX>(data_.size()));}
 	virtual bool hasNull(INDEX start, INDEX length);
 	virtual bool isNull(INDEX index) const {return data_[index]->isNull();}
 	virtual bool isNull() const {return false;}
@@ -123,7 +125,7 @@ public:
 	virtual char** getStringConst(INDEX start, int len, char** buf) const {
 		throw RuntimeException("getStringConst method not supported for AnyVector");
 	}
-	virtual INDEX size() const {return data_.size();}
+	virtual INDEX size() const {return static_cast<INDEX>(data_.size());}
 	virtual void neg(){throw RuntimeException("neg method not supported for AnyVector");}
 	virtual void reverse(){std::reverse(data_.begin(),data_.end());}
 	virtual void reverse(INDEX start, INDEX length){
@@ -140,7 +142,7 @@ public:
 	virtual int asof(const ConstantSP& value) const {throw RuntimeException("asof not supported.");}
 
 private:
-	mutable deque<ConstantSP> data_;
+	mutable std::deque<ConstantSP> data_;
 	bool containNull_;
 };
 
@@ -210,7 +212,7 @@ public:
 		if(!in->isIntegerReversed()){
 			size_t actualLength;
 			ret = in->readBytes((char*)(data_ + i), unitLength,  targetNumElement, actualLength);
-			i += actualLength;
+			i += static_cast<INDEX>(actualLength);
 		}
 		else{
 			for(; i<end; ++i){
@@ -490,9 +492,9 @@ public:
 			return;
 		T replace;
 		if(val->getCategory()==FLOATING)
-			replace=val->getDouble();
+			replace = static_cast<T>(val->getDouble());
 		else
-			replace=val->getLong();
+			replace = static_cast<T>(val->getLong());
 		replaceNull(replace);
 	}
 
@@ -961,7 +963,7 @@ protected:
 
 	bool checkCapacity(int appendSize){
 		if(size_+appendSize>capacity_){
-			INDEX newCapacity= (size_+appendSize)*1.2;
+			INDEX newCapacity= static_cast<INDEX>((size_ + appendSize) * 1.2);
 			T* newData = new T[newCapacity];
 			memcpy(newData,data_,size_*sizeof(T));
 			delete[] data_;
@@ -1080,7 +1082,7 @@ protected:
 
 
 protected:
-	typedef typename unordered_map<T, INDEX>::const_iterator iterator;   
+	typedef typename std::unordered_map<T, INDEX>::const_iterator iterator;   
 	T* data_;
 	T nullVal_;
 	int size_;
@@ -1088,6 +1090,25 @@ protected:
 	bool containNull_;
 	DATA_TYPE dataType_;
 };
+
+template<>
+template<typename Y>
+inline bool AbstractFastVector<wide_integer::int128>::setData(int start, int len, DATA_TYPE sourceType, Y sourceNullVal, const Y* buf){
+    for(int i = 0; i < len; ++i)
+        data_[start + i] = (buf[i] == sourceNullVal) ? nullVal_ : static_cast<wide_integer::int128>(buf[i]);
+    return true;
+}
+
+template<>
+template<typename Y>
+inline bool AbstractFastVector<wide_integer::int128>::appendData(Y* buf, int len, DATA_TYPE sourceType, Y sourceNullVal){
+    if(!checkCapacity(len))
+        return false;
+    for(int i = 0; i < len; ++i)
+        data_[size_ + i]=(buf[i] == sourceNullVal)? nullVal_ : static_cast<wide_integer::int128>(buf[i]);
+    size_ += len;
+    return true;
+}
 
 class FastVoidVector:public AbstractFastVector<char>{
 	public:
@@ -2266,14 +2287,14 @@ protected:
 class StringVector: public AbstractStringVector{
 public:
 	StringVector(INDEX size, INDEX capacity, bool blob = false);
-	StringVector(const vector<string>& data, INDEX capacity, bool containNull, bool blob = false);
+	StringVector(const std::vector<string>& data, INDEX capacity, bool containNull, bool blob = false);
     virtual DATA_TYPE getType() const {return blob_ ? DT_BLOB: DT_STRING;}
     virtual DATA_TYPE getRawType() const { return blob_ ? DT_BLOB: DT_STRING;}
     virtual DATA_CATEGORY getCategory() const {return blob_ ? BINARY : LITERAL;}
 
 	virtual ~StringVector(){}
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
-	virtual INDEX getCapacity() const {return data_.capacity();}
+	virtual INDEX getCapacity() const {return static_cast<INDEX>(data_.capacity());}
 	virtual	INDEX reserve(INDEX capacity);
 	virtual bool isFastMode() const {return false;}
 	virtual short getUnitLength() const {return 0;}
@@ -2300,7 +2321,7 @@ public:
 	virtual bool isNull() const {return false;}
 	virtual void setNull(INDEX index){data_[index]="";}
 	virtual void setNull(){}
-	virtual bool hasNull(){return hasNullInRange(0, data_.size());}
+	virtual bool hasNull(){return hasNullInRange(0, static_cast<INDEX>(data_.size()));}
 	virtual bool hasNull(INDEX start, INDEX length){return hasNullInRange(start, start + length);}
 	bool hasNullInRange(INDEX start, INDEX end);
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
@@ -2335,7 +2356,7 @@ public:
 	}
 	bool has(const string& val) const {	return std::find(data_.begin(),data_.end(),val)!=data_.end();}
 	INDEX search(const string& val);
-	virtual INDEX size() const {return data_.size();}
+	virtual INDEX size() const {return static_cast<INDEX>(data_.size());}
 	string getMember(const int& index) const { return data_[index];}
 	void setMember(const int& index, const string& val){data_[index]=val;}
 	virtual void upper();
@@ -2372,7 +2393,7 @@ public:
 	}
 
 private:
-	mutable vector<string> data_;
+	mutable std::vector<string> data_;
     bool blob_;
 };
 
@@ -2450,7 +2471,7 @@ protected:
 	int getSegmentCount(INDEX size, int segmentSizeInBit) const;
 	//start is inclusive, but end is exclusive
 	virtual bool hasNullInRange(const unsigned char* buf, INDEX start, INDEX end) const { return true;}
-
+	void* getDataArray() const override {return (void*)data_;}
 
 protected:
 	int fixedLength_;
@@ -2582,7 +2603,7 @@ public:
 		bool hasNull = false;
 		unsigned char *pdata = data_ + size_ * fixedLength_;
 		for (int i = 0; i < len; i++, pdata += fixedLength_) {
-			int buflen = strlen(buf[i]);
+			std::size_t buflen = strlen(buf[i]);
 			if (buflen == 0) {
 				hasNull = true;
 				memset(pdata, 0, fixedLength_);
@@ -2643,7 +2664,7 @@ public:
 		bool hasNull = false;
 		unsigned char *pdata = data_ + size_ * fixedLength_;
 		for (int i = 0; i < len; i++, pdata += fixedLength_) {
-			int buflen = strlen(buf[i]);
+			std::size_t buflen = strlen(buf[i]);
 			if (buflen == 0) {
 				hasNull = true;
 				memset(pdata, 0, fixedLength_);
@@ -2698,7 +2719,7 @@ public:
 		bool hasNull = false;
 		unsigned char *pdata = data_ + size_ * fixedLength_;
 		for (int i = 0; i < len; i++, pdata += fixedLength_) {
-			int buflen = strlen(buf[i]);
+			std::size_t buflen = strlen(buf[i]);
 			if (buflen == 0) {
 				hasNull = true;
 				memset(pdata, 0, fixedLength_);
@@ -3347,9 +3368,9 @@ inline void valueToDecimalraw(T value, int scale, R* result) {
         const auto factor = decimal_util::scaleMultiplier<R>(scale);
 
         if ((std::is_same<T, float>::value || std::is_same<T, double>::value) && std::trunc(value) != value) {
-            //FIXME tmp should be const long double, wait for server
-            const auto tmp = value * static_cast<T>(factor);
-            if (tmp > static_cast<T>(std::numeric_limits<R>::max()) || tmp <= static_cast<T>(std::numeric_limits<R>::min())) {
+            using UU = typename std::conditional<std::is_same<R, wide_integer::int128>::value, long double, double>::type;
+            const UU tmp = static_cast<UU>(value) * static_cast<UU>(factor);
+            if (tmp > static_cast<UU>(std::numeric_limits<R>::max()) || tmp <= static_cast<UU>(std::numeric_limits<R>::min())) {
                 throw MathException("Decimal math overflow");
             }
             *result  = static_cast<R>(tmp);
@@ -4201,7 +4222,7 @@ public:
         if (!in->isIntegerReversed()) {
             size_t actualLength;
             ret = in->readBytes(reinterpret_cast<char *>(data_ + i), unitLength, targetNumElement, actualLength);
-            i += actualLength;
+            i += static_cast<INDEX>(actualLength);
         }
         else {
             for (/**/; i < end; ++i) {

@@ -4,7 +4,8 @@
 
 #include "Types.h"
 #include "SysIO.h"
-#include "DolphinDB.h"
+#include "Vector.h"
+
 namespace dolphindb {
 
 class CompressEncoderDecoder;

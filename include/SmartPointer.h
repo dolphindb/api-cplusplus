@@ -9,15 +9,8 @@
 #define SMARTPOINTER_H_
 
 #include <atomic>
-#ifdef _MSC_VER
-	#ifdef _DDBAPIDLL	
-		#define EXPORT_DECL _declspec(dllexport)
-	#else
-		#define EXPORT_DECL __declspec(dllimport)
-	#endif
-#else
-	#define EXPORT_DECL 
-#endif
+#include "Exports.h"
+
 namespace dolphindb {
 
 class Counter {

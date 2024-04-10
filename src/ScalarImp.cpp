@@ -211,7 +211,7 @@ IO_ERR Void::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumE
 }
 
 int String::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const {
-    int len = val_.size();
+    int len = static_cast<int>(val_.size());
     if(len >= 262144){
         throw RuntimeException("String too long, Serialization failed, length must be less than 256K bytes");
     }
@@ -238,7 +238,7 @@ int String::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int&
         } else {
             if (UNLIKELY((size_t)bufSize < sizeof(int)))
                 return 0;
-            int len = val_.size();
+            int len = static_cast<int>(val_.size());
             memcpy(buf, &len, sizeof(int));
             buf += sizeof(int);
             bufSize -= sizeof(int);
@@ -323,7 +323,11 @@ string Char::getScript() const {
 	}
 	else{
 		char buf[5];
+#ifdef _MSC_VER
+		sprintf_s(buf, 5, "%d", val_);
+#else
 		sprintf(buf,"%d",val_);
+#endif
 		return string(buf);
 	}
 }
@@ -514,7 +518,7 @@ string Int128::toString(const unsigned char* data) {
 	return string(buf, 32);
 }
 
-Int128* Int128::parseInt128(const char* str, int len){
+Int128* Int128::parseInt128(const char* str, size_t len){
 	unsigned char buf[16];
 	if(len == 0){
 		memset(buf, 0, 16);
@@ -526,7 +530,7 @@ Int128* Int128::parseInt128(const char* str, int len){
 		return nullptr;
 }
 
-bool Int128::parseInt128(const char* str, int len, unsigned char *buf) {
+bool Int128::parseInt128(const char* str, size_t len, unsigned char *buf) {
 	if (len == 0) {
 		memset(buf, 0, 16);
 		return true;
@@ -558,7 +562,7 @@ Uuid::Uuid(const unsigned char* uuid){
 	memcpy(uuid_, uuid, 16);
 }
 
-Uuid::Uuid(const char* guid, int len){
+Uuid::Uuid(const char* guid, size_t len){
 	if(len == 0)
 		memset(uuid_, 0, 16);
 	else if(len != 36 || !Util::fromGuid(guid, uuid_))
@@ -569,7 +573,7 @@ Uuid::Uuid(const Uuid& copy){
 	memcpy(uuid_, copy.uuid_, 16);
 }
 
-Uuid* Uuid::parseUuid(const char* str, int len){
+Uuid* Uuid::parseUuid(const char* str, size_t len){
 	return new Uuid(str, len);
 }
 
@@ -602,13 +606,21 @@ string IPAddr::toString(const unsigned char* data) {
 	if(isIP4){
 		if(LIKELY(Util::LITTLE_ENDIAN_ORDER)){
 			for(int i=3; i>=0; --i){
+#ifdef _MSC_VER
+				cursor += sprintf_s(buf + cursor, 40 - cursor, "%d", data[i]);
+#else
 				cursor += sprintf(buf + cursor, "%d", data[i]);
+#endif
 				buf[cursor++] = '.';
 			}
 		}
 		else{
 			for(int i=12; i<16; ++i){
+#ifdef _MSC_VER
+				cursor += sprintf_s(buf + cursor, 40 - cursor, "%d", data[i]);
+#else
 				cursor += sprintf(buf + cursor, "%d", data[i]);
+#endif
 				buf[cursor++] = '.';
 			}
 		}
@@ -648,7 +660,7 @@ string IPAddr::toString(const unsigned char* data) {
 	return string(buf, cursor - 1);
 }
 
-IPAddr* IPAddr::parseIPAddr(const char* str, int len){
+IPAddr* IPAddr::parseIPAddr(const char* str, size_t len){
 	unsigned char buf[16];
 	if(parseIPAddr(str, len, buf))
 		return new IPAddr(buf);
@@ -725,7 +737,7 @@ bool IPAddr::parseIP6(const char* str, size_t len, unsigned char* buf){
 				}
 				curByte = 0;
 			}
-			lastColonPos = i;
+			lastColonPos = static_cast<int>(i);
 			continue;
 		}
 		char ch = str[i];
@@ -738,56 +750,56 @@ bool IPAddr::parseIP6(const char* str, size_t len, unsigned char* buf){
 }
 
 bool Float::getChar(INDEX start, int len, char* buf) const {
-	char tmp=isNull()?CHAR_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	char tmp = isNull() ? CHAR_MIN : static_cast<char>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return true;
 }
 
 const char* Float::getCharConst(INDEX start, int len, char* buf) const {
-	char tmp=isNull()?CHAR_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	char tmp = isNull() ? CHAR_MIN : static_cast<char>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return buf;
 }
 
 bool Float::getShort(INDEX start, int len, short* buf) const {
-	short tmp=isNull()?SHRT_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	short tmp = isNull() ? SHRT_MIN : static_cast<short>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return true;
 }
 
 const short* Float::getShortConst(INDEX start, int len, short* buf) const {
-	short tmp=isNull()?SHRT_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	short tmp = isNull() ? SHRT_MIN : static_cast<short>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return buf;
 }
 
 bool Float::getInt(INDEX start, int len, int* buf) const {
-	int tmp=isNull()?INT_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	int tmp = isNull() ? INT_MIN : static_cast<int>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return true;
 }
 
 const int* Float::getIntConst(INDEX start, int len, int* buf) const {
-	int tmp=isNull()?INT_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	int tmp = isNull() ? INT_MIN : static_cast<int>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return buf;
 }
 
 bool Float::getLong(INDEX start, int len, long long* buf) const {
-	long long tmp=isNull()?LLONG_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	long long tmp = isNull() ? LLONG_MIN : static_cast<long long>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return true;
 }
 
 const long long* Float::getLongConst(INDEX start, int len, long long* buf) const {
-	long long tmp=isNull()?LLONG_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	long long tmp = isNull() ? LLONG_MIN : static_cast<long long>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return buf;
@@ -817,7 +829,7 @@ Float* Float::parseFloat(const string& str){
 		p->setNull();
 	}
 	else
-		p=new Float(atof(str.c_str()));
+		p=new Float(static_cast<float>(atof(str.c_str())));
 	return p;
 }
 
@@ -829,55 +841,55 @@ IO_ERR Float::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNum
 }
 
 bool Double::getChar(INDEX start, int len, char* buf) const {
-	char tmp=isNull()?CHAR_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	char tmp = isNull() ? CHAR_MIN : static_cast<char>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return true;
 }
 
 const char* Double::getCharConst(INDEX start, int len, char* buf) const {
-	char tmp=isNull()?CHAR_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	char tmp = isNull() ? CHAR_MIN : static_cast<char>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return buf;
 }
 
 bool Double::getShort(INDEX start, int len, short* buf) const {
-	short tmp=isNull()?SHRT_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	short tmp = isNull() ? SHRT_MIN : static_cast<short>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return true;
 }
 
 const short* Double::getShortConst(INDEX start, int len, short* buf) const {
-	short tmp=isNull()?SHRT_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	short tmp = isNull() ? SHRT_MIN : static_cast<short>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return buf;
 }
 
 bool Double::getInt(INDEX start, int len, int* buf) const {
-	int tmp=isNull()?INT_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	int tmp = isNull() ? INT_MIN : static_cast<int>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return true;
 }
 
 const int* Double::getIntConst(INDEX start, int len, int* buf) const {
-	int tmp=isNull()?INT_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	int tmp = isNull() ? INT_MIN : static_cast<int>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return buf;
 }
 
 bool Double::getLong(INDEX start, int len, long long* buf) const {
-	long long tmp=isNull()?LLONG_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	long long tmp = isNull() ? LLONG_MIN : static_cast<long long>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return true;
 }
 const long long* Double::getLongConst(INDEX start, int len, long long* buf) const {
-	long long tmp=isNull()?LLONG_MIN:(val_<0?(val_-0.5):(val_+0.5));
+	long long tmp = isNull() ? LLONG_MIN : static_cast<long long>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return buf;
@@ -1116,7 +1128,7 @@ NanoTime* NanoTime::parseNanoTime(const string& str){
 	if(second>=60)
 		return p;
 	if(str[8]=='.'){
-		int len  = str.length()-9;
+		std::size_t len  = str.length()-9;
 		if(len == 9)
 			nanoSecond=atoi(str.substr(9, len).c_str());
 		else if(len == 6)
@@ -1224,7 +1236,7 @@ Timestamp* Timestamp::parseTimestamp(const string& str){
 		return p;
 	}
 
-	int len = str.size();
+	std::size_t len = str.size();
 	if(len < 19)
 		return p;
 
@@ -1288,7 +1300,7 @@ NanoTimestamp* NanoTimestamp::parseNanoTimestamp(const string& str){
 	if(second>=60)
 		return p;
 	if(str[19]=='.'){
-		int len = str.length()-20;
+		std::size_t len = str.length()-20;
 		if(len == 9)
 			nanosecond=atoi(str.substr(20, len).c_str());
 		else if(len == 6)
@@ -1367,7 +1379,7 @@ ConstantSP Date::castTemporal(DATA_TYPE expectType) {
 	else if (expectType == DT_DATETIME) {
 		int result;
 
-		val_ == INT_MIN ? result = INT_MIN : result = val_ * ratio;
+		val_ == INT_MIN ? result = INT_MIN : result = static_cast<int>(val_ * ratio);
 		return Util::createObject(expectType, result);
 	}
 	else {
@@ -1404,7 +1416,7 @@ ConstantSP DateHour::castTemporal(DATA_TYPE expectType) {
 	}
 	else if (expectType == DT_DATE) {
 		int result;
-		val_ == INT_MIN ? result = INT_MIN : result = val_ * 3600 / (-ratio);
+		val_ == INT_MIN ? result = INT_MIN : result = static_cast<int>(val_ * 3600 / (-ratio));
 		return Util::createObject(expectType, result);
 	}
 	else if (expectType == DT_MONTH) {
@@ -1428,10 +1440,10 @@ ConstantSP DateHour::castTemporal(DATA_TYPE expectType) {
 		ratio = Util::getTemporalConversionRatio(DT_SECOND, expectType);
 		int result;
 		if (ratio > 0) {
-			val_ == INT_MIN ? result = INT_MIN : result = val_ * 3600 % 86400 * ratio;
+			val_ == INT_MIN ? result = INT_MIN : result = static_cast<int>(val_ * 3600 % 86400 * ratio);
 		}
 		else {
-			val_ == INT_MIN ? result = INT_MIN : result = val_ * 3600 % 86400 / (-ratio);
+			val_ == INT_MIN ? result = INT_MIN : result = static_cast<int>(val_ * 3600 % 86400 / (-ratio));
 		}
 		return Util::createObject(expectType, result);
 	}
@@ -1463,7 +1475,7 @@ ConstantSP DateTime::castTemporal(DATA_TYPE expectType) {
 		ratio = -ratio;
 
 		int tail = (val_ < 0) && (val_ % ratio);
-		val_ == INT_MIN ? result = INT_MIN : result = val_ / ratio - tail;
+		val_ == INT_MIN ? result = INT_MIN : result = static_cast<int>(val_ / ratio - tail);
 		return Util::createObject(expectType, result);
 	}
 	else if (expectType == DT_MONTH) {
@@ -1491,12 +1503,12 @@ ConstantSP DateTime::castTemporal(DATA_TYPE expectType) {
 		int result;
 		if (ratio > 0) {
 			int remainder = val_ % 86400;
-			val_ == INT_MIN ? result = INT_MIN : result = (remainder + ((val_ < 0) && remainder) * 86400) * ratio;
+			val_ == INT_MIN ? result = INT_MIN : result = static_cast<int>((remainder + ((val_ < 0) && remainder) * 86400) * ratio);
 		}
 		else {
 			ratio = -ratio;
 			int remainder = val_ % 86400;
-			val_ == INT_MIN ? result = INT_MIN : result = (remainder + ((val_ < 0) && remainder) * 86400) / ratio;
+			val_ == INT_MIN ? result = INT_MIN : result = static_cast<int>((remainder + ((val_ < 0) && remainder) * 86400) / ratio);
 		}
 		return Util::createObject(expectType, result);
 	}
@@ -1522,7 +1534,7 @@ ConstantSP Minute::castTemporal(DATA_TYPE expectType) {
 	else {
 		int result;
 
-		val_ == INT_MIN ? result = INT_MIN : result = val_ * ratio;
+		val_ == INT_MIN ? result = INT_MIN : result = static_cast<int>(val_ * ratio);
 		return Util::createObject(expectType, result);
 	}
 }
@@ -1554,13 +1566,13 @@ ConstantSP Second::castTemporal(DATA_TYPE expectType) {
 	else if (expectType == DT_TIME) {
 		int result;
 
-		val_ == INT_MIN ? result = INT_MIN : result = val_ * ratio;
+		val_ == INT_MIN ? result = INT_MIN : result = static_cast<int>(val_ * ratio);
 		return Util::createObject(expectType, result);
 	}
 	else {
 		int result;
 
-		val_ == INT_MIN ? result = INT_MIN : result = val_ / (-ratio);
+		val_ == INT_MIN ? result = INT_MIN : result = static_cast<int>(val_ / (-ratio));
 		return Util::createObject(expectType, result);
 	}
 }
@@ -1584,7 +1596,7 @@ ConstantSP Time::castTemporal(DATA_TYPE expectType) {
 	else {
 		int result;
 
-		val_ == INT_MIN ? result = INT_MIN : result = val_ / (-ratio);
+		val_ == INT_MIN ? result = INT_MIN : result = static_cast<int>(val_ / (-ratio));
 		return Util::createObject(expectType, result);
 	}
 }
@@ -1602,7 +1614,7 @@ ConstantSP NanoTime::castTemporal(DATA_TYPE expectType) {
 	long long ratio = Util::getTemporalConversionRatio(DT_NANOTIME, expectType);
 
 	int result;
-	val_ == LLONG_MIN ? result = INT_MIN : result = val_ / (-ratio);
+	val_ == LLONG_MIN ? result = INT_MIN : result = static_cast<int>(val_ / (-ratio));
 	return Util::createObject(expectType, result);
 }
 
@@ -1617,7 +1629,7 @@ ConstantSP Timestamp::castTemporal(DATA_TYPE expectType) {
 		int result;
 
 		int tail = (val_ < 0) && (val_ % 3600000);
-		val_ == LLONG_MIN ? result = INT_MIN : result = val_ / 3600000LL - tail;
+		val_ == LLONG_MIN ? result = INT_MIN : result = static_cast<int>(val_ / 3600000LL - tail);
 		return Util::createObject(expectType, result);
 	}
 	long long ratio = Util::getTemporalConversionRatio(DT_TIMESTAMP, expectType);
@@ -1632,7 +1644,7 @@ ConstantSP Timestamp::castTemporal(DATA_TYPE expectType) {
 		ratio = -ratio;
 
 		int tail = (val_ < 0) && (val_ % ratio);
-		val_ == LLONG_MIN ? result = INT_MIN : result = val_ / ratio - tail;
+		val_ == LLONG_MIN ? result = INT_MIN : result = static_cast<int>(val_ / ratio - tail);
 		return Util::createObject(expectType, result);
 	}
 	else if (expectType == DT_MONTH) {
@@ -1643,7 +1655,7 @@ ConstantSP Timestamp::castTemporal(DATA_TYPE expectType) {
 		}
 		else {
 			int year, month, day;
-			Util::parseDate(val_ / 86400000, year, month, day);
+			Util::parseDate(static_cast<int>(val_ / 86400000), year, month, day);
 			result = year * 12 + month - 1;
 		}
 		return Util::createObject(expectType, result);
@@ -1661,7 +1673,7 @@ ConstantSP Timestamp::castTemporal(DATA_TYPE expectType) {
 		if (ratio < 0) ratio = -ratio;
 
 		int remainder = val_ % 86400000;
-		val_ == LLONG_MIN ? result = INT_MIN : result = (remainder + ((val_ < 0) && remainder) * 86400000) / ratio;
+		val_ == LLONG_MIN ? result = INT_MIN : result = static_cast<int>((remainder + ((val_ < 0) && remainder) * 86400000) / ratio);
 		return Util::createObject(expectType, result);
 	}
 }
@@ -1677,7 +1689,7 @@ ConstantSP NanoTimestamp::castTemporal(DATA_TYPE expectType) {
 		int result;
 
 		int tail = (val_ < 0) && (val_ % 3600000000000ll);
-		val_ == LLONG_MIN ? result = INT_MIN : result = val_ / 3600000000000ll - tail;
+		val_ == LLONG_MIN ? result = INT_MIN : result = static_cast<int>(val_ / 3600000000000ll - tail);
 		return Util::createObject(expectType, result);
 	}
 	long long ratio = -Util::getTemporalConversionRatio(DT_NANOTIMESTAMP, expectType);
@@ -1692,7 +1704,7 @@ ConstantSP NanoTimestamp::castTemporal(DATA_TYPE expectType) {
 		int result;
 
 		int tail = (val_ < 0) && (val_ % ratio);
-		val_ == LLONG_MIN ? result = INT_MIN : result = val_ / ratio - tail;
+		val_ == LLONG_MIN ? result = INT_MIN : result = static_cast<int>(val_ / ratio - tail);
 		return Util::createObject(expectType, result);
 	}
 	else if (expectType == DT_MONTH) {
@@ -1703,7 +1715,7 @@ ConstantSP NanoTimestamp::castTemporal(DATA_TYPE expectType) {
 		}
 		else {
 			int year, month, day;
-			Util::parseDate(val_ / 86400000000000ll, year, month, day);
+			Util::parseDate(static_cast<int>(val_ / 86400000000000ll), year, month, day);
 			result = year * 12 + month - 1;
 		}
 		return Util::createObject(expectType, result);
@@ -1721,7 +1733,7 @@ ConstantSP NanoTimestamp::castTemporal(DATA_TYPE expectType) {
 		ratio = -ratio;
 
 		long long remainder = val_ % 86400000000000ll;
-		val_ == LLONG_MIN ? result = INT_MIN : result = (remainder + (val_ < 0 && remainder) * 86400000000000ll) / ratio;
+		val_ == LLONG_MIN ? result = INT_MIN : result = static_cast<int>((remainder + (val_ < 0 && remainder) * 86400000000000ll) / ratio);
 		return Util::createObject(expectType, result);
 	}
 }

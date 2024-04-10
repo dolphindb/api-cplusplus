@@ -293,6 +293,7 @@ bool DeltaBufferRead::readBits(int bits, unsigned long long *value) {
 	}
 	else {
 		// This word and next one, no more (max bits is 64)
+		if(bitsAvailable_ < 1) return false;
 		*value = (*b_) & m.MASK_ARRAY[bitsAvailable_ - 1]; // Read what's left first
 		bits -= bitsAvailable_;
 		if (!flipByte()) {
@@ -453,7 +454,7 @@ int DeltaCompressor<T>::writeData(const T *data, int DataSize, long long *buf, i
 	blockData_ = (long long)data[count];
 
 	write_.writeBits(1, 1);
-	writeHeaderData(blockData_);
+	writeHeaderData(static_cast<T>(blockData_));
 
 	count++;
 	while (count<DataSize) {

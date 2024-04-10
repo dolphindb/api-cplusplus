@@ -1,3 +1,5 @@
+#include "config.h"
+
 class DolphinDBTest:public testing::Test
 {
 protected:
@@ -971,7 +973,24 @@ TEST_F(DolphinDBTest,test_printMsg){
 						s=uuid(\"5d212a78-cc48-e3b1-4235-b4d91473ee87\");\
 						t=blob(string[1]);\
 						u=table(1 2 3 as col1, `a`b`c as col2);\
-        				v=arrayVector(1 2 3 , 9 9 9)";
-	conn.run(script5);					
-    conn.run("print(a,b,c,d,ee,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v)");
+        				v=arrayVector(1 2 3 , 9 9 9);\
+						w=dict(`a`b, '中文123￥……，'`)";
+	conn.run(script5);
+	ofstream file("output.txt");
+	std::streambuf* originalBuffer = std::cout.rdbuf();
+	std::cout.rdbuf(file.rdbuf());
+
+ 	conn.run("print(a,b,c,d,ee,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w)");
+
+	std::cout.rdbuf(originalBuffer);
+	file.close();
+	ifstream infile("output.txt");
+	string content((std::istreambuf_iterator<char>(infile)),
+                        std::istreambuf_iterator<char>());
+	cout << content<<endl;
+	const string expectedContent = "1\n1\n1\n1\n1\n1970.01.02\n0000.02M\n00:00:00.001\n00:01m\n00:00:01\n1970.01.01T00:00:01\n1970.01.01T00:00:00.001\n00:00:00.000000001\n1970.01.01T00:00:00.000000001\n1\n1\n1\n5d212a78-cc48-e3b1-4235-b4d91473ee87\n[\"1\"]\ncol1 col2\n---- ----\n1    a   \n2    b   \n3    c   \n\n[[9],[9],[9]]\nb->\na->中文123￥……，\n\n";
+	EXPECT_EQ(content, expectedContent);
+	infile.close();
+
+	remove("output.txt");
 }

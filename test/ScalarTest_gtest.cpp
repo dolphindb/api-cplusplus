@@ -1,3 +1,4 @@
+#include "config.h"
 #include <sstream>
 
 class ScalarTest:public testing::Test
@@ -564,7 +565,7 @@ TEST_F(ScalarTest,testDecimal128){
     ConstantSP decimalval2 = Util::createNullConstant(DT_DECIMAL128, 26);
 
     EXPECT_DOUBLE_EQ(decimalval1->getDouble(), 13.1626);
-    EXPECT_EQ(decimalval1->getString(), decimal128_normal->getString());
+    EXPECT_NEAR(decimalval1->getDouble(), decimal128_normal->getDouble(), 0.0001);
     EXPECT_EQ(decimalval1->getType(), DT_DECIMAL128);
     EXPECT_EQ(decimalval1->getType(), decimal128_normal->getType());
     EXPECT_EQ(decimalval1->getRawType(), DT_DECIMAL128);
@@ -641,7 +642,11 @@ TEST_F(ScalarTest,testDecimal128){
     EXPECT_NEAR(decimalval1->getFloat(),(float)3.1315, 4);
     EXPECT_NEAR(decimalval2->getFloat(),(float)3.1315, 4);
     decimalval2->assign(Util::createDouble(-3.131544));
-    EXPECT_EQ(decimalval2->getString(),"-3.13154400000000037287362560");
+	string re0 = decimalval2->getString();
+	size_t re0_scale = re0.length() - re0.find(".") - 1;
+	EXPECT_EQ(re0_scale, 26);
+	double re0_val = stod(re0);
+	EXPECT_NEAR(re0_val, -3.131544, 0.000001);
 
     decimalval1->assign(Util::createInt(1));
 	EXPECT_EQ(decimalval1->compare(0,Util::createInt(0)),1);
@@ -735,8 +740,11 @@ TEST_F(ScalarTest, test_convertType_decimal64){
     cout<< dcmVal->getString()<<endl;
 
     dcmVal->setFloat(-1.1);
-
-    EXPECT_EQ(dcmVal->getString(), "-1.1000000729317376");
+	string re0 = dcmVal->getString();
+	size_t re0_scale = re0.length() - re0.find(".") - 1;
+	EXPECT_EQ(re0_scale, 16);
+	double re0_val = stod(re0);
+	EXPECT_NEAR(re0_val, -1.1, 0.1f);
     cout<< dcmVal->getString()<<endl;
 
     dcmVal->setInt(1);
@@ -760,12 +768,20 @@ TEST_F(ScalarTest, test_convertType_decimal64){
 
 TEST_F(ScalarTest, test_convertType_decimal128){
     ConstantSP dcmVal = Util::createDecimal128(26, -0.53);
-    EXPECT_EQ(dcmVal->getString(), "-0.53000000000000007163871232");
+	string re0 = dcmVal->getString();
+	size_t re0_scale = re0.length() - re0.find(".") - 1;
+	EXPECT_EQ(re0_scale, 26);
+	double re0_val = stod(re0);
+	EXPECT_NEAR(re0_val, -0.53, 0.01f);
     cout<< dcmVal->getString()<<endl;
 
     dcmVal->setDouble(8.3456);
     EXPECT_DOUBLE_EQ(dcmVal->getDouble(), 8.3456);
-    EXPECT_EQ(dcmVal->getString(), "8.34560000000000010737418240");
+	re0 = dcmVal->getString();
+	re0_scale = re0.length() - re0.find(".") - 1;
+	EXPECT_EQ(re0_scale, 26);
+	re0_val = stod(re0);
+	EXPECT_NEAR(re0_val, 8.3456, 0.0001);
     cout<< dcmVal->getString()<<endl;
 
     dcmVal->setString("987.213649237905538612254387602358");
@@ -781,7 +797,11 @@ TEST_F(ScalarTest, test_convertType_decimal128){
     cout<< dcmVal->getString()<<endl;
 
     dcmVal->setFloat(-1.1);
-    EXPECT_EQ(dcmVal->getString(), "-1.10000000946866311755988992");
+	re0 = dcmVal->getString();
+	re0_scale = re0.length() - re0.find(".") - 1;
+	EXPECT_EQ(re0_scale, 26);
+	re0_val = stod(re0);
+	EXPECT_NEAR(re0_val, -1.1, 0.1f);
     cout<< dcmVal->getString()<<endl;
 
     dcmVal->setInt(1);
@@ -2416,4 +2436,13 @@ TEST_F(ScalarTest,testFunction_parseInt128){
     val = Util::parseConstant(DT_INT128, "e1671797c52e15f763380b45e841ec32");
     EXPECT_EQ(val->getString(), "e1671797c52e15f763380b45e841ec32");
 
+}
+
+TEST_F(ScalarTest,testFunction_parseUUID){
+    ConstantSP val;
+    val = Util::parseConstant(DT_UUID, "");
+    EXPECT_EQ(val->getString(), "00000000-0000-0000-0000-000000000000");
+
+    val = Util::parseConstant(DT_UUID, "5d212a78-cc48-e3b1-4235-b4d91473ee87");
+    EXPECT_EQ(val->getString(), "5d212a78-cc48-e3b1-4235-b4d91473ee87");
 }

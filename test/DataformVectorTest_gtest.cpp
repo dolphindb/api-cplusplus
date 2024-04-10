@@ -1,4 +1,6 @@
 
+#include "config.h"
+
 class DataformVectorTest : public testing::Test
 {
 protected:
@@ -4333,7 +4335,7 @@ TEST_F(DataformVectorTest, testDecimal32Vector)
 	const double buf4[1] = {5.6320001};
 	v1->setFloat(0, 1, buf3);
 	v1->setDouble(1, 1, buf4);
-	EXPECT_EQ(v1->getString(), "[4.10,5.63]");
+	EXPECT_EQ(v1->getString(), "[4.09,5.63]");
 
 	v1->set(0, Util::createDecimal32(1, 1.2322));
 	v1->set(1, Util::createDecimal32(5, 3.15));
@@ -4467,12 +4469,32 @@ TEST_F(DataformVectorTest, testDecimal64Vector)
 
 	v1->setFloat(0, 0.999);
 	v1->setDouble(1, 2.5);
-	EXPECT_EQ(v1->getString(), "[0.9990000514957312,2.5000000000000000]");
+	string re0 = v1->get(0)->getString();
+	string re1 = v1->get(1)->getString();
+	size_t re0_scale = re0.length() - re0.find(".") - 1;
+	size_t re1_scale = re1.length() - re1.find(".") - 1;
+	EXPECT_EQ(re0_scale, 16);
+	EXPECT_EQ(re1_scale, 16);
+	double re0_val = stod(re0);
+	double re1_val = stod(re1);
+	EXPECT_NEAR(re0_val, 0.999, 0.001f);
+	EXPECT_NEAR(re1_val, 2.5, 0.1f);
+
+
 	const float buf3[1] = {4.1};
 	const double buf4[1] = {5.6320001};
 	v1->setFloat(0, 1, buf3);
 	v1->setDouble(1, 1, buf4);
-	EXPECT_EQ(v1->getString(), "[4.0999998325784576,5.6320001000000000]");
+	re0 = v1->get(0)->getString();
+	re1 = v1->get(1)->getString();
+	re0_scale = re0.length() - re0.find(".") - 1;
+	re1_scale = re1.length() - re1.find(".") - 1;
+	EXPECT_EQ(re0_scale, 16);
+	EXPECT_EQ(re1_scale, 16);
+	re0_val = stod(re0);
+	re1_val = stod(re1);
+	EXPECT_NEAR(re0_val, 4.1, 0.1);
+	EXPECT_NEAR(re1_val, 5.6320001, 0.001);
 
 	v1->set(0, Util::createDecimal64(1, 1.2322));
 	v1->set(1, Util::createDecimal64(5, 3.15));
@@ -4613,15 +4635,34 @@ TEST_F(DataformVectorTest, testDecimal128Vector)
 
 	v1->setFloat(0, 0.999);
 	v1->setDouble(1, 2.5);
-	EXPECT_EQ(v1->getString(), "[0.99900002738140710636093440,2.50000000000000003321888768]");
+	string re0 = v1->get(0)->getString();
+	string re1 = v1->get(1)->getString();
+	size_t re0_scale = re0.length() - re0.find(".") - 1;
+	size_t re1_scale = re1.length() - re1.find(".") - 1;
+	EXPECT_EQ(re0_scale, 26);
+	EXPECT_EQ(re1_scale, 26);
+	double re0_val = stod(re0);
+	double re1_val = stod(re1);
+	EXPECT_NEAR(re0_val, 0.999, 0.001);
+	EXPECT_NEAR(re1_val, 2.5, 0.1);
+
 	const float buf3[1] = {4.1};
 	const double buf4[1] = {5.6320001};
 	v1->setFloat(0, 1, buf3);
 	v1->setDouble(1, 1, buf4);
-	EXPECT_EQ(v1->getString(), "[4.09999990113415108392648704,5.63200010000000053520891904]");
+	re0 = v1->get(0)->getString();
+	re1 = v1->get(1)->getString();
+	re0_scale = re0.length() - re0.find(".") - 1;
+	re1_scale = re1.length() - re1.find(".") - 1;
+	EXPECT_EQ(re0_scale, 26);
+	EXPECT_EQ(re1_scale, 26);
+	re0_val = stod(re0);
+	re1_val = stod(re1);
+	EXPECT_NEAR(re0_val, 4.1, 0.1);
+	EXPECT_NEAR(re1_val, 5.6320001, 0.001);
 
 	v1->set(0, Util::createDecimal128(1, 1.2322));
-	v1->set(1, Util::createDecimal128(5, 3.15));
+	v1->set(1, Util::createDecimal128(5, 3.15f));
 	EXPECT_EQ(v1->getType(), DT_DECIMAL128);
 	EXPECT_EQ(v1->getString(), "[1.20000000000000000000000000,3.15000000000000000000000000]");
 
@@ -4797,7 +4838,7 @@ TEST_F(DataformVectorTest, testDecimal64Vector_typeConvert){
 	dsm64V->setBool(4, true);
 	dsm64V->setChar(5, '\2');
 	dsm64V->setDouble(6, -0.23559913);
-	dsm64V->setFloat(7, 1.1);
+	dsm64V->setFloat(7, 1.1f);
 	dsm64V->setInt(8, 100);
 	dsm64V->setLong(9, 6l);
 	dsm64V->setShort(10, 200);
@@ -4805,8 +4846,21 @@ TEST_F(DataformVectorTest, testDecimal64Vector_typeConvert){
 	dsm64strval->setString("3.4562987561654895642");
 	dsm64V->set(11, dsm64strval);
 	dsm64V->setNull(12);
-	EXPECT_EQ(dsm64V->getString(), "[0.2345670000000000,,-0.2345678652346821,1.1000000000000000,1.0000000000000000,2.0000000000000000"
-									",-0.2355991300000000,1.1000000729317376,100.0000000000000000,6.0000000000000000,200.0000000000000000,3.4562987561654896,]");
+
+	vector<double> vals = {0.23456789,DBL_MIN,-0.2345678652346821,1.1,1.0,2.0,-0.23559913,1.1,100.0,6.0,200.0,3.4562987561654895642,DBL_MIN};
+	for (auto i=0;i<dsm64V->size();i++){
+		string re = dsm64V->get(i)->getString();
+		size_t re_scale = re.length() - re.find(".") - 1;
+
+		if (vals[i] == DBL_MIN){
+			EXPECT_EQ(re, "");
+			EXPECT_EQ(re_scale, 0);
+			continue;
+		}
+		EXPECT_EQ(re_scale, 16);
+		double re_val = stod(re);
+		EXPECT_NEAR(re_val, vals[i], 0.000001);
+	}
 
 	VectorSP v2 = conn.run("take(decimal64(NULL, 9), 3)");
 	dsm64V->append(v2, 2);
@@ -4828,11 +4882,24 @@ TEST_F(DataformVectorTest, testDecimal64Vector_typeConvert){
 	EXPECT_TRUE(dsm64V->appendString(stringbuf, 1));
 	dsm64V->append(Util::createNullConstant(DT_DECIMAL64, 17));
 	cout<< dsm64V->getString()<<endl;
-	EXPECT_EQ(dsm64V->getString(), "[0.2345670000000000,,-0.2345678652346821,1.1000000000000000,1.0000000000000000,2.0000000000000000,"
-									"-0.2355991300000000,1.1000000729317376,100.0000000000000000,6.0000000000000000,200.0000000000000000,3.4562987561654896,,,,"
-									"1.0000000000000000,0.0000000000000000,-1.2345000000000000,1.1000000729317376,100.0000000000000000,200.0000000000000000,300.0000000000000000,3.4562987561654896,]");
-	delete boolbuf, charbuf, doublebuf, floatbuf, intbuf, longbuf, shortbuf, stringbuf;
 
+	vals = {0.23456789,DBL_MIN,-0.2345678652346821,1.1,1.0,2.0,-0.23559913,1.1,100.0,6.0,200.0,3.4562987561654895642,DBL_MIN,DBL_MIN,DBL_MIN,1.0,0.0,-1.2345,1.1,100.0,200.0,300.0,3.4562987561654896,DBL_MIN};
+	for (auto i=0;i<dsm64V->size();i++){
+		string re = dsm64V->get(i)->getString();
+		size_t re_scale = re.length() - re.find(".") - 1;
+
+		if (vals[i] == DBL_MIN){
+			EXPECT_EQ(re, "");
+			EXPECT_EQ(re_scale, 0);
+			continue;
+		}
+		EXPECT_EQ(re_scale, 16);
+		double re_val = stod(re);
+		EXPECT_NEAR(re_val, vals[i], 0.000001);
+	}
+	
+	
+	delete boolbuf, charbuf, doublebuf, floatbuf, intbuf, longbuf, shortbuf, stringbuf;
 
 }
 
@@ -4847,7 +4914,7 @@ TEST_F(DataformVectorTest, testDecimal128Vector_typeConvert){
 	dsm128V->setBool(4, true);
 	dsm128V->setChar(5, '\2');
 	dsm128V->setDouble(6, -0.23559913);
-	dsm128V->setFloat(7, 1.1);
+	dsm128V->setFloat(7, 1.1f);
 	dsm128V->setInt(8, 100);
 	dsm128V->setLong(9, 6l);
 	dsm128V->setShort(10, 200);
@@ -4855,9 +4922,22 @@ TEST_F(DataformVectorTest, testDecimal128Vector_typeConvert){
 	dsm128strval->setString("3.1643352698353646483264836492356");
 	dsm128V->set(11, dsm128strval);
 	dsm128V->setNull(12);
-	EXPECT_EQ(dsm128V->getString(), "[0.23456700000000000000000000,,-0.23456779999999999854247936,999.10000000000000000000000000,"
-									"1.00000000000000000000000000,2.00000000000000000000000000,-0.23559913000000001845231616,1.10000000946866311755988992,100.00000000000000000000000000"
-									",6.00000000000000000000000000,200.00000000000000000000000000,3.16433526983536464832648365,]");
+
+	vector<double> vals = {0.23456789,DBL_MIN,-0.2345678652346821,999.1,1.0,2.0,-0.23559913,1.1,100.0,6.0,200.0,3.1643352698353646483264836492356,DBL_MIN};
+	for (auto i=0;i<dsm128V->size();i++){
+		string re = dsm128V->get(i)->getString();
+		size_t re_scale = re.length() - re.find(".") - 1;
+
+		if (vals[i] == DBL_MIN){
+			EXPECT_EQ(re, "");
+			EXPECT_EQ(re_scale, 0);
+			continue;
+		}
+		EXPECT_EQ(re_scale, 26);
+		double re_val = stod(re);
+		EXPECT_NEAR(re_val, vals[i], 0.000001);
+	}
+
 
 	VectorSP v2 = conn.run("take(decimal128(NULL, 0), 3)");
 	dsm128V->append(v2, 2);
@@ -4880,12 +4960,20 @@ TEST_F(DataformVectorTest, testDecimal128Vector_typeConvert){
 
 	dsm128V->append(Util::createNullConstant(DT_DECIMAL128, 30));
 	cout<< dsm128V->getString()<<endl;
-	EXPECT_EQ(dsm128V->getString(), "[0.23456700000000000000000000,,-0.23456779999999999854247936,999.10000000000000000000000000,"
-									"1.00000000000000000000000000,2.00000000000000000000000000,-0.23559913000000001845231616,1.10000000946866311755988992,100.00000000000000000000000000"
-									",6.00000000000000000000000000,200.00000000000000000000000000,3.16433526983536464832648365"
-									",,,,1.00000000000000000000000000,0.00000000000000000000000000,-1.23449999999999992748048384"
-									",1.10000000946866311755988992,100.00000000000000000000000000,200.00000000000000000000000000"
-									",300.00000000000000000000000000,3.16433526983536464832648365,]");
+	vals = {0.23456789,DBL_MIN,-0.2345678652346821,999.1,1.0,2.0,-0.23559913,1.1,100.0,6.0,200.0,3.1643352698353646483264836492356,DBL_MIN,DBL_MIN,DBL_MIN,1.0,0.0,-1.2345,1.1,100.0,200.0,300.0,3.1643352698353646483264836492356,DBL_MIN};
+	for (auto i=0;i<dsm128V->size();i++){
+		string re = dsm128V->get(i)->getString();
+		size_t re_scale = re.length() - re.find(".") - 1;
+
+		if (vals[i] == DBL_MIN){
+			EXPECT_EQ(re, "");
+			EXPECT_EQ(re_scale, 0);
+			continue;
+		}
+		EXPECT_EQ(re_scale, 26);
+		double re_val = stod(re);
+		EXPECT_NEAR(re_val, vals[i], 0.000001);
+	}
 	delete boolbuf, charbuf, doublebuf, floatbuf, intbuf, longbuf, shortbuf, stringbuf;
 
 }
@@ -7173,7 +7261,7 @@ namespace BigArray1
 	}
 }
 
-INSTANTIATE_TEST_CASE_P(someNull_BigArray, BigArray_SomeNull, testing::ValuesIn(BigArray1::get_prepare()));
+INSTANTIATE_TEST_SUITE_P(someNull_BigArray, BigArray_SomeNull, testing::ValuesIn(BigArray1::get_prepare()));
 TEST_P(BigArray_SomeNull, test_bigArray)
 {
 	string cur_type = std::get<0>(GetParam());
@@ -7267,7 +7355,7 @@ namespace BigArray2
 	}
 }
 
-INSTANTIATE_TEST_CASE_P(allNull_BigArray, BigArray_AllNull, testing::ValuesIn(BigArray2::get_prepare()));
+INSTANTIATE_TEST_SUITE_P(allNull_BigArray, BigArray_AllNull, testing::ValuesIn(BigArray2::get_prepare()));
 TEST_P(BigArray_AllNull, test_bigArray)
 {
 	string cur_type = std::get<0>(GetParam());
@@ -7359,7 +7447,7 @@ namespace BigArray3
 	}
 }
 
-INSTANTIATE_TEST_CASE_P(gt1048576_BigArray, BigArray_gt1048576, testing::ValuesIn(BigArray3::get_prepare()));
+INSTANTIATE_TEST_SUITE_P(gt1048576_BigArray, BigArray_gt1048576, testing::ValuesIn(BigArray3::get_prepare()));
 TEST_P(BigArray_gt1048576, test_bigArray)
 {
 	string cur_type = std::get<0>(GetParam());

@@ -1,3 +1,5 @@
+#include "config.h"
+
 class DataformMatrixTest : public testing::Test
 {
 protected:

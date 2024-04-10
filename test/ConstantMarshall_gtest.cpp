@@ -1,16 +1,220 @@
+#include "config.h"
+
 class MarshallTest:public testing::Test
 {
-protected:
-    //Suite
-    static void SetUpTestCase() {}
-    static void TearDownTestCase(){}
-
-    //Case
-    virtual void SetUp(){}
-    virtual void TearDown(){}
 };
 
 #ifdef LINUX
+
+TEST_F(MarshallTest, VectorUnmarshallStartSymbolbaseUnmarshallStart){
+    //VectorUnmarshall::start symbaseUnmarshall_->start(blocking, ret) return false
+    IO_ERR ret;
+    VectorSP bv = Util::createVector(dolphindb::DT_SYMBOL, 0, 10);
+    std::string con = "12345";
+    bv->appendString(&con, 1);
+    bv->appendString(&con, 1);
+    bv->appendString(&con, 1);
+    bv->appendString(&con, 1);
+    bv->appendString(&con, 1);
+    bv->appendString(&con, 1);
+    bv->appendString(&con, 1);
+    bv->appendString(&con, 1);
+    std::cout << bv->getString() << std::endl;
+
+    DataOutputStreamSP outStream = new DataOutputStream(1024);
+    ConstantMarshallSP marshall = ConstantMarshallFactory::getInstance(bv->getForm(), outStream);
+    marshall->start(bv, true, false, ret);
+
+    std::string binary(outStream->getBuffer(), outStream->size());
+    
+    DataInputStreamSP inStream = new DataInputStream(binary.data(), 12);
+    short flag;
+    inStream->readShort(flag);
+    DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
+
+    auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+}
+
+TEST_F(MarshallTest, VectorUnmarshallObjDeserializeFail){
+    IO_ERR ret;
+    VectorSP bv = Util::createVector(dolphindb::DT_INT, 0, 1);
+    bv->append(Util::createInt(1));
+    std::cout << bv->getString() << std::endl;
+
+    DataOutputStreamSP outStream = new DataOutputStream(1024);
+    ConstantMarshallSP marshall = ConstantMarshallFactory::getInstance(bv->getForm(), outStream);
+    marshall->start(bv, true, false, ret);
+    std::string binary(outStream->getBuffer(), outStream->size());
+
+    DataInputStreamSP inStream = new DataInputStream(binary.data(), 12);
+    
+    short flag;
+    inStream->readShort(flag);
+    DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
+    auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+}
+
+TEST_F(MarshallTest, VectorUnmarshallStartReadScaleFail){
+    //VectorUnmarshall::start symbaseUnmarshall_->start(blocking, ret) return false
+    IO_ERR ret;
+    VectorSP bv = Util::createVector(dolphindb::DT_DECIMAL32, 0, 10, true, 3);
+    int con = 100;
+    bv->appendInt(&con, 1);
+    bv->appendInt(&con, 1);
+    bv->appendInt(&con, 1);
+    std::cout << bv->getString() << std::endl;
+
+    DataOutputStreamSP outStream = new DataOutputStream(1024);
+    ConstantMarshallSP marshall = ConstantMarshallFactory::getInstance(bv->getForm(), outStream);
+    marshall->start(bv, true, false, ret);
+    std::string binary(outStream->getBuffer(), outStream->size());
+    
+    DataInputStreamSP inStream = new DataInputStream(binary.data(), 12);
+    short flag;
+    inStream->readShort(flag);
+    DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
+
+    auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    //VectorUnmarshall::start scale_ < 0 return true
+    std::string copy = binary;
+    int invalid = -1;
+    memcpy(&copy[10], &invalid, 4);
+    inStream = new DataInputStream(copy.data(), 14);
+    inStream->readShort(flag);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    //VectorUnmarshall::start form is invalid
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), copy.size());
+    inStream->readShort(flag);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    flag = flag & 0x00ff;
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+}
+
+TEST_F(MarshallTest, VectorUnmarshallStartObjIsNull){
+    IO_ERR ret;
+    VectorSP bv = Util::createPair(dolphindb::DT_INT);
+    bv->setInt(0, 1);
+    bv->setInt(1, 2);
+    std::cout << bv->getString() << std::endl;
+
+    DataOutputStreamSP outStream = new DataOutputStream(1024);
+    ConstantMarshallSP marshall = ConstantMarshallFactory::getInstance(bv->getForm(), outStream);
+    marshall->start(bv, true, false, ret);
+
+    std::string binary(outStream->getBuffer(), outStream->size());
+    DataInputStreamSP inStream = new DataInputStream(binary.data(), binary.size());
+    short flag;
+    inStream->readShort(flag);
+    DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
+    //SET TYPE TO DT_ANY
+    flag = flag & 0xff00;
+    flag = flag | 0x0019;
+
+    auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+}
+
+TEST_F(MarshallTest, VectorUnmarshallAnyVectorSpecialCase){
+IO_ERR ret;
+    VectorSP bv = Util::createVector(dolphindb::DT_ANY, 0, 1);
+    bv->append(Util::createInt(1));
+    std::cout << bv->getString() << std::endl;
+
+    DataOutputStreamSP outStream = new DataOutputStream(1024);
+    ConstantMarshallSP marshall = ConstantMarshallFactory::getInstance(bv->getForm(), outStream);
+    marshall->start(bv, true, false, ret);
+    std::string binary(outStream->getBuffer(), outStream->size());
+
+    std::string copy = binary;
+    short invalidFlag = 0x0904;
+    memcpy(&copy[10], &invalidFlag, 2);
+    DataInputStreamSP inStream = new DataInputStream(copy.data(), copy.size());
+    short flag;
+    inStream->readShort(flag);
+    DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
+    auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 14, false);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    inStream->reset(14);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 11);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+}
+
+TEST_F(MarshallTest, VectorMarshalStart){
+    IO_ERR ret;
+    VectorSP bv = Util::createVector(dolphindb::DT_BLOB, 0, 10);
+    std::string con = "12345";
+    bv->appendString(&con, 1);
+    bv->appendString(&con, 1);
+    bv->appendString(&con, 1);
+    std::cout << bv->getString() << std::endl;
+
+    DataOutputStreamSP outStream = new DataOutputStream(1024);
+    ConstantMarshallSP marshall = ConstantMarshallFactory::getInstance(bv->getForm(), outStream);
+    marshall->start(bv, true, false, ret);
+
+    std::string binary(outStream->getBuffer(), outStream->size());
+    //VectorUnmarshall::start input->readInt(rows_) return false
+    DataInputStreamSP inStream = new DataInputStream(binary.data(), 4);
+    short flag;
+    inStream->readShort(flag);
+    DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
+
+    auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    //VectorUnmarshall::start rows_ < 0 return true
+    std::string copy = binary;
+    int invalid = -1;
+    memcpy(&copy[2], &invalid, 4);
+    inStream = new DataInputStream(copy.data(), 6);
+    inStream->readShort(flag);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    //VectorUnmarshall::start input->readInt(columns_) return false
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 8);
+    inStream->readShort(flag);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    //VectorUnmarshall::start columns_ < 0 return true
+    copy = binary;
+    memcpy(&copy[6], &invalid, 4);
+    inStream = new DataInputStream(copy.data(), 10);
+    inStream->readShort(flag);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+}
+
 TEST_F(MarshallTest, SymbolBaseMarshallStart){
     IO_ERR ret;
     SymbolBaseSP base = new SymbolBase(3);
@@ -1004,7 +1208,7 @@ TEST_F(MarshallTest, ConstantFactory_createDictionary){
     DictionarySP d4 = f.createDictionary(DT_INT, DT_INT, DT_DATEMINUTE);
     DictionarySP d5 = f.createDictionary(DT_CHAR, DT_CHAR, DT_ANY);
     DictionarySP d6 = f.createDictionary(DT_SHORT, DT_SHORT, DT_ANY);
-    DictionarySP d7 = f.createDictionary(DT_SECOND, DT_CHAR, DT_ANY);
+    EXPECT_ANY_THROW(f.createDictionary(DT_SECOND, DT_CHAR, DT_ANY));
 
     EXPECT_EQ("UnknowCategory-1", f.getCategoryString((DATA_CATEGORY)-1));
     EXPECT_EQ("UnknowCategory12", f.getCategoryString((DATA_CATEGORY)12));

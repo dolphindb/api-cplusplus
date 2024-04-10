@@ -10,161 +10,17 @@
 
 #include <climits>
 
-#include "DolphinDB.h"
+#include "Constant.h"
 #include "Util.h"
-
+#include "Guid.h"
 using std::ostringstream;
 
 namespace dolphindb {
 
 void initFormatters();
-//-----------------------------------------------------------------------------
-// MurmurHash2, by Austin Appleby
 
-// Note - This code makes a few assumptions about how your machine behaves -
 
-// 1. We can read a 4-byte value from any address without crashing
-// 2. sizeof(int) == 4
 
-// And it has a few limitations -
-
-// 1. It will not work incrementally.
-// 2. It will not produce the same results on little-endian and big-endian
-//    machines.
-
-static inline uint32_t murmur32 (const char *key, int len){
-	// 'm' and 'r' are mixing constants generated offline.
-	// They're not really 'magic', they just happen to work well.
-
-	const uint32_t m = 0x5bd1e995;
-	const int r = 24;
-
-	// Initialize the hash to a 'random' value
-	uint32_t h = len;
-
-	// Mix 4 bytes at a time into the hash
-
-	const unsigned char *data = (const unsigned char *)key;
-
-	while(len >= 4)
-	{
-		uint32_t k = *(uint32_t *)data;
-
-		k *= m;
-		k ^= k >> r;
-		k *= m;
-
-		h *= m;
-		h ^= k;
-
-		data += 4;
-		len -= 4;
-	}
-
-	// Handle the last few bytes of the input array
-
-	switch(len)
-	{
-	case 3: h ^= data[2] << 16;
-	/* no break */
-	case 2: h ^= data[1] << 8;
-	/* no break */
-	case 1: h ^= data[0];
-	        h *= m;
-	};
-
-	// Do a few final mixes of the hash to ensure the last few
-	// bytes are well-incorporated.
-
-	h ^= h >> 13;
-	h *= m;
-	h ^= h >> 15;
-
-	return h;
-}
-
-static inline uint32_t murmur32_16b (const unsigned char* key){
-    const uint32_t m = 0x5bd1e995;
-    const int r = 24;
-    uint32_t h = 16;
-
-    uint32_t k1 = *(uint32_t*)(key);
-    uint32_t k2 = *(uint32_t*)(key + 4);
-    uint32_t k3 = *(uint32_t*)(key + 8);
-    uint32_t k4 = *(uint32_t*)(key + 12);
-
-    k1 *= m;
-    k1 ^= k1 >> r;
-    k1 *= m;
-
-    k2 *= m;
-    k2 ^= k2 >> r;
-    k2 *= m;
-
-    k3 *= m;
-    k3 ^= k3 >> r;
-    k3 *= m;
-
-    k4 *= m;
-    k4 ^= k4 >> r;
-    k4 *= m;
-
-    // Mix 4 bytes at a time into the hash
-    h *= m;
-    h ^= k1;
-    h *= m;
-    h ^= k2;
-    h *= m;
-    h ^= k3;
-    h *= m;
-    h ^= k4;
-
-    // Do a few final mixes of the hash to ensure the last few
-    // bytes are well-incorporated.
-    h ^= h >> 13;
-    h *= m;
-    h ^= h >> 15;
-
-    return h;
-}
-
-static inline uint32_t murmur32_8b (uint64_t key){
-    // 'm' and 'r' are mixing constants generated offline.
-    // They're not really 'magic', they just happen to work well.
-
-    const uint32_t m = 0x5bd1e995;
-    const int r = 24;
-
-    // Initialize the hash to a 'random' value
-    uint32_t h = 8;
-
-    uint32_t k1 = (uint32_t)(key >> 32);
-    uint32_t k2 = (uint32_t)key;
-
-    k1 *= m;
-    k1 ^= k1 >> r;
-    k1 *= m;
-
-    k2 *= m;
-    k2 ^= k2 >> r;
-    k2 *= m;
-
-    // Mix 4 bytes at a time into the hash
-
-    h *= m;
-    h ^= k1;
-    h *= m;
-    h ^= k2;
-
-    // Do a few final mixes of the hash to ensure the last few
-    // bytes are well-incorporated.
-
-    h ^= h >> 13;
-    h *= m;
-    h ^= h >> 15;
-
-    return h;
-}
 
 class Void: public Constant{
 public:
@@ -254,8 +110,8 @@ public:
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
 	virtual int getHash(int buckets) const { return murmur32_16b(uuid_) % buckets;}
 	static string toString(const unsigned char* data);
-	static Int128* parseInt128(const char* str, int len);
-	static bool parseInt128(const char* str, int len, unsigned char *buf);
+	static Int128* parseInt128(const char* str, size_t len);
+	static bool parseInt128(const char* str, size_t len, unsigned char *buf);
 
 protected:
 	union{
@@ -268,7 +124,7 @@ class Uuid : public Int128 {
 public:
 	Uuid(bool newUuid = false);
 	Uuid(const unsigned char* uuid);
-	Uuid(const char* uuid, int len);
+	Uuid(const char* uuid, size_t len);
 	Uuid(const Uuid& copy);
 	virtual ~Uuid(){}
 	virtual ConstantSP getInstance() const {return new Uuid(false);}
@@ -276,7 +132,7 @@ public:
 	virtual DATA_TYPE getType() const {return DT_UUID;}
 	virtual DATA_TYPE getRawType() const { return DT_INT128;}
 	virtual string getString() const { return Guid::getString(uuid_);}
-	static Uuid* parseUuid(const char* str, int len);
+	static Uuid* parseUuid(const char* str, size_t len);
 };
 
 class IPAddr : public Int128 {
@@ -291,7 +147,7 @@ public:
 	virtual DATA_TYPE getRawType() const { return DT_INT128;}
 	virtual string getString() const { return toString(uuid_);}
 	static string toString(const unsigned char* data);
-	static IPAddr* parseIPAddr(const char* str, int len);
+	static IPAddr* parseIPAddr(const char* str, size_t len);
 	static bool parseIPAddr(const char* str, size_t len, unsigned char* buf);
 
 private:
@@ -374,13 +230,13 @@ public:
 	AbstractScalar(T val=0):val_(val){}
 	virtual ~AbstractScalar(){}
 	virtual char getBool() const {return isNull()?CHAR_MIN:(bool)val_;}
-	virtual char getChar() const {return isNull()?CHAR_MIN:val_;}
-	virtual short getShort() const {return isNull()?SHRT_MIN:val_;}
-	virtual int getInt() const {return isNull()?INT_MIN:val_;}
-	virtual long long getLong() const {return isNull()?LLONG_MIN:val_;}
-	virtual INDEX getIndex() const {return isNull()?INDEX_MIN:val_;}
-	virtual float getFloat() const {return isNull()?FLT_NMIN:val_;}
-	virtual double getDouble() const {return isNull()?DBL_NMIN:val_;}
+	virtual char getChar() const {return isNull() ? CHAR_MIN : static_cast<char>(val_);}
+	virtual short getShort() const {return isNull() ? SHRT_MIN : static_cast<short>(val_);}
+	virtual int getInt() const {return isNull() ? INT_MIN : static_cast<int>(val_);}
+	virtual long long getLong() const {return isNull() ? LLONG_MIN : static_cast<long long>(val_);}
+	virtual INDEX getIndex() const {return isNull() ? INDEX_MIN : static_cast<INDEX>(val_);}
+	virtual float getFloat() const {return isNull() ? FLT_NMIN : static_cast<float>(val_);}
+	virtual double getDouble() const {return isNull() ? DBL_NMIN : static_cast<double>(val_);}
 
 	virtual void setBool(char val){if(val != CHAR_MIN) val_=(T)val; else setNull();}
 	virtual void setChar(char val){if(val != CHAR_MIN) val_=(T)val; else setNull();}
@@ -404,9 +260,9 @@ public:
 	virtual void nullFill(const ConstantSP& val){
 		if(isNull()){
 			if(val->getCategory()==FLOATING)
-				val_=val->getDouble();
+				val_ = static_cast<T>(val->getDouble());
 			else
-				val_=val->getLong();
+				val_ = static_cast<T>(val->getLong());
 		}
 	}
 	virtual bool isNull(INDEX start, int len, char* buf) const {
@@ -434,73 +290,73 @@ public:
 		return buf;
 	}
 	virtual bool getChar(INDEX start, int len, char* buf) const {
-		char tmp=isNull()?CHAR_MIN:val_;
+		char tmp = isNull() ? CHAR_MIN : static_cast<char>(val_);
 		for(int i=0;i<len;++i)
 			buf[i]=tmp;
 		return true;
 	}
 	virtual const char* getCharConst(INDEX start, int len, char* buf) const {
-		char tmp=isNull()?CHAR_MIN:val_;
+		char tmp = isNull() ? CHAR_MIN : static_cast<char>(val_);
 		for(int i=0;i<len;++i)
 			buf[i]=tmp;
 		return buf;
 	}
 	virtual bool getShort(INDEX start, int len, short* buf) const {
-		short tmp=isNull()?SHRT_MIN:val_;
+		short tmp = isNull() ? SHRT_MIN : static_cast<short>(val_);
 		for(int i=0;i<len;++i)
 			buf[i]=tmp;
 		return true;
 	}
 	virtual const short* getShortConst(INDEX start, int len, short* buf) const {
-		short tmp=isNull()?SHRT_MIN:val_;
+		short tmp = isNull() ? SHRT_MIN : static_cast<short>(val_);
 		for(int i=0;i<len;++i)
 			buf[i]=tmp;
 		return buf;
 	}
 	virtual bool getInt(INDEX start, int len, int* buf) const {
-		int tmp=isNull()?INT_MIN:val_;
+		int tmp = isNull() ? INT_MIN : static_cast<int>(val_);
 		for(int i=0;i<len;++i)
 			buf[i]=tmp;
 		return true;
 	}
 	virtual const int* getIntConst(INDEX start, int len, int* buf) const {
-		int tmp=isNull()?INT_MIN:val_;
+		int tmp = isNull() ? INT_MIN : static_cast<int>(val_);
 		for(int i=0;i<len;++i)
 			buf[i]=tmp;
 		return buf;
 	}
 	virtual bool getLong(INDEX start, int len, long long* buf) const {
-		long long tmp=isNull()?LLONG_MIN:val_;
+		long long tmp = isNull() ? LLONG_MIN : static_cast<long long>(val_);
 		for(int i=0;i<len;++i)
 			buf[i]=tmp;
 		return true;
 	}
 	virtual const long long* getLongConst(INDEX start, int len, long long* buf) const {
-		long long tmp=isNull()?LLONG_MIN:val_;
+		long long tmp = isNull() ? LLONG_MIN : static_cast<long long>(val_);
 		for(int i=0;i<len;++i)
 			buf[i]=tmp;
 		return buf;
 	}
 	virtual bool getIndex(INDEX start, int len, INDEX* buf) const {
-		INDEX tmp=isNull()?INDEX_MIN:val_;
+		INDEX tmp = isNull() ? INDEX_MIN : static_cast<INDEX>(val_);
 		for(int i=0;i<len;++i)
 			buf[i]=tmp;
 		return true;
 	}
 	virtual const INDEX* getIndexConst(INDEX start, int len, INDEX* buf) const {
-		INDEX tmp=isNull()?INDEX_MIN:val_;
+		INDEX tmp = isNull() ? INDEX_MIN : static_cast<INDEX>(val_);
 		for(int i=0;i<len;++i)
 			buf[i]=tmp;
 		return buf;
 	}
 	virtual bool getFloat(INDEX start, int len, float* buf) const {
-		float tmp=isNull()?FLT_NMIN:val_;
+		float tmp = isNull() ? FLT_NMIN : static_cast<float>(val_);
 		for(int i=0;i<len;++i)
 			buf[i]=tmp;
 		return true;
     }
 	virtual const float* getFloatConst(INDEX start, int len, float* buf) const {
-		float tmp=isNull()?FLT_NMIN:val_;
+		float tmp = isNull() ? FLT_NMIN : static_cast<float>(val_);
 		for(int i=0;i<len;++i)
 			buf[i]=tmp;
 		return buf;
@@ -568,14 +424,14 @@ public:
 	virtual bool add(INDEX start, INDEX length, long long inc) {
 		if(isNull())
 			return false;
-		val_ += inc;
+		val_ += static_cast<T>(inc);
 		return true;
 	}
 
 	virtual bool add(INDEX start, INDEX length, double inc) {
 		if(isNull())
 			return false;
-		val_ += inc;
+		val_ += static_cast<T>(inc);
 		return true;
 	}
 
@@ -726,10 +582,10 @@ public:
 	virtual ConstantSP getInstance() const {return ConstantSP(new Float());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Float(val_));}
 	virtual DATA_CATEGORY getCategory() const {return FLOATING;}
-	virtual char getChar() const {return isNull()?CHAR_MIN:(val_<0?val_-0.5:val_+0.5);}
-	virtual short getShort() const {return isNull()?SHRT_MIN:(val_<0?val_-0.5:val_+0.5);}
-	virtual int getInt() const {return isNull()?INT_MIN:(val_<0?val_-0.5:val_+0.5);}
-	virtual long long  getLong() const {return isNull()?LLONG_MIN:(val_<0?val_-0.5:val_+0.5);}
+	virtual char getChar() const {return isNull() ? CHAR_MIN : static_cast<char>(val_ < 0 ? val_ - 0.5 : val_ + 0.5);}
+	virtual short getShort() const {return isNull() ? SHRT_MIN : static_cast<short>(val_ < 0 ? val_ - 0.5 : val_ + 0.5);}
+	virtual int getInt() const {return isNull() ? INT_MIN : static_cast<int>(val_ < 0 ? val_ - 0.5 : val_ + 0.5);}
+	virtual long long  getLong() const {return isNull() ? LLONG_MIN : static_cast<long long>(val_ < 0 ? val_ - 0.5 : val_ + 0.5);}
 	virtual bool getChar(INDEX start, int len, char* buf) const;
 	virtual const char* getCharConst(INDEX start, int len, char* buf) const;
 	virtual bool getShort(INDEX start, int len, short* buf) const;
@@ -756,10 +612,10 @@ public:
 	virtual ConstantSP getInstance() const {return ConstantSP(new Double());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Double(val_));}
 	virtual DATA_CATEGORY getCategory() const {return FLOATING;}
-	virtual char getChar() const {return isNull()?CHAR_MIN:(val_<0?val_-0.5:val_+0.5);}
-	virtual short getShort() const {return isNull()?SHRT_MIN:(val_<0?val_-0.5:val_+0.5);}
-	virtual int getInt() const {return isNull()?INT_MIN:(val_<0?val_-0.5:val_+0.5);}
-	virtual long long  getLong() const {return isNull()?LLONG_MIN:(val_<0?val_-0.5:val_+0.5);}
+	virtual char getChar() const {return isNull() ? CHAR_MIN : static_cast<char>(val_ < 0 ? val_ - 0.5 : val_ + 0.5);}
+	virtual short getShort() const {return isNull() ? SHRT_MIN : static_cast<short>(val_ < 0 ? val_ - 0.5 : val_ + 0.5);}
+	virtual int getInt() const {return isNull() ? INT_MIN : static_cast<int>(val_ < 0 ? val_ - 0.5 : val_ + 0.5);}
+	virtual long long  getLong() const {return isNull() ? LLONG_MIN : static_cast<long long>(val_ < 0 ? val_ - 0.5 : val_ + 0.5);}
 	virtual bool getChar(INDEX start, int len, char* buf) const;
 	virtual const char* getCharConst(INDEX start, int len, char* buf) const;
 	virtual bool getShort(INDEX start, int len, short* buf) const;

@@ -1,3 +1,5 @@
+#include "config.h"
+
 class PartitionedTableAppenderTest:public testing::Test
 {
 protected:
@@ -29,7 +31,7 @@ protected:
 		{
 			conn.connect(hostName, port, "admin", "123456");
 		}
-		
+
         cout<<"ok"<<endl;
     }
     virtual void TearDown()
@@ -168,7 +170,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_date2){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<4; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_date3){
@@ -212,7 +214,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_date3){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<4; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_date4){
@@ -256,7 +258,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_date4){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<4; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_month1){
@@ -300,7 +302,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_month1){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<4; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_month2){
@@ -344,7 +346,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_month2){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<4; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_month3){
@@ -388,7 +390,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_month3){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<4; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_string){
@@ -477,7 +479,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_symbol){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<3; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_range_int){
@@ -523,7 +525,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_range_int){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<3; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_range_date){
@@ -567,7 +569,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_range_date){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<4; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_range_symbol){
@@ -613,7 +615,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_range_symbol){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<3; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_range_string){
@@ -659,7 +661,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_range_string){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<3; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_hash_int){
@@ -704,7 +706,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_hash_int){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<3; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_hash_date){
@@ -748,7 +750,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_hash_date){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<4; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_hash_symbol){
@@ -793,7 +795,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_hash_symbol){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<3; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_hash_string){
@@ -838,7 +840,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_hash_string){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<3; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_list_int){
@@ -883,7 +885,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_list_int){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<3; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_list_date){
@@ -927,7 +929,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_list_date){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<4; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_list_string){
@@ -972,7 +974,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_list_string){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<3; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_list_symbol){
@@ -1017,7 +1019,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_list_symbol){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<3; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_hash){
@@ -1111,7 +1113,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_range){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<3; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_alltypes_OLAP){
@@ -1174,7 +1176,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_alltypes
 		columnVecs[14]->set(i, Util::createFloat(rand()/float(RAND_MAX)));
 		columnVecs[15]->set(i, Util::createDouble(rand()/double(RAND_MAX)));
 		columnVecs[16]->set(i, Util::createString("str"+to_string(i)));
-		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));	
+		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));
 		columnVecs[18]->set(i, Util::parseConstant(DT_IP,"192.0.0."+to_string(rand()%255)));
 		columnVecs[19]->set(i, Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"));
 		columnVecs[20]->set(i, Util::createDateHour(rand()%INT_MAX));
@@ -1188,9 +1190,9 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_value_alltypes
 			columnVecs[j]->setNull(rowNum-1);
 	}
 
-    string dbName ="dfs://test_PartitionedTableAppender";
+    string dbName ="dfs://test_PartitionedTableAppenderasdwa";
     string tableName = "pt";
-	string script = "dbName = \"dfs://test_PartitionedTableAppender\";"
+	string script = "dbName = '"+dbName+"';"
 			"if(exists(dbName)){dropDatabase(dbName)};"
 			"db  = database(dbName, VALUE,0..1000);"
 			"temp = table(1000:0, take(`col,23)+string(take(0..22,23)), \
@@ -1272,7 +1274,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_hash_alltypes_
 		columnVecs[14]->set(i, Util::createFloat(rand()/float(RAND_MAX)));
 		columnVecs[15]->set(i, Util::createDouble(rand()/double(RAND_MAX)));
 		columnVecs[16]->set(i, Util::createString("str"+to_string(i)));
-		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));	
+		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));
 		columnVecs[18]->set(i, Util::parseConstant(DT_IP,"192.0.0."+to_string(rand()%255)));
 		columnVecs[19]->set(i, Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"));
 		columnVecs[20]->set(i, Util::createDateHour(rand()%INT_MAX));
@@ -1286,9 +1288,9 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_hash_alltypes_
 			columnVecs[j]->setNull(rowNum-1);
 	}
 
-    string dbName ="dfs://test_PartitionedTableAppender";
+    string dbName ="dfs://test_PartitionedTableAppenderzcsedwa";
     string tableName = "pt";
-	string script = "dbName = \"dfs://test_PartitionedTableAppender\";"
+	string script = "dbName = '"+dbName+"';"
 			"if(exists(dbName)){dropDatabase(dbName)};"
 			"db  = database(dbName, HASH,[INT,1]);"
 			"temp = table(1000:0, take(`col,23)+string(take(0..22,23)), \
@@ -1371,7 +1373,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_range_alltypes
 		columnVecs[14]->set(i, Util::createFloat(rand()/float(RAND_MAX)));
 		columnVecs[15]->set(i, Util::createDouble(rand()/double(RAND_MAX)));
 		columnVecs[16]->set(i, Util::createString("str"+to_string(i)));
-		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));	
+		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));
 		columnVecs[18]->set(i, Util::parseConstant(DT_IP,"192.0.0."+to_string(rand()%255)));
 		columnVecs[19]->set(i, Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"));
 		columnVecs[20]->set(i, Util::createDateHour(rand()%INT_MAX));
@@ -1385,9 +1387,9 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_range_alltypes
 			columnVecs[j]->setNull(rowNum-1);
 	}
 
-    string dbName ="dfs://test_PartitionedTableAppender";
+    string dbName ="dfs://test_PartitionedTableAppenderolwpqjk";
     string tableName = "pt";
-	string script = "dbName = \"dfs://test_PartitionedTableAppender\";"
+	string script = "dbName = '"+dbName+"';"
 			"if(exists(dbName)){dropDatabase(dbName)};"
 			"db  = database(dbName, RANGE,0 1000);"
 			"temp = table(1000:0, take(`col,23)+string(take(0..22,23)), \
@@ -1470,7 +1472,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_list_alltypes_
 		columnVecs[14]->set(i, Util::createFloat(rand()/float(RAND_MAX)));
 		columnVecs[15]->set(i, Util::createDouble(rand()/double(RAND_MAX)));
 		columnVecs[16]->set(i, Util::createString("str"+to_string(i)));
-		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));	
+		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));
 		columnVecs[18]->set(i, Util::parseConstant(DT_IP,"192.0.0."+to_string(rand()%255)));
 		columnVecs[19]->set(i, Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"));
 		columnVecs[20]->set(i, Util::createDateHour(rand()%INT_MAX));
@@ -1484,9 +1486,9 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_list_alltypes_
 			columnVecs[j]->setNull(rowNum-1);
 	}
 
-    string dbName ="dfs://test_PartitionedTableAppender";
+    string dbName ="dfs://test_PartitionedTableAppenderd5awvy";
     string tableName = "pt";
-	string script = "dbName = \"dfs://test_PartitionedTableAppender\";"
+	string script = "dbName = '"+dbName+"';"
 			"if(exists(dbName)){dropDatabase(dbName)};"
 			"db  = database(dbName, LIST,0..1000);"
 			"temp = table(1000:0, take(`col,23)+string(take(0..22,23)), \
@@ -1533,7 +1535,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withIntArrayV
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_INT_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -1573,7 +1575,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withIntNullAr
 	v1->setInt(2, 9999);
 	v2->setNull(0);
 	v2->setNull(1);
-	v2->setNull(2);	
+	v2->setNull(2);
 
 	VectorSP av1 = Util::createArrayVector(DT_INT_ARRAY, 0, 3);
 	av1->append(v2);
@@ -1582,7 +1584,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withIntNullAr
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_INT_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -1628,7 +1630,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withIntArrayV
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_INT_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -1676,7 +1678,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withCharArray
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_CHAR_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -1724,7 +1726,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withCharNullA
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_CHAR_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -1767,10 +1769,10 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withCharArray
 	VectorSP av1 = Util::createArrayVector(DT_CHAR_ARRAY, 0, 70000);
 	for(unsigned int i=0;i<3;i++)
 		av1->append(v2);
-		
+
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_CHAR_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -1818,7 +1820,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withFloatArra
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_FLOAT_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -1866,7 +1868,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withFloatNull
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_FLOAT_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -1909,10 +1911,10 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withFloatArra
 	VectorSP av1 = Util::createArrayVector(DT_FLOAT_ARRAY, 0, 70000);
 	for(unsigned int i=0;i<3;i++)
 		av1->append(v2);
-		
+
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_FLOAT_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -1960,7 +1962,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withDateArray
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_DATE_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2008,7 +2010,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withDateNullA
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_DATE_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2051,10 +2053,10 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withDateArray
 	VectorSP av1 = Util::createArrayVector(DT_DATE_ARRAY, 0, 70000);
 	for(unsigned int i=0;i<3;i++)
 		av1->append(v2);
-		
+
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_DATE_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2102,7 +2104,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withMonthArra
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_MONTH_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2150,7 +2152,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withMonthNull
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_MONTH_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2193,10 +2195,10 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withMonthArra
 	VectorSP av1 = Util::createArrayVector(DT_MONTH_ARRAY, 0, 70000);
 	for(unsigned int i=0;i<3;i++)
 		av1->append(v2);
-		
+
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_MONTH_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2244,7 +2246,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withTimeArray
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_TIME_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2292,7 +2294,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withTimeNullA
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_TIME_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2335,10 +2337,10 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withTimeArray
 	VectorSP av1 = Util::createArrayVector(DT_TIME_ARRAY, 0, 70000);
 	for(unsigned int i=0;i<3;i++)
 		av1->append(v2);
-		
+
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_TIME_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2386,7 +2388,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withSecondArr
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_SECOND_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2434,7 +2436,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withSecondNul
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_SECOND_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2477,10 +2479,10 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withSecondArr
 	VectorSP av1 = Util::createArrayVector(DT_SECOND_ARRAY, 0, 70000);
 	for(unsigned int i=0;i<3;i++)
 		av1->append(v2);
-		
+
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_SECOND_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2528,7 +2530,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withDatehourA
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_DATEHOUR_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2576,7 +2578,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withDatehourN
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_DATEHOUR_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2619,10 +2621,10 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withDatehourA
 	VectorSP av1 = Util::createArrayVector(DT_DATEHOUR_ARRAY, 0, 70000);
 	for(unsigned int i=0;i<3;i++)
 		av1->append(v2);
-		
+
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_DATEHOUR_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2670,7 +2672,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withUuidArray
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_UUID_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2719,7 +2721,7 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withUuidNullA
 
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_UUID_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2763,10 +2765,10 @@ TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_withUuidArray
 	VectorSP av1 = Util::createArrayVector(DT_UUID_ARRAY, 0, 70000);
 	for(unsigned int i=0;i<3;i++)
 		av1->append(v2);
-		
+
 	vector<string> colNames = { "id", "value" };
 	vector<DATA_TYPE> colTypes = { DT_INT, DT_UUID_ARRAY };
-	
+
 	TableSP tab = Util::createTable(colNames, colTypes, 0, 10);
 	vector<ConstantSP> colVecs{ v1,av1 };
 	INDEX insertrows;
@@ -2882,7 +2884,7 @@ TEST_F(PartitionedTableAppenderTest,test_PartitionedTableAppender_compo3){
 	ConstantSP result = conn.run(script2);
 	for (int i = 0; i<4; i++)
 		EXPECT_EQ(result->getInt(i), 1);
-	pool.shutDown();	
+	pool.shutDown();
 }
 
 TEST_F(PartitionedTableAppenderTest,test_mutithread_schema){
@@ -2902,49 +2904,52 @@ TEST_F(PartitionedTableAppenderTest,test_mutithread_schema){
 	pool.shutDown();
 }
 
-// TEST_F(PartitionedTableAppenderTest,test_mutithread_WandR){
-// 	DBConnectionPool pool(hostName, port, 10, "admin", "123456");
-// 	int64_t startTime, time;
-// 	startTime = Util::getEpochTime();
-// 	string script, script1;
-// 	script += "login(`admin,`123456);";
-// 	script += "dbPath = \"dfs://test_mutithread_\";";
-// 	script += "if(existsDatabase(dbPath)){dropDatabase(dbPath)};";
-// 	script += "db1 = database(\"\",VALUE,`A0`A1`A2`A3`A4`A5`A6`A7`A8`A9);";
-// 	script += "db2 = database(\"\",RANGE,0 5 10);";
-// 	script += "db = database(dbPath, COMPO, [db1, db2]);";
-// 	script += "dummy = table(1:0, `id`sym`value, [INT, SYMBOL, INT]);";
-// 	script += "pt = db.createPartitionedTable(dummy,`pt,`sym`id);";
-// 	pool.run(script, 0);
-// 	//create tableSP
-// 	vector<string> colNames = { "id", "sym", "value" };
-// 	vector<DATA_TYPE> colTypes = { DT_INT, DT_SYMBOL, DT_INT };
-// 	int colNum = 3, rowNum = 1000000;
-// 	TableSP t = Util::createTable(colNames, colTypes, rowNum, 1000000);
-// 	vector<VectorSP> columnVecs;
-// 	columnVecs.reserve(colNum);
-// 	for (int i = 0; i < colNum; i++)
-// 		columnVecs.emplace_back(t->getColumn(i));
-// 	for (int i = 0; i < rowNum; i++) {
-// 		columnVecs[0]->set(i, Util::createInt(i % 10));
-// 		columnVecs[1]->set(i, Util::createString("A" + std::to_string(i % 10)));
-// 		columnVecs[2]->set(i, Util::createInt(i));
-// 	}
-// 	PartitionedTableAppender appender("dfs://test_mutithread_", "pt", "sym", pool);
-// 	appender.append(t);
 
-// 	script1 += "login(`admin,`123456);";
-// 	script1 += "dbPath = \"dfs://test_mutithread_1\";";
-// 	script1 += "if(existsDatabase(dbPath)){dropDatabase(dbPath)};";
-// 	script1 += "db1 = database(\"\",VALUE,`A0`A1`A2`A3`A4`A5`A6`A7`A8`A9);";
-// 	script1 += "db2 = database(\"\",RANGE,0 5 10);";
-// 	script1 += "db = database(dbPath, COMPO, [db1, db2]);";
-// 	script1 += "dummy = table(1:0, `id`sym`value, [INT, SYMBOL, INT]);";
-// 	script1 += "pt = db.createPartitionedTable(dummy,`pt,`sym`id);";
-// 	conn.run(script1);
-// 	PartitionedTableAppender appender1("dfs://test_mutithread_1", "pt", "sym", pool);
-// 	appender1.append(t);
-// 	time = Util::getEpochTime() - startTime;
-// 	cout << "test_mutithread_:" << time << "ms" << endl;
-// 	pool.shutDown();
-// }
+class PTA_append_null : public PartitionedTableAppenderTest, public testing::WithParamInterface<tuple<string, DATA_TYPE>>
+{
+public:
+	static vector<tuple<string, DATA_TYPE>> data_prepare()
+	{
+		vector<string> testTypes = {"BOOL", "CHAR", "SHORT", "INT", "LONG", "DATE", "MONTH", "TIME", "MINUTE", "SECOND", "DATETIME", "TIMESTAMP", "NANOTIME", "NANOTIMESTAMP", "DATEHOUR", "FLOAT", "DOUBLE", "STRING", "SYMBOL", "BLOB", "IPADDR", "UUID", "INT128", "DECIMAL32(8)", "DECIMAL64(15)", "DECIMAL128(28)",
+				"BOOL[]", "CHAR[]", "SHORT[]", "INT[]", "LONG[]", "DATE[]", "MONTH[]", "TIME[]", "MINUTE[]", "SECOND[]", "DATETIME[]", "TIMESTAMP[]", "NANOTIME[]", "NANOTIMESTAMP[]", "DATEHOUR[]", "FLOAT[]", "DOUBLE[]", "IPADDR[]", "UUID[]", "INT128[]", "DECIMAL32(8)[]", "DECIMAL64(15)[]", "DECIMAL128(25)[]"};
+		vector<DATA_TYPE> dataTypes = {DT_BOOL, DT_CHAR, DT_SHORT, DT_INT, DT_LONG, DT_DATE, DT_MONTH, DT_TIME, DT_MINUTE, DT_SECOND, DT_DATETIME, DT_TIMESTAMP, DT_NANOTIME, DT_NANOTIMESTAMP, DT_DATEHOUR, DT_FLOAT, DT_DOUBLE, DT_STRING,DT_SYMBOL,DT_BLOB, DT_IP, DT_UUID, DT_INT128, DT_DECIMAL32, DT_DECIMAL64, DT_DECIMAL128,
+		DT_BOOL_ARRAY, DT_CHAR_ARRAY, DT_SHORT_ARRAY, DT_INT_ARRAY, DT_LONG_ARRAY, DT_DATE_ARRAY, DT_MONTH_ARRAY, DT_TIME_ARRAY, DT_MINUTE_ARRAY, DT_SECOND_ARRAY, DT_DATETIME_ARRAY, DT_TIMESTAMP_ARRAY, DT_NANOTIME_ARRAY, DT_NANOTIMESTAMP_ARRAY, DT_DATEHOUR_ARRAY, DT_FLOAT_ARRAY, DT_DOUBLE_ARRAY, DT_IP_ARRAY, DT_UUID_ARRAY, DT_INT128_ARRAY, DT_DECIMAL32_ARRAY, DT_DECIMAL64_ARRAY, DT_DECIMAL128_ARRAY};
+		vector<tuple<string, DATA_TYPE>> data;
+		for	(auto i = 0; i < testTypes.size(); i++)
+			data.push_back(make_tuple(testTypes[i], dataTypes[i]));
+		return data;
+	}
+
+};
+INSTANTIATE_TEST_SUITE_P(, PTA_append_null, testing::ValuesIn(PTA_append_null::data_prepare()));
+
+TEST_P(PTA_append_null, test_append_empty_table)
+{
+	DBConnectionPoolSP pool = new DBConnectionPool(hostName, port, 10, "admin", "123456");
+	string type = std::get<0>(GetParam());
+	DATA_TYPE dataType = std::get<1>(GetParam());
+	cout << "test type: " << type << endl;
+	string colName = "c1";
+	string script1 =
+		"colName = [`ind,`time, `" + colName + "];"
+		"colType = [INT, DATETIME, " + type + "];"
+		"t=table(1:0, colName, colType);"
+		"if(existsDatabase('dfs://test_append_empty_table')) dropDatabase('dfs://test_append_empty_table');go;"
+		"db = database('dfs://test_append_empty_table', VALUE, 1..10,,'TSDB');"
+		"db.createPartitionedTable(t, `pt, `ind,,`ind`time)";
+
+	conn.run(script1);
+	VectorSP col0 = Util::createVector(DT_INT, 0);
+	VectorSP col1 = Util::createVector(DT_DATETIME, 0);
+	VectorSP col2 = Util::createVector(dataType, 0);
+	vector<string> colNames = { "c1", "c2", "c3" };
+	vector<ConstantSP> cols = { col0, col1, col2};
+	TableSP empty2 = Util::createTable(colNames, cols);
+
+    PartitionedTableAppenderSP appender = new PartitionedTableAppender("dfs://test_append_empty_table", "pt", "ind", *pool);
+	int rows = appender->append(empty2);
+	EXPECT_EQ(rows, 0);
+	auto res = conn.run("exec * from loadTable('dfs://test_append_empty_table', `pt)");
+	EXPECT_EQ(res->rows(), 0);
+	conn.run("dropDatabase('dfs://test_append_empty_table')");
+}

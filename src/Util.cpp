@@ -46,11 +46,11 @@
 
 namespace dolphindb{
 
+static SmartPointer<ConstantFactory> s_constFactory(new ConstantFactory());
 const bool Util::LITTLE_ENDIAN_ORDER = isLittleEndian();
-SmartPointer<ConstantFactory> Util::constFactory_(new ConstantFactory());
-string Util::VER = "1.30.22.1";
-int Util::VERNUM = 13022;
-string Util::BUILD = "2023.07.15";
+string Util::VER = "3.00.0.0";
+int Util::VERNUM = 30000;
+string Util::BUILD = "2024.04.01";
 #ifndef _MSC_VER
 const int Util::BUF_SIZE = 1024;
 #endif
@@ -187,15 +187,15 @@ Constant* Util::parseConstant(int type, const string& word){
 	if(type < 0)
 		return NULL;
 	else
-		return constFactory_->parseConstant(type,word);
+		return s_constFactory->parseConstant(type,word);
 }
 
 Constant* Util::createConstant(DATA_TYPE type, int extraParam){
-	return constFactory_->createConstant(type, extraParam);
+	return s_constFactory->createConstant(type, extraParam);
 }
 
 Constant* Util::createNullConstant(DATA_TYPE dataType, int extraParam){
-	Constant* result=constFactory_->createConstant(dataType, extraParam);
+	Constant* result=s_constFactory->createConstant(dataType, extraParam);
 	result->setNull();
 	return result;
 }
@@ -410,22 +410,22 @@ Table* Util::createTable(const vector<string>& colNames, const vector<ConstantSP
 }
 
 Dictionary* Util::createDictionary(DATA_TYPE keyType, DATA_TYPE valueType){
-	return constFactory_->createDictionary(convertToIntegralDataType(keyType),keyType,valueType);
+	return s_constFactory->createDictionary(convertToIntegralDataType(keyType),keyType,valueType);
 }
 
 Set* Util::createSet(DATA_TYPE keyType, INDEX capacity){
-	return constFactory_->createSet(convertToIntegralDataType(keyType),keyType,capacity);
+	return s_constFactory->createSet(convertToIntegralDataType(keyType),keyType,capacity);
 }
 
 Vector* Util::createVector(DATA_TYPE type, INDEX size, INDEX capacity, bool fast, int extraParam, void* data, bool containNull){
 	if (type < ARRAY_TYPE_BASE)
-		return constFactory_->createConstantVector(type, size, capacity, true, extraParam, data, 0, 0, containNull);
+		return s_constFactory->createConstantVector(type, size, capacity, true, extraParam, data, 0, 0, containNull);
 	else
 		return createArrayVector(type, size, capacity, fast, extraParam);
 }
 
 Vector* Util::createArrayVector(DATA_TYPE type, INDEX size, INDEX capacity, bool fast, int extraParam, void* data, INDEX *pindex, bool containNull){
-	return constFactory_->createConstantArrayVector(type,size,capacity,true,extraParam, data, pindex, 0, 0, containNull);
+	return s_constFactory->createConstantArrayVector(type,size,capacity,true,extraParam, data, pindex, 0, 0, containNull);
 }
 
 Vector* Util::createArrayVector(VectorSP index, VectorSP value) {
@@ -439,11 +439,11 @@ Vector* Util::createArrayVector(VectorSP index, VectorSP value) {
 }
 
 Vector* Util::createMatrix(DATA_TYPE type, int cols, int rows, int colCapacity,int extraParam, void* data, bool containNull){
-	return constFactory_->createConstantMatrix(type, cols, rows, colCapacity, extraParam, data, 0, 0, containNull);
+	return s_constFactory->createConstantMatrix(type, cols, rows, colCapacity, extraParam, data, 0, 0, containNull);
 }
 
 Vector* Util::createDoubleMatrix(int cols, int rows){
-	return constFactory_->createConstantMatrix(DT_DOUBLE, cols, rows, 0, 0, NULL, 0, 0, false);
+	return s_constFactory->createConstantMatrix(DT_DOUBLE, cols, rows, 0, 0, NULL, 0, 0, false);
 }
 
 Vector* Util::createIndexVector(INDEX start, INDEX length){
@@ -469,9 +469,9 @@ Vector* Util::createIndexVector(INDEX length, bool arrayOnly, INDEX capacity){
 #endif
 }
 
-void Util::toHex(const unsigned char* data, int len, bool littleEndian, char* str){
-	int lastPos = len*2 - 1;
-	for(int i=0; i<len; ++i){
+void Util::toHex(const unsigned char* data, size_t len, bool littleEndian, char* str){
+	size_t lastPos = len*2 - 1;
+	for(size_t i=0; i<len; ++i){
 		unsigned char ch = data[i];
 		char low4 = ch & (unsigned char)15;
 		char high4 =  ch>>4;
@@ -486,9 +486,9 @@ void Util::toHex(const unsigned char* data, int len, bool littleEndian, char* st
 	}
 }
 
-bool Util::fromHex(const char* str, int len, bool littleEndian, unsigned char* data){
-	int lastPos = len/2 - 1;
-	for(int i=0; i<len; i += 2){
+bool Util::fromHex(const char* str, size_t len, bool littleEndian, unsigned char* data){
+	size_t lastPos = len/2 - 1;
+	for(size_t i=0; i<len; i += 2){
 		char high = str[i];
 		char low = str[i+1];
 		int highValue = high >= 97 ? high -87 : (high >= 65 ? high -55 : (high >= 58 ? -1 : high -48));
@@ -573,27 +573,27 @@ bool Util::fromGuid(const char* str, unsigned char* data){
 }
 
 DATA_TYPE Util::getDataType(const string& typestr){
-	return constFactory_->getDataType(lower(typestr));
+	return s_constFactory->getDataType(lower(typestr));
 }
 
 DATA_FORM Util::getDataForm(const string& formstr){
-	return constFactory_->getDataForm(lower(formstr));
+	return s_constFactory->getDataForm(lower(formstr));
 }
 
 char Util::getDataTypeSymbol(DATA_TYPE type){
-	return constFactory_->getDataTypeSymbol(type);
+	return s_constFactory->getDataTypeSymbol(type);
 }
 
 string Util::getDataTypeString(DATA_TYPE type){
-	return constFactory_->getDataTypeString(type);
+	return s_constFactory->getDataTypeString(type);
 }
 
 string Util::getDataFormString(DATA_FORM form){
-	return constFactory_->getDataFormString(form);
+	return s_constFactory->getDataFormString(form);
 }
 
 string Util::getTableTypeString(TABLE_TYPE type){
-	return constFactory_->getTableTypeString(type);
+	return s_constFactory->getTableTypeString(type);
 }
 
 DATA_TYPE Util::getDataType(char ch){
@@ -679,7 +679,7 @@ DATA_CATEGORY Util::getCategory(DATA_TYPE type){
 		return LOGICAL;
 	else if (type == DT_DOUBLE || type == DT_FLOAT)
 		return FLOATING;
-	else if (type == DT_STRING || type == DT_SYMBOL)
+	else if (type == DT_STRING || type == DT_SYMBOL || type == DT_BLOB)
 		return LITERAL;
 	else if (type == DT_INT128 || type == DT_UUID || type == DT_IP)
 		return BINARY;
@@ -696,10 +696,10 @@ DATA_CATEGORY Util::getCategory(DATA_TYPE type){
 }
 
 bool Util::equalIgnoreCase(const string& str1, const string& str2){
-	unsigned int len=str1.size();
+	std::size_t len=str1.size();
 	if(len!=str2.size())
 		return false;
-	unsigned int i;
+	std::size_t i;
 	for(i=0;i<len && toLower(str1[i])==toLower(str2[i]);i++);
 	if(i>=len)
 		return true;
@@ -813,14 +813,18 @@ char Util::toLower(char ch){
 
 string Util::convert(int val){
 	char buf[15];
+#ifdef _MSC_VER
+	sprintf_s(buf, 15, "%d", val);
+#else
 	sprintf(buf,"%d",val);
+#endif
 	return string(buf);
 }
 
 string Util::longToString(long long val){
 	char buf[30];
-#ifdef BIT32
-	std::sprintf(buf,"%lld",val);
+#ifdef _MSC_VER
+	sprintf_s(buf, 30, "%lld", val);
 #else
 	std::sprintf(buf,"%lld",val);
 #endif
@@ -829,7 +833,11 @@ string Util::longToString(long long val){
 
 string Util::doubleToString(double val){
 	char buf[30];
-	sprintf(buf,"%f",val);
+#ifdef _MSC_VER
+	sprintf_s(buf, 30, "%f", val);
+#else
+	sprintf(buf, "%f", val);
+#endif
 	//trim unnecessary zeros after decimal point.
 	char* cur=buf;
 	while(*cur!='.') ++cur;
@@ -1012,10 +1020,17 @@ string Util::toMicroTimestampStr(std::chrono::system_clock::time_point& tp, bool
 	#endif
 	int microsecond= (tp.time_since_epoch()/std::chrono::microseconds(1)) % 1000000;
 	char buf[100]{};
+#ifdef _MSC_VER
+	if(printDate)
+		sprintf_s(buf, 100, "%04d-%02d-%02d %02d:%02d:%02d.%06d", lt.tm_year+1900, lt.tm_mon+1, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec, microsecond);
+	else
+		sprintf_s(buf, 100, "%02d:%02d:%02d.%06d",lt.tm_hour, lt.tm_min, lt.tm_sec, microsecond);
+#else
 	if(printDate)
 		sprintf(buf, "%04d-%02d-%02d %02d:%02d:%02d.%06d", lt.tm_year+1900, lt.tm_mon+1, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec, microsecond);
 	else
 		sprintf(buf, "%02d:%02d:%02d.%06d",lt.tm_hour, lt.tm_min, lt.tm_sec, microsecond);
+#endif
 	return string(buf);
 }
 
@@ -1023,7 +1038,7 @@ int Util::getDataTypeSize(DATA_TYPE type){
 	if (type >= ARRAY_TYPE_BASE) {
 		type = DATA_TYPE(type - ARRAY_TYPE_BASE);
 	}
-	if(type == DT_BOOL || type == DT_CHAR || type == DT_COMPRESS){
+	if(type == DT_VOID || type == DT_BOOL || type == DT_CHAR || type == DT_COMPRESS){
 		return sizeof(char);
 	}
 	else if(type == DT_INT || type == DT_SYMBOL || type == DT_SECOND ||
@@ -1175,7 +1190,7 @@ long long Util::getPhysicalMemorySize() {
 
 void Util::writeDoubleQuotedString(string& dest, const string& source){
 	dest.append(1, '"');
-	int len = source.length();
+	int len = static_cast<int>(source.length());
 	for(int i=0; i<len; ++i){
 		char ch = source[i];
 		dest.append(ch=='"' ? 2 : 1, ch);
@@ -1279,11 +1294,11 @@ string Util::getErrorMessage(int errCode){
 }
 
 string Util::getPartitionTypeString(PARTITION_TYPE type){
-	return constFactory_->getPartitionTypeString(type);
+	return s_constFactory->getPartitionTypeString(type);
 }
 
 string Util::getCategoryString(DATA_CATEGORY type){
-	return constFactory_->getCategoryString(type);
+	return s_constFactory->getCategoryString(type);
 }
 Domain* Util::createDomain(PARTITION_TYPE type, DATA_TYPE partitionColType, const ConstantSP& partitionSchema){
 	if(type == HASH){
@@ -1364,13 +1379,13 @@ ConstantSP Util::createValue(DATA_TYPE dataType, long long val, const char *pTyp
 		if (extraParam > 0)
 			return createDecimal128(extraParam, (double)val);
 		else
-			return createDouble(val);
+			return createDouble(static_cast<double>(val));
 		break;
 	case DATA_TYPE::DT_DECIMAL64:
 		if (extraParam > 0)
 			return createDecimal64(extraParam, (double)val);
 		else
-			return createDouble(val);
+			return createDouble(static_cast<double>(val));
 		break;
 	case DATA_TYPE::DT_LONG:
 		return createLong(val);
@@ -1379,24 +1394,24 @@ ConstantSP Util::createValue(DATA_TYPE dataType, long long val, const char *pTyp
 		if (extraParam > 0)
 			return createDecimal32(extraParam, (double)val);
 		else
-			return createDouble(val);
+			return createDouble(static_cast<double>(val));
 		break;
 	case DATA_TYPE::DT_INT:
 		if(val >= INT_MIN && val <= INT_MAX)
-			return createInt(val);
+			return createInt(static_cast<int>(val));
 		else {
 			SetOrThrowErrorInfo(errorCodeInfo,ErrorCodeInfo::EC_InvalidObject, std::string(pTypeName) + " cannot be converted because it exceeds the range of " + getDataTypeString(dataType));
 		}
 		break;
 	case DATA_TYPE::DT_SHORT:
 		if(val >= SHRT_MIN && val <= SHRT_MAX)
-			return createShort(val);
+			return createShort(static_cast<short>(val));
 		else {
 			SetOrThrowErrorInfo(errorCodeInfo,ErrorCodeInfo::EC_InvalidObject, std::string(pTypeName) + " cannot be converted because it exceeds the range of  " + getDataTypeString(dataType));
 		}
 		break;
 	case DATA_TYPE::DT_CHAR:
-		if(val > SCHAR_MIN && val <= SCHAR_MAX)
+		if(val >= SCHAR_MIN && val <= SCHAR_MAX)
 			return createChar((char)val);
 		else {
 			SetOrThrowErrorInfo(errorCodeInfo,ErrorCodeInfo::EC_InvalidObject, std::string(pTypeName) + " cannot be converted because it exceeds the range of  " + getDataTypeString(dataType));
@@ -1445,7 +1460,7 @@ ConstantSP Util::createObject(DATA_TYPE dataType, const char* val, ErrorCodeInfo
 		break;
 		case DATA_TYPE::DT_IP:
 		{
-			IPAddr *pip=IPAddr::parseIPAddr(val, strlen(val));
+			IPAddr *pip = IPAddr::parseIPAddr(val, strlen(val));
 			if (pip == nullptr) {
 				SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert string to " + getDataTypeString(dataType));
 			}
@@ -1574,25 +1589,25 @@ ConstantSP Util::createObject(DATA_TYPE dataType, long long val, ErrorCodeInfo *
 		return createTimestamp(val);
 		break;
 	case DATA_TYPE::DT_DATE:
-		return createDate(val);
+		return createDate(static_cast<int>(val));
 		break;
 	case DATA_TYPE::DT_MONTH:
-		return createMonth(val);
+		return createMonth(static_cast<int>(val));
 		break;
 	case DATA_TYPE::DT_TIME:
-		return createTime(val);
+		return createTime(static_cast<int>(val));
 		break;
 	case DATA_TYPE::DT_SECOND:
-		return createSecond(val);
+		return createSecond(static_cast<int>(val));
 		break;
 	case DATA_TYPE::DT_MINUTE:
-		return createMinute(val);
+		return createMinute(static_cast<int>(val));
 		break;
 	case DATA_TYPE::DT_DATETIME:
-		return createDateTime(val);
+		return createDateTime(static_cast<int>(val));
 		break;
 	case DATA_TYPE::DT_DATEHOUR:
-		return createDateHour(val);
+		return createDateHour(static_cast<int>(val));
 		break;
 	default:
 		return createValue(dataType,(long long)val,"long", errorCodeInfo, extraParam);
@@ -1635,7 +1650,7 @@ ConstantSP Util::createObject(DATA_TYPE dataType, double val, ErrorCodeInfo *err
 	switch (dataType) {
 	case DATA_TYPE::DT_FLOAT:
 		if(val >= FLT_MIN && val <= FLT_MAX)
-			return createFloat(val);
+			return createFloat(static_cast<float>(val));
 		else {
 			SetOrThrowErrorInfo(errorCodeInfo,ErrorCodeInfo::EC_InvalidObject, "Cannot convert double to " + getDataTypeString(dataType));
 		}
@@ -1700,7 +1715,7 @@ ConstantSP Util::createObject(DATA_TYPE dataType, int val, ErrorCodeInfo *errorC
 template<class T>
 ConstantSP createVectorObject(DATA_TYPE dataType, std::vector<T> val, ErrorCodeInfo *errorCodeInfo, int extraParam) {
 	//Only arrayVector needs vector data and it requires any vector.
-	VectorSP dataVector = Util::createVector(dataType, 0, val.size(), true, extraParam);
+	VectorSP dataVector = Util::createVector(dataType, 0, static_cast<INDEX>(val.size()), true, extraParam);
 	for (auto one : val) {
 		ConstantSP csp = Util::createObject(dataType, one, errorCodeInfo, extraParam);
 		if (!csp.isNull())
@@ -1800,341 +1815,19 @@ unsigned long Util::getCurThreadId() {
 #endif
 }
 
-void Util::writeFile(const char *pfilepath, const void *pbytes, int bytelen){
+void Util::writeFile(const char *pfilepath, const void *pbytes, std::size_t bytelen){
 	if(bytelen < 1)
 		return;
-	FILE *pf = fopen(pfilepath,"ab");
+	FILE *pf = NULL;
+#ifdef _MSC_VER
+	fopen_s(&pf, pfilepath, "ab");
+#else
+	pf = fopen(pfilepath,"ab");
+#endif	
 	if(pf == NULL)
 		return;
 	fwrite(pbytes, bytelen, 1, pf);
 	fclose(pf);
 }
-/*
-bool Util::appendVector(DATA_TYPE dataType, VectorSP& vec, const std::nullptr_t* val, int valSize,ErrorCodeInfo* errorCodeInfo) {
-	for(int i=0;i<valSize;i++)
-		vec->append(Constant::void_);
-	return true;
-}
-bool Util::appendVector(DATA_TYPE dataType, VectorSP& vec, const Constant** val, int valSize, ErrorCodeInfo* errorCodeInfo) {
-	for(int i=0;i<valSize;i++)
-		vec->append(val[i]);
-	return true;
-}
-bool Util::appendVector(DATA_TYPE dataType, VectorSP& vec, const ConstantSP* val, int valSize, ErrorCodeInfo* errorCodeInfo) {
-	return vec->append(val);
-}
-bool Util::appendVector(DATA_TYPE dataType, VectorSP& vec, const bool *val, int valSize, ErrorCodeInfo* errorCodeInfo) {
-	switch (dataType) {
-	case DATA_TYPE::DT_BOOL:
-		return vec->appendBool((char*)val, valSize);
-		break;
-	default:
-		SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert bool to " + getDataTypeString(dataType));
-		return false;
-		break;
-	}
-}
 
-bool Util::appendVector(DATA_TYPE dataType, VectorSP& vec, const long long *val, int valSize, const char* pTypeName, ErrorCodeInfo* errorCodeInfo) {
-	switch (dataType) {
-	case DATA_TYPE::DT_DECIMAL64:
-	case DATA_TYPE::DT_LONG:
-		return vec->appendLong(&val, 1);
-		break;
-	case DATA_TYPE::DT_DECIMAL32:
-	case DATA_TYPE::DT_INT:
-		if (val >= INT_MIN && val <= INT_MAX)
-			return vec->appendInt((int*)&val, 1);
-		else {
-			SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, std::string(pTypeName) + " cannot be converted because it exceeds the range of " + getDataTypeString(dataType));
-		}
-		break;
-	case DATA_TYPE::DT_SHORT:
-		if (val >= SHRT_MIN && val <= SHRT_MAX)
-			return vec->appendShort((short*)&val, 1);
-		else {
-			SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, std::string(pTypeName) + " cannot be converted because it exceeds the range of  " + getDataTypeString(dataType));
-		}
-		break;
-	case DATA_TYPE::DT_CHAR:
-		if (val > SCHAR_MIN && val <= SCHAR_MAX)
-			return vec->appendChar((char*)&val, 1);
-		else {
-			SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, std::string(pTypeName) + " cannot be converted because it exceeds the range of  " + getDataTypeString(dataType));
-		}
-		break;
-	default:
-		SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert " + std::string(pTypeName) + " to " + getDataTypeString(dataType));
-		break;
-	}
-	return false;
-}
-
-bool Util::appendVector(DATA_TYPE dataType, VectorSP& vec, char val, ErrorCodeInfo* errorCodeInfo) {
-	switch (dataType) {
-	case DATA_TYPE::DT_BOOL:
-		return createBool(val);
-		break;
-	default:
-		return appendVector(dataType, (long long)val, "char", errorCodeInfo, extraParam);
-		break;
-	}
-}
-ConstantSP Util::appendVector(DATA_TYPE dataType, VectorSP& vec, short val, ErrorCodeInfo* errorCodeInfo) {
-	return createValue(dataType, (long long)val, "short", errorCodeInfo, extraParam);
-}
-ConstantSP Util::appendVector(DATA_TYPE dataType, VectorSP& vec, const char* val, ErrorCodeInfo* errorCodeInfo) {
-	if (val != (const void*)0) {
-		switch (dataType) {
-		case DATA_TYPE::DT_INT128:
-		{
-			Int128* pint128 = Int128::parseInt128(val, strlen(val));
-			if (pint128 == nullptr) {
-				SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert string to " + getDataTypeString(dataType));
-			}
-			return pint128;
-		}
-		break;
-		case DATA_TYPE::DT_UUID:
-		{
-			Uuid* puuid = Uuid::parseUuid(val, strlen(val));
-			if (puuid == nullptr) {
-				SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert string to " + getDataTypeString(dataType));
-			}
-			return puuid;
-		}
-		break;
-		case DATA_TYPE::DT_IP:
-		{
-			IPAddr* pip = IPAddr::parseIPAddr(val, strlen(val));
-			if (pip == nullptr) {
-				SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert string to " + getDataTypeString(dataType));
-			}
-			return pip;
-		}
-		break;
-		case DATA_TYPE::DT_SYMBOL:
-		{
-			ConstantSP tmp = createConstant(DATA_TYPE::DT_SYMBOL);
-			tmp->setString((const char*)val);
-			return tmp;
-		}
-		break;
-		case DATA_TYPE::DT_STRING:
-			return createString((const char*)val);
-		case DATA_TYPE::DT_BLOB:
-		{
-			ConstantSP tmp = createConstant(DATA_TYPE::DT_BLOB);
-			tmp->setString((const char*)val);
-			return tmp;
-		}
-		default:
-			SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert pointer to " + getDataTypeString(dataType));
-			break;
-		}
-	}
-	else {
-		return createNullConstant((DATA_TYPE)dataType);
-	}
-	return NULL;
-}
-ConstantSP Util::appendVector(DATA_TYPE dataType, VectorSP& vec, const void* val, ErrorCodeInfo* errorCodeInfo) {
-	if (val != (const void*)0) {
-		switch (dataType) {
-		case DATA_TYPE::DT_DECIMAL32:
-		{
-			Decimal32* pdecimal = new Decimal32(extraParam, *(int32_t*)val);
-			return pdecimal;
-		}
-		break;
-		case DATA_TYPE::DT_DECIMAL64:
-		{
-			Decimal64* pdecimal = new Decimal64(extraParam, *(int64_t*)val);
-			return pdecimal;
-		}
-		break;
-		case DATA_TYPE::DT_INT128:
-		{
-			ConstantSP tmp = createConstant(DATA_TYPE::DT_INT128);
-			tmp->setBinary((const unsigned char*)val, 16);
-			return tmp;
-		}
-		break;
-		case DATA_TYPE::DT_UUID:
-		{
-			ConstantSP tmp = createConstant(DATA_TYPE::DT_UUID);
-			tmp->setBinary((const unsigned char*)val, 16);
-			return tmp;
-		}
-		break;
-		case DATA_TYPE::DT_IP:
-		{
-			ConstantSP tmp = createConstant(DATA_TYPE::DT_IP);
-			tmp->setBinary((const unsigned char*)val, 16);
-			return tmp;
-		}
-		break;
-		case DATA_TYPE::DT_SYMBOL:
-		{
-			ConstantSP tmp = createConstant(DATA_TYPE::DT_SYMBOL);
-			tmp->setString((const char*)val);
-			return tmp;
-		}
-		break;
-		case DATA_TYPE::DT_STRING:
-			return createString((const char*)val);
-		case DATA_TYPE::DT_BLOB:
-		{
-			ConstantSP tmp = createConstant(DATA_TYPE::DT_BLOB);
-			tmp->setString((const char*)val);
-			return tmp;
-		}
-		default:
-			SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert pointer to " + getDataTypeString(dataType));
-			break;
-		}
-	}
-	else {
-		return createNullConstant((DATA_TYPE)dataType);
-	}
-	return NULL;
-}
-ConstantSP Util::appendVector(DATA_TYPE dataType, VectorSP& vec, std::string val, ErrorCodeInfo* errorCodeInfo) {
-	return creaappendVectorteObject(dataType, (const char*)val.data(), errorCodeInfo, extraParam);
-}
-ConstantSP Util::appendVector(DATA_TYPE dataType, VectorSP& vec, const unsigned char* val, ErrorCodeInfo* errorCodeInfo) {
-	return appendVector(dataType, (const void*)val, errorCodeInfo, extraParam);
-}
-ConstantSP Util::appendVector(DATA_TYPE dataType, VectorSP& vec, unsigned char val[], ErrorCodeInfo* errorCodeInfo) {
-	return appendVector(dataType, (const void*)val, errorCodeInfo, extraParam);
-}
-ConstantSP Util::appendVector(DATA_TYPE dataType, VectorSP& vec, long int val, ErrorCodeInfo* errorCodeInfo) {
-	return appendVector(dataType, (long long)val, errorCodeInfo, extraParam);
-}
-//ConstantSP Util::createObject(DATA_TYPE dataType, long val){
-//    return createObject(dataType, (long long)val);
-//}
-ConstantSP Util::appendVector(DATA_TYPE dataType, VectorSP& vec, long long val, ErrorCodeInfo* errorCodeInfo) {
-	switch (dataType) {
-	case DATA_TYPE::DT_NANOTIME:
-		return createNanoTime(val);
-		break;
-	case DATA_TYPE::DT_NANOTIMESTAMP:
-		return createNanoTimestamp(val);
-		break;
-	case DATA_TYPE::DT_TIMESTAMP:
-		return createTimestamp(val);
-		break;
-	case DATA_TYPE::DT_DATE:
-		return createDate(val);
-		break;
-	case DATA_TYPE::DT_MONTH:
-		return createMonth(val);
-		break;
-	case DATA_TYPE::DT_TIME:
-		return createTime(val);
-		break;
-	case DATA_TYPE::DT_SECOND:
-		return createSecond(val);
-		break;
-	case DATA_TYPE::DT_MINUTE:
-		return createMinute(val);
-		break;
-	case DATA_TYPE::DT_DATETIME:
-		return createDateTime(val);
-		break;
-	case DATA_TYPE::DT_DATEHOUR:
-		return createDateHour(val);
-		break;
-	default:
-		return createValue(dataType, (long long)val, "long", errorCodeInfo, extraParam);
-		break;
-	}
-}
-ConstantSP Util::appendVector(DATA_TYPE dataType, VectorSP& vec, float val, ErrorCodeInfo* errorCodeInfo) {
-	switch (dataType) {
-	case DATA_TYPE::DT_DECIMAL32:
-		if (extraParam > 0)
-			return createDecimal32(extraParam, val);
-		else
-			return createDouble(val);
-		break;
-	case DATA_TYPE::DT_DECIMAL64:
-		if (extraParam > 0)
-			return createDecimal64(extraParam, val);
-		else
-			return createDouble(val);
-		break;
-	case DATA_TYPE::DT_FLOAT:
-		return createFloat(val);
-		break;
-	case DATA_TYPE::DT_DOUBLE:
-		return createDouble(val);
-		break;
-	default:
-		SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert float to " + getDataTypeString(dataType));
-		break;
-	}
-	return NULL;
-}
-ConstantSP Util::appendVector(DATA_TYPE dataType, VectorSP& vec, double val, ErrorCodeInfo* errorCodeInfo) {
-	switch (dataType) {
-	case DATA_TYPE::DT_FLOAT:
-		if (val >= FLT_MIN && val <= FLT_MAX)
-			return createFloat(val);
-		else {
-			SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert double to " + getDataTypeString(dataType));
-		}
-		break;
-	case DATA_TYPE::DT_DECIMAL32:
-		if (extraParam > 0)
-			return createDecimal32(extraParam, val);
-		else
-			return createDouble(val);
-		break;
-	case DATA_TYPE::DT_DECIMAL64:
-		if (extraParam > 0)
-			return createDecimal64(extraParam, val);
-		else
-			return createDouble(val);
-
-		break;
-	case DATA_TYPE::DT_DOUBLE:
-		return createDouble(val);
-		break;
-	default:
-		SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "Cannot convert double to " + getDataTypeString(dataType));
-		break;
-	}
-	return NULL;
-}
-ConstantSP Util::appendVector(DATA_TYPE dataType, VectorSP& vec, int val, ErrorCodeInfo* errorCodeInfo) {
-	switch (dataType) {
-	case DATA_TYPE::DT_DATE:
-		return createDate(val);
-		break;
-	case DATA_TYPE::DT_MONTH:
-		return createMonth(val);
-		break;
-	case DATA_TYPE::DT_TIME:
-		return createTime(val);
-		break;
-	case DATA_TYPE::DT_SECOND:
-		return createSecond(val);
-		break;
-	case DATA_TYPE::DT_MINUTE:
-		return createMinute(val);
-		break;
-	case DATA_TYPE::DT_DATETIME:
-		return createDateTime(val);
-		break;
-	case DATA_TYPE::DT_DATEHOUR:
-		return createDateHour(val);
-		break;
-	default:
-		return appendVector(dataType, (long long)val, "int", errorCodeInfo, extraParam);
-		break;
-	}
-}
-*/
 };

@@ -738,7 +738,7 @@ MessageQueueSP points to a MessageQueue, where user can poll messages from the s
 ###### Example
 
 ```c++
-auto queue = client.subscribe(host, port, tableName);
+auto queue = client.subscribe(host, port, handler, tableName);
 Message msg;
 while(true) {
     if(queue->poll(msg, 1000)) {

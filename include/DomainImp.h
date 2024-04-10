@@ -8,8 +8,9 @@
 #ifndef DOMAIN_H
 #define DOMAIN_H
 
-#include "DolphinDB.h"
-#include "ConstantImp.h"
+#include "Domain.h"
+#include "Dictionary.h"
+#include "Constant.h"
 
 namespace dolphindb{
 

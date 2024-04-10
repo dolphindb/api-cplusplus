@@ -11,15 +11,7 @@
 #include <exception>
 #include <string>
 #include "Types.h"
-#ifdef _MSC_VER
-	#ifdef _DDBAPIDLL	
-		#define EXPORT_DECL _declspec(dllexport)
-	#else
-		#define EXPORT_DECL __declspec(dllimport)
-	#endif
-#else
-	#define EXPORT_DECL 
-#endif
+#include "Exports.h"
 using std::exception;
 using std::string;
 
@@ -161,7 +153,7 @@ private:
 	const string newLeader_;
 };
 
-class EXPORT_DECL  MathException: public exception {
+class EXPORT_DECL MathException: public exception {
 public:
 	MathException(const string& errMsg) : errMsg_(errMsg){}
 	virtual const char* what() const throw(){

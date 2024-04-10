@@ -1,3 +1,6 @@
+#ifdef LINUX
+#include "config.h"
+
 class IPCinMemoryTableTest : public testing::Test
 {
 protected:
@@ -473,3 +476,4 @@ TEST_F(IPCinMemoryTableTest, test_subscribeUnsubscribe_overwriteTrue_with_gt1048
     th_new.join();
     th2.join();
 }
+#endif // if LINUX

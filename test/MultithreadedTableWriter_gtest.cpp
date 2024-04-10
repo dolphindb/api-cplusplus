@@ -1,3 +1,5 @@
+#include "config.h"
+
 class MultithreadedTableWriterTest : public testing::Test
 {
 protected:
@@ -5040,7 +5042,7 @@ TEST_F(MultithreadedTableWriterTest, insertTo_inMemoryTable_with_CallbackHandler
 	};
 
 	mulwrite = new MultithreadedTableWriter(hostName, port, "admin", "123456", "", "tab", false, false, NULL,
-											1000, 1, 5, "col1", nullptr, MultithreadedTableWriter::M_Append, nullptr, callback);
+											1000, 1, 5, "col1", nullptr, MultithreadedTableWriter::Mode::M_Append, nullptr, callback);
 	MultithreadedTableWriter::Status status;
 
 	string callbackfunc_id = "";
@@ -5083,7 +5085,7 @@ TEST_F(MultithreadedTableWriterTest, insertTo_dfsTable_with_CallbackHandlerFunc_
 	};
 
 	mulwrite = new MultithreadedTableWriter(hostName, port, "admin", "123456", "dfs://mtw_alldataTypes", "pt", false, false, NULL,
-											1000, 1, 5, "col1", nullptr, MultithreadedTableWriter::M_Append, nullptr, callback);
+											1000, 1, 5, "col1", nullptr, MultithreadedTableWriter::Mode::M_Append, nullptr, callback);
 	MultithreadedTableWriter::Status status;
 	vector<ConstantSP> datas;
 
@@ -5156,7 +5158,7 @@ TEST_F(MultithreadedTableWriterTest, insertTo_inMemorytable_with_CallbackHandler
 	};
 
 	mulwrite = new MultithreadedTableWriter(hostName, port, "admin", "123456", "", "target", false, false, NULL,
-											1000, 1, 1, "", nullptr, MultithreadedTableWriter::M_Append, nullptr, callback);
+											1000, 1, 1, "", nullptr, MultithreadedTableWriter::Mode::M_Append, nullptr, callback);
 
 	MultithreadedTableWriter::Status status;
 	vector<ConstantSP> datas;
@@ -5233,7 +5235,7 @@ TEST_F(MultithreadedTableWriterTest, insert_with_CallbackHandlerFunc_getUnwritte
 	};
 
 	mulwrite = new MultithreadedTableWriter(hostName, port, "admin", "123456", "", "target", false, false, NULL,
-											1000, 1, 1, "", nullptr, MultithreadedTableWriter::M_Append, nullptr, callback);
+											1000, 1, 1, "", nullptr, MultithreadedTableWriter::Mode::M_Append, nullptr, callback);
 
 	MultithreadedTableWriter::Status status;
 	vector<ConstantSP> datas;
@@ -5343,7 +5345,7 @@ TEST_F(MultithreadedTableWriterTest, test_insert_dfs_column_info_in_errMsg)
 
 	writer.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1l, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1);
 	writer.waitForThreadCompletion();
-	EXPECT_TRUE(conn.run("eqObj(values t1, [[false], ['1'], [short(1)], [int(1)], [long(1)], [date(1)], [month(1)], [time(1)], [minute(1)], [second(1)], [datetime(1)], [timestamp(1)], [nanotime(1)], [nanotimestamp(1)], [datehour(1)], [float(10.0)], [double(-0.123)], symbol([`123456msg]), [`123456msg], [blob(`123456msg)], [ipaddr('192.168.2.1')], [uuid('0f0e0d0c-0b0a-0908-0706-050403020100')], [int128('0f0e0d0c0b0a09080706050403020100')], decimal32([0.2353], 2), decimal64([-1], 11)])")->getBool());
+	EXPECT_TRUE(conn.run("eqObj((select * from loadTable('dfs://test_errMsg',`pt)).values(), [[false], ['1'], [short(1)], [int(1)], [long(1)], [date(1)], [month(1)], [time(1)], [minute(1)], [second(1)], [datetime(1)], [timestamp(1)], [nanotime(1)], [nanotimestamp(1)], [datehour(1)], [float(10.0)], [double(-0.123)], symbol([`123456msg]), [`123456msg], [blob(`123456msg)], [ipaddr('192.168.2.1')], [uuid('0f0e0d0c-0b0a-0908-0706-050403020100')], [int128('0f0e0d0c0b0a09080706050403020100')], decimal32([0.2353], 2), decimal64([-1], 11)])")->getBool());
 
 	// insert int to timestamp
 	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1))
@@ -5395,4 +5397,107 @@ TEST_F(MultithreadedTableWriterTest, test_insert_dfs_column_info_in_errMsg)
 	writer2.waitForThreadCompletion();
 	// EXPECT_TRUE(conn.run("eqObj(values t1, [[false,true], ['1', '1'], [short(1),short(1)], [int(1),int(1)], [long(1),long(1)], [date(1),date(1)], [month(1),month(1)], [time(1),time(1)], [minute(1),minute(1)], [second(1),second(1)], [datetime(1),datetime(1)], [timestamp(1),timestamp(1)], [nanotime(1),nanotime(1)], [nanotimestamp(1),nanotimestamp(1)], [datehour(1),datehour(1)], [float(10.0),float(10.0)], [double(-0.123),double(-0.123)], symbol([`123456msg,`1]), [`123456msg, `1], blob(`123456msg`1), [ipaddr('192.168.2.1'),ipaddr('192.168.2.1')], [uuid('0f0e0d0c-0b0a-0908-0706-050403020100'),uuid('0f0e0d0c-0b0a-0908-0706-050403020100')], [int128('0f0e0d0c0b0a09080706050403020100'),int128('0f0e0d0c0b0a09080706050403020100')], decimal32([0.2353, 0.2353], 2), decimal64([-1,-1], 11)])")->getBool());
 
+}
+
+class MTW_insert_null_data : public MultithreadedTableWriterTest, public testing::WithParamInterface<string>
+{
+public:
+	static vector<string> testTypes()
+	{
+		return {"BOOL", "CHAR", "SHORT", "INT", "LONG", "DATE", "MONTH", "TIME", "MINUTE", "SECOND", "DATETIME", "TIMESTAMP", "NANOTIME", "NANOTIMESTAMP", "DATEHOUR", "FLOAT", "DOUBLE", "STRING", "SYMBOL", "BLOB", "IPADDR", "UUID", "INT128", "DECIMAL32(8)", "DECIMAL64(15)", "DECIMAL128(28)",
+				"BOOL[]", "CHAR[]", "SHORT[]", "INT[]", "LONG[]", "DATE[]", "MONTH[]", "TIME[]", "MINUTE[]", "SECOND[]", "DATETIME[]", "TIMESTAMP[]", "NANOTIME[]", "NANOTIMESTAMP[]", "DATEHOUR[]", "FLOAT[]", "DOUBLE[]", "IPADDR[]", "UUID[]", "INT128[]", "DECIMAL32(8)[]", "DECIMAL64(15)[]", "DECIMAL128(25)[]"};
+	}
+};
+INSTANTIATE_TEST_SUITE_P(, MTW_insert_null_data, testing::ValuesIn(MTW_insert_null_data::testTypes()));
+
+TEST_P(MTW_insert_null_data, test_insert_all_null_data)
+{
+	string type = GetParam();
+	cout << "test type: " << type << endl;
+	string colName = "c1";
+	string script1 =
+		"colName = [`" + colName + "];"
+		"colType = [" + type + "];"
+		"share table(1:0, colName, colType) as att;";
+
+	conn.run(script1);
+	ErrorCodeInfo errorInfo;
+	MultithreadedTableWriter writer(hostName, port, "admin", "123456", "", "att", false);
+	bool success = false;
+	if (type == "STRING" || type == "SYMBOL" || type == "BLOB"){
+		success = writer.insert(errorInfo, "");
+	}else if (type.find("IPADDR") != string::npos){
+		success = writer.insert(errorInfo, Util::createNullConstant(DT_IP));
+	}else if (type.find("UUID") != string::npos){
+		success = writer.insert(errorInfo, Util::createNullConstant(DT_UUID));
+	}else if (type.find("INT128") != string::npos){
+		success = writer.insert(errorInfo, Util::createNullConstant(DT_INT128));
+	}
+	else if (type == "BOOL"){
+		success = writer.insert(errorInfo, Util::createNullConstant(DT_BOOL));
+	}
+	else{
+		success = writer.insert(errorInfo, Util::createNullConstant(DT_CHAR));
+	}
+	EXPECT_FALSE(errorInfo.hasError()) << errorInfo.errorInfo;
+	EXPECT_TRUE(success);
+	writer.waitForThreadCompletion();
+
+	auto res = conn.run("exec * from att");
+	EXPECT_EQ(res->rows(), 1);
+	auto val = res->getColumn(0)->get(0);
+	EXPECT_TRUE(val->get(0)->isNull()) << val->getString();
+	conn.run("undef(`att, SHARED);go");
+}
+
+TEST_F(MultithreadedTableWriterTest, test_insertToinMemoryTable_threadCount_gt1)
+{
+	string script1 =
+		"colName = [`c1];"
+		"colType = [INT];"
+		"share table(1:0, colName, colType) as att;";
+
+	conn.run(script1);
+	ErrorCodeInfo errorInfo;
+	unsigned int threadCount = 2;
+	EXPECT_ANY_THROW(MultithreadedTableWriter writer(hostName, port, "admin", "123456", "", "att", true, false, nullptr, 1, 0.01, threadCount));
+	conn.run("undef(`att, SHARED);go");
+}
+
+class MultithreadedTableWriterTest_enableStreamTableTimestamp : public MultithreadedTableWriterTest, public testing::WithParamInterface<string>{
+public:
+	static vector<string> getScripts(){
+		return {
+			R"(try{dropStreamTable(`test_enableStreamTableTimestamp)}catch(ex){};go;
+				share streamTable(1:0, `ts`sym`ind`val, [TIMESTAMP, SYMBOL, INT, DOUBLE]) as test_enableStreamTableTimestamp;
+				setStreamTableTimestamp(test_enableStreamTableTimestamp, `ts))",
+			R"(try{dropStreamTable(`test_enableStreamTableTimestamp)}catch(ex){};go;
+				share streamTable(1:0, `sym`ind`ts`val, [SYMBOL, INT, TIMESTAMP, DOUBLE]) as test_enableStreamTableTimestamp;
+				setStreamTableTimestamp(test_enableStreamTableTimestamp, `ts))",
+			R"(try{dropStreamTable(`test_enableStreamTableTimestamp)}catch(ex){};go;
+				share streamTable(1:0, `sym`ind`val`ts, [SYMBOL, INT, DOUBLE, TIMESTAMP]) as test_enableStreamTableTimestamp;
+				setStreamTableTimestamp(test_enableStreamTableTimestamp, `ts))"
+		};
+	}
+};
+INSTANTIATE_TEST_SUITE_P(, MultithreadedTableWriterTest_enableStreamTableTimestamp, testing::ValuesIn(MultithreadedTableWriterTest_enableStreamTableTimestamp::getScripts()));
+TEST_P(MultithreadedTableWriterTest_enableStreamTableTimestamp, test_timeCol_position){
+	srand(time(0));
+	conn.run(GetParam());
+
+	MultithreadedTableWriter* writer = new MultithreadedTableWriter(hostName, port, "admin", "123456", "", "test_enableStreamTableTimestamp", false, false, nullptr, 1, 0.01, 1, "", nullptr,MultithreadedTableWriter::M_Append, nullptr, nullptr, true);
+	const int rows = 1000;
+	vector<string> syms = {"APPL", "MSFT", "GOOL", "ORCL", "BABA"};
+	vector<int> inds = {0, -10823, 94, 305, 19};
+	vector<double> vals = {0.0, -2.394, 99.2016, 50.002, 9};
+	ErrorCodeInfo err;
+	for (auto i=0;i<rows;i++){
+		if (!writer->insert(err, syms[rand()%5], inds[rand()%5], vals[rand()%5]))
+			throw RuntimeException(err.errorInfo);
+	}
+
+	writer->waitForThreadCompletion();
+	EXPECT_EQ(conn.run("test_enableStreamTableTimestamp.rows()")->getInt(), 1000);
+	conn.run("try{dropStreamTable(`test_enableStreamTableTimestamp)}catch(ex){};");
+	delete writer;
 }

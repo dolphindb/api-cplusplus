@@ -1,3 +1,5 @@
+#include "config.h"
+
 class SqlTest : public testing::Test
 {
 protected:

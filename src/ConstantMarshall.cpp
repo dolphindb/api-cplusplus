@@ -11,10 +11,10 @@
 #include "Util.h"
 #include "Compress.h"
 #include "ConstantImp.h"
-
+#include "Set.h"
+#include "Dictionary.h"
+#include "DFSChunkMeta.h"
 namespace dolphindb {
-
-#define DLOG true?DLogger::GetMinLevel() : DLogger::Info
 
 short ConstantMarshallImp::encodeFlag(const ConstantSP& target, bool compress){
 	short flag = target->getForm() << 8;
@@ -22,7 +22,7 @@ short ConstantMarshallImp::encodeFlag(const ConstantSP& target, bool compress){
 		if (target->isTable()) {
 			flag += ((Table*)target.get())->getTableType();
 		}else
-			flag += (target->isVector() && target->getType() == DT_SYMBOL) ? DT_SYMBOL + 128 : target->getType();
+			flag += (target->isVector() && target->getType() == DT_SYMBOL && target->size() != 0) ? DT_SYMBOL + 128 : target->getType();
 	}
 	else {
 		if (target->isTable())
@@ -67,7 +67,7 @@ bool ScalarMarshall::start(const char* requestHeader, size_t headerSize, const C
 
 	int numElement =0;
 	int actualSize = 0;
-	actualSize = target->serialize(buf_ + headerSize, MARSHALL_BUFFER_SIZE - headerSize,0,0,numElement,partial_);
+	actualSize = target->serialize(buf_ + headerSize, static_cast<int>(MARSHALL_BUFFER_SIZE - headerSize),0,0,numElement,partial_);
 	if(actualSize < 0){
 		ret = OTHERERR;
 		return false;
@@ -135,7 +135,7 @@ bool VectorMarshall::writeMetaValues(BufferWriter<DataOutputStreamSP> &output, c
 
 	INDEX actualSize = 0;
 	if (size>0 && vec->getType() != DT_ANY && vec->getType() != DT_SYMBOL) {
-		actualSize = vec->serialize(buf_ + offset, MARSHALL_BUFFER_SIZE - offset, 0, 0, numElement, partial_);
+		actualSize = vec->serialize(buf_ + offset, static_cast<int>(MARSHALL_BUFFER_SIZE - offset), 0, 0, numElement, partial_);
 		if (actualSize < 0) {
 			ret = OTHERERR;
 			return false;
@@ -314,24 +314,32 @@ bool TableMarshall::sendMeta(const char* requestHeader, size_t headerSize, const
 
 	Table* table= static_cast<Table*>(target.get());
 	//serialize table name
+#ifdef _MSC_VER
+	strcpy_s(buf_+ headerSize, MARSHALL_BUFFER_SIZE - headerSize, table->getName().c_str());
+#else
 	strcpy(buf_+ headerSize, table->getName().c_str());
+#endif
 	headerSize += table->getName().size() + 1;
 
 
 	//serialize column names
 	while(columnNamesSent_ < cols){
 		const string& name = table->getColumnName(columnNamesSent_);
-		int strLen = name.size() + 1;
+		size_t strLen = name.size() + 1;
 		if(headerSize + strLen <= MARSHALL_BUFFER_SIZE){
+#ifdef _MSC_VER
+			strcpy_s(buf_ + headerSize, MARSHALL_BUFFER_SIZE - headerSize, name.c_str());
+#else
 			strcpy(buf_ + headerSize, name.c_str());
+#endif
 			headerSize += strLen;
 			++columnNamesSent_;
 		}
 		else{
 			size_t totalLen = headerSize + strLen;
-			int nameIndex = 0;
+			size_t nameIndex = 0;
 			while(totalLen > 0){	
-				int nameLen = std::min(MARSHALL_BUFFER_SIZE - headerSize, totalLen);
+				size_t nameLen = std::min(MARSHALL_BUFFER_SIZE - headerSize, totalLen);
 				memcpy(buf_ + headerSize, name.c_str() + nameIndex, nameLen);
 				headerSize += nameLen;
 				ret = out_.start(buf_, headerSize);
@@ -518,8 +526,8 @@ bool ChunkMarshall::start(const char* requestHeader, size_t headerSize, const Co
 		return false;
 
 	//set bytearray size
-	int count = buffer.size();
-	short byteArraySize = count - 4 - headerSize;
+	std::size_t count = buffer.size();
+	short byteArraySize = static_cast<short>(count - 4 - headerSize);
 	memcpy(buf_ + headerSize + 2, &byteArraySize, 2);
 
 	complete_ = ((ret = out_.start(buf_, count)) == OK);
@@ -534,7 +542,7 @@ bool SymbolBaseMarshall::start(const SymbolBaseSP target, bool blocking, IO_ERR&
 	memcpy(buf_, &dict_, sizeof(int));
 	int count;
 	dict_++;
-	count = target->size();
+	count = static_cast<int>(target->size());
 	memcpy(buf_ + sizeof(int), &count, sizeof(int));
 	int numElement, actualSize;
 	nextStart_ = 0;
@@ -780,9 +788,6 @@ bool VectorUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 				return false;
 			leftSize -= numElements;
 			nextStart_ += numElements;
-			if ((bool)notify_) {
-				notify_(obj_, nextStart_);
-			}
 		}
 #endif
 	}

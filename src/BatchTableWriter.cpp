@@ -1,6 +1,6 @@
 #include "BatchTableWriter.h"
 #include "ScalarImp.h"
-
+#include "DolphinDB.h"
 namespace dolphindb{
 
 BatchTableWriter::BatchTableWriter(const std::string& hostName, int port, const std::string& userId, const std::string& password, bool acquireLock):
@@ -140,16 +140,16 @@ bool BatchTableWriter::writeTableAllData(SmartPointer<DestTable> destTable,bool 
             Util::sleep(20);
         }
     }
-    destTableRawPtr->writeQueue.pop(items, size);
+    destTableRawPtr->writeQueue.pop(items, static_cast<int>(size));
 
     size = items.size();
 
     bool writedataok = true;
     {
-        destTableRawPtr->writeTable = Util::createTable(destTableRawPtr->colNames, destTableRawPtr->colTypes, 0, size);
+        destTableRawPtr->writeTable = Util::createTable(destTableRawPtr->colNames, destTableRawPtr->colTypes, 0, static_cast<int>(size));
         INDEX insertedRows;
         std::string errMsg;
-        for (int i = 0; i < size; i++)
+        for (std::size_t i = 0; i < size; i++)
         {
             ret = destTableRawPtr->writeTable->append(items[i], insertedRows, errMsg);
             if (!ret)
@@ -172,7 +172,7 @@ bool BatchTableWriter::writeTableAllData(SmartPointer<DestTable> destTable,bool 
             destTableRawPtr->conn->run(destTableRawPtr->tableInsert, args);
             if (!partitioned)
                 destTableRawPtr->conn->run(destTableRawPtr->saveTable);
-            destTableRawPtr->sendedRows += size;
+            destTableRawPtr->sendedRows += static_cast<int>(size);
         }
         catch (std::exception &e)
         {
@@ -183,7 +183,7 @@ bool BatchTableWriter::writeTableAllData(SmartPointer<DestTable> destTable,bool 
     if (writedataok == false)
     {
         destTableRawPtr->finished = true;
-        for (int i = 0; i < size; i++)
+        for (std::size_t i = 0; i < size; i++)
             destTableRawPtr->saveQueue.push(items[i]);
     }
     return writedataok;
@@ -194,7 +194,7 @@ std::tuple<int,bool,bool> BatchTableWriter::getStatus(const string& dbName, cons
     if(destTables_.find(std::make_pair(dbName, tableName)) == destTables_.end())
         throw RuntimeException("Failed to get queue depth. Please use addTable to add infomation of database and table first.");
     SmartPointer<DestTable> destTable = destTables_[std::make_pair(dbName, tableName)];
-    return std::make_tuple(destTable->writeQueue.size(), destTable->destroy, destTable->finished);
+    return std::make_tuple(static_cast<int>(destTable->writeQueue.size()), destTable->destroy, destTable->finished);
 }
 
 TableSP BatchTableWriter::getAllStatus(){
@@ -206,7 +206,7 @@ TableSP BatchTableWriter::getAllStatus(){
     TableSP table;
 
     RWLockGuard<RWLock> _(&rwLock, false, acquireLock_);
-    int rowNum = destTables_.size();
+    int rowNum = static_cast<int>(destTables_.size());
     table = Util::createTable(colNames, colTypes, rowNum, rowNum);
     for(int i = 0; i < columnNum; i++)
         columnVecs.push_back(table->getColumn(i));
@@ -214,7 +214,7 @@ TableSP BatchTableWriter::getAllStatus(){
     for(auto &destTable: destTables_){
         columnVecs[0]->set(i, Util::createString(destTable.second->dbName));
         columnVecs[1]->set(i, Util::createString(destTable.second->tableName));
-        columnVecs[2]->set(i, Util::createInt(destTable.second->writeQueue.size()));
+        columnVecs[2]->set(i, Util::createInt(static_cast<int>(destTable.second->writeQueue.size())));
         columnVecs[3]->set(i, Util::createInt(destTable.second->sendedRows));
         columnVecs[4]->set(i, Util::createBool(destTable.second->destroy));
         columnVecs[5]->set(i, Util::createBool(destTable.second->finished));
@@ -229,8 +229,8 @@ TableSP BatchTableWriter::getUnwrittenData(const string& dbName, const string& t
         throw RuntimeException("Failed to get unwritten data. Please use addTable to add infomation of database and table first.");
     SmartPointer<DestTable> destTable = destTables_[std::make_pair(dbName, tableName)];
 
-    int saveQueueSize = destTable->saveQueue.size();
-    int writeQueueSize = destTable->writeQueue.size();
+    int saveQueueSize = static_cast<int>(destTable->saveQueue.size());
+    int writeQueueSize = static_cast<int>(destTable->writeQueue.size());
     int size = saveQueueSize + writeQueueSize;
     TableSP table = Util::createTable(destTable->colNames, destTable->colTypes, 0, size);
 
@@ -239,7 +239,7 @@ TableSP BatchTableWriter::getUnwrittenData(const string& dbName, const string& t
     destTable->saveQueue.pop(items, saveQueueSize);
     destTable->writeQueue.pop(items, writeQueueSize);
 
-    size = items.size();
+    size = static_cast<int>(items.size());
 
     INDEX insertedRows;
     std::string errMsg;
