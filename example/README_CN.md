@@ -21,7 +21,7 @@
 本例子目录下包含3个文件，各文件说明如下：
 
 * [DFSWriting.cpp](./DFSWriting/DFSWriting.cpp)：源代码文件
-* [CreateDB.dos](./DFSWriting/CreateDB.dos)：脚本文件，用于创建例子用到的分布式数据库
+* [createDB.dos](./DFSWriting/createDB.dos)：脚本文件，用于创建例子用到的分布式数据库
 * [Makefile](./DFSWriting/Makefile)：makefile文件，用于编译和链接例子程序
 
 
