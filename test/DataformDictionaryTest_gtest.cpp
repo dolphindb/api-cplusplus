@@ -33,10 +33,11 @@ protected:
 		}
 		
         cout<<"ok"<<endl;
+		CLEAR_ENV(conn);
     }
     virtual void TearDown()
     {
-        conn.run("undef all;");
+        CLEAR_ENV(conn);
     }
 };
 
@@ -134,6 +135,20 @@ TEST_F(DataformDictionaryTest,testStringDictionary){
 	EXPECT_EQ(dict1->getValue()->getString(),"zzz123中文a->*-/%**%#~！#“》（a\n");
 	dict1->clear();
 	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+	EXPECT_ANY_THROW(dict1->set(Util::createInt(1), Util::createString("value1")));
+	VectorSP k1 = conn.run("blob(`b1`b2)");
+	VectorSP v1 = conn.run("blob(`v1`v2)");
+	VectorSP v2 = conn.run("blob(`v1`v2`v3)");
+	EXPECT_FALSE(dict1->set(k1, v2));
+	EXPECT_TRUE(dict1->set(k1, v1));
+	EXPECT_TRUE(dict1->set(Util::createBlob("b3"), Util::createString("aaaa")));
+	EXPECT_EQ(dict1->getMember(Util::createString("b3"))->getString(),"aaaa");
+	EXPECT_EQ(dict1->getMember(Util::createBlob("b1"))->getString(),"v1");
+	EXPECT_EQ(dict1->getMember(Util::createBlob("b2"))->getString(),"v2");
+	EXPECT_ANY_THROW(dict1->getMember(Util::createInt(1)));
+	EXPECT_ANY_THROW(dict1->remove(Util::createInt(1)));
+	EXPECT_TRUE(dict1->remove(Util::createBlob("b1")));
+	EXPECT_EQ(dict1->getMember(Util::createString("b1"))->getString(), "");
 }
 
 
@@ -197,7 +212,19 @@ TEST_F(DataformDictionaryTest,testStringAnyDictionary){
 	dict2->set(Util::createString("sym"), Util::createInt(23456));
 	dict1->set(Util::createString("matrix"), matrix_val);
 	dict1->set(Util::createString("dict"), dict2);
-	cout<<dict1->getString()<<endl;
+
+	dict1->clear();
+	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+	VectorSP k1 = conn.run("`a`b`c");
+	VectorSP k2 = conn.run("`a`b");
+	VectorSP v1 = conn.run("`10`20`30");
+	VectorSP v2 = conn.run("[table(take(1, 1000) as c1), 2]");
+	EXPECT_ANY_THROW(dict1->set(k1, v2));
+	EXPECT_TRUE(dict1->set(k1, v1));
+	EXPECT_TRUE(dict1->set(k2, v2));
+	EXPECT_EQ(dict1->getMember(Util::createString("a"))->getString(),"c1\n--\n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n1 \n...\n");
+	EXPECT_EQ(dict1->getMember(Util::createString("b"))->getString(),"2");
+	EXPECT_EQ(dict1->getMember(Util::createString("c"))->getString(),"30");
 }
 
 
@@ -370,6 +397,17 @@ TEST_F(DataformDictionaryTest,testCharDictionary){
 	EXPECT_EQ(dict1->getValue()->getString(),"1->0\n");
 	dict1->clear();
 	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+
+	VectorSP k1 = conn.run("1c 2c 3c");
+	VectorSP k2 = conn.run("1c 2c");
+	VectorSP v1 = conn.run("`10`20`30");
+	VectorSP v2 = conn.run("`40`50");
+	EXPECT_FALSE(dict1->set(k1, v2));
+	EXPECT_TRUE(dict1->set(k1, v1));
+	EXPECT_TRUE(dict1->set(k2, v2));
+	EXPECT_EQ(dict1->getMember(Util::createInt(1))->getString(),"40");
+	EXPECT_EQ(dict1->getMember(Util::createInt(2))->getString(),"50");
+	EXPECT_EQ(dict1->getMember(Util::createInt(3))->getString(),"30");
 }
 
 TEST_F(DataformDictionaryTest,testCharNullDictionary){
@@ -454,6 +492,17 @@ TEST_F(DataformDictionaryTest,testIntDictionary){
 	EXPECT_EQ(dict1->getValue()->getString(),"1->0\n");
 	dict1->clear();
 	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+	VectorSP k1 = conn.run("1 2 3");
+	VectorSP k2 = conn.run("1 2");
+	VectorSP v1 = conn.run("`10`20`30");
+	VectorSP v2 = conn.run("`40`50");
+	EXPECT_FALSE(dict1->set(k1, v2));
+	EXPECT_TRUE(dict1->set(k1, v1));
+	EXPECT_TRUE(dict1->set(k2, v2));
+	EXPECT_EQ(dict1->getMember(Util::createInt(1))->getString(),"40");
+	EXPECT_EQ(dict1->getMember(Util::createInt(2))->getString(),"50");
+	EXPECT_EQ(dict1->getMember(Util::createInt(3))->getString(),"30");
+
 }
 
 TEST_F(DataformDictionaryTest,testIntNullDictionary){
@@ -538,6 +587,16 @@ TEST_F(DataformDictionaryTest,testLongDictionary){
 	EXPECT_EQ(dict1->getValue()->getString(),"100000000->0\n");
 	dict1->clear();
 	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+	VectorSP k1 = conn.run("1l 2l 3l");
+	VectorSP k2 = conn.run("1l 2l");
+	VectorSP v1 = conn.run("`10`20`30");
+	VectorSP v2 = conn.run("`40`50");
+	EXPECT_FALSE(dict1->set(k1, v2));
+	EXPECT_TRUE(dict1->set(k1, v1));
+	EXPECT_TRUE(dict1->set(k2, v2));
+	EXPECT_EQ(dict1->getMember(Util::createInt(1))->getString(),"40");
+	EXPECT_EQ(dict1->getMember(Util::createInt(2))->getString(),"50");
+	EXPECT_EQ(dict1->getMember(Util::createInt(3))->getString(),"30");
 }
 
 TEST_F(DataformDictionaryTest,testLongNullDictionary){
@@ -622,6 +681,17 @@ TEST_F(DataformDictionaryTest,testShortDictionary){
 	EXPECT_EQ(dict1->getValue()->getString(),"100->0\n");
 	dict1->clear();
 	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+
+	VectorSP k1 = conn.run("1h 2h 3h");
+	VectorSP k2 = conn.run("1h 2h");
+	VectorSP v1 = conn.run("`10`20`30");
+	VectorSP v2 = conn.run("`40`50");
+	EXPECT_FALSE(dict1->set(k1, v2));
+	EXPECT_TRUE(dict1->set(k1, v1));
+	EXPECT_TRUE(dict1->set(k2, v2));
+	EXPECT_EQ(dict1->getMember(Util::createInt(1))->getString(),"40");
+	EXPECT_EQ(dict1->getMember(Util::createInt(2))->getString(),"50");
+	EXPECT_EQ(dict1->getMember(Util::createInt(3))->getString(),"30");
 }
 
 TEST_F(DataformDictionaryTest,testShortNullDictionary){
@@ -707,6 +777,16 @@ TEST_F(DataformDictionaryTest,testFloatDictionary){
 	EXPECT_EQ(dict1->getValue()->getString(),"100.233299->0\n");
 	dict1->clear();
 	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+	VectorSP k1 = conn.run("1f 2f 3f");
+	VectorSP k2 = conn.run("1f 2f");
+	VectorSP v1 = conn.run("`10`20`30");
+	VectorSP v2 = conn.run("`40`50");
+	EXPECT_FALSE(dict1->set(k1, v2));
+	EXPECT_TRUE(dict1->set(k1, v1));
+	EXPECT_TRUE(dict1->set(k2, v2));
+	EXPECT_EQ(dict1->getMember(Util::createInt(1))->getString(),"40");
+	EXPECT_EQ(dict1->getMember(Util::createInt(2))->getString(),"50");
+	EXPECT_EQ(dict1->getMember(Util::createInt(3))->getString(),"30");
 }
 
 
@@ -792,6 +872,17 @@ TEST_F(DataformDictionaryTest,testDoubleDictionary){
 	EXPECT_EQ(dict1->getValue()->getString(),"100.2333->0\n");
 	dict1->clear();
 	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+	VectorSP k1 = conn.run("1.0 2.0 3.0");
+	VectorSP k2 = conn.run("1.0 2.0");
+	VectorSP v1 = conn.run("`10`20`30");
+	VectorSP v2 = conn.run("`40`50");
+	EXPECT_FALSE(dict1->set(k1, v2));
+	EXPECT_TRUE(dict1->set(k1, v1));
+	EXPECT_TRUE(dict1->set(k2, v2));
+	EXPECT_EQ(dict1->getMember(Util::createInt(1))->getString(),"40");
+	EXPECT_EQ(dict1->getMember(Util::createInt(2))->getString(),"50");
+	EXPECT_EQ(dict1->getMember(Util::createInt(3))->getString(),"30");
+
 }
 
 
@@ -961,6 +1052,8 @@ TEST_F(DataformDictionaryTest,testDateDictionary){
 	EXPECT_EQ(dict1->getValue()->getString(),"1970.04.11->0\n");
 	dict1->clear();
 	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+	EXPECT_FALSE(dict1->set(Util::createString("a"), Util::createString("100")));
+	EXPECT_ANY_THROW(dict1->getMember(Util::createInt(100)));
 }
 
 TEST_F(DataformDictionaryTest,testDatenullDictionary){
@@ -1297,6 +1390,7 @@ TEST_F(DataformDictionaryTest,testnanotimeDictionary){
 	EXPECT_EQ(dict1->getValue()->getString(),"02:46:40.000000000->0\n");
 	dict1->clear();
 	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+	EXPECT_FALSE(dict1->set(Util::createString("a"), Util::createString("10000000000")));
 }
 
 TEST_F(DataformDictionaryTest,testnanotimenullDictionary){
@@ -1381,6 +1475,7 @@ TEST_F(DataformDictionaryTest,testnanotimestampDictionary){
 	EXPECT_EQ(dict1->getValue()->getString(),"1970.01.01T02:46:40.000000000->0\n");
 	dict1->clear();
 	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+	EXPECT_ANY_THROW(dict1->getMember(Util::createLong(10)));
 }
 
 TEST_F(DataformDictionaryTest,testnanotimestampnullDictionary){
@@ -1644,6 +1739,17 @@ TEST_F(DataformDictionaryTest,testInt128Dictionary){
 	EXPECT_EQ(dict1->getValue()->getString(),"e1671797-c52e-15f7-6338-0b45e841ec32->0\n");
 	dict1->clear();
 	EXPECT_EQ(dict1->getString(),dict1->getInstance()->getString());
+	VectorSP k1 = conn.run("x=rand(int128(),3);x");
+	VectorSP k2 = conn.run("x[:2]");
+	VectorSP v1 = conn.run("`10`20`30");
+	VectorSP v2 = conn.run("`40`50");
+	EXPECT_FALSE(dict1->set(k1, v2));
+	EXPECT_TRUE(dict1->set(k1, v1));
+	EXPECT_TRUE(dict1->set(k2, v2));
+	EXPECT_EQ(dict1->getMember(k1->get(0))->getString(),"40");
+	EXPECT_EQ(dict1->getMember(k1->get(1))->getString(),"50");
+	EXPECT_EQ(dict1->getMember(k1->get(2))->getString(),"30");
+	EXPECT_ANY_THROW(dict1->getMember(Util::createInt(4)));
 }
 
 
@@ -2323,3 +2429,175 @@ TEST_F(DataformDictionaryTest,testtimeDictionaryMoreThan1048576){
 	string judgestr= "res=[false];for(key in z.keys()){res.append!(dict1[key].isNull())};eqObj(res,take(false,1100001))";
 	EXPECT_EQ(conn.run(judgestr)->getBool(),true);
 }
+
+class DataformDictionaryTest_AnyDictionary : public DataformDictionaryTest, public testing::WithParamInterface<tuple<DATA_TYPE,string,string>> 
+{
+public:
+	static vector<tuple<DATA_TYPE,string,string>> getFloatingData(){
+		return {
+			std::make_tuple(DT_FLOAT, "float(1..5)", "200f 300f"),
+			std::make_tuple(DT_DOUBLE, "double(1..5)", "200.0 300.0"),
+			std::make_tuple(DT_CHAR, "char(1..5)", "100c 101c"),
+			std::make_tuple(DT_SHORT, "short(1..5)", "200h 300h"),
+			std::make_tuple(DT_INT, "int(1..5)", "200 300"),
+			std::make_tuple(DT_LONG, "long(1..5)", "200l 300l"),
+			std::make_tuple(DT_DATE, "2021.01.01..2021.01.05", "2022.01.01 2022.01.02"),
+			std::make_tuple(DT_MONTH, "2021.01M..2021.05M", "2022.01M 2022.02M"),
+			std::make_tuple(DT_TIME, "10:10:10.101..10:10:10.105", "10:10:11.101 10:10:11.102"),
+			std::make_tuple(DT_MINUTE, "10:11m..10:15m", "11:11m 11:12m"),
+			std::make_tuple(DT_SECOND, "10:10:11..10:10:15", "10:11:12 10:11:13"),
+			std::make_tuple(DT_DATETIME, "2021.01.01T10:10:10.101..2021.01.01T10:10:10.105", "2022.01.01T10:10:11.101 2022.01.01T10:10:11.102"),
+			std::make_tuple(DT_TIMESTAMP, "2021.01.01T10:10:10.100000001..2021.01.01T10:10:10.100000005", "2022.01.01T10:10:11.101000000 2022.01.01T10:10:11.102000000"),
+			std::make_tuple(DT_NANOTIME, "10:10:10.100000001..10:10:10.100000005", "10:10:11.101000000 10:10:11.102000000"),
+			std::make_tuple(DT_NANOTIMESTAMP, "2021.01.01T10:10:10.100000001..2021.01.01T10:10:10.100000005", "2022.01.01T10:10:11.101000000 2022.01.01T10:10:11.102000000"),
+			std::make_tuple(DT_INT128, "rand(int128(), 5)", "rand(int128(), 2)"),
+		};
+	};
+};
+
+INSTANTIATE_TEST_SUITE_P(, DataformDictionaryTest_AnyDictionary, testing::ValuesIn(DataformDictionaryTest_AnyDictionary::getFloatingData()));
+TEST_P(DataformDictionaryTest_AnyDictionary, test_anyDict)
+{
+	DATA_TYPE keyType = std::get<0>(GetParam());
+	DictionarySP dict1 = Util::createDictionary(keyType, DT_ANY);
+	EXPECT_EQ(dict1->size(), 0);
+	EXPECT_EQ(dict1->getKeyType(), keyType);
+
+	VectorSP Keys1 = conn.run("keys1 = "+std::get<1>(GetParam())+";keys1");
+	VectorSP Keys2 = conn.run("keys2 = "+std::get<2>(GetParam())+";keys2");
+	VectorSP Values1 = conn.run("vals1 = [decimal64(`1.1333'-0.1236657', 3), int128(`e1671797c52e15f763380b45e841ec32), matrix(1 2, 3 4), table(take(`a`b`c, 100) as c1, take(100.0000, 100) as c2), dict(timestamp(1 2), symbol(`sym1`sym2))];vals1");
+	VectorSP Values2 = conn.run("vals2=[1,2];vals2");
+	// if (keyType != DT_FLOAT && keyType != DT_DOUBLE)
+	// 	conn.run("ex_dict1= dict(keys1.append!(keys2), vals1.append!(vals2[0]).append!(vals2[1]))");
+
+	/* set */
+	EXPECT_ANY_THROW(dict1->set(Util::createString("a"), Util::createInt(1)));
+	EXPECT_FALSE(dict1->set(Keys1, Values2));
+	EXPECT_TRUE(dict1->set(Keys1, Values1));
+	EXPECT_TRUE(dict1->set(Keys2, Values2));
+
+	/* getString */
+	cout << dict1->getString() << endl;
+	conn.upload("dict1",{dict1});
+	// if (keyType != DT_FLOAT && keyType != DT_DOUBLE)
+	// 	EXPECT_TRUE(conn.run("all((dict1 == ex_dict1).values())")->getBool());
+
+	cout<< dict1->getAllocatedMemory() << endl;
+
+	/* contain */
+	ConstantSP res = Util::createBool(false);
+	VectorSP resV = Util::createVector(DT_BOOL, Keys1->size());;
+	EXPECT_ANY_THROW(dict1->contain(Util::createString("a"), res));
+	ConstantSP test_key = Keys1->get(0);
+	dict1->contain(test_key, res);
+	EXPECT_TRUE(res->getBool());
+
+	dict1->contain(Keys1, resV);
+	for (int i = 0; i < resV->size(); i++)
+		EXPECT_TRUE(resV->getBool(i));
+
+	/* getMember */
+	EXPECT_ANY_THROW(dict1->getMember(Util::createString("a")));
+	EXPECT_EQ(dict1->getMember(test_key)->getString(), "[1.133,-0.124]");
+	ConstantSP errKey = Util::createNullConstant(keyType);
+	EXPECT_TRUE(dict1->getMember(errKey)->isNull());
+	VectorSP res1 = dict1->getMember(Keys1);
+	conn.upload("res1",{res1});
+	// if (keyType != DT_FLOAT && keyType != DT_DOUBLE)
+	// 	EXPECT_TRUE(conn.run("all((res1 == ex_dict1[keys1]).values())")->getBool());
+
+	/* remove */
+	EXPECT_ANY_THROW(dict1->remove(Util::createString("a")));
+	ConstantSP test_key2 = Keys2->get(0);
+	EXPECT_TRUE(dict1->remove(test_key2));
+	conn.upload("dict1",{dict1});
+	// if (keyType != DT_FLOAT && keyType != DT_DOUBLE)
+	// 	EXPECT_TRUE(conn.run("all((dict1 == ex_dict1[keys1]).values())")->getBool());
+
+	EXPECT_TRUE(dict1->remove(Keys1));
+	EXPECT_TRUE(dict1->remove(Keys2));
+	EXPECT_EQ(dict1->size(), 0);
+	EXPECT_EQ(dict1->getString(), "");
+
+}
+
+
+
+
+// class DataformDictionaryTest_func_set : public DataformDictionaryTest, public testing::WithParamInterface<tuple<DATA_TYPE,string,string,string>> {
+// public:
+// 	static vector<tuple<DATA_TYPE,string,string,string>> getData(){
+// 		return {
+// 			std::make_tuple(DT_CHAR,"[1c]","1c 2c","`a1`b1"),
+// 			std::make_tuple(DT_INT,"[1]","1 2","`a1`b1"),
+// 			std::make_tuple(DT_SHORT,"[1h]","1h 2h","`a1`b1"),
+// 			std::make_tuple(DT_LONG,"[1l]","1l 2l","`a1`b1"),
+// 			std::make_tuple(DT_DATE,"[2021.01.01]","2021.01.01 2021.01.02","`a1`b1"),
+// 			std::make_tuple(DT_MONTH,"[2021.01M]","2021.01M 2021.02M","`a1`b1"),
+// 			std::make_tuple(DT_TIME,"[15:30:00.000]","15:30:00.000 15:30:00.001","`a1`b1"),
+// 			std::make_tuple(DT_MINUTE,"[15:30m]","15:30m 15:31m","`a1`b1"),
+// 			std::make_tuple(DT_SECOND,"[15:30:00s]","15:30:00s 15:30:01s","`a1`b1"),
+// 			std::make_tuple(DT_DATETIME,"[2021.01.01T15:30:00.000]","2021.01.01T15:30:00.000 2021.01.01T15:30:00.001","`a1`b1"),
+// 			std::make_tuple(DT_TIMESTAMP,"[2021.01.01T15:30:00.000000000]","2021.01.01T15:30:00.000000000 2021.01.01T15:30:00.000000001","`a1`b1"),
+// 			std::make_tuple(DT_NANOTIME,"[15:30:00.000000000]","15:30:00.000000000 15:30:00.000000001","`a1`b1"),
+// 			std::make_tuple(DT_NANOTIMESTAMP,"[2021.01.01T15:30:00.000000000]","2021.01.01T15:30:00.000000000 2021.01.01T15:30:00.000000001","`a1`b1"),
+// 			std::make_tuple(DT_FLOAT,"[1.1f]","1.1f 2.1f","`a1`b1"),
+// 			std::make_tuple(DT_DOUBLE,"[1.1]","1.1 2.1","`a1`b1"),
+// 			std::make_tuple(DT_STRING,"[`abc]","`a1`b1","1 2"),
+// 			std::make_tuple(DT_INT128,"[int128(`e1671797c52e15f763380b45e841ec32)]","[int128(`e1671797c52e15f763380b45e841ec32), int128(`e1671797c52e15f763380b45e841ec33)]","1 2"),
+
+// 		};
+// 	};
+
+// };
+
+// INSTANTIATE_TEST_SUITE_P(test_dictionary_func_set, DataformDictionaryTest_func_set, 
+// 						testing::ValuesIn(DataformDictionaryTest_func_set::getData()),
+// 						[](const testing::TestParamInfo<DataformDictionaryTest_func_set::ParamType>& info) {
+// 							return "keyType_" + Util::getDataTypeString(std::get<0>(info.param));
+// 						}
+// );
+// TEST_P(DataformDictionaryTest_func_set, test_dictionary_func_set){
+// 	DictionarySP dict1 = Util::createDictionary(std::get<0>(GetParam()), DT_STRING);
+// 	VectorSP keysV0 = conn.run(std::get<1>(GetParam()));
+// 	VectorSP keysV1 = conn.run(std::get<2>(GetParam()));
+// 	cout << keysV1->getString() << endl;
+// 	VectorSP keysVErr = conn.run(std::get<3>(GetParam()));
+// 	VectorSP valuesV0 = conn.run("['v1']");
+// 	VectorSP valuesV1 = conn.run("`v1`v2");
+// 	VectorSP valuesVErr = conn.run("3 4");
+
+// 	if (dict1->getCategory() == TEMPORAL)
+// 		EXPECT_FALSE(dict1->set(Util::createInt(1), Util::createString("val_1")));
+// 	EXPECT_FALSE(dict1->set(keysV0, valuesV1));
+// 	// EXPECT_FALSE(dict1->set(keysV1, valuesV0));
+
+// 	EXPECT_ANY_THROW(dict1->set(keysV1, valuesVErr));
+// 	EXPECT_FALSE(dict1->set(keysVErr, valuesV1));
+// }
+
+// INSTANTIATE_TEST_SUITE_P(test_dictionary_func_set_value_any, DataformDictionaryTest_func_set, 
+// 						testing::ValuesIn(DataformDictionaryTest_func_set::getData()),
+// 						[](const testing::TestParamInfo<DataformDictionaryTest_func_set::ParamType>& info) {
+// 							return "keyType_" + Util::getDataTypeString(std::get<0>(info.param));
+// 						}
+// );
+// TEST_P(DataformDictionaryTest_func_set, test_dictionary_func_set_value_any){
+// 	DictionarySP dict1 = Util::createDictionary(std::get<0>(GetParam()), DT_ANY);
+// 	VectorSP keysV0 = conn.run(std::get<1>(GetParam()));
+// 	VectorSP keysV1 = conn.run(std::get<2>(GetParam()));
+
+// 	VectorSP keysVErr = conn.run(std::get<3>(GetParam()));
+// 	VectorSP valuesV0 = conn.run("[table(1 2 as c1)]");
+// 	VectorSP valuesV1 = conn.run("[matrix(1 2, 3 4), matrix(5 6, 7 8)]");
+
+// 	if (dict1->getCategory() == TEMPORAL)
+// 		EXPECT_FALSE(dict1->set(Util::createInt(1), Util::createString("val_1")));
+// 	if (dict1->getKeyType() == DT_STRING)
+// 		EXPECT_ANY_THROW(dict1->set(keysV0, valuesV1));
+// 	else
+// 		EXPECT_FALSE(dict1->set(keysV0, valuesV1));
+// 	// EXPECT_FALSE(dict1->set(keysV1, valuesV0));
+
+// 	EXPECT_ANY_THROW(dict1->set(keysVErr, valuesV1));
+// }

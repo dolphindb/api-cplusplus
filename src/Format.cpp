@@ -53,22 +53,22 @@ int NumberFormat::printFraction(char* buf, int digitCount, bool optional, double
 	return cursor;
 }
 
-NumberFormat::NumberFormat(const string& format): percent_(0), science_(0), segmentLength_(INT_MAX),
+NumberFormat::NumberFormat(const string& form): percent_(0), science_(0), segmentLength_(INT_MAX),
 		integerMinDigits_(0), fractionMinDigits_(0), fractionOptionalDigits_(0), headSize_(0), tailSize_(0), rounding_(0) {
-    initialize(format);
+    initialize(form);
 }
 
-void NumberFormat::initialize(const string& format) {
-	if(format.empty())
+void NumberFormat::initialize(const string& form) {
+	if(form.empty())
 		throw RuntimeException("The format string can't be empty.");
 	int firstSymPos = -1;
 	int lastSymPos = 0;
-	int len = static_cast<int>(format.size());
+	int len = static_cast<int>(form.size());
 
 	int scienceCount = 0, dotCount = 0, commaCount = 0, percentCount = 0, digitCount = 0;
 	int sciencePos = -1, pointPos = -1, commaPos = -1;
 	for (int i = 0; i < len; ++i) {
-		char ch = format[i];
+		char ch = form[i];
 		if (ch == '#' || ch == '.' || ch == '0' || ch == ',' ||	ch == 'E' || ch == '%') {
 			if(firstSymPos < 0)
 				firstSymPos = i;
@@ -88,7 +88,7 @@ void NumberFormat::initialize(const string& format) {
 				commaCount++;
 				commaPos = i;
 			}
-			else if (format[i] == '%')
+			else if (form[i] == '%')
 				percentCount++;
 			else
 				digitCount++;
@@ -100,14 +100,14 @@ void NumberFormat::initialize(const string& format) {
 		throw RuntimeException("The number format doesn't contain '0' or '#'.");
 	if (percentCount > 0){
 		percent_ = true;
-		if(format[lastSymPos] != '%')
+		if(form[lastSymPos] != '%')
 			throw RuntimeException("The percent sign(%) must be the last symbol of a number format.");
 	}
 	if(sciencePos >= 0){
 		if(sciencePos == firstSymPos || sciencePos == lastSymPos)
 			throw RuntimeException("The scientific notation(E) can't be the first symbol or last symbol of a number format.");
 		for (int i = sciencePos + 1; i <= lastSymPos; ++i) {
-			if(format[i] != '0')
+			if(form[i] != '0')
 				throw RuntimeException("The format symbol after scientific notation (E) must be 0");
 		}
 		science_ = lastSymPos - sciencePos;
@@ -131,9 +131,9 @@ void NumberFormat::initialize(const string& format) {
 		lastIntegerPos = pointPos -1;
 	integerMinDigits_ = 0;
 	for (int i = lastIntegerPos; i >= firstSymPos; --i) {
-		if (format[i] == '0')
+		if (form[i] == '0')
 			integerMinDigits_ ++;
-		else if(format[i] == ',')
+		else if(form[i] == ',')
 			continue;
 		else
 			break;
@@ -150,10 +150,10 @@ void NumberFormat::initialize(const string& format) {
 		if(sciencePos >= 0)
 			lastFractionPos = sciencePos - 1;
 		int i = pointPos + 1;
-		while(i <= lastFractionPos && format[i] == '0') ++i;
+		while(i <= lastFractionPos && form[i] == '0') ++i;
 		fractionMinDigits_ = i - pointPos -1;
 
-		while(i <= lastFractionPos && format[i] == '#') ++i;
+		while(i <= lastFractionPos && form[i] == '#') ++i;
 		fractionOptionalDigits_ = i - pointPos -1 - fractionMinDigits_;
 	}
 
@@ -168,9 +168,9 @@ void NumberFormat::initialize(const string& format) {
 		rounding_ += epsilon_;
 
 	headSize_ = firstSymPos;
-	head_ = format.substr(0, headSize_);
+	head_ = form.substr(0, headSize_);
 	tailSize_ = len - lastSymPos - 1;
-	tail_ = format.substr(lastSymPos + 1, tailSize_);
+	tail_ = form.substr(lastSymPos + 1, tailSize_);
 }
 
 string NumberFormat::format(double x) const{
@@ -273,7 +273,7 @@ string NumberFormat::format(double x) const{
 		for (; digits < science_; ++digits)
 			buf[cursor++] = '0';
 		//reverse the digits of integer part
-		int intLen = (cursor - intStart)/2;
+		intLen = (cursor - intStart)/2;
 		for(int i=0; i<intLen; ++i){
 			char tmp = buf[intStart + i];
 			buf[intStart + i] = buf[cursor - 1 - i];
@@ -314,13 +314,13 @@ string NumberFormat::toString(long long x){
 	return buf;
 }
 
-DecimalFormat::DecimalFormat(const string& format) : format_(0), negFormat_(0){
-	size_t pos = format.find(';');
-	if(pos == string::npos || pos == 0 || pos == format.size() - 1)
-		format_ = new NumberFormat(format);
+DecimalFormat::DecimalFormat(const string& form) : format_(0), negFormat_(0){
+	size_t pos = form.find(';');
+	if(pos == string::npos || pos == 0 || pos == form.size() - 1)
+		format_ = new NumberFormat(form);
 	else{
-		format_ = new NumberFormat(format.substr(0, pos));
-		negFormat_ = new NumberFormat(format.substr(pos + 1));
+		format_ = new NumberFormat(form.substr(0, pos));
+		negFormat_ = new NumberFormat(form.substr(pos + 1));
 	}
 }
 
@@ -353,14 +353,14 @@ vector<pair<int, int> > TemporalFormat::initFormatMap() {
 	return initvector;
 }
 
-TemporalFormat::TemporalFormat(const string& format) : quickFormat_(false), segmentCount_(0) {
-	initialize(format);
+TemporalFormat::TemporalFormat(const string& form) : quickFormat_(false), segmentCount_(0) {
+	initialize(form);
 }
 
-void TemporalFormat::initialize(const string& format) {
+void TemporalFormat::initialize(const string& form) {
 	if(formatMap.empty())
 		formatMap = std::move(TemporalFormat::initFormatMap());
-	int len = static_cast<int>(format.length());
+	int len = static_cast<int>(form.length());
 	if(len == 0)
 		throw RuntimeException("The format string can't be empty.");
 	else if(len > 128)
@@ -372,11 +372,11 @@ void TemporalFormat::initialize(const string& format) {
 	int cursor = 0;
 	int i = 0;
 	while(i < len){
-		char ch = format[i];
+		char ch = form[i];
 		if(ch == '\\'){
 			if(i == len  - 1)
 				throw RuntimeException("Invalid escape (\\)in the end of the format string.");
-			format_.append(1, format[i+1]);
+			format_.append(1, form[i+1]);
 			escape[cursor++] = true;
 			i += 2;
 		}
@@ -582,7 +582,7 @@ string TemporalFormat::format(long long nowtime, DATA_TYPE dtype) const{
 					if (cntDigits >= formatDemandLength && tmpNumber == 0)
 						break;
 				}
-				for (int i = 0; i < formatDemandLength - cntDigits; ++i)
+				for (int j = 0; j < formatDemandLength - cntDigits; ++j)
 					tmpString += '0';
 				std::reverse(tmpString.begin(), tmpString.end());
 			}
@@ -594,4 +594,4 @@ string TemporalFormat::format(long long nowtime, DATA_TYPE dtype) const{
 	}
 }
 
-};
+}

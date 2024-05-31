@@ -12,7 +12,7 @@ BatchTableWriter::BatchTableWriter(const std::string& hostName, int port, const 
     {}
 
 BatchTableWriter::~BatchTableWriter(){
-    vector<SmartPointer<DestTable>> dt;
+    std::vector<SmartPointer<DestTable>> dt;
     for(auto& i: destTables_){
         if(i.second->destroy == false){
             dt.push_back(i.second);
@@ -26,7 +26,7 @@ BatchTableWriter::~BatchTableWriter(){
     }
 }
 
-void BatchTableWriter::addTable(const string& dbName, const string& tableName, bool partitioned){
+void BatchTableWriter::addTable(const std::string& dbName, const std::string& tableName, bool partitioned){
     {
         SmartPointer<DestTable> destTable;
         RWLockGuard<RWLock> _(&rwLock, false, acquireLock_);
@@ -81,7 +81,7 @@ void BatchTableWriter::addTable(const string& dbName, const string& tableName, b
     destTable->colDefsTypeInt = colDefs->getColumn("typeInt");
     destTable->destroy = false;
     
-    std::vector<string> colNames;
+    std::vector<std::string> colNames;
     std::vector<DATA_TYPE> colTypes;
     ConstantSP colDefsName = colDefs->getColumn("name");
     for(int i = 0; i < destTable->columnNum; i++){
@@ -92,14 +92,14 @@ void BatchTableWriter::addTable(const string& dbName, const string& tableName, b
     destTable->colTypes = std::move(colTypes);
 
     if(tmpDiskGlobal.empty() == false){//update need temp table
-        std::string colNames;
-        std::string colTypes;
+        std::string colName;
+        std::string colType;
         ConstantSP colDefsTypeString = colDefs->getColumn("typeString");
         for(int i = 0; i < destTable->columnNum; i++){
-            colNames += "`" + colDefsName->getString(i);
-            colTypes += "`" + colDefsTypeString->getString(i);
+            colName += "`" + colDefsName->getString(i);
+            colType += "`" + colDefsTypeString->getString(i);
         }
-        destTable->createTmpSharedTable = std::move(std::string("share table(") + "1000:0," + colNames + "," + colTypes + ") as " + tmpDiskGlobal);
+        destTable->createTmpSharedTable = std::move(std::string("share table(") + "1000:0," + colName + "," + colType + ") as " + tmpDiskGlobal);
     }
 
     DestTable *destTableRawPtr = destTable.get();
@@ -189,7 +189,7 @@ bool BatchTableWriter::writeTableAllData(SmartPointer<DestTable> destTable,bool 
     return writedataok;
 }
 
-std::tuple<int,bool,bool> BatchTableWriter::getStatus(const string& dbName, const string& tableName){
+std::tuple<int,bool,bool> BatchTableWriter::getStatus(const std::string& dbName, const std::string& tableName){
     RWLockGuard<RWLock> _(&rwLock, false, acquireLock_);
     if(destTables_.find(std::make_pair(dbName, tableName)) == destTables_.end())
         throw RuntimeException("Failed to get queue depth. Please use addTable to add infomation of database and table first.");
@@ -223,7 +223,7 @@ TableSP BatchTableWriter::getAllStatus(){
     return table;
 }
 
-TableSP BatchTableWriter::getUnwrittenData(const string& dbName, const string& tableName){
+TableSP BatchTableWriter::getUnwrittenData(const std::string& dbName, const std::string& tableName){
     RWLockGuard<RWLock> _(&rwLock, true, acquireLock_);
     if(destTables_.find(std::make_pair(dbName, tableName)) == destTables_.end())
         throw RuntimeException("Failed to get unwritten data. Please use addTable to add infomation of database and table first.");
@@ -251,7 +251,7 @@ TableSP BatchTableWriter::getUnwrittenData(const string& dbName, const string& t
     return table;
 }
 
-void BatchTableWriter::removeTable(const string& dbName, const string& tableName){
+void BatchTableWriter::removeTable(const std::string& dbName, const std::string& tableName){
     SmartPointer<DestTable> destTable;
     {
         RWLockGuard<RWLock> _(&rwLock, true, acquireLock_);
@@ -438,5 +438,5 @@ ConstantSP BatchTableWriter::createObject(int dataType, int val){
             break;
     }
 }
-};
+}
 

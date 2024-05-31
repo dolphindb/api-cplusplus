@@ -50,7 +50,7 @@ protected:
     }
     virtual void TearDown()
     {
-        conn.run("undef all;");
+		CLEAR_ENV(conn);
     }
 };
 
@@ -174,11 +174,15 @@ TEST_F(IPCinMemoryTableTest, test_subscribe_outputTableNull)
     conn.run("share t as t1");
 
     ThreadSP thread0 = IPCMclient.subscribe(tableName, insertRow, nullptr, false);
-    this_thread::sleep_for(chrono::seconds(10));
+    int rows = conn.run("t1.rows()")->getInt();
+    while(rows < 10000){
+        rows = conn.run("t1.rows()")->getInt();
+        Util::sleep(500);
+    }
     th1.join();
 
     IPCMclient.unsubscribe(tableName);
-    EXPECT_EQ(conn.run("each(eqObj, t1.values(), pubTable.values())")->getString(), "[1,1,1]");
+    EXPECT_TRUE(conn.run("all(each(eqObj, t1.values(), pubTable.values()))")->getBool());
 }
 
 TEST_F(IPCinMemoryTableTest, test_subscribe_outputTableErrorColType)

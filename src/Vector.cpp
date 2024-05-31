@@ -7,13 +7,13 @@ ConstantSP Vector::getColumnLabel() const {
     return new String(name_);
 }
 
-string Vector::getString() const {
+std::string Vector::getString() const {
     if (getForm() == DF_PAIR) {
         return getScript();
     } else {
         int len = (std::min)(Util::DISPLAY_ROWS, size());
         bool notTuple = getType() != DT_ANY;
-        string str(notTuple ? "[" : "(");
+        std::string str(notTuple ? "[" : "(");
 
         if (len > 0) {
             if (len == 1 && isNull(0))
@@ -43,9 +43,9 @@ string Vector::getString() const {
     }
 }
 
-string Vector::getScript() const {
+std::string Vector::getScript() const {
     if (getForm() == DF_PAIR) {
-        string str = get(0)->getScript();
+        std::string str = get(0)->getScript();
         str.append(" : ");
         str.append(get(1)->getScript());
         return str;
@@ -56,7 +56,7 @@ string Vector::getScript() const {
         if (len > Util::CONST_VECTOR_MAX_SIZE)
             return name_.empty() ? "array()" : name_;
 
-        string str("[");
+        std::string str("[");
         if (len > 0)
             str.append(get(0)->getScript());
         for (int i = 1; i < len; ++i) {

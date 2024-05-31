@@ -3,6 +3,7 @@
 #include "Exports.h"
 #include <string>
 #include <string.h>
+#include <cstdint>
 
 namespace dolphindb {
 
@@ -24,6 +25,14 @@ public:
         memcpy((char*)uuid_ + 8, (char*)&low, 8);
 #endif
     }
+
+    Guid& operator=(const Guid& copy){
+        if(this != &copy){
+            memcpy(uuid_, copy.uuid_, 16);
+        }
+        return *this;
+    }
+
     inline bool operator==(const Guid &other) const {
         const unsigned char* a = (const unsigned char*)uuid_;
         const unsigned char* b = (const unsigned char*)other.uuid_;

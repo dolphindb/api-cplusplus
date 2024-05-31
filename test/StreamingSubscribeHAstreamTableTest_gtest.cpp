@@ -34,14 +34,12 @@ public:
         {
             cout << "Server not responed, please check." << endl;
         }
-        else
-        {
-            cout << "ok" << endl;
-        }
+        cout << "ok" << endl;
+        CLEAR_ENV(conn);
     }
     virtual void TearDown()
     {
-        conn.run("undef all;");
+        CLEAR_ENV(conn);
     }
 };
 
@@ -145,10 +143,22 @@ string createHAstreamTable(){
     string st = "tradeHA_" + getRandString(8);
     string createHAstreamTable = "colNames = `timestamp`sym`qty`price;\
                                     colTypes = [TIMESTAMP,SYMBOL,INT,DOUBLE];\
-                                    t=table(2000:0,colNames,colTypes);\
+                                    t=table(1:0,colNames,colTypes);\
                                     haStreamTable(" +
                                          raftsGroup + ",t,`"+st+",100000);sleep(1000);";
     conn.run(createHAstreamTable);
+    for (int i = 0; i < sites.size(); i++)
+    {
+        string host = split(sites[i], ":")[0];
+        int port = atoi(split(sites[i], ":")[1].c_str());
+        DBConnectionSP _conn = new DBConnection();
+        EXPECT_TRUE(_conn->connect(host, port, "admin", "123456"));
+        _conn->run(
+            "do{\
+                sleep(1000);\
+            }while(!(`"+st+" in (exec name from objs(true))))"); // server有时候在raftGroup的某个节点上建表太慢，需要遍历每个节点并等待建表完成
+        _conn->close();
+    }
     return st;
 }
 

@@ -77,9 +77,9 @@ public:
     virtual INDEX getIndex() const {throw RuntimeException("The object can't be converted to index scalar.");}
     virtual float getFloat() const {throw RuntimeException("The object can't be converted to float scalar.");}
     virtual double getDouble() const {throw RuntimeException("The object can't be converted to double scalar.");}
-    virtual string getString() const {return "";}
-    virtual string getScript() const { return getString();}
-    virtual const string& getStringRef() const {return EMPTY;}
+    virtual std::string getString() const {return "";}
+    virtual std::string getScript() const { return getString();}
+    virtual const std::string& getStringRef() const {return EMPTY;}
     virtual const Guid getUuid() const {return getInt128();}
     virtual const Guid getInt128() const {throw RuntimeException("The object can't be converted to uuid scalar.");}
     virtual const unsigned char* getBinary() const {throw RuntimeException("The object can't be converted to int128 scalar.");}
@@ -94,7 +94,7 @@ public:
     virtual void setIndex(INDEX val){}
     virtual void setFloat(float val){}
     virtual void setDouble(double val){}
-    virtual void setString(const string& val){}
+    virtual void setString(const std::string& val){}
     virtual void setBinary(const unsigned char* val, int unitLength){}
     virtual void setNull(){}
 
@@ -106,8 +106,8 @@ public:
     virtual INDEX getIndex(INDEX index) const {return getIndex();}
     virtual float getFloat(INDEX index) const {return getFloat();}
     virtual double getDouble(INDEX index) const {return getDouble();}
-    virtual string getString(INDEX index) const {return getString();}
-    virtual const string& getStringRef(INDEX index) const {return EMPTY;}
+    virtual std::string getString(INDEX index) const {return getString();}
+    virtual const std::string& getStringRef(INDEX index) const {return EMPTY;}
     virtual bool isNull(INDEX index) const {return isNull();}
 
     virtual int32_t getDecimal32(INDEX index, int scale) const { NOT_IMPLEMENT; }
@@ -135,7 +135,7 @@ public:
     virtual bool getFloat(INDEX start, int len, float* buf) const {return false;}
     virtual bool getDouble(INDEX start, int len, double* buf) const {return false;}
     virtual bool getSymbol(INDEX start, int len, int* buf, SymbolBase* symBase,bool insertIfNotThere) const {return false;}
-    virtual bool getString(INDEX start, int len, string** buf) const {return false;}
+    virtual bool getString(INDEX start, int len, std::string** buf) const {return false;}
     virtual bool getString(INDEX start, int len, char** buf) const {return false;}
     virtual bool getBinary(INDEX start, int len, int unitLength, unsigned char* buf) const {return false;}
     virtual bool getHash(INDEX start, int len, int buckets, int* buf) const {return false;}
@@ -152,7 +152,7 @@ public:
     virtual const float* getFloatConst(INDEX start, int len, float* buf) const {throw RuntimeException("getFloatConst method not supported");}
     virtual const double* getDoubleConst(INDEX start, int len, double* buf) const {throw RuntimeException("getDoubleConst method not supported");}
     virtual const int* getSymbolConst(INDEX start, int len, int* buf, SymbolBase* symBase, bool insertIfNotThere) const {throw RuntimeException("getSymbolConst method not supported");}
-    virtual string** getStringConst(INDEX start, int len, string** buf) const {throw RuntimeException("getStringConst method not supported");}
+    virtual std::string** getStringConst(INDEX start, int len, std::string** buf) const {throw RuntimeException("getStringConst method not supported");}
     virtual char** getStringConst(INDEX start, int len, char** buf) const {throw RuntimeException("getStringConst method not supported");}
     virtual const unsigned char* getBinaryConst(INDEX start, int len, int unitLength, unsigned char* buf) const {throw RuntimeException("getBinaryConst method not supported");}
 
@@ -180,7 +180,7 @@ public:
     virtual void setIndex(INDEX index,INDEX val){setIndex(val);}
     virtual void setFloat(INDEX index,float val){setFloat(val);}
     virtual void setDouble(INDEX index, double val){setDouble(val);}
-    virtual void setString(INDEX index, const string& val){setString(val);}
+    virtual void setString(INDEX index, const std::string& val){setString(val);}
     virtual void setBinary(INDEX index, int unitLength, const unsigned char* val){setBinary(val, unitLength);}
     virtual void setNull(INDEX index){setNull();}
 
@@ -191,7 +191,7 @@ public:
     virtual bool setColumn(INDEX index, const ConstantSP& value){return assign(value);}
     virtual void setRowLabel(const ConstantSP& label){}
     virtual void setColumnLabel(const ConstantSP& label){}
-    virtual bool reshape(INDEX cols, INDEX rows) {return false;}
+    virtual bool reshape(INDEX colNum, INDEX rowNum) {return false;}
     virtual bool assign(const ConstantSP& value){return false;}
 
     virtual bool setBool(INDEX start, int len, const char* buf){return false;}
@@ -202,7 +202,7 @@ public:
     virtual bool setIndex(INDEX start, int len, const INDEX* buf){return false;}
     virtual bool setFloat(INDEX start, int len, const float* buf){return false;}
     virtual bool setDouble(INDEX start, int len, const double* buf){return false;}
-    virtual bool setString(INDEX start, int len, const string* buf){return false;}
+    virtual bool setString(INDEX start, int len, const std::string* buf){return false;}
     virtual bool setString(INDEX start, int len, char** buf){return false;}
     virtual bool setBinary(INDEX start, int len, int unitLength, const unsigned char* buf){return false;}
     virtual bool setData(INDEX start, int len, void* buf) {return false;}

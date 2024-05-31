@@ -6,6 +6,8 @@
 #include <thread>
 //#include "DdbPythonUtil.h"
 
+using std::string;
+using std::vector;
 namespace dolphindb {
 
 MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, int port, const std::string& userId, const std::string& password,
@@ -338,9 +340,9 @@ void MultithreadedTableWriter::getStatus(Status& status) {
     status.errorCode = errorInfo_.errorCode;
     status.errorInfo = errorInfo_.errorInfo;
     status.sentRows = status.unsentRows = status.sendFailedRows = 0;
-    status.threadStatus.resize(threads_.size());
+    status.threadStatus_.resize(threads_.size());
     for (size_t i = 0; i < threads_.size(); i++) {
-        ThreadStatus& threadStatus = status.threadStatus[i];
+        ThreadStatus& threadStatus = status.threadStatus_[i];
         WriterThread& writeThread = threads_[i];
         LockGuard<Mutex> _(&writeThread.mutex_);
         threadStatus.threadId = writeThread.threadId;
@@ -435,11 +437,10 @@ void MultithreadedTableWriter::SendExecutor::run(){
 
 bool MultithreadedTableWriter::SendExecutor::writeAllData(){
     //reset idle
-	DLOG("writeAllData", writeThread_.writeQueue.size());
     LockGuard<Mutex> _(&writeThread_.mutex_);
     std::vector<std::vector<ConstantSP>*> items;
     {
-        LockGuard<Mutex> _(&writeThread_.writeQueueMutex_);
+        LockGuard<Mutex> __(&writeThread_.writeQueueMutex_);
         std::size_t size = writeThread_.writeQueue.size();
         if (size < 1){
             return false;
@@ -451,7 +452,6 @@ bool MultithreadedTableWriter::SendExecutor::writeAllData(){
     if(size < 1){
         return false;
     }
-    DLOG("writeAllData",size,"/",writeThread_.writeQueue.size());
     writeThread_.sendingRows = size;
     string runscript;
     try{
@@ -530,4 +530,4 @@ bool MultithreadedTableWriter::SendExecutor::writeAllData(){
     return true;
 }
 
-};
+}

@@ -8,8 +8,18 @@
 #include <type_traits>
 
 #include <stdint.h>
+
+//elimitate compilation warning for ISO C++ does not support '__int128' for 'type name'
+#if defined (__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+
 #include "absl/numeric/int128.h"
 
+#if defined (__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 namespace wide_integer {
 
 using int128 = absl::int128;

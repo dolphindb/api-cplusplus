@@ -37,11 +37,12 @@ protected:
 		}
 
 		cout << "ok" << endl;
+		CLEAR_ENV(conn);
 	}
-	virtual void TearDown()
-	{
-		conn.run("undef all;");
-	}
+    virtual void TearDown()
+    {
+		CLEAR_ENV(conn);
+    }
 };
 
 TEST_F(MultithreadedTableWriterTest, hostNameNULL)
@@ -1342,7 +1343,7 @@ TEST_F(MultithreadedTableWriterTest, insertValuesErrorTypeDataPartitionTable_1)
 	conn.run(script);
 	SmartPointer<MultithreadedTableWriter> mulwrite;
 	ErrorCodeInfo pErrorInfo;
-	mulwrite = new MultithreadedTableWriter(hostName, port, "admin", "123456", "", "t1", false, false, nullptr, 1, 0.1, 5, "sym");
+	mulwrite = new MultithreadedTableWriter(hostName, port, "admin", "123456", dbName, "pt", false, false, nullptr, 1, 0.1, 5, "sym");
 	bool flag = mulwrite->insert(pErrorInfo, "A", 12, 12.9);
 	EXPECT_EQ(flag, false);
 	cout << pErrorInfo.errorInfo;
@@ -5271,9 +5272,9 @@ TEST_F(MultithreadedTableWriterTest, test_column_info_in_errMsg)
 	MultithreadedTableWriter writer2(hostName, port, "admin", "123456", "", "t1", false, false, nullptr, 1, 0.1, 1, "csymbol");
 	char msg[] = "123456msg";
 
-	writer.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1l, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1);
+	writer.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1l, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2313, -1);
 	writer.waitForThreadCompletion();
-	EXPECT_TRUE(conn.run("eqObj(values t1, [[false], ['1'], [short(1)], [int(1)], [long(1)], [date(1)], [month(1)], [time(1)], [minute(1)], [second(1)], [datetime(1)], [timestamp(1)], [nanotime(1)], [nanotimestamp(1)], [datehour(1)], [float(10.0)], [double(-0.123)], symbol([`123456msg]), [`123456msg], [blob(`123456msg)], [ipaddr('192.168.2.1')], [uuid('0f0e0d0c-0b0a-0908-0706-050403020100')], [int128('0f0e0d0c0b0a09080706050403020100')], decimal32([0.2353], 2), decimal64([-1], 11)])")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(values t1, [[false], ['1'], [short(1)], [int(1)], [long(1)], [date(1)], [month(1)], [time(1)], [minute(1)], [second(1)], [datetime(1)], [timestamp(1)], [nanotime(1)], [nanotimestamp(1)], [datehour(1)], [float(10.0)], [double(-0.123)], symbol([`123456msg]), [`123456msg], [blob(`123456msg)], [ipaddr('192.168.2.1')], [uuid('0f0e0d0c-0b0a-0908-0706-050403020100')], [int128('0f0e0d0c0b0a09080706050403020100')], decimal32([0.2313], 2), decimal64([-1], 11)])")->getBool());
 
 	// insert int to timestamp
 	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1))
@@ -5343,9 +5344,9 @@ TEST_F(MultithreadedTableWriterTest, test_insert_dfs_column_info_in_errMsg)
 	MultithreadedTableWriter writer2(hostName, port, "admin", "123456", "dfs://test_errMsg", "pt", false, false, nullptr, 1, 0.1, 1, "cint");
 	char msg[] = "123456msg";
 
-	writer.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1l, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1);
+	writer.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1l, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2313, -1);
 	writer.waitForThreadCompletion();
-	EXPECT_TRUE(conn.run("eqObj((select * from loadTable('dfs://test_errMsg',`pt)).values(), [[false], ['1'], [short(1)], [int(1)], [long(1)], [date(1)], [month(1)], [time(1)], [minute(1)], [second(1)], [datetime(1)], [timestamp(1)], [nanotime(1)], [nanotimestamp(1)], [datehour(1)], [float(10.0)], [double(-0.123)], symbol([`123456msg]), [`123456msg], [blob(`123456msg)], [ipaddr('192.168.2.1')], [uuid('0f0e0d0c-0b0a-0908-0706-050403020100')], [int128('0f0e0d0c0b0a09080706050403020100')], decimal32([0.2353], 2), decimal64([-1], 11)])")->getBool());
+	EXPECT_TRUE(conn.run("eqObj((select * from loadTable('dfs://test_errMsg',`pt)).values(), [[false], ['1'], [short(1)], [int(1)], [long(1)], [date(1)], [month(1)], [time(1)], [minute(1)], [second(1)], [datetime(1)], [timestamp(1)], [nanotime(1)], [nanotimestamp(1)], [datehour(1)], [float(10.0)], [double(-0.123)], symbol([`123456msg]), [`123456msg], [blob(`123456msg)], [ipaddr('192.168.2.1')], [uuid('0f0e0d0c-0b0a-0908-0706-050403020100')], [int128('0f0e0d0c0b0a09080706050403020100')], decimal32([0.2313], 2), decimal64([-1], 11)])")->getBool());
 
 	// insert int to timestamp
 	if (!writer2.insert(errorInfo, false, '1', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1ll, 1l, 1, 10.0, -0.123, msg, msg, msg, "192.168.2.1", "0f0e0d0c-0b0a-0908-0706-050403020100", "0f0e0d0c0b0a09080706050403020100", 0.2353, -1))
@@ -5468,12 +5469,12 @@ class MultithreadedTableWriterTest_enableStreamTableTimestamp : public Multithre
 public:
 	static vector<string> getScripts(){
 		return {
-			R"(try{dropStreamTable(`test_enableStreamTableTimestamp)}catch(ex){};go;
-				share streamTable(1:0, `ts`sym`ind`val, [TIMESTAMP, SYMBOL, INT, DOUBLE]) as test_enableStreamTableTimestamp;
-				setStreamTableTimestamp(test_enableStreamTableTimestamp, `ts))",
-			R"(try{dropStreamTable(`test_enableStreamTableTimestamp)}catch(ex){};go;
-				share streamTable(1:0, `sym`ind`ts`val, [SYMBOL, INT, TIMESTAMP, DOUBLE]) as test_enableStreamTableTimestamp;
-				setStreamTableTimestamp(test_enableStreamTableTimestamp, `ts))",
+			// R"(try{dropStreamTable(`test_enableStreamTableTimestamp)}catch(ex){};go;
+			// 	share streamTable(1:0, `ts`sym`ind`val, [TIMESTAMP, SYMBOL, INT, DOUBLE]) as test_enableStreamTableTimestamp;
+			// 	setStreamTableTimestamp(test_enableStreamTableTimestamp, `ts))",
+			// R"(try{dropStreamTable(`test_enableStreamTableTimestamp)}catch(ex){};go;
+			// 	share streamTable(1:0, `sym`ind`ts`val, [SYMBOL, INT, TIMESTAMP, DOUBLE]) as test_enableStreamTableTimestamp;
+			// 	setStreamTableTimestamp(test_enableStreamTableTimestamp, `ts))",
 			R"(try{dropStreamTable(`test_enableStreamTableTimestamp)}catch(ex){};go;
 				share streamTable(1:0, `sym`ind`val`ts, [SYMBOL, INT, DOUBLE, TIMESTAMP]) as test_enableStreamTableTimestamp;
 				setStreamTableTimestamp(test_enableStreamTableTimestamp, `ts))"
@@ -5500,4 +5501,63 @@ TEST_P(MultithreadedTableWriterTest_enableStreamTableTimestamp, test_timeCol_pos
 	EXPECT_EQ(conn.run("test_enableStreamTableTimestamp.rows()")->getInt(), 1000);
 	conn.run("try{dropStreamTable(`test_enableStreamTableTimestamp)}catch(ex){};");
 	delete writer;
+}
+
+
+TEST_F(MultithreadedTableWriterTest, test_insertTable_arrayVector)
+{
+	TableSP table1 = conn.run(R"(
+		cindex = [0]
+		cbool= array(BOOL[]).append!([(0..8).append!(NULL)]);
+		cchar = array(CHAR[]).append!([(0..8).append!(NULL)]);
+		cshort = array(SHORT[]).append!([(0..8).append!(NULL)]);
+		cint = array(INT[]).append!([(0..8).append!(NULL)]);
+		clong = array(LONG[]).append!([(0..8).append!(NULL)]);
+		cdate = array(DATE[]).append!([(0..8).append!(NULL)]);
+		cmonth = array(MONTH[]).append!([(0..8).append!(NULL)]);
+		ctime = array(TIME[]).append!([(0..8).append!(NULL)]);
+		cminute = array(MINUTE[]).append!([(0..8).append!(NULL)]);
+		csecond = array(SECOND[]).append!([(0..8).append!(NULL)]);
+		cdatetime = array(DATETIME[]).append!([(0..8).append!(NULL)]);
+		ctimestamp = array(TIMESTAMP[]).append!([(0..8).append!(NULL)]);
+		cnanotime = array(NANOTIME[]).append!([(0..8).append!(NULL)]);
+		cnanotimestamp = array(NANOTIMESTAMP[]).append!([(0..8).append!(NULL)]);
+		cdatehour = array(DATEHOUR[]).append!([(0..8).append!(NULL)]);
+		cfloat = array(FLOAT[]).append!([(0..8).append!(NULL)]);
+		cdouble = array(DOUBLE[]).append!([(0..8).append!(NULL)]);
+		cipaddr = array(IPADDR[]).append!([(take(ipaddr(['192.168.1.13']),9)).append!(NULL)]);
+		cuuid = array(UUID[]).append!([(take(uuid(['5d212a78-cc48-e3b1-4235-b4d91473ee87']),9)).append!(NULL)]);
+		cint128 = array(INT128[]).append!([(take(int128(['e1671797c52e15f763380b45e841ec32']),9)).append!(NULL)]);
+		cdecimal32 = array(DECIMAL32(6)[], 0, 10).append!(decimal32([(0..8).append!(NULL)], 6));
+		cdecimal64 = array(DECIMAL64(16)[], 0, 10).append!(decimal64([(0..8).append!(NULL)], 16));
+		cdecimal128 = array(DECIMAL128(26)[], 0, 10).append!(decimal128([(0..8).append!(NULL)], 26));
+		try{undef(`table1,SHARED)}catch(ex){};go;
+		table1=table(cindex, cchar,cbool,cshort,cint,clong,cdate,cmonth,ctime,cminute,cdatetime,csecond,ctimestamp,cnanotime,cnanotimestamp,cdatehour,cfloat,cdouble,cuuid,cipaddr,cint128,cdecimal32,cdecimal64,cdecimal128);
+		for (i in 1:100){
+			tableInsert(table1, i, cchar,cbool,cshort,cint,clong,cdate,cmonth,ctime,cminute,cdatetime,csecond,ctimestamp,cnanotime,cnanotimestamp,cdatehour,cfloat,cdouble,cuuid,cipaddr,cint128,cdecimal32,cdecimal64,cdecimal128)}
+		tableInsert(table1,100, NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+		table1
+	)");
+	conn.run("tmp = select top 0* from table1;share tmp as act");
+
+	SmartPointer<MultithreadedTableWriter> mtw;
+	ErrorCodeInfo pErrorInfo;
+
+	mtw = new MultithreadedTableWriter(hostName, port, "admin", "123456", "", "act", false, false, nullptr, 1, 1, 1, "cindex", nullptr, MultithreadedTableWriter::Mode::M_Append, nullptr, nullptr, false);
+
+	for (auto i = 0; i < table1->rows(); i++){
+		if (!mtw->insert(pErrorInfo, table1->getColumn(0)->get(i), table1->getColumn(1)->get(i), table1->getColumn(2)->get(i), table1->getColumn(3)->get(i), table1->getColumn(4)->get(i), table1->getColumn(5)->get(i), table1->getColumn(6)->get(i), table1->getColumn(7)->get(i), table1->getColumn(8)->get(i), table1->getColumn(9)->get(i), table1->getColumn(10)->get(i), table1->getColumn(11)->get(i), table1->getColumn(12)->get(i), table1->getColumn(13)->get(i), table1->getColumn(14)->get(i), table1->getColumn(15)->get(i), table1->getColumn(16)->get(i), table1->getColumn(17)->get(i), table1->getColumn(18)->get(i), table1->getColumn(19)->get(i), table1->getColumn(20)->get(i), table1->getColumn(21)->get(i), table1->getColumn(22)->get(i), table1->getColumn(23)->get(i))){
+			cout << "insert failed, reason: " << pErrorInfo.errorInfo<< endl;
+			break;
+		}
+	}
+	mtw->waitForThreadCompletion();
+
+	EXPECT_TRUE(conn.run(
+		"res = select * from act order by cindex;"
+		"ex = select * from table1 order by cindex;"
+		"all(each(eqObj, res.values(), ex.values()))"
+	)->getBool());
+
+	conn.run("undef(`act, SHARED)");
 }

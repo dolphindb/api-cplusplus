@@ -63,5 +63,5 @@ private:
 	static const int maxCompressedSize_;
 };
 
-};//dolphindb
+}//dolphindb
 #endif//COMPRESSION_H_

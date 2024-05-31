@@ -25,19 +25,20 @@ namespace{
 		{
 			cout<<"check connect...";
 			try
-		{
-			ConstantSP res = conn.run("1+1");
-		}
-		catch(const std::exception& e)
-		{
-			conn.connect(hostName, port, "admin", "123456");
-		}
+			{
+				ConstantSP res = conn.run("1+1");
+			}
+			catch(const std::exception& e)
+			{
+				conn.connect(hostName, port, "admin", "123456");
+			}
 			
-        cout<<"ok"<<endl;
+			cout<<"ok"<<endl;
+			CLEAR_ENV(conn);
 		}
 		virtual void TearDown()
 		{
-			conn.run("undef all;");
+			CLEAR_ENV(conn);
 		}
 	};
 

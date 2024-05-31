@@ -102,6 +102,4 @@ private:
     }
 };
 
-#define DLOG true ? dolphindb::DLogger::GetMinLevel() : dolphindb::DLogger::Info
-
 }

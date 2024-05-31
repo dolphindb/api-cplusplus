@@ -647,6 +647,6 @@ private:
     
 };
 
-};
+}
 
 #endif /* CONCURRENT_H_ */

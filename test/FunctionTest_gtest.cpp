@@ -2,7 +2,7 @@
 
 class FunctionTest:public testing::Test
 {
-protected:
+public:
     //Suite
     static void SetUpTestCase() {
         //DBConnection conn;
@@ -45,7 +45,7 @@ protected:
         }
     }
     static void TearDownTestCase(){
-        conn.run("undef all;");
+        CLEAR_ENV(conn);
         conn.close();
     }
 
@@ -66,7 +66,6 @@ protected:
     }
     virtual void TearDown()
     {
-        pass;
     }
 };
 

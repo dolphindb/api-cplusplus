@@ -37,10 +37,11 @@ protected:
         }
 
         cout << "ok" << endl;
+        CLEAR_ENV(conn);
     }
     virtual void TearDown()
     {
-        conn.run("undef all;");
+        CLEAR_ENV(conn);
     }
 };
 
@@ -464,16 +465,16 @@ TEST_F(ArrayVectorTest, test_IntArrayVector)
     av1->append(val_av1, 1);
     EXPECT_EQ(av1->getString(), "[[2000],[4000],[1000],[3000]]");
     av1->append(val_t3, 1);
-    EXPECT_EQ(av1->getString(), "[[2000],[4000],[1000],[3000],[4000],[4000]]");
+    EXPECT_EQ(av1->getString(), "[[2000],[4000],[1000],[3000],[4000]]");
 
     EXPECT_FALSE(av1->remove(10));
     av1->remove(2);
-    EXPECT_EQ(av1->getString(), "[[2000],[4000],[1000],[3000]]");
+    EXPECT_EQ(av1->getString(), "[[2000],[4000],[1000]]");
     av1->remove(-1);
-    EXPECT_EQ(av1->getString(), "[[4000],[1000],[3000]]");
-    av1->remove(3);
+    EXPECT_EQ(av1->getString(), "[[4000],[1000]]");
+    av1->remove(2);
     EXPECT_EQ(av1->getString(), "[]");
-    av1->append(val_v1);
+    EXPECT_TRUE(av1->append(val_v1));
     av1->remove(-1);
     EXPECT_EQ(av1->getString(), "[]");
 
@@ -5258,6 +5259,44 @@ TEST_F(ArrayVectorTest, testDecimal128ArrayVector_gt65535)
     EXPECT_EQ(ex->getString(), av1->getString());
 }
 
+TEST_F(ArrayVectorTest, test_set_null)
+{
+	VectorSP vec1 = conn.run("x=array(INT[]).append!([1 2 3]).append!([4 5 6]);x");
+	VectorSP vec2 = conn.run("x=array(INT[]).append!([7 8 9]).append!([10 11 12]);x");
+	EXPECT_FALSE(vec1->hasNull());
+	EXPECT_FALSE(vec2->hasNull());
+
+	VectorSP indV = Util::createIndexVector(0, 2);
+    VectorSP nullAV = conn.run("u=array(INT[]).append!([take(00i, 3)]).append!([take(00i, 3)]);u");
+    VectorSP nullV = conn.run("u=array(ANY).append!(take(00i, 3)).append!(take(00i, 3));u");;
+
+	EXPECT_TRUE(vec1->set(indV, nullAV));
+    EXPECT_FALSE(vec1->isNull());
+	EXPECT_TRUE(vec1->get(0)->hasNull());
+    EXPECT_TRUE(vec1->get(1)->hasNull());
+	EXPECT_EQ(vec1->getString(), "[[,,],[,,]]");
+
+	EXPECT_TRUE(vec2->set(indV, nullV));
+    EXPECT_FALSE(vec2->isNull());
+	EXPECT_TRUE(vec2->get(0)->hasNull());
+    EXPECT_TRUE(vec2->get(1)->hasNull());
+	EXPECT_EQ(vec2->getString(), "[[,,],[,,]]");
+}
+
+TEST_F(ArrayVectorTest, test_get_subArrayVector)
+{
+    ConstantSP ind = Util::createInt(0);
+    VectorSP indv = Util::createIndexVector(0, 2);
+    VectorSP indav = conn.run("x=array(INT[]).append!([0 1]);x");
+	VectorSP av = conn.run("x=array(INT[]).append!([[1]]).append!([[2]]).append!([[3,4]]).append!([[]]);x");
+    EXPECT_ANY_THROW(dynamic_cast<FastArrayVector*>(av.get())->get(0, ind));
+    EXPECT_ANY_THROW(dynamic_cast<FastArrayVector*>(av.get())->get(0, indav));
+	VectorSP subAV =  dynamic_cast<FastArrayVector*>(av.get())->get(0, indv);
+    EXPECT_EQ(subAV->getString(), "[[1],[2]]");
+	subAV =  dynamic_cast<FastArrayVector*>(av.get())->get(2, indv);
+    EXPECT_EQ(subAV->getString(), "[[3,4],[]]");
+}
+
 class ArrayVectorTest_set : public ArrayVectorTest, public ::testing::WithParamInterface<std::tuple<DATA_TYPE, DATA_TYPE, string, string>>
 {
 public:
@@ -5300,14 +5339,18 @@ TEST_P(ArrayVectorTest_set, testArrayVector_set)
     DATA_TYPE v_type = std::get<1>(GetParam());
     string v0_script = std::get<2>(GetParam());
     string ex_av1_script = std::get<3>(GetParam());
-    VectorSP av1 = Util::createArrayVector(av_type, size, size);
+    int extra = 0;
+    if (v_type == DT_DECIMAL32 || v_type == DT_DECIMAL64 || v_type == DT_DECIMAL128)
+    {
+        extra = 5;
+    }
+    VectorSP av1 = Util::createArrayVector(av_type, size, size, true, extra);
     VectorSP indexV = Util::createIndexVector(0, size);
     VectorSP v0 = conn.run(v0_script);
 
     EXPECT_FALSE(av1->set(indexV, v0));
     for (auto i = 0; i < 50; i++)
     {
-        // cout << v0->get(i)->getString()<<endl;
         ASSERT_TRUE(av1->set(indexV->get(i), v0->get(i)));
     }
     for (auto i = 50; i < 100; i++)
@@ -5319,4 +5362,316 @@ TEST_P(ArrayVectorTest_set, testArrayVector_set)
     conn.run(ex_av1_script);
     ConstantSP res = conn.run("eqObj(ex, av1)");
     EXPECT_TRUE(res->getBool());
+}
+
+class ArrayVectorTest_set_av : public ArrayVectorTest, public ::testing::WithParamInterface<std::vector<string>>
+{
+public:
+    static const vector<std::vector<string>> get_testData()
+    {
+        return {
+            {"bool_arrayVector", "x = array(BOOL[]).append!([take(false, 2)]);vals = take(x, 5);vals", "x = array(BOOL[]).append!([take(true, 2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(true true);data_anyv = take(x, 5);data_anyv"},
+            {"char_arrayVector", "x = array(CHAR[]).append!([rand(127c, 2)]);vals = take(x, 5);vals", "x = array(CHAR[]).append!([rand(127c, 2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(127c, 2));data_anyv = take(x, 5);data_anyv"},
+            {"short_arrayVector", "x = array(SHORT[]).append!([rand(32767h, 2)]);vals = take(x, 5);vals", "x = array(SHORT[]).append!([rand(32767h, 2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(32767h, 2));data_anyv = take(x, 5);data_anyv"},
+            {"int_arrayVector", "x = array(INT[]).append!([1..5]);vals = take(x, 5);vals", "x = array(INT[]).append!([6..10]);data_av = take(x, 5);data_av", "x = array(ANY).append!(6..10);data_anyv = take(x, 5);data_anyv"},
+            {"long_arrayVector", "x = array(LONG[]).append!([rand(2147483647l, 2)]);vals = take(x, 5);vals", "x = array(LONG[]).append!([rand(2147483647l, 2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(2147483647l, 2));data_anyv = take(x, 5);data_anyv"},
+            {"float_arrayVector", "x = array(FLOAT[]).append!([rand(100.00f, 2)]);vals = take(x, 5);vals", "x = array(FLOAT[]).append!([rand(100.00f, 2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(100.00f, 2));data_anyv = take(x, 5);data_anyv"},
+            {"double_arrayVector", "x = array(DOUBLE[]).append!([rand(100.00, 2)]);vals = take(x, 5);vals", "x = array(DOUBLE[]).append!([rand(100.00, 2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(100.00, 2));data_anyv = take(x, 5);data_anyv"},
+            {"date_arrayVector", "x = array(DATE[]).append!([rand(2023.01.01,2)]);vals = take(x, 5);vals", "x = array(DATE[]).append!([rand(2023.01.01,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(2023.01.01,2));data_anyv = take(x, 5);data_anyv"},
+            {"month_arrayVector", "x = array(MONTH[]).append!([rand(2023.01M,2)]);vals = take(x, 5);vals", "x = array(MONTH[]).append!([rand(2023.01M,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(2023.01M,2));data_anyv = take(x, 5);data_anyv"},
+            {"time_arrayVector", "x = array(TIME[]).append!([rand(23:00:00.000,2)]);vals = take(x, 5);vals", "x = array(TIME[]).append!([rand(23:00:00.000,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(23:00:00.000,2));data_anyv = take(x, 5);data_anyv"},
+            {"minute_arrayVector", "x = array(MINUTE[]).append!([rand(23:00m,2)]);vals = take(x, 5);vals", "x = array(MINUTE[]).append!([rand(23:00m,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(23:00m,2));data_anyv = take(x, 5);data_anyv"},
+            {"second_arrayVector", "x = array(SECOND[]).append!([rand(23:00:00,2)]);vals = take(x, 5);vals", "x = array(SECOND[]).append!([rand(23:00:00,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(23:00:00,2));data_anyv = take(x, 5);data_anyv"},
+            {"datetime_arrayVector", "x = array(DATETIME[]).append!([rand(2023.01.01T00:00:00,2)]);vals = take(x, 5);vals", "x = array(DATETIME[]).append!([rand(2023.01.01T00:00:00,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(2023.01.01T00:00:00,2));data_anyv = take(x, 5);data_anyv"},
+            {"timestamp_arrayVector", "x = array(TIMESTAMP[]).append!([rand(2023.01.01T00:00:00.000,2)]);vals = take(x, 5);vals", "x = array(TIMESTAMP[]).append!([rand(2023.01.01T00:00:00.000,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(2023.01.01T00:00:00.000,2));data_anyv = take(x, 5);data_anyv"},
+            {"nanotime_arrayVector", "x = array(NANOTIME[]).append!([rand(23:00:00.000000000,2)]);vals = take(x, 5);vals", "x = array(NANOTIME[]).append!([rand(23:00:00.000000000,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(23:00:00.000000000,2));data_anyv = take(x, 5);data_anyv"},
+            {"nanotimestamp_arrayVector", "x = array(NANOTIMESTAMP[]).append!([rand(2023.01.01T00:00:00.000000000,2)]);vals = take(x, 5);vals", "x = array(NANOTIMESTAMP[]).append!([rand(2023.01.01T00:00:00.000000000,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(2023.01.01T00:00:00.000000000,2));data_anyv = take(x, 5);data_anyv"},
+            {"int128_arrayVector", "x = array(INT128[]).append!([rand(int128('e1671797c52e15f763380b45e841ec32'),2)]);vals = take(x, 5);vals", "x = array(INT128[]).append!([rand(int128('e1671797c52e15f763380b45e841ec32'),2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(int128('e1671797c52e15f763380b45e841ec32'),2));data_anyv = take(x, 5);data_anyv"},
+            {"uuid_arrayVector", "x = array(UUID[]).append!([rand(uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87'),2)]);vals = take(x, 5);vals", "x = array(UUID[]).append!([rand(uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87'),2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87'),2));data_anyv = take(x, 5);data_anyv"},
+            {"ipaddr_arrayVector", "x = array(IPADDR[]).append!([rand(ipaddr('255.255.255.0'),2)]);vals = take(x, 5);vals", "x = array(IPADDR[]).append!([rand(ipaddr('255.255.255.0'),2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(ipaddr('255.255.255.0'),2));data_anyv = take(x, 5);data_anyv"},
+            {"decimal32_arrayVector", "x = array(DECIMAL32(5)[]).append!([decimal32(rand(100.00,2), 5)]);vals = take(x, 5);vals", "x = array(DECIMAL32(5)[]).append!([decimal32(rand(100.00,2), 5)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(decimal32(rand(100.00,2), 5));data_anyv = take(x, 5);data_anyv"},
+            {"decimal64_arrayVector", "x = array(DECIMAL64(10)[]).append!([decimal64(rand(100.00,2), 10)]);vals = take(x, 5);vals", "x = array(DECIMAL64(10)[]).append!([decimal64(rand(100.00,2), 10)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(decimal64(rand(100.00,2), 10));data_anyv = take(x, 5);data_anyv"},
+            {"decimal128_arrayVector", "x = array(DECIMAL128(20)[]).append!([decimal128(rand(100.00,2), 20)]);vals = take(x, 5);vals", "x = array(DECIMAL128(20)[]).append!([decimal128(rand(100.00,2), 20)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(decimal128(rand(100.00,2), 20));data_anyv = take(x, 5);data_anyv"},
+        };
+    }
+};
+
+INSTANTIATE_TEST_SUITE_P(, ArrayVectorTest_set_av, testing::ValuesIn(ArrayVectorTest_set_av::get_testData()),
+    [](const testing::TestParamInfo<ArrayVectorTest_set_av::ParamType>& info){ 
+        return info.param[0]; 
+    });
+TEST_P(ArrayVectorTest_set_av, set_valueIsArrayVector){
+    string s1 = GetParam()[1];
+    string s2 = GetParam()[2];
+    string s3 = GetParam()[3];
+    VectorSP av1 = conn.run(s1);
+    VectorSP av2 = av1->getInstance();
+
+    VectorSP indexV = Util::createIndexVector(0, 5);
+    VectorSP data_av = conn.run(s2);
+    VectorSP data_anyv = conn.run(s3);
+
+    EXPECT_TRUE(av1->set(indexV, data_av));
+    EXPECT_TRUE(av2->set(indexV, data_anyv));
+
+    vector<string> names = {"av1", "av2"};
+    vector<ConstantSP> vectors = {av1, av2};
+    conn.upload(names, vectors);
+
+    EXPECT_TRUE(conn.run("eqObj(av1, data_av);")->getBool());
+    EXPECT_TRUE(conn.run("res = array(BOOL);\
+        for (i in 0:data_anyv.size()){\
+            res.append!(eqObj(av2.row(i).sort(), data_anyv[i].sort()));\
+        };all(res)")->getBool());
+
+}
+
+TEST_F(ArrayVectorTest, test_fill_scalar){
+    VectorSP av0 = conn.run("x=array(INT[]).append!([1 2]).append!([1..100]).append!([[1]]).append!([[int(NULL)]]);x");
+    cout << av0->getString() << endl;
+    EXPECT_EQ(av0->getString(), "[[1,2],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30...],[1],[]]");
+
+    // set scalar
+    av0->fill(0, 1, Util::createInt(888));
+    cout << av0->getString() << endl;
+    EXPECT_EQ(av0->getString(), "[[888],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30...],[1],[]]");
+    av0->fill(1, 2, Util::createNullConstant(DT_INT));
+    cout << av0->getString() << endl;
+    EXPECT_EQ(av0->getString(), "[[888],[],[],[]]");
+
+    av0->fill(2, 1, Util::createInt(999));
+    cout << av0->getString() << endl;
+    EXPECT_EQ(av0->getString(), "[[888],[],[999],[]]");
+
+    av0->fill(3, 1, Util::createInt(1));
+    cout << av0->getString() << endl;
+    EXPECT_EQ(av0->getString(), "[[888],[],[999],[1]]");
+
+}
+
+
+TEST_F(ArrayVectorTest, test_fill_tuple){
+    VectorSP av0 = conn.run("x=array(INT[]).append!([1 2]).append!([1..100]).append!([[1]]).append!([[int(NULL)]]);x");
+    cout << av0->getString() << endl;
+    EXPECT_EQ(av0->getString(), "[[1,2],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30...],[1],[]]");
+
+    VectorSP tupleVal_1 = Util::createVector(DT_ANY, 2);
+    tupleVal_1->setNull(0);
+    tupleVal_1->setNull(1);
+
+    VectorSP tupleVal_2 = conn.run("x=array(ANY).append!(0);x");
+    VectorSP tupleVal_3 = conn.run("x=array(ANY).append!(3 4).append!(5 6);x");
+    VectorSP tupleVal_4 = conn.run("x=array(ANY).append!(NULL).append!(take(int(NULL),2));x");
+    av0->fill(1, 2, tupleVal_1);
+    cout << av0->getString() << endl;
+    EXPECT_EQ(av0->getString(), "[[1,2],[],[],[]]");
+
+    av0->fill(1, 0, tupleVal_1);
+    cout << av0->getString() << endl;
+    EXPECT_EQ(av0->getString(), "[[1,2],[],[],[]]");
+
+    av0->fill(1, 1, tupleVal_2);
+    cout << av0->getString() << endl;
+    EXPECT_EQ(av0->getString(), "[[1,2],[0],[],[]]");
+    EXPECT_ANY_THROW(av0->fill(1, 2, tupleVal_2));
+    av0->fill(2, 2, tupleVal_3);
+    cout << av0->getString() << endl;
+    EXPECT_EQ(av0->getString(), "[[1,2],[0],[3,4],[5,6]]");
+    av0->fill(2, 2, tupleVal_4);
+    cout << av0->getString() << endl;
+    EXPECT_EQ(av0->getString(), "[[1,2],[0],[],[,]]");
+
+    VectorSP av1 = conn.run("x=array(INT[]).append!([[1]]).append!([[2]]);x");
+    av1->fill(0, 2, tupleVal_4);
+    cout << av1->getString() <<endl;
+    EXPECT_EQ(av1->getString(), "[[],[,]]");
+
+}
+
+
+TEST_F(ArrayVectorTest, test_fill_array){
+    VectorSP av2 = conn.run("x=array(INT[]).append!([1 2]).append!([1..100]).append!([[1]]).append!([[int(NULL)]]);x");
+    EXPECT_EQ(av2->getString(), "[[1,2],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30...],[1],[]]");
+    VectorSP vecVal_1 = Util::createVector(DT_INT_ARRAY, 2);
+    vecVal_1->setNull(0);
+    vecVal_1->setNull(1);
+
+    VectorSP vecVal_2 = conn.run("x=array(INT).append!(999);x");
+    VectorSP vecVal_3 = conn.run("x=array(INT[]).append!([3 4]).append!([5 6]);x");
+    VectorSP vecVal_4 = conn.run("x=array(INT[]).append!([[int(NULL)]]).append!([take(int(NULL),2)]);x");
+    VectorSP vecVal_5 = conn.run("x=array(INT).append!(NULL).append!(NULL);x");
+    av2->fill(1, 2, vecVal_1);
+    cout << av2->getString() << endl;
+    EXPECT_EQ(av2->getString(), "[[1,2],[],[],[]]");
+
+    av2->fill(1, 0, vecVal_1);
+    cout << av2->getString() << endl;
+    EXPECT_EQ(av2->getString(), "[[1,2],[],[],[]]");
+
+    av2->fill(1, 1, vecVal_2);
+    cout << av2->getString() << endl;
+    EXPECT_EQ(av2->getString(), "[[1,2],[999],[],[]]");
+    EXPECT_ANY_THROW(av2->fill(1, 2, vecVal_2));
+    av2->fill(2, 2, vecVal_3);
+    cout << av2->getString() << endl;
+    EXPECT_EQ(av2->getString(), "[[1,2],[999],[3,4],[5,6]]");
+    av2->fill(2, 2, vecVal_4);
+    cout << av2->getString() << endl;
+    EXPECT_EQ(av2->getString(), "[[1,2],[999],[],[,]]");
+
+    VectorSP av3 = conn.run("x=array(INT[]).append!([[1]]).append!([[2]]);x");
+    av3->fill(0, 2, vecVal_4);
+    cout << av3->getString() <<endl;
+    EXPECT_EQ(av3->getString(), "[[],[,]]");
+
+    EXPECT_ANY_THROW(av3->fill(0, 2, vecVal_5));
+}
+
+class ArrayVectorTest_create : public ArrayVectorTest, public ::testing::WithParamInterface<DATA_TYPE>{
+};
+
+INSTANTIATE_TEST_SUITE_P(, ArrayVectorTest_create, testing::Values(DT_BOOL_ARRAY,DT_CHAR_ARRAY,DT_SHORT_ARRAY,DT_INT_ARRAY,DT_LONG_ARRAY,DT_FLOAT_ARRAY,DT_DOUBLE_ARRAY,DT_DATE_ARRAY,DT_MONTH_ARRAY,DT_TIME_ARRAY,DT_MINUTE_ARRAY,DT_SECOND_ARRAY,DT_DATETIME_ARRAY,DT_TIMESTAMP_ARRAY,DT_NANOTIME_ARRAY,DT_NANOTIMESTAMP_ARRAY,DT_INT128_ARRAY,DT_UUID_ARRAY,DT_IP_ARRAY,DT_DECIMAL32_ARRAY,DT_DECIMAL64_ARRAY,DT_DECIMAL128_ARRAY,DT_DATEHOUR_ARRAY));
+
+TEST_P(ArrayVectorTest_create, test_create_ArraryVector){
+    DATA_TYPE type = GetParam();
+    VectorSP av = Util::createArrayVector(type, 70000);
+
+    EXPECT_EQ(av->size(), 70000);
+    if (type == DT_INT128_ARRAY)
+        EXPECT_EQ(av->getString(), "[[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000],[00000000000000000000000000000000]...]");
+    else if (type == DT_UUID_ARRAY)
+        EXPECT_EQ(av->getString(), "[[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000],[00000000-0000-0000-0000-000000000000]...]");
+    else if (type == DT_IP_ARRAY)
+        EXPECT_EQ(av->getString(), "[[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0],[0.0.0.0]...]");
+    else
+        EXPECT_EQ(av->getString(), "[[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]...]");
+    for (auto i=0; i< av->size(); i++){
+        ASSERT_EQ(av->get(i)->size(), 1);
+        ASSERT_TRUE(av->get(i)->isNull(0));
+    }
+}
+
+
+class ArrayVectorTest_append_anyv : public ArrayVectorTest, public ::testing::WithParamInterface<std::tuple<DATA_TYPE, DATA_TYPE, string, string>>
+{
+public:
+    static const vector<std::tuple<DATA_TYPE, DATA_TYPE, string, string>> get_testData()
+    {
+        return {
+            std::make_tuple(DT_BOOL_ARRAY, DT_BOOL, "x = array(ANY);for(i in 0:100){x.append!(true false)};x", "ex=array(BOOL[]);for(i in 0:50){ex.append!([true false])};for(i in 0:50){ex.append!([[bool(NULL)]])};"),
+            std::make_tuple(DT_CHAR_ARRAY, DT_CHAR, "x = array(ANY);for(i in 0:100){x.append!(1c NULL)};x", "ex=array(CHAR[]);for(i in 0:50){ex.append!([1c NULL])};for(i in 0:50){ex.append!([[char(NULL)]])};"),
+            std::make_tuple(DT_SHORT_ARRAY, DT_SHORT, "x = array(ANY);for(i in 0:100){x.append!(1h NULL)};x", "ex=array(SHORT[]);for(i in 0:50){ex.append!([1h NULL])};for(i in 0:50){ex.append!([[short(NULL)]])};"),
+            std::make_tuple(DT_INT_ARRAY, DT_INT, "x = array(ANY);for(i in 0:100){x.append!(1 NULL)};x", "ex=array(INT[]);for(i in 0:50){ex.append!([1 NULL])};for(i in 0:50){ex.append!([[int(NULL)]])};"),
+            std::make_tuple(DT_LONG_ARRAY, DT_LONG, "x = array(ANY);for(i in 0:100){x.append!(1l NULL)};x", "ex=array(LONG[]);for(i in 0:50){ex.append!([1l NULL])};for(i in 0:50){ex.append!([[long(NULL)]])};"),
+            std::make_tuple(DT_FLOAT_ARRAY, DT_FLOAT, "x = array(ANY);for(i in 0:100){x.append!(1f NULL)};x", "ex=array(FLOAT[]);for(i in 0:50){ex.append!([1f NULL])};for(i in 0:50){ex.append!([[float(NULL)]])};"),
+            std::make_tuple(DT_DOUBLE_ARRAY, DT_DOUBLE, "x = array(ANY);for(i in 0:100){x.append!(1.0 NULL)};x", "ex=array(DOUBLE[]);for(i in 0:50){ex.append!([1.0 NULL])};for(i in 0:50){ex.append!([[double(NULL)]])};"),
+            std::make_tuple(DT_DATE_ARRAY, DT_DATE, "x = array(ANY);for(i in 0:100){x.append!(2023.01.01 NULL)};x", "ex=array(DATE[]);for(i in 0:50){ex.append!([2023.01.01 NULL])};for(i in 0:50){ex.append!([[date(NULL)]])};"),
+            std::make_tuple(DT_MONTH_ARRAY, DT_MONTH, "x = array(ANY);for(i in 0:100){x.append!(2013.11M NULL)};x", "ex=array(MONTH[]);for(i in 0:50){ex.append!([2013.11M NULL])};for(i in 0:50){ex.append!([[month(NULL)]])};"),
+            std::make_tuple(DT_TIME_ARRAY, DT_TIME, "x = array(ANY);for(i in 0:100){x.append!(12:00:00.123 NULL)};x", "ex=array(TIME[]);for(i in 0:50){ex.append!([12:00:00.123 NULL])};for(i in 0:50){ex.append!([[time(NULL)]])};"),
+            std::make_tuple(DT_MINUTE_ARRAY, DT_MINUTE, "x = array(ANY);for(i in 0:100){x.append!(13:30m NULL)};x", "ex=array(MINUTE[]);for(i in 0:50){ex.append!([13:30m NULL])};for(i in 0:50){ex.append!([[minute(NULL)]])};"),
+            std::make_tuple(DT_SECOND_ARRAY, DT_SECOND, "x = array(ANY);for(i in 0:100){x.append!(13:30:30 NULL)};x", "ex=array(SECOND[]);for(i in 0:50){ex.append!([13:30:30 NULL])};for(i in 0:50){ex.append!([[second(NULL)]])};"),
+            std::make_tuple(DT_DATETIME_ARRAY, DT_DATETIME, "x = array(ANY);for(i in 0:100){x.append!(2012.06.13T13:30:10 NULL)};x", "ex=array(DATETIME[]);for(i in 0:50){ex.append!([2012.06.13T13:30:10 NULL])};for(i in 0:50){ex.append!([[datetime(NULL)]])};"),
+            std::make_tuple(DT_TIMESTAMP_ARRAY, DT_TIMESTAMP, "x = array(ANY);for(i in 0:100){x.append!(2023.01.01T12:00:00.123 NULL)};x", "ex=array(TIMESTAMP[]);for(i in 0:50){ex.append!([2023.01.01T12:00:00.123 NULL])};for(i in 0:50){ex.append!([[timestamp(NULL)]])};"),
+            std::make_tuple(DT_NANOTIME_ARRAY, DT_NANOTIME, "x = array(ANY);for(i in 0:100){x.append!(13:30:10.008007006 NULL)};x", "ex=array(NANOTIME[]);for(i in 0:50){ex.append!([13:30:10.008007006 NULL])};for(i in 0:50){ex.append!([[nanotime(NULL)]])};"),
+            std::make_tuple(DT_NANOTIMESTAMP_ARRAY, DT_NANOTIMESTAMP, "x = array(ANY);for(i in 0:100){x.append!(2012.06.13T13:30:10.008007006 NULL)};x", "ex=array(NANOTIMESTAMP[]);for(i in 0:50){ex.append!([2012.06.13T13:30:10.008007006 NULL])};for(i in 0:50){ex.append!([[nanotimestamp(NULL)]])};"),
+            std::make_tuple(DT_DATEHOUR_ARRAY, DT_DATEHOUR, "x = array(ANY);for(i in 0:100){x.append!(datehour(10000 NULL))};x", "ex=array(DATEHOUR[]);for(i in 0:50){ex.append!([datehour(10000 NULL)])};for(i in 0:50){ex.append!([[datehour(NULL)]])};"),
+            std::make_tuple(DT_INT128_ARRAY, DT_INT128, "x = array(ANY);for(i in 0:100){x.append!(int128(`e1671797c52e15f763380b45e841ec32`))};x", "ex=array(INT128[]);for(i in 0:50){ex.append!([int128(`e1671797c52e15f763380b45e841ec32`)])};for(i in 0:50){ex.append!([[int128()]])};"),
+            std::make_tuple(DT_UUID_ARRAY, DT_UUID, "x = array(ANY);for(i in 0:100){x.append!(uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87'`))};x", "ex=array(UUID[]);for(i in 0:50){ex.append!([uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87'`)])};for(i in 0:50){ex.append!([[uuid()]])};"),
+            std::make_tuple(DT_IP_ARRAY, DT_IP, "x = array(ANY);for(i in 0:100){x.append!(ipaddr('1.1.1.1'`))};x", "ex=array(IPADDR[]);for(i in 0:50){ex.append!([ipaddr('1.1.1.1'`)])};for(i in 0:50){ex.append!([[ipaddr()]])};"),
+            std::make_tuple(DT_DECIMAL32_ARRAY, DT_DECIMAL32, "x = array(ANY);for(i in 0:100){x.append!(decimal32('-1.453254'`,5))};x", "ex=array(DECIMAL32(5)[]);for(i in 0:50){ex.append!([decimal32('-1.453254'`,5)])};for(i in 0:50){ex.append!([[decimal32(,5)]])};"),
+            std::make_tuple(DT_DECIMAL64_ARRAY, DT_DECIMAL64, "x = array(ANY);for(i in 0:100){x.append!(decimal64('-1.453254'`,5))};x", "ex=array(DECIMAL64(5)[]);for(i in 0:50){ex.append!([decimal64('-1.453254'`,5)])};for(i in 0:50){ex.append!([[decimal64(, 5)]])};"),
+            std::make_tuple(DT_DECIMAL128_ARRAY, DT_DECIMAL128, "x = array(ANY);for(i in 0:100){x.append!(decimal128('-1.453254'`,5))};x", "ex=array(DECIMAL128(5)[]);for(i in 0:50){ex.append!([decimal128('-1.453254'`,5)])};for(i in 0:50){ex.append!([[decimal128(, 5)]])};"),
+        };
+    }
+};
+
+INSTANTIATE_TEST_SUITE_P(, ArrayVectorTest_append_anyv, ::testing::ValuesIn(ArrayVectorTest_append_anyv::get_testData()));
+TEST_P(ArrayVectorTest_append_anyv, testArrayVector_append_anyv_and_scalar)
+{
+    int size = 100;
+    DATA_TYPE av_type = std::get<0>(GetParam());
+    DATA_TYPE v_type = std::get<1>(GetParam());
+    string v0_script = std::get<2>(GetParam());
+    string ex_av1_script = std::get<3>(GetParam());
+    int extra = 0;
+    if (v_type == DT_DECIMAL32 || v_type == DT_DECIMAL64 || v_type == DT_DECIMAL128)
+    {
+        extra = 5;
+    }
+    VectorSP av1 = Util::createArrayVector(av_type, 0, 0, true, extra);
+    VectorSP v0 = conn.run(v0_script);
+
+    ASSERT_FALSE(av1->append(v0->get(0), 0, 1));
+    EXPECT_TRUE(av1->append(v0, 0, 50));
+
+    for (int i = 50; i < 100; i++) {
+        ASSERT_TRUE(av1->append(Util::createNullConstant(v_type, extra), i, 1));
+    }
+
+    conn.upload("av1", av1);
+    conn.run(ex_av1_script);
+    ConstantSP res = conn.run("eqObj(ex, av1)");
+    EXPECT_TRUE(res->getBool());
+}
+
+class ArrayVectorTest_append_av : public ArrayVectorTest, public ::testing::WithParamInterface<std::vector<string>>
+{
+public:
+    static const vector<std::vector<string>> get_testData()
+    {
+        return {
+            {"bool_arrayVector", "x = array(BOOL[]).append!([take(false, 2)]);vals = take(x, 5);vals", "x = array(BOOL[]).append!([take(true, 2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(true true);data_anyv = take(x, 5);data_anyv"},
+            {"char_arrayVector", "x = array(CHAR[]).append!([rand(127c, 2)]);vals = take(x, 5);vals", "x = array(CHAR[]).append!([rand(127c, 2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(127c, 2));data_anyv = take(x, 5);data_anyv"},
+            {"short_arrayVector", "x = array(SHORT[]).append!([rand(32767h, 2)]);vals = take(x, 5);vals", "x = array(SHORT[]).append!([rand(32767h, 2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(32767h, 2));data_anyv = take(x, 5);data_anyv"},
+            {"int_arrayVector", "x = array(INT[]).append!([1..5]);vals = take(x, 5);vals", "x = array(INT[]).append!([6..10]);data_av = take(x, 5);data_av", "x = array(ANY).append!(6..10);data_anyv = take(x, 5);data_anyv"},
+            {"long_arrayVector", "x = array(LONG[]).append!([rand(2147483647l, 2)]);vals = take(x, 5);vals", "x = array(LONG[]).append!([rand(2147483647l, 2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(2147483647l, 2));data_anyv = take(x, 5);data_anyv"},
+            {"float_arrayVector", "x = array(FLOAT[]).append!([rand(100.00f, 2)]);vals = take(x, 5);vals", "x = array(FLOAT[]).append!([rand(100.00f, 2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(100.00f, 2));data_anyv = take(x, 5);data_anyv"},
+            {"double_arrayVector", "x = array(DOUBLE[]).append!([rand(100.00, 2)]);vals = take(x, 5);vals", "x = array(DOUBLE[]).append!([rand(100.00, 2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(100.00, 2));data_anyv = take(x, 5);data_anyv"},
+            {"date_arrayVector", "x = array(DATE[]).append!([rand(2023.01.01,2)]);vals = take(x, 5);vals", "x = array(DATE[]).append!([rand(2023.01.01,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(2023.01.01,2));data_anyv = take(x, 5);data_anyv"},
+            {"month_arrayVector", "x = array(MONTH[]).append!([rand(2023.01M,2)]);vals = take(x, 5);vals", "x = array(MONTH[]).append!([rand(2023.01M,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(2023.01M,2));data_anyv = take(x, 5);data_anyv"},
+            {"time_arrayVector", "x = array(TIME[]).append!([rand(23:00:00.000,2)]);vals = take(x, 5);vals", "x = array(TIME[]).append!([rand(23:00:00.000,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(23:00:00.000,2));data_anyv = take(x, 5);data_anyv"},
+            {"minute_arrayVector", "x = array(MINUTE[]).append!([rand(23:00m,2)]);vals = take(x, 5);vals", "x = array(MINUTE[]).append!([rand(23:00m,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(23:00m,2));data_anyv = take(x, 5);data_anyv"},
+            {"second_arrayVector", "x = array(SECOND[]).append!([rand(23:00:00,2)]);vals = take(x, 5);vals", "x = array(SECOND[]).append!([rand(23:00:00,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(23:00:00,2));data_anyv = take(x, 5);data_anyv"},
+            {"datetime_arrayVector", "x = array(DATETIME[]).append!([rand(2023.01.01T00:00:00,2)]);vals = take(x, 5);vals", "x = array(DATETIME[]).append!([rand(2023.01.01T00:00:00,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(2023.01.01T00:00:00,2));data_anyv = take(x, 5);data_anyv"},
+            {"timestamp_arrayVector", "x = array(TIMESTAMP[]).append!([rand(2023.01.01T00:00:00.000,2)]);vals = take(x, 5);vals", "x = array(TIMESTAMP[]).append!([rand(2023.01.01T00:00:00.000,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(2023.01.01T00:00:00.000,2));data_anyv = take(x, 5);data_anyv"},
+            {"nanotime_arrayVector", "x = array(NANOTIME[]).append!([rand(23:00:00.000000000,2)]);vals = take(x, 5);vals", "x = array(NANOTIME[]).append!([rand(23:00:00.000000000,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(23:00:00.000000000,2));data_anyv = take(x, 5);data_anyv"},
+            {"nanotimestamp_arrayVector", "x = array(NANOTIMESTAMP[]).append!([rand(2023.01.01T00:00:00.000000000,2)]);vals = take(x, 5);vals", "x = array(NANOTIMESTAMP[]).append!([rand(2023.01.01T00:00:00.000000000,2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(2023.01.01T00:00:00.000000000,2));data_anyv = take(x, 5);data_anyv"},
+            {"datehour_arrayVector", "x = array(DATEHOUR[]).append!([rand(datehour(10000),2)]);vals = take(x, 5);vals", "x = array(DATEHOUR[]).append!([rand(datehour(10000),2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(datehour(10000),2));data_anyv = take(x, 5);data_anyv"},
+            {"int128_arrayVector", "x = array(INT128[]).append!([rand(int128('e1671797c52e15f763380b45e841ec32'),2)]);vals = take(x, 5);vals", "x = array(INT128[]).append!([rand(int128('e1671797c52e15f763380b45e841ec32'),2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(int128('e1671797c52e15f763380b45e841ec32'),2));data_anyv = take(x, 5);data_anyv"},
+            {"uuid_arrayVector", "x = array(UUID[]).append!([rand(uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87'),2)]);vals = take(x, 5);vals", "x = array(UUID[]).append!([rand(uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87'),2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87'),2));data_anyv = take(x, 5);data_anyv"},
+            {"ipaddr_arrayVector", "x = array(IPADDR[]).append!([rand(ipaddr('255.255.255.0'),2)]);vals = take(x, 5);vals", "x = array(IPADDR[]).append!([rand(ipaddr('255.255.255.0'),2)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(rand(ipaddr('255.255.255.0'),2));data_anyv = take(x, 5);data_anyv"},
+            {"decimal32_arrayVector", "x = array(DECIMAL32(5)[]).append!([decimal32(rand(100.00,2), 5)]);vals = take(x, 5);vals", "x = array(DECIMAL32(5)[]).append!([decimal32(rand(100.00,2), 5)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(decimal32(rand(100.00,2), 5));data_anyv = take(x, 5);data_anyv"},
+            {"decimal64_arrayVector", "x = array(DECIMAL64(10)[]).append!([decimal64(rand(100.00,2), 10)]);vals = take(x, 5);vals", "x = array(DECIMAL64(10)[]).append!([decimal64(rand(100.00,2), 10)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(decimal64(rand(100.00,2), 10));data_anyv = take(x, 5);data_anyv"},
+            {"decimal128_arrayVector", "x = array(DECIMAL128(20)[]).append!([decimal128(rand(100.00,2), 20)]);vals = take(x, 5);vals", "x = array(DECIMAL128(20)[]).append!([decimal128(rand(100.00,2), 20)]);data_av = take(x, 5);data_av", "x = array(ANY).append!(decimal128(rand(100.00,2), 20));data_anyv = take(x, 5);data_anyv"},
+        };
+    }
+};
+
+INSTANTIATE_TEST_SUITE_P(, ArrayVectorTest_append_av, testing::ValuesIn(ArrayVectorTest_append_av::get_testData()),
+    [](const testing::TestParamInfo<ArrayVectorTest_append_av::ParamType>& info){ 
+        return info.param[0]; 
+    });
+TEST_P(ArrayVectorTest_append_av, testArrayVector_append_av){
+    string s1 = GetParam()[1];
+    string s2 = GetParam()[2];
+    string s3 = GetParam()[3];
+    VectorSP av1 = conn.run(s1);
+    VectorSP av2 = av1->getInstance();
+
+    VectorSP indexV = Util::createIndexVector(0, 5);
+    VectorSP data_av = conn.run(s2);
+    VectorSP data_anyv = conn.run(s3);
+
+    EXPECT_TRUE(av1->set(indexV, data_av));
+    EXPECT_TRUE(av2->set(indexV, data_anyv));
+
+    vector<string> names = {"av1", "av2"};
+    vector<ConstantSP> vectors = {av1, av2};
+    conn.upload(names, vectors);
+
+    EXPECT_TRUE(conn.run("eqObj(av1, data_av);")->getBool());
+    EXPECT_TRUE(conn.run("res = array(BOOL);\
+        for (i in 0:data_anyv.size()){\
+            res.append!(eqObj(av2.row(i).sort(), data_anyv[i].sort()));\
+        };all(res)")->getBool());
 }

@@ -505,6 +505,6 @@ int Thread::getID(){
 #endif
 }
 
-};
+}
 
 

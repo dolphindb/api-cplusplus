@@ -7,31 +7,14 @@
 
 namespace dolphindb {
 
-SymbolBase::SymbolBase(const DataInputStreamSP& in, IO_ERR& ret){
-    ret = in->readInt(id_);
-    if(ret != OK)
-        return;
-    int size;
-    ret = in->readInt(size);
-    if(ret != OK)
-        return;
-
-    for(int i = 0; i < size; i++){
-        string s;
-        ret = in->readString(s);
-        if(ret != OK) return;
-        syms_.emplace_back(s);
-    }
-}
-
 SymbolBase::SymbolBase(int id, const DataInputStreamSP& in, IO_ERR& ret){
     id_ = id;
-    int size;
-    ret =  in->readInt(size);
+    int sz;
+    ret =  in->readInt(sz);
     if(ret != OK)
         return;
-    for(int i = 0; i < size; i++){
-        string s;
+    for(int i = 0; i < sz; i++){
+        std::string s;
         ret = in->readString(s);
         if(ret != OK)
             return;
@@ -48,11 +31,11 @@ int SymbolBase::serialize(char* buf, int bufSize, INDEX indexStart, int offset, 
         if(syms_[index].size() >= 262144){
             throw RuntimeException("String in symbol too long, Serialization failed, length must be less than 256K bytes");
         }
-        int size = std::min(bufSize, (int)syms_[index].size() + 1 - offset);
-        memcpy(buf, syms_[index].data() + offset,  size);
-        buf += size;
-        bufSize -= size;
-        offset += size;
+        int sz = std::min(bufSize, (int)syms_[index].size() + 1 - offset);
+        memcpy(buf, syms_[index].data() + offset,  sz);
+        buf += sz;
+        bufSize -= sz;
+        offset += sz;
         if(offset == (int)syms_[index].size() + 1){
             offset = 0;
             index ++;
@@ -63,7 +46,7 @@ int SymbolBase::serialize(char* buf, int bufSize, INDEX indexStart, int offset, 
     return initSize - bufSize;
 }
 
-int SymbolBase::find(const string& symbol){
+int SymbolBase::find(const std::string& symbol){
     if(symMap_.empty()){
         if(syms_.size() > 0 && syms_[0] != "")
             throw RuntimeException("A symbol base's first key must be empty string.");
@@ -83,7 +66,7 @@ int SymbolBase::find(const string& symbol){
     return index;
 }
 
-int SymbolBase::findAndInsert(const string& symbol){
+int SymbolBase::findAndInsert(const std::string& symbol){
     //remove following line to support empty symbol
     //if(symbol == "")
     //    throw RuntimeException("A symbol base key string can't be null.");

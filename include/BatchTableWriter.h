@@ -39,13 +39,13 @@ public:
      * table, and the parameter tableName should be a null string. If error is raised on the server, this
      * function throws an exception.
      */
-    void addTable(const string& dbName, const string& tableName="", bool partitioned=true);
+    void addTable(const std::string& dbName, const std::string& tableName="", bool partitioned=true);
 
     /**
      * Gets the current size of the specified table write queue and whethre the specified table is removed. If
      * the specified table is not added first, this function throw and exception.
      */
-    std::tuple<int,bool,bool> getStatus(const string& dbName, const string& tableName="");
+    std::tuple<int,bool,bool> getStatus(const std::string& dbName, const std::string& tableName="");
 
     /**
      * Gets the current size of all table write queue, number of rows already sended to server, whether a
@@ -53,14 +53,14 @@ public:
      */
     TableSP getAllStatus();
 
-    TableSP getUnwrittenData(const string& dbName, const string& tableName="");
+    TableSP getUnwrittenData(const std::string& dbName, const std::string& tableName="");
 
     /**
      * Release the resouces occupied by the specified table, including write queue and write thread. If this
      * function is called to add an in-memory table, the parameter dbName indicates the name of the in-memory
      * table, and the parameter tableName should be a null string.
      */
-    void removeTable(const string& dbName, const string& tableName="");
+    void removeTable(const std::string& dbName, const std::string& tableName="");
 
     /**
      * Insert a row into the specified table. If this function is called to insert data into an in-memory table,
@@ -72,7 +72,7 @@ public:
      * If the background thread fails to write a row, it will print error message to std::cerr and return.
      */
     template<typename... Targs>
-    void insert(const string& dbName, const string& tableName, Targs... Fargs){
+    void insert(const std::string& dbName, const std::string& tableName, Targs... Fargs){
         //RECORDTIME("BTW::insert");
         SmartPointer<DestTable> destTable;
         {
@@ -104,7 +104,7 @@ private:
         TableSP colDefs;
         int columnNum;
         ConstantSP colDefsTypeInt;
-        std::vector<string> colNames;
+        std::vector<std::string> colNames;
         std::vector<DATA_TYPE> colTypes;
         std::string createTmpSharedTable;
         SynchronizedQueue<std::vector<ConstantSP>> writeQueue;
@@ -183,5 +183,5 @@ private:
 };
 
 
-};
+}
 #endif /* BATCHTABLEWRITER_H_ */

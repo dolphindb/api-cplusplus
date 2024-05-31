@@ -34,8 +34,6 @@
 #include <openssl/ssl.h>
 #endif
 
-using std::string;
-
 namespace dolphindb {
 
 class Constant;
@@ -55,16 +53,16 @@ typedef SmartPointer<BlockingQueue<DataBlock>> DataQueueSP;
 class EXPORT_DECL Socket{
 public:
 	Socket();
-	Socket(const string& host, int port, bool blocking, int keepAliveTime, bool enableSSL = false);
+	Socket(const std::string& host, int port, bool blocking, int keepAliveTime, bool enableSSL = false);
 	Socket(SOCKET handle, bool blocking, int keepAliveTime);
 	~Socket();
-	const string& getHost() const {return host_;}
+	const std::string& getHost() const {return host_;}
 	int getPort() const {return port_;}
 	IO_ERR read(char* buffer, size_t length, size_t& actualLength, bool msgPeek = false);
 	IO_ERR write(const char* buffer, size_t length, size_t& actualLength);
 	IO_ERR bind();
 	IO_ERR listen();
-	IO_ERR connect(const string& host, int port, bool blocking, int keepAliveTime, bool enableSSL = false);
+	IO_ERR connect(const std::string& host, int port, bool blocking, int keepAliveTime, bool enableSSL = false);
 	IO_ERR connect();
 #ifdef USE_OPENSSL
 	IO_ERR sslConnect();
@@ -92,7 +90,7 @@ private:
 	void showCerts(SSL* ssl);
 #endif
 private:
-	string host_;
+	std::string host_;
 	int port_;
 	SOCKET handle_;
 	bool blocking_;
@@ -108,7 +106,7 @@ private:
 class EXPORT_DECL UdpSocket{
 public:
 	UdpSocket(int port);
-	UdpSocket(const string& remoteHost, int remotePort);
+	UdpSocket(const std::string& remoteHost, int remotePort);
 	~UdpSocket();
 	int getPort() const {return port_;}
 	IO_ERR send(const char* buffer, size_t length);
@@ -121,7 +119,7 @@ private:
 
 private:
 	int port_;
-	string remoteHost_;
+	std::string remoteHost_;
 	int remotePort_;
 	SOCKET handle_;
 	struct sockaddr_in addrRemote_;
@@ -172,9 +170,9 @@ public:
 	IO_ERR readIndex(INDEX& value);
 	IO_ERR readFloat(float& value);
 	IO_ERR readDouble(double& value);
-	IO_ERR readString(string& value);
-	IO_ERR readString(string& value, size_t length);
-	IO_ERR readLine(string& value);
+	IO_ERR readString(std::string& value);
+	IO_ERR readString(std::string& value, size_t length);
+	IO_ERR readLine(std::string& value);
 	/**
 	 * Preview the given size of stream data from the current position. The internal current position will not change
 	 * after this operation. If the available data in the internal buffer from the current position is less than the
@@ -182,7 +180,7 @@ public:
 	 * is not data available unfortunately depending on the socket mode, blocking or non-blocking.
 	 */
 	IO_ERR peekBuffer(char* buf, size_t size);
-	IO_ERR peekLine(string& value);
+	IO_ERR peekLine(std::string& value);
 
 	inline bool isSocketStream() const {return source_ == SOCKET_STREAM;}
 	inline bool isFileStream() const { return source_ == FILE_STREAM;}
@@ -254,8 +252,8 @@ public:
 	IO_ERR write(const char* buffer, size_t length);
 	IO_ERR resume();
 	inline IO_ERR start(const char* buffer, size_t length){return write(buffer, length);}
-	inline IO_ERR write(const string& buffer){ return write(buffer.c_str(), buffer.length() + 1);}
-	inline IO_ERR writeData(const string& buffer){ return write(buffer.data(), buffer.length());}
+	inline IO_ERR write(const std::string& buffer){ return write(buffer.c_str(), buffer.length() + 1);}
+	inline IO_ERR writeData(const std::string& buffer){ return write(buffer.data(), buffer.length());}
 	inline IO_ERR write(bool val){ return write((const char*)&val, 1);}
 	inline IO_ERR write(char val){ return write(&val, 1);}
 	inline IO_ERR write(short val){ return write((const char*)&val, 2);}
@@ -290,15 +288,15 @@ protected:
 
 class EXPORT_DECL Buffer {
 public:
-	Buffer(size_t capacity) : buf_(new char[capacity]), capacity_(capacity), size_(0), external_(false){}
+	Buffer(size_t cap) : buf_(new char[cap]), capacity_(cap), size_(0), external_(false){}
 	Buffer() : buf_(new char[256]), capacity_(256), size_(0), external_(false){}
-	Buffer(char* buf, size_t capacity) : buf_(buf), capacity_(capacity), size_(0), external_(true){}
-	Buffer(char* buf, size_t offset, size_t capacity, bool external = true) : buf_(buf), capacity_(capacity), size_(offset), external_(external){}
+	Buffer(char* buf, size_t cap) : buf_(buf), capacity_(cap), size_(0), external_(true){}
+	Buffer(char* buf, size_t offset, size_t cap, bool external = true) : buf_(buf), capacity_(cap), size_(offset), external_(external){}
 	~Buffer() { if(!external_) delete[] buf_;}
 	IO_ERR write(const char* buffer, size_t length, size_t& actualLength);
 	IO_ERR write(const char* buffer, size_t length);
-	inline IO_ERR write(const string& buffer){ return write(buffer.c_str(), buffer.length() + 1);}
-	inline IO_ERR writeData(const string& buffer){ return write(buffer.data(), buffer.length());}
+	inline IO_ERR write(const std::string& buffer){ return write(buffer.c_str(), buffer.length() + 1);}
+	inline IO_ERR writeData(const std::string& buffer){ return write(buffer.data(), buffer.length());}
 	inline IO_ERR write(bool val){ return write((const char*)&val, 1);}
 	inline IO_ERR write(char val){ return write(&val, 1);}
 	inline IO_ERR write(short val){ return write((const char*)&val, 2);}
@@ -383,7 +381,7 @@ public:
 	IO_ERR write(const char* buf, std::size_t length, std::size_t& sent);
 	IO_ERR writeLine(const char* obj, const char* newline);
 	IO_ERR seek(long long offset, int mode, long long& newPosition);
-	string getDescription() const;
+	std::string getDescription() const;
 
 private:
 	char flag_; // bit0: readable bit1: writable
@@ -392,12 +390,12 @@ private:
 };
 
 struct EXPORT_DECL FileAttributes{
-	string name;
+	std::string name;
 	bool isDir;
 	long long size;
 	long long lastModified; //epoch time in milliseconds
 	long long lastAccessed; //epoch time in milliseconds
 };
 
-};
+}
 #endif

@@ -980,7 +980,7 @@ void StringSet::contain(const ConstantSP& target, const ConstantSP& resultSP) co
 		INDEX start=0;
 		int count;
 
-		unordered_set<string>::const_iterator end=data_.end();
+		unordered_set<std::string>::const_iterator end=data_.end();
 		while(start<len){
 			count=(std::min)(len-start,bufSize);
 			pbuf=source->getStringConst(start,count,buf);
@@ -1038,12 +1038,12 @@ bool StringSet::inverse(const ConstantSP& value){
 	INDEX start = 0;
 	int count;
 
-	unordered_set<string>::iterator end = data_.end();
+	unordered_set<std::string>::iterator end = data_.end();
 	while(start<len){
 		count=(std::min)(len-start,bufSize);
 		pbuf=source->getStringConst(start,count,buf);
 		for(int i=0; i<count; ++i){
-			unordered_set<string>::iterator  it = data_.find(pbuf[i]);
+			unordered_set<std::string>::iterator  it = data_.find(pbuf[i]);
 			if(it != end)
 				data_.erase(it);
 			else
@@ -1063,7 +1063,7 @@ bool StringSet::isSuperset(const ConstantSP& target) const {
 	INDEX start=0;
 	int count;
 
-	unordered_set<string>::const_iterator end=data_.end();
+	unordered_set<std::string>::const_iterator end=data_.end();
 	while(start<len){
 		count=(std::min)(len-start,bufSize);
 		pbuf=source->getStringConst(start,count,buf);
@@ -1088,7 +1088,7 @@ ConstantSP StringSet::interaction(const ConstantSP& value) const {
 	INDEX start=0;
 	int count;
 
-	unordered_set<string>::const_iterator end=data_.end();
+	unordered_set<std::string>::const_iterator end=data_.end();
 	while(start<len){
 		count=(std::min)(len-start,bufSize);
 		pbuf=source->getStringConst(start,count,buf);
@@ -1102,7 +1102,7 @@ ConstantSP StringSet::interaction(const ConstantSP& value) const {
 }
 
 ConstantSP StringSet::getSubVector(INDEX start, INDEX length) const {
-	unordered_set<string>::const_iterator it = data_.begin();
+	unordered_set<std::string>::const_iterator it = data_.begin();
 	for(int i=0; i<start; ++i)
 		++it;
 	ConstantSP result = Util::createVector(type_, length, 0,true);
@@ -1281,4 +1281,4 @@ ConstantSP Int128Set::getSubVector(INDEX start, INDEX length) const {
 	return result;
 }
 
-};
+}

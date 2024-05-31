@@ -4,20 +4,20 @@
 #include "ConstantImp.h"
 namespace dolphindb {
 
-DFSChunkMeta::DFSChunkMeta(const string& path, const Guid& id, int version, int size, CHUNK_TYPE chunkType, const vector<string>& sites, long long cid)
-    : Constant(2051), type_(chunkType), replicaCount_(static_cast<char>(sites.size())), version_(version), size_(size), sites_(0), path_(path), cid_(cid), id_(id) {
+DFSChunkMeta::DFSChunkMeta(const std::string& path, const Guid& id, int version, int sz, CHUNK_TYPE chunkType, const std::vector<std::string>& sites, long long cid)
+    : Constant(2051), type_(chunkType), replicaCount_(static_cast<char>(sites.size())), version_(version), size_(sz), sites_(0), path_(path), cid_(cid), id_(id) {
     if (replicaCount_ == 0)
         return;
-    sites_ = new string[replicaCount_];
+    sites_ = new std::string[replicaCount_];
     for (int i = 0; i < replicaCount_; ++i)
         sites_[i] = sites[i];
 }
 
-DFSChunkMeta::DFSChunkMeta(const string& path, const Guid& id, int version, int size, CHUNK_TYPE chunkType, const string* sites, int siteCount, long long cid)
-    : Constant(2051), type_(chunkType), replicaCount_(siteCount), version_(version), size_(size), sites_(0), path_(path), cid_(cid), id_(id) {
+DFSChunkMeta::DFSChunkMeta(const std::string& path, const Guid& id, int version, int sz, CHUNK_TYPE chunkType, const std::string* sites, int siteCount, long long cid)
+    : Constant(2051), type_(chunkType), replicaCount_(siteCount), version_(version), size_(sz), sites_(0), path_(path), cid_(cid), id_(id) {
     if (replicaCount_ == 0)
         return;
-    sites_ = new string[replicaCount_];
+    sites_ = new std::string[replicaCount_];
     for (int i = 0; i < replicaCount_; ++i)
         sites_[i] = sites[i];
 }
@@ -36,9 +36,9 @@ DFSChunkMeta::DFSChunkMeta(const DataInputStreamSP& in) : Constant(2051), sites_
     if (ret != OK)
         throw RuntimeException("Failed to deserialize DFSChunkMeta object.");
     if (replicaCount_ > 0)
-        sites_ = new string[replicaCount_];
+        sites_ = new std::string[replicaCount_];
     for (int i = 0; i < replicaCount_; ++i) {
-        string site;
+        std::string site;
         if ((ret = in->readString(site)) != OK)
             throw RuntimeException("Failed to deserialize DFSChunkMeta object.");
         sites_[i] = site;
@@ -53,8 +53,8 @@ DFSChunkMeta::~DFSChunkMeta() {
         delete[] sites_;
 }
 
-string DFSChunkMeta::getString() const {
-    string str(isTablet() ? "Tablet[" : "FileBlock[");
+std::string DFSChunkMeta::getString() const {
+    std::string str(isTablet() ? "Tablet[" : "FileBlock[");
     str.append(path_);
     str.append(", ");
     str.append(id_.getString());
@@ -78,7 +78,7 @@ string DFSChunkMeta::getString() const {
 }
 
 long long DFSChunkMeta::getAllocatedMemory() const {
-    long long length = 33 + sizeof(sites_) + (1 + replicaCount_) * (1 + sizeof(string)) + path_.size();
+    long long length = 33 + sizeof(sites_) + (1 + replicaCount_) * (1 + sizeof(std::string)) + path_.size();
     for (int i = 0; i < replicaCount_; ++i)
         length += sites_[i].size();
     return length;
@@ -106,7 +106,7 @@ ConstantSP DFSChunkMeta::getSiteVector() const {
     return vec;
 }
 
-ConstantSP DFSChunkMeta::getAttribute(const string& attr) const {
+ConstantSP DFSChunkMeta::getAttribute(const std::string& attr) const {
     if (attr == "path")
         return new String(path_);
     else if (attr == "id")
@@ -130,7 +130,7 @@ ConstantSP DFSChunkMeta::getAttribute(const string& attr) const {
 }
 
 ConstantSP DFSChunkMeta::keys() const {
-    vector<string> attrs({"path", "id", "version", "size", "isTablet", "splittable", "sites", "cid"});
+    std::vector<std::string> attrs({"path", "id", "version", "size", "isTablet", "splittable", "sites", "cid"});
     return new StringVector(attrs, static_cast<INDEX>(attrs.size()), false);
 }
 

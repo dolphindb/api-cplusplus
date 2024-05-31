@@ -11,11 +11,11 @@ public:
     void setRowLabel(const ConstantSP& label);
     void setColumnLabel(const ConstantSP& label);
     bool reshape(INDEX cols, INDEX rows);
-    string getString() const;
-    string getString(INDEX index) const ;
+    std::string getString() const;
+    std::string getString(INDEX index) const ;
     ConstantSP get(const ConstantSP& index) const ;
     bool set(const ConstantSP index, const ConstantSP& value);
-    virtual string getString(int column, int row) const = 0;
+    virtual std::string getString(int column, int row) const = 0;
     virtual ConstantSP getInstance(INDEX size) const = 0;
     virtual ConstantSP getColumn(INDEX index) const = 0;
     virtual bool setColumn(INDEX index, const ConstantSP& value)=0;

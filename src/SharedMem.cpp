@@ -153,8 +153,8 @@ void SharedMemStream::parseTableMeta(bool print) {
         if (it == tableMeta_.end()) {
             TableMetaData  tableData(tableName);
 
-            for (int i = 0;  i < tablemeta->colNum_; i++) {
-                ColMeta* colmeta = (ColMeta*)(tablemeta->colMeta_) + i;
+            for (int j = 0;  j < tablemeta->colNum_; j++) {
+                ColMeta* colmeta = (ColMeta*)(tablemeta->colMeta_) + j;
                 tableData.colNames_.push_back(std::string(colmeta->name_, colmeta->nameLen_));
                 tableData.colTypes_.push_back((DATA_TYPE)(colmeta->type_));
                 tableData.colLength_.push_back(colmeta->length_);
@@ -166,8 +166,8 @@ void SharedMemStream::parseTableMeta(bool print) {
 
 }
 
-IPCInMemTable::IPCInMemTable(bool create, std::string shmPath, std::string tableName, const vector<ConstantSP>& cols, \
-  const vector<string>& colNames, size_t bufSize) : BasicTable(cols, colNames), tablename_(tableName) {
+IPCInMemTable::IPCInMemTable(bool create, std::string shmPath, std::string tableName, const std::vector<ConstantSP>& cols, \
+  const std::vector<std::string>& colNames, size_t bufSize) : BasicTable(cols, colNames), tablename_(tableName) {
     pShmStream_ = std::shared_ptr<SharedMemStream>(new SharedMemStream(create, shmPath, bufSize));
 
     if (!pShmStream_) {

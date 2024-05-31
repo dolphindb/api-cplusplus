@@ -50,11 +50,11 @@ namespace dolphindb {
 
 bool Socket::ENABLE_TCP_NODELAY = true;
 
-void LOG_ERR(const string& msg){
+void LOG_ERR(const std::string& msg){
 	std::cout<<msg<<std::endl;
 }
 
-void LOG_INFO(const string& msg){
+void LOG_INFO(const std::string& msg){
 	std::cout<<msg<<std::endl;
 }
 
@@ -74,7 +74,7 @@ Socket::Socket():host_(""), port_(-1), blocking_(true), autoClose_(true), enable
         setTcpNoDelay();
 }
 
-Socket::Socket(const string& host, int port, bool blocking, int keepAliveTime, bool enableSSL) : host_(host), port_(port), blocking_(blocking), autoClose_(true), enableSSL_(enableSSL),
+Socket::Socket(const std::string& host, int port, bool blocking, int keepAliveTime, bool enableSSL) : host_(host), port_(port), blocking_(blocking), autoClose_(true), enableSSL_(enableSSL),
 #ifdef USE_OPENSSL
     ctx_(nullptr), ssl_(nullptr),
 #endif
@@ -153,9 +153,6 @@ IO_ERR Socket::read(char* buffer, size_t length, size_t& actualLength, bool msgP
 readdata:
 		actualLength = recv(handle_, (void*)buffer, length, (blocking_ ? 0 : MSG_DONTWAIT) | (msgPeek ? MSG_PEEK : 0));
 		RECORD_READ(buffer, actualLength);
-		if (actualLength < 0) {
-			DLogger::Error("socket read error", actualLength);
-		}
 		if (actualLength == (size_t)SOCKET_ERROR && errno == EINTR) goto readdata;
 		if (actualLength == 0)
 			return DISCONNECTED;
@@ -283,7 +280,7 @@ void Socket::enableTcpNoDelay(bool enable){
 	 ENABLE_TCP_NODELAY = enable;
 }
 
-IO_ERR Socket::connect(const string& host, int port, bool blocking, int keepAliveTime, bool sslEnable){
+IO_ERR Socket::connect(const std::string& host, int port, bool blocking, int keepAliveTime, bool sslEnable){
 	host_ = host;
 	port_ = port;
 	blocking_ = blocking;
@@ -303,7 +300,7 @@ IO_ERR Socket::connect(){
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
-	string portStr=std::to_string(port_);
+	std::string portStr=std::to_string(port_);
 	if (getaddrinfo(host_.c_str(), portStr.c_str(), &hints, &servinfo)!= 0) {
 		LOG_ERR("Failed to call getaddrinfo for host = " + host_ + " port = " + portStr + " with error code " + std::to_string(getErrorCode()));
 		return OTHERERR;
@@ -639,7 +636,7 @@ UdpSocket::UdpSocket(int port) : port_(port), remotePort_(-1){
     }
 }
 
-UdpSocket::UdpSocket(const string& remoteHost, int remotePort ) : port_(0), remoteHost_(remoteHost), remotePort_(remotePort){
+UdpSocket::UdpSocket(const std::string& remoteHost, int remotePort ) : port_(0), remoteHost_(remoteHost), remotePort_(remotePort){
     if ((handle_ = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
     	throw IOException("Couldn't create a udp socket with error code " + std::to_string(getErrorCode()));
     }
@@ -880,7 +877,7 @@ IO_ERR DataInputStream::readDouble(double& value){
 	return readBytes((char*)(&value), 8, reverseOrder_);
 }
 
-IO_ERR DataInputStream::readString(string& value){
+IO_ERR DataInputStream::readString(std::string& value){
 	if(source_ == QUEUE_STREAM){
 		value.clear();
 		bool isStringFinished = true;
@@ -920,7 +917,7 @@ IO_ERR DataInputStream::readString(string& value){
 	return OK;
 }
 
-IO_ERR DataInputStream::readString(string& value, size_t length){
+IO_ERR DataInputStream::readString(std::string& value, size_t length){
 	if(source_ == QUEUE_STREAM){
 		value.clear();
 		size_t left = length;
@@ -949,7 +946,7 @@ IO_ERR DataInputStream::readString(string& value, size_t length){
 	return OK;
 }
 
-IO_ERR DataInputStream::readLine(string& value){
+IO_ERR DataInputStream::readLine(std::string& value){
 	if(source_ == QUEUE_STREAM){
 		value.clear();
 		bool isStringFinished = true;
@@ -1005,7 +1002,7 @@ IO_ERR DataInputStream::peekBuffer(char* buf, size_t length){
 	return OK;
 }
 
-IO_ERR DataInputStream::peekLine(string& value){
+IO_ERR DataInputStream::peekLine(std::string& value){
 	size_t endPos;
 	IO_ERR ret = prepareBytesEndWith('\n', endPos);
 	if(ret != OK)
@@ -1622,7 +1619,7 @@ IO_ERR DataOutputStream::flush(){
 	return OK;
 }
 
-IO_ERR DataOutputStream::internalFlush(size_t size){
+IO_ERR DataOutputStream::internalFlush(size_t sz){
 	throw RuntimeException("DataOutputStream::internalFlush not implemented yet.");
 }
 
@@ -1785,7 +1782,7 @@ IO_ERR DataStream::seek(long long offset, int mode, long long& newPosition){
 	return ret;
 }
 
-string DataStream::getDescription() const {
+std::string DataStream::getDescription() const {
 	if(source_ == SOCKET_STREAM)
 		return "SocketStream[" + std::to_string(socket_->getHandle()) + "]";
 	else if(source_ == FILE_STREAM)
@@ -1836,4 +1833,4 @@ void Buffer::clear() {
 	size_ = 0;
 }
 
-};
+}

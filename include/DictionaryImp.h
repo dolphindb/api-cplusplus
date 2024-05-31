@@ -32,7 +32,7 @@ public:
 	virtual DATA_CATEGORY getCategory() const {return Util::getCategory(type_);}
 	virtual DATA_TYPE getKeyType() const {return keyType_;}
 	virtual DATA_CATEGORY getKeyCategory() const {return keyCategory_;}
-	virtual const string& getStringRef() const {throw RuntimeException("dictionary doesn't support random access.");}
+	virtual const std::string& getStringRef() const {throw RuntimeException("dictionary doesn't support random access.");}
 	virtual ConstantSP get(INDEX index) const {throw RuntimeException("dictionary doesn't support random access.");}
 	virtual ConstantSP get(INDEX column, INDEX row) const {throw RuntimeException("dictionary doesn't support random access.");}
 	virtual ConstantSP getColumn(INDEX index) const {throw RuntimeException("dictionary doesn't support random access.");}
@@ -71,7 +71,7 @@ public:
 	virtual ConstantSP keys() const;
 	virtual ConstantSP values() const;
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
-	virtual string getString() const;
+	virtual std::string getString() const;
 	virtual long long getAllocatedMemory() const;
 private:
 	std::unordered_map<char,U8> dict_;
@@ -93,7 +93,7 @@ public:
 	virtual ConstantSP keys() const;
 	virtual ConstantSP values() const;
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
-	virtual string getString() const;
+	virtual std::string getString() const;
 	virtual long long getAllocatedMemory() const;
 private:
 	std::unordered_map<short,U8> dict_;
@@ -115,7 +115,7 @@ public:
 	virtual ConstantSP keys() const;
 	virtual ConstantSP values() const;
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
-	virtual string getString() const;
+	virtual std::string getString() const;
 	virtual long long getAllocatedMemory() const;
 private:
 	std::unordered_map<int,U8> dict_;
@@ -137,7 +137,7 @@ public:
 	virtual ConstantSP keys() const;
 	virtual ConstantSP values() const;
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
-	virtual string getString() const;
+	virtual std::string getString() const;
 	virtual long long getAllocatedMemory() const;
 private:
 	std::unordered_map<long long,U8> dict_;
@@ -159,7 +159,7 @@ public:
 	virtual ConstantSP keys() const;
 	virtual ConstantSP values() const;
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
-	virtual string getString() const;
+	virtual std::string getString() const;
 	virtual long long getAllocatedMemory() const;
 private:
 	std::unordered_map<float,U8> dict_;
@@ -181,7 +181,7 @@ public:
 	virtual ConstantSP keys() const;
 	virtual ConstantSP values() const;
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
-	virtual string getString() const;
+	virtual std::string getString() const;
 	virtual long long getAllocatedMemory() const;
 private:
 	std::unordered_map<double,U8> dict_;
@@ -190,25 +190,25 @@ private:
 class StringDictionary: public AbstractDictionary{
 public:
 	StringDictionary(DATA_TYPE keyType, DATA_TYPE type):AbstractDictionary(keyType,type){}
-	StringDictionary(const std::unordered_map<string,U8>& dict, DATA_TYPE keyType,DATA_TYPE type);
+	StringDictionary(const std::unordered_map<std::string,U8>& dict, DATA_TYPE keyType,DATA_TYPE type);
 	virtual ~StringDictionary();
 	virtual void clear(){dict_.clear();}
 	virtual INDEX size() const {return (INDEX)dict_.size();}
 	virtual INDEX count() const {return (INDEX)dict_.size();}
 	virtual ConstantSP getInstance() const { return new StringDictionary(keyType_,type_);}
 	virtual ConstantSP getValue() const {return new StringDictionary(dict_,keyType_,type_);}
-	virtual bool set(const string& key, const ConstantSP& value);
+	virtual bool set(const std::string& key, const ConstantSP& value);
 	virtual bool set(const ConstantSP& key, const ConstantSP& value);
 	virtual bool remove(const ConstantSP& value);
 	virtual ConstantSP getMember(const ConstantSP& key) const;
-	virtual ConstantSP getMember(const string& key) const;
+	virtual ConstantSP getMember(const std::string& key) const;
 	virtual ConstantSP keys() const;
 	virtual ConstantSP values() const;
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
-	virtual string getString() const;
+	virtual std::string getString() const;
 	virtual long long getAllocatedMemory() const;
 private:
-	std::unordered_map<string,U8> dict_;
+	std::unordered_map<std::string,U8> dict_;
 };
 
 class Int128Dictionary: public AbstractDictionary{
@@ -228,7 +228,7 @@ public:
 	virtual ConstantSP keys() const;
 	virtual ConstantSP values() const;
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
-	virtual string getString() const;
+	virtual std::string getString() const;
 	virtual long long getAllocatedMemory() const;
 private:
 	std::unordered_map<Guid,U8> dict_;
@@ -237,26 +237,26 @@ private:
 class AnyDictionary: public AbstractDictionary{
 public:
 	AnyDictionary():AbstractDictionary(DT_STRING,DT_ANY){}
-	AnyDictionary(const std::unordered_map<string,ConstantSP>& dict):AbstractDictionary(DT_STRING,DT_ANY),dict_(dict){}
+	AnyDictionary(const std::unordered_map<std::string,ConstantSP>& dict):AbstractDictionary(DT_STRING,DT_ANY),dict_(dict){}
 	virtual ~AnyDictionary(){};
 	virtual void clear(){dict_.clear();}
 	virtual INDEX size() const {return (INDEX)dict_.size();}
 	virtual INDEX count() const {return (INDEX)dict_.size();}
 	virtual ConstantSP getInstance() const { return new AnyDictionary();}
 	virtual ConstantSP getValue() const {return new AnyDictionary(dict_);}
-	virtual bool set(const string& key, const ConstantSP& value);
+	virtual bool set(const std::string& key, const ConstantSP& value);
 	virtual bool set(const ConstantSP& key, const ConstantSP& value);
 	virtual bool remove(const ConstantSP& value);
-	virtual ConstantSP getMember(const string& key) const;
+	virtual ConstantSP getMember(const std::string& key) const;
 	virtual ConstantSP getMember(const ConstantSP& key) const;
 	virtual ConstantSP keys() const;
 	virtual ConstantSP values() const;
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
-	virtual string getString() const;
+	virtual std::string getString() const;
 	virtual long long getAllocatedMemory() const;
 	virtual bool containNotMarshallableObject() const;
 private:
-	std::unordered_map<string,ConstantSP> dict_;
+	std::unordered_map<std::string,ConstantSP> dict_;
 };
 
 class IntAnyDictionary: public AbstractDictionary{
@@ -276,7 +276,7 @@ public:
 	virtual ConstantSP keys() const;
 	virtual ConstantSP values() const;
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
-	virtual string getString() const;
+	virtual std::string getString() const;
 	virtual long long getAllocatedMemory() const;
 	virtual bool containNotMarshallableObject() const;
 private:
@@ -300,7 +300,7 @@ public:
     ConstantSP keys() const override;
     ConstantSP values() const override;
     void contain(const ConstantSP& target, const ConstantSP& resultSP) const override;
-    string getString() const override;
+    std::string getString() const override;
     long long getAllocatedMemory() const override;
     bool containNotMarshallableObject() const override;
 private:
@@ -324,7 +324,7 @@ public:
     ConstantSP keys() const override;
     ConstantSP values() const override;
     void contain(const ConstantSP& target, const ConstantSP& resultSP) const override;
-    string getString() const override;
+    std::string getString() const override;
     long long getAllocatedMemory() const override;
     bool containNotMarshallableObject() const override;
 private:
@@ -348,7 +348,7 @@ public:
 	virtual ConstantSP keys() const;
 	virtual ConstantSP values() const;
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
-	virtual string getString() const;
+	virtual std::string getString() const;
 	virtual long long getAllocatedMemory() const;
 	virtual bool containNotMarshallableObject() const;
 private:
@@ -372,13 +372,13 @@ public:
 	virtual ConstantSP keys() const;
 	virtual ConstantSP values() const;
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
-	virtual string getString() const;
+	virtual std::string getString() const;
 	virtual long long getAllocatedMemory() const;
 	virtual bool containNotMarshallableObject() const;
 private:
 	std::unordered_map<Guid,ConstantSP> dict_;
 };
 
-};
+}
 
 #endif /* DICTIONARYIMP_H_ */

@@ -238,8 +238,8 @@ int String::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int&
         } else {
             if (UNLIKELY((size_t)bufSize < sizeof(int)))
                 return 0;
-            int len = static_cast<int>(val_.size());
-            memcpy(buf, &len, sizeof(int));
+            int sz = static_cast<int>(val_.size());
+            memcpy(buf, &sz, sizeof(int));
             buf += sizeof(int);
             bufSize -= sizeof(int);
             bytes += sizeof(int);
@@ -569,7 +569,9 @@ Uuid::Uuid(const char* guid, size_t len){
 		throw RuntimeException("Invalid UUID string");
 }
 
-Uuid::Uuid(const Uuid& copy){
+Uuid::Uuid(const Uuid& copy)
+	: Int128()
+{
 	memcpy(uuid_, copy.uuid_, 16);
 }
 
@@ -1744,11 +1746,11 @@ ConstantSP NanoTimestamp::castTemporal(DATA_TYPE expectType) {
     template bool AbstractScalar<class_type_t>::getDecimal(INDEX, int, int, Decimal64::raw_data_t *) const; \
 	template bool AbstractScalar<class_type_t>::getDecimal(INDEX, int, int, Decimal128::raw_data_t *) const;
 
-INSTANTIATE(char);
-INSTANTIATE(short);
-INSTANTIATE(int);
+INSTANTIATE(char)
+INSTANTIATE(short)
+INSTANTIATE(int)
 INSTANTIATE(long long)
-INSTANTIATE(float);
-INSTANTIATE(double);
+INSTANTIATE(float)
+INSTANTIATE(double)
 
-};
+}

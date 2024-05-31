@@ -159,5 +159,5 @@ typedef union {
 } U8;
 
 
-};
+}
 #endif /* TYPES_H_ */

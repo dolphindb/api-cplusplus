@@ -38,7 +38,7 @@ public:
     struct Status : ErrorCodeInfo{
         bool isExiting;
         long sentRows, unsentRows, sendFailedRows;
-        std::vector<ThreadStatus> threadStatus;
+        std::vector<ThreadStatus> threadStatus_;
         void plus(const ThreadStatus &threadStatus){
             sentRows += threadStatus.sentRows;
             unsentRows += threadStatus.unsentRows;
@@ -49,10 +49,10 @@ public:
      * If fail to connect to the specified DolphinDB server, this function throw an exception.
      */
     MultithreadedTableWriter(const std::string& host, int port, const std::string& userId, const std::string& password,
-                            const string& dbPath, const string& tableName, bool useSSL, bool enableHighAvailability = false, const vector<string> *pHighAvailabilitySites = nullptr,
-							int batchSize = 1, float throttle = 0.01f,int threadCount = 1, const string& partitionCol ="",
-							const vector<COMPRESS_METHOD> *pCompressMethods = nullptr, Mode mode = M_Append,
-                            vector<string> *pModeOption = nullptr, const std::function<void(ConstantSP)> &callbackFunc = nullptr, bool enableStreamTableTimestamp = false);
+                            const std::string& dbPath, const std::string& tableName, bool useSSL, bool enableHighAvailability = false, const std::vector<std::string> *pHighAvailabilitySites = nullptr,
+							int batchSize = 1, float throttle = 0.01f,int threadCount = 1, const std::string& partitionCol ="",
+							const std::vector<COMPRESS_METHOD> *pCompressMethods = nullptr, Mode mode = M_Append,
+                            std::vector<std::string> *pModeOption = nullptr, const std::function<void(ConstantSP)> &callbackFunc = nullptr, bool enableStreamTableTimestamp = false);
 
     virtual ~MultithreadedTableWriter();
 
@@ -104,7 +104,7 @@ public:
     //int getColSize(){ return colTypes_.size(); }
 private:
 	bool insert(std::vector<ConstantSP> **records, int recordCount, ErrorCodeInfo &errorInfo);
-	void setError(int code, const string &info);
+	void setError(int code, const std::string &info);
     void setError(const ErrorCodeInfo &errorInfo);
     DATA_TYPE getColDataType(int colIndex) {
 		DATA_TYPE dataType = colTypes_[colIndex];
@@ -113,14 +113,14 @@ private:
 		return dataType;
 	}
 	void insertThreadWrite(int threadhashkey, std::vector<ConstantSP> *prow);
-    static void callBack(std::function<void(ConstantSP)> callbackFunc, bool result, vector<vector<ConstantSP>*>& queue1);
+    static void callBack(std::function<void(ConstantSP)> callbackFunc, bool result, std::vector<std::vector<ConstantSP>*>& queue1);
 
     struct WriterThread {
 		WriterThread() : nonemptySignal(false,true){}
 		SmartPointer<DBConnection> conn;
         
-        vector<vector<ConstantSP>*> writeQueue;
-        vector<vector<ConstantSP>*> failedQueue;
+        std::vector<std::vector<ConstantSP>*> writeQueue;
+        std::vector<std::vector<ConstantSP>*> failedQueue;
         ThreadSP writeThread;
         Signal nonemptySignal;
 
@@ -154,11 +154,11 @@ private:
     bool isPartionedTable_, exited_;
 	std::atomic_bool hasError_;
     //all column include callback id
-    std::vector<string> colNames_,colTypeString_;
+    std::vector<std::string> colNames_,colTypeString_;
     std::vector<DATA_TYPE> colTypes_;
 	std::vector<int> colExtras_;
     //columns except callback id which no need to save.
-    std::vector<string> saveColNames_;
+    std::vector<std::string> saveColNames_;
     std::vector<DATA_TYPE> saveColTypes_;
     std::vector<int> saveColExtras_;
 	std::vector<COMPRESS_METHOD> saveCompressMethods_;
@@ -183,6 +183,6 @@ public:
     PytoDdbRowPool * getPytoDdb(){ return pytoDdb_;}
 };
 
-};
+}
 
 #endif //MUTITHREADEDTABLEWRITER_H_

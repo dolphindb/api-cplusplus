@@ -157,7 +157,7 @@ bool EventHandler::checkSchema(const std::vector<EventSchema>& eventSchemas, con
             schemaEx->commonKeyIndex_.push_back(std::distance(schema.fieldNames_.begin(), iter));
         }
 
-        vector<AttributeSerializerSP> serls;
+        std::vector<AttributeSerializerSP> serls;
         unsigned length = schema.fieldNames_.size();
         for(unsigned j = 0; j < length; ++j){
             DATA_TYPE type = schema.fieldTypes_[j];
@@ -267,12 +267,12 @@ bool EventHandler::deserializeEvent(ConstantSP obj, std::vector<std::string>& ev
             errorInfo.set(ErrorCodeInfo::EC_InvalidParameter, "UnKnown eventType" + eventType);
             return false;
         }
-        const string &blob = blobVec->getStringRef(rowIndex);
+        const std::string &blob = blobVec->getStringRef(rowIndex);
         DataInputStreamSP input = new DataInputStream(blob.data(), blob.size(), false);
 
         EventSchema& schema = iter->second.eventSchema_->schema_;
         unsigned attrCount = schema.fieldTypes_.size();
-        vector<ConstantSP> datas(attrCount);
+        std::vector<ConstantSP> datas(attrCount);
         for(unsigned i = 0; i < attrCount; ++i){
             DATA_FORM form = schema.fieldForms_[i];
             DATA_TYPE type = schema.fieldTypes_[i];

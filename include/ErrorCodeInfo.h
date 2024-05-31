@@ -28,17 +28,17 @@ public:
     bool succeed() {
         return errorCode.empty();
     }
-    static string formatApiCode(int code){
+    static std::string formatApiCode(int code){
         if(code != EC_None)
             return "A" + std::to_string(code);
         else
             return "";
     }
-    void set(int apiCode, const string &info);
-    void set(const string &code, const string &info);
+    void set(int apiCode, const std::string &info);
+    void set(const std::string &code, const std::string &info);
     void set(const ErrorCodeInfo &src);
-    string errorCode;
-    string errorInfo;
+    std::string errorCode;
+    std::string errorInfo;
 };
 
 }

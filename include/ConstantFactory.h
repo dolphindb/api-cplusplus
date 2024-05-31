@@ -19,7 +19,7 @@
 namespace dolphindb {
 
 class ConstantFactory{
-	typedef Constant*(ConstantFactory::*ConstantParser)(const string&);
+	typedef Constant*(ConstantFactory::*ConstantParser)(const std::string&);
 	typedef Constant*(ConstantFactory::*ConstantFunc)(int extraParam);
 	typedef Vector*(ConstantFactory::*ConstantVectorFunc)(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void** dataSegment, int segmentSizeInBit, bool containNull);
 	typedef Vector*(ConstantFactory::*ConstantArrayVectorFunc)(INDEX size, INDEX capacity, bool fastMode, int extraParam, void* data, void *pindex, void** dataSegment, int segmentSizeInBit, bool containNull);
@@ -32,7 +32,7 @@ public:
 		init();
 	}
 
-	Constant* parseConstant(int type, const string& word){
+	Constant* parseConstant(int type, const std::string& word){
 		if(type < 0 || type >= TYPE_COUNT)
 			throw RuntimeException("Invalid data type value " + Util::getDataTypeString((DATA_TYPE)type));
 		ConstantParser func=arrConstParser[type];
@@ -82,16 +82,16 @@ public:
 			return (this->*func)(cols,rows,colCapacity,extraParam, data, dataSegment, segmentSizeInBit, containNull);
 	}
 
-	DATA_TYPE getDataType(const string& type) const {
-		std::unordered_map<string,DATA_TYPE>::const_iterator it=typeMap_.find(type);
+	DATA_TYPE getDataType(const std::string& type) const {
+		std::unordered_map<std::string,DATA_TYPE>::const_iterator it=typeMap_.find(type);
 		if(it==typeMap_.end())
 			return DT_VOID;
 		else
 			return it->second;
 	}
 
-	DATA_FORM getDataForm(const string& form) const {
-		std::unordered_map<string,DATA_FORM>::const_iterator it=formMap_.find(form);
+	DATA_FORM getDataForm(const std::string& form) const {
+		std::unordered_map<std::string,DATA_FORM>::const_iterator it=formMap_.find(form);
 		if(it==formMap_.end())
 			return (DATA_FORM)-1;
 		else
@@ -103,7 +103,7 @@ public:
 		return arrTypeSymbol[type];
 	}
 
-	string getDataTypeString(DATA_TYPE type) const {
+	std::string getDataTypeString(DATA_TYPE type) const {
 		if(type >= 0 && type < TYPE_COUNT)
 			return arrTypeStr[type];
 		else if(type >= ARRAY_TYPE_BASE){
@@ -113,14 +113,14 @@ public:
 		}
 	}
 
-	string getDataFormString(DATA_FORM form) const {
+	std::string getDataFormString(DATA_FORM form) const {
 		if(form >= 0 && form < 9)
 			return arrFormStr[form];
 		else
 			return "UknownForm"+std::to_string(form);
 	}
 
-	string getTableTypeString(TABLE_TYPE type) const {
+	std::string getTableTypeString(TABLE_TYPE type) const {
 		if(type >= 0 && type < 10)
 			return arrTableTypeStr[type];
 		else
@@ -175,14 +175,14 @@ public:
 		}
 	}
 
-	string getPartitionTypeString(PARTITION_TYPE type) const {
+	std::string getPartitionTypeString(PARTITION_TYPE type) const {
 		if(type >= 0 && type < 6)
 			return arrPartitionTypeStr[type];
 		else
 			return "UnknowPartition"+std::to_string(type);
 	}
 
-	string getCategoryString(DATA_CATEGORY type) const {
+	std::string getCategoryString(DATA_CATEGORY type) const {
 		if(type >= 0 && type < 12)
 			return arrCategoryTypeStr[type];
 		else
@@ -211,29 +211,29 @@ private:
 		}
 	}
 
-	Constant* parseVoid(const string& word){return new Void(true);}
-	Constant* parseBool(const string& word){return Bool::parseBool(word);}
-	Constant* parseChar(const string& word){return Char::parseChar(word);}
-	Constant* parseShort(const string& word){return Short::parseShort(word);}
-	Constant* parseInt(const string& word){return Int::parseInt(word);}
-	Constant* parseLong(const string& word){return Long::parseLong(word);}
-	Constant* parseFloat(const string& word){return Float::parseFloat(word);}
-	Constant* parseDouble(const string& word){return Double::parseDouble(word);}
-	Constant* parseDate(const string& word) {return Date::parseDate(word);}
-	Constant* parseDateTime(const string& word) {return DateTime::parseDateTime(word);}
-	Constant* parseDateHour(const string& word) {return DateHour::parseDateHour(word);}
-	Constant* parseMonth(const string& word) {return Month::parseMonth(word);}
-	Constant* parseTime(const string& word) {return Time::parseTime(word);}
-	Constant* parseNanoTime(const string& word) {return NanoTime::parseNanoTime(word);}
-	Constant* parseTimestamp(const string& word) {return Timestamp::parseTimestamp(word);}
-	Constant* parseNanoTimestamp(const string& word) {return NanoTimestamp::parseNanoTimestamp(word);}
-	Constant* parseMinute(const string& word) {return Minute::parseMinute(word);}
-	Constant* parseSecond(const string& word) {return Second::parseSecond(word);}
-	Constant* parseString(const string& word){return new String(word);}
-	Constant* parseInt128(const string& word){return Int128::parseInt128(word.c_str(), word.size());}
-	Constant* parseUuid(const string& word){return Uuid::parseUuid(word.c_str(), word.size());}
-	Constant* parseIPAddr(const string& word){return IPAddr::parseIPAddr(word.c_str(), word.size());}
-	Constant* parseDoubleEnum(const string& word){
+	Constant* parseVoid(const std::string& word){return new Void(true);}
+	Constant* parseBool(const std::string& word){return Bool::parseBool(word);}
+	Constant* parseChar(const std::string& word){return Char::parseChar(word);}
+	Constant* parseShort(const std::string& word){return Short::parseShort(word);}
+	Constant* parseInt(const std::string& word){return Int::parseInt(word);}
+	Constant* parseLong(const std::string& word){return Long::parseLong(word);}
+	Constant* parseFloat(const std::string& word){return Float::parseFloat(word);}
+	Constant* parseDouble(const std::string& word){return Double::parseDouble(word);}
+	Constant* parseDate(const std::string& word) {return Date::parseDate(word);}
+	Constant* parseDateTime(const std::string& word) {return DateTime::parseDateTime(word);}
+	Constant* parseDateHour(const std::string& word) {return DateHour::parseDateHour(word);}
+	Constant* parseMonth(const std::string& word) {return Month::parseMonth(word);}
+	Constant* parseTime(const std::string& word) {return Time::parseTime(word);}
+	Constant* parseNanoTime(const std::string& word) {return NanoTime::parseNanoTime(word);}
+	Constant* parseTimestamp(const std::string& word) {return Timestamp::parseTimestamp(word);}
+	Constant* parseNanoTimestamp(const std::string& word) {return NanoTimestamp::parseNanoTimestamp(word);}
+	Constant* parseMinute(const std::string& word) {return Minute::parseMinute(word);}
+	Constant* parseSecond(const std::string& word) {return Second::parseSecond(word);}
+	Constant* parseString(const std::string& word){return new String(word);}
+	Constant* parseInt128(const std::string& word){return Int128::parseInt128(word.c_str(), word.size());}
+	Constant* parseUuid(const std::string& word){return Uuid::parseUuid(word.c_str(), word.size());}
+	Constant* parseIPAddr(const std::string& word){return IPAddr::parseIPAddr(word.c_str(), word.size());}
+	Constant* parseDoubleEnum(const std::string& word){
 		char ch=word[0];
 		if(ch=='p')
 			return new EnumDouble(word, MC_PI);
@@ -911,44 +911,44 @@ private:
 		arrConstMatrixFactory[DT_DICTIONARY]=NULL;
 		arrConstMatrixFactory[DT_ANY]=NULL;
 
-		typeMap_.insert(std::pair<string,DATA_TYPE>("void",DT_VOID));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("bool",DT_BOOL));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("char",DT_CHAR));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("short",DT_SHORT));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("int",DT_INT));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("long",DT_LONG));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("float",DT_FLOAT));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("double",DT_DOUBLE));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("date",DT_DATE));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("month",DT_MONTH));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("datetime",DT_DATETIME));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("datehour",DT_DATEHOUR));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("time",DT_TIME));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("nanotime",DT_NANOTIME));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("timestamp",DT_TIMESTAMP));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("nanotimestamp",DT_NANOTIMESTAMP));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("minute",DT_MINUTE));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("second",DT_SECOND));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("symbol",DT_SYMBOL));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("string",DT_STRING));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("any",DT_ANY));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("int128",DT_INT128));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("uuid",DT_UUID));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("ipaddr",DT_IP));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("dictionary",DT_DICTIONARY));
-		typeMap_.insert(std::pair<string,DATA_TYPE>("decimal32", DT_DECIMAL32));
-		typeMap_.insert(std::pair<string, DATA_TYPE>("decimal64", DT_DECIMAL64));
-		typeMap_.insert(std::pair<string, DATA_TYPE>("decimal128", DT_DECIMAL128));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("void",DT_VOID));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("bool",DT_BOOL));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("char",DT_CHAR));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("short",DT_SHORT));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("int",DT_INT));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("long",DT_LONG));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("float",DT_FLOAT));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("double",DT_DOUBLE));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("date",DT_DATE));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("month",DT_MONTH));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("datetime",DT_DATETIME));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("datehour",DT_DATEHOUR));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("time",DT_TIME));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("nanotime",DT_NANOTIME));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("timestamp",DT_TIMESTAMP));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("nanotimestamp",DT_NANOTIMESTAMP));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("minute",DT_MINUTE));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("second",DT_SECOND));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("symbol",DT_SYMBOL));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("std::string",DT_STRING));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("any",DT_ANY));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("int128",DT_INT128));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("uuid",DT_UUID));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("ipaddr",DT_IP));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("dictionary",DT_DICTIONARY));
+		typeMap_.insert(std::pair<std::string,DATA_TYPE>("decimal32", DT_DECIMAL32));
+		typeMap_.insert(std::pair<std::string, DATA_TYPE>("decimal64", DT_DECIMAL64));
+		typeMap_.insert(std::pair<std::string, DATA_TYPE>("decimal128", DT_DECIMAL128));
 
-		formMap_.insert(std::pair<string,DATA_FORM>("scalar",DF_SCALAR));
-		formMap_.insert(std::pair<string,DATA_FORM>("pair",DF_PAIR));
-		formMap_.insert(std::pair<string,DATA_FORM>("vector",DF_VECTOR));
-		formMap_.insert(std::pair<string,DATA_FORM>("matrix",DF_MATRIX));
-		formMap_.insert(std::pair<string,DATA_FORM>("set",DF_SET));
-		formMap_.insert(std::pair<string,DATA_FORM>("dictionary",DF_DICTIONARY));
-		formMap_.insert(std::pair<string,DATA_FORM>("table",DF_TABLE));
-		formMap_.insert(std::pair<string,DATA_FORM>("chart",DF_CHART));
-		formMap_.insert(std::pair<string,DATA_FORM>("chunk",DF_CHUNK));
+		formMap_.insert(std::pair<std::string,DATA_FORM>("scalar",DF_SCALAR));
+		formMap_.insert(std::pair<std::string,DATA_FORM>("pair",DF_PAIR));
+		formMap_.insert(std::pair<std::string,DATA_FORM>("vector",DF_VECTOR));
+		formMap_.insert(std::pair<std::string,DATA_FORM>("matrix",DF_MATRIX));
+		formMap_.insert(std::pair<std::string,DATA_FORM>("set",DF_SET));
+		formMap_.insert(std::pair<std::string,DATA_FORM>("dictionary",DF_DICTIONARY));
+		formMap_.insert(std::pair<std::string,DATA_FORM>("table",DF_TABLE));
+		formMap_.insert(std::pair<std::string,DATA_FORM>("chart",DF_CHART));
+		formMap_.insert(std::pair<std::string,DATA_FORM>("chunk",DF_CHUNK));
 
 		arrTypeSymbol[DT_VOID]=' ';
 		arrTypeSymbol[DT_BOOL]='b';
@@ -1068,15 +1068,15 @@ private:
 	ConstantVectorFunc arrConstVectorFactory[TYPE_COUNT];
 	ConstantArrayVectorFunc arrConstArrayVectorFactory[TYPE_COUNT];
 	ConstantMatrixFunc arrConstMatrixFactory[TYPE_COUNT];
-	std::unordered_map<string,DATA_TYPE> typeMap_;
-	std::unordered_map<string,DATA_FORM> formMap_;
+	std::unordered_map<std::string,DATA_TYPE> typeMap_;
+	std::unordered_map<std::string,DATA_FORM> formMap_;
 	char arrTypeSymbol[TYPE_COUNT];
-	string arrTypeStr[TYPE_COUNT];
-	string arrFormStr[9];
-	string arrTableTypeStr[10];
-	string arrPartitionTypeStr[6];
-	string arrCategoryTypeStr[12];
+	std::string arrTypeStr[TYPE_COUNT];
+	std::string arrFormStr[9];
+	std::string arrTableTypeStr[10];
+	std::string arrPartitionTypeStr[6];
+	std::string arrCategoryTypeStr[12];
 };
 
-};
+}
 #endif /* CONSTANTFACTORY_H_ */

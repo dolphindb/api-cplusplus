@@ -21,7 +21,7 @@
 #include "Vector.h"
 #include "Table.h"
 #include "ErrorCodeInfo.h"
-using std::vector;
+
 namespace dolphindb {
 
 class Dictionary;
@@ -30,13 +30,13 @@ class Domain;
 
 class EXPORT_DECL Util {
 public:
-	static string VER;
+	static std::string VER;
 	static int VERNUM;
-	static string BUILD;
+	static std::string BUILD;
 #ifdef _MSC_VER
 	const static int BUF_SIZE = 1024;
 #else
-	const static int BUF_SIZE;
+	static constexpr int BUF_SIZE = 1024;
 #endif
 	static int DISPLAY_ROWS;
 	static int DISPLAY_COLS;
@@ -53,13 +53,13 @@ private:
 	static int cumLeapMonthDays[13];
 	static int leapMonthDays[12];
 	static char escapes[128];
-	static string duSyms[10];
+	static std::string duSyms[10];
 	static long long tmporalDurationRatioMatrix[9][10];
 	static long long tmporalRatioMatrix[81];
 	static long long tmporalUplimit[9];
 
 public:
-	static Constant* parseConstant(int type, const string& word);
+	static Constant* parseConstant(int type, const std::string& word);
 	static Constant* createConstant(DATA_TYPE dataType, int extraParam = 0);
 	static Constant* createNullConstant(DATA_TYPE dataType, int extraParam = 0);
 	static Constant* createBool(char val);
@@ -69,8 +69,8 @@ public:
 	static Constant* createLong(long long val);
 	static Constant* createFloat(float val);
 	static Constant* createDouble(double val);
-	static Constant* createString(const string& val);
-	static Constant* createBlob(const string& val);
+	static Constant* createString(const std::string& val);
+	static Constant* createBlob(const std::string& val);
 	static Constant* createDate(int year, int month, int day);
 	static Constant* createDate(int days);
 	static Constant* createMonth(int year, int month);
@@ -97,8 +97,8 @@ public:
 
 	static bool isFlatDictionary(Dictionary* dict);
 	static Table* createTable(Dictionary* dict, int size);
-	static Table* createTable(const vector<string>& colNames, const vector<DATA_TYPE>& colTypes, INDEX size, INDEX capacity, const vector<int>& extraParams = {});
-	static Table* createTable(const vector<string>& colNames, const vector<ConstantSP>& cols);
+	static Table* createTable(const std::vector<std::string>& colNames, const std::vector<DATA_TYPE>& colTypes, INDEX size, INDEX capacity, const std::vector<int>& extraParams = {});
+	static Table* createTable(const std::vector<std::string>& colNames, const std::vector<ConstantSP>& cols);
 	static Set* createSet(DATA_TYPE keyType, INDEX capacity);
 	static Dictionary* createDictionary(DATA_TYPE keyType, DATA_TYPE valueType);
 	static Vector* createVector(DATA_TYPE type, INDEX size, INDEX capacity = 0, bool fast = true, int extraParam = 0, void* data = 0, bool containNull = false);
@@ -141,45 +141,45 @@ public:
 	static DATA_TYPE convertToIntegralDataType(DATA_TYPE type);
 	static long long getTemporalConversionRatio(DATA_TYPE first, DATA_TYPE second);
 	static char getDataTypeSymbol(DATA_TYPE type);
-	static string getDataTypeString(DATA_TYPE type);
-	static string getDataFormString(DATA_FORM form);
-	static string getTableTypeString(TABLE_TYPE type);
-	static DATA_TYPE getDataType(const string& typestr);
-	static DATA_FORM getDataForm(const string& formstr);
+	static std::string getDataTypeString(DATA_TYPE type);
+	static std::string getDataFormString(DATA_FORM form);
+	static std::string getTableTypeString(TABLE_TYPE type);
+	static DATA_TYPE getDataType(const std::string& typestr);
+	static DATA_FORM getDataForm(const std::string& formstr);
 	static int getDataTypeSize(DATA_TYPE type);
 	static DATA_TYPE getDataType(char ch);
 	static DATA_CATEGORY getCategory(DATA_TYPE type);
-	static DURATION_UNIT getDurationUnit(const string& typestr);
+	static DURATION_UNIT getDurationUnit(const std::string& typestr);
 	static long long getTemporalDurationConversionRatio(DATA_TYPE t, DURATION_UNIT du);
 	static long long getTemporalUplimit(DATA_TYPE t);
 
-	static bool equalIgnoreCase(const string& str1, const string& str2);
-	static string lower(const string& str);
-	static string upper(const string& str);
+	static bool equalIgnoreCase(const std::string& str1, const std::string& str2);
+	static std::string lower(const std::string& str);
+	static std::string upper(const std::string& str);
 	static char toUpper(char ch);
 	static char toLower(char ch);
-	static string ltrim(const string& str);
-	static string trim(const string& str);
-	static string strip(const string& str);
+	static std::string ltrim(const std::string& str);
+	static std::string trim(const std::string& str);
+	static std::string strip(const std::string& str);
 	static int wc(const char* str);
-	static bool endWith(const string& str, const string& end);
-	static bool startWith(const string& str, const string& start);
+	static bool endWith(const std::string& str, const std::string& end);
+	static bool startWith(const std::string& str, const std::string& start);
 	static bool strWildCmp(const char* wildstring, const char* matchstring);
 	static bool strCaseInsensitiveWildCmp(const char* str, const char* pat);
-	static string replace(const string& str, const string& pattern, const string& replacement);
-	static string replace(const string& str, char pattern, char replacement);
-	static string convert(int val);
-	static string longToString(long long val);
-	static string doubleToString(double val);
-	static bool isVariableCandidate(const string& word);
-	static string literalConstant(const string& str);
-	static void split(const char* s, char delim, vector<string> &elems);
-	static vector<string> split(const string &s, char delim);
+	static std::string replace(const std::string& str, const std::string& pattern, const std::string& replacement);
+	static std::string replace(const std::string& str, char pattern, char replacement);
+	static std::string convert(int val);
+	static std::string longToString(long long val);
+	static std::string doubleToString(double val);
+	static bool isVariableCandidate(const std::string& word);
+	static std::string literalConstant(const std::string& str);
+	static void split(const char* s, char delim, std::vector<std::string> &elems);
+	static std::vector<std::string> split(const std::string &s, char delim);
 	inline static bool isDigit(char ch) { return '0' <= ch && ch <= '9'; }
 	inline static bool isDateDelimitor(char ch) { return ch == '.' || ch == '/' || ch == '-'; }
 	inline static bool isLetter(char ch) { return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'); }
 	static char escape(char original);
-	static void writeDoubleQuotedString(string& dest, const string& source);
+	static void writeDoubleQuotedString(std::string& dest, const std::string& source);
 
 	static int countDays(int year, int month, int day);
 	static int parseYear(int days);
@@ -197,7 +197,7 @@ public:
 	static long long* toLocalTimestamp(long long* epochTimes, int n);
 	static long long toLocalNanoTimestamp(long long epochNanoTime);
 	static long long* toLocalNanoTimestamp(long long* epochNanoTimes, int n);
-	static string toMicroTimestampStr(std::chrono::system_clock::time_point& tp, bool printDate = false);
+	static std::string toMicroTimestampStr(std::chrono::system_clock::time_point& tp, bool printDate = false);
 
 	static char* allocateMemory(INDEX size, bool throwIfFail = true);
 	static bool isLittleEndian() { int x = 1; return *(char *)&x == 1; }
@@ -207,16 +207,16 @@ public:
 	static long long getPhysicalMemorySize();
 	static void sleep(int milliSeconds);
 	static int getLastErrorCode();
-	static string getLastErrorMessage();
-	static string getErrorMessage(int errCode);
-	static string getPartitionTypeString(PARTITION_TYPE type);
+	static std::string getLastErrorMessage();
+	static std::string getErrorMessage(int errCode);
+	static std::string getPartitionTypeString(PARTITION_TYPE type);
 	static Domain* createDomain(PARTITION_TYPE type, DATA_TYPE partitionColType, const ConstantSP& partitionSchema);
-	static Vector* createSubVector(const VectorSP& source, vector<int> indices);
-	static string getCategoryString(DATA_CATEGORY type);
+	static Vector* createSubVector(const VectorSP& source, std::vector<int> indices);
+	static std::string getCategoryString(DATA_CATEGORY type);
 	static Vector* createSymbolVector(const SymbolBaseSP& symbolBase, INDEX size, INDEX capacity = 0, bool fast = true,
 		void* data = 0, void** dataSegment = 0, int segmentSizeInBit = 0, bool containNull = false);
 
-	static void SetOrThrowErrorInfo(ErrorCodeInfo *errorCodeInfo, int errorCode, const string &errorInfo);
+	static void SetOrThrowErrorInfo(ErrorCodeInfo *errorCodeInfo, int errorCode, const std::string &errorInfo);
 	template<typename T>
 	static ConstantSP createObject(DATA_TYPE dataType, T val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0) {
 		SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "It cannot be converted to " + getDataTypeString(dataType));
@@ -281,9 +281,9 @@ public:
 	static void enumDoubleVector(const VectorSP &pVector, std::function<bool(const double *pbuf, INDEX startIndex, int length)> func, INDEX offset = 0) {
 		enumDdbVector<double>(pVector, &Vector::getDoubleConst, func, offset);
 	}
-	static void enumStringVector(const VectorSP &pVector, std::function<bool(string **pbuf, INDEX startIndex, int length)> func, INDEX offset = 0) {
-		string* buffer[Util::BUF_SIZE];
-		string** pbuf;
+	static void enumStringVector(const VectorSP &pVector, std::function<bool(std::string **pbuf, INDEX startIndex, int length)> func, INDEX offset = 0) {
+		std::string* buffer[Util::BUF_SIZE];
+		std::string** pbuf;
 		INDEX startIndex = offset;
 		int size;
 		INDEX leftSize = pVector->size() - startIndex;
@@ -314,7 +314,7 @@ public:
 private:
 	template <class T>
 	static void enumBinaryVector(const VectorSP &pVector, std::function<bool(const T *pbuf, INDEX startIndex, int length)> func, INDEX offset = 0) {
-		vector<T> buffer(Util::BUF_SIZE);
+		std::vector<T> buffer(Util::BUF_SIZE);
 		const T* pbuf;
 		INDEX startIndex = offset;
 		int size;
@@ -369,9 +369,11 @@ inline float getNullValue<float>() { return FLT_NMIN; }
 template <>
 inline double getNullValue<double>() { return DBL_NMIN; }
 template <>
-inline string getNullValue<string>() { return ""; }
+inline std::string getNullValue<std::string>() { return ""; }
 template <>
 inline Guid getNullValue<Guid>() { return Guid(); }
+template <>
+inline wide_integer::int128 getNullValue<wide_integer::int128>() { return std::numeric_limits<wide_integer::int128>::min(); }
 
 class ResultSet {
 public:
@@ -387,71 +389,71 @@ public:
 			DATA_TYPE type = pVector->getRawType();
 			switch (type) {
 			case DT_BOOL:
-				column_[i].charCol = new Column<char>(pVector, [=](const VectorSP &pVector, INDEX position, int len, char *buf) {
-					return pVector->getBoolConst(position, len, buf);
+				column_[i].charCol = new Column<char>(pVector, [=](const VectorSP &vector, INDEX position, int len, char *buf) {
+					return vector->getBoolConst(position, len, buf);
 				});
 				break;
 			case DT_CHAR:
-				column_[i].charCol = new Column<char>(pVector, [=](const VectorSP &pVector, INDEX position, int len, char *buf) {
-					return pVector->getCharConst(position, len, buf);
+				column_[i].charCol = new Column<char>(pVector, [=](const VectorSP &vector, INDEX position, int len, char *buf) {
+					return vector->getCharConst(position, len, buf);
 				});
 				break;
 			case DT_SHORT:
-				column_[i].shortCol = new Column<short>(pVector, [=](const VectorSP &pVector, INDEX position, int len, short *buf) {
-					return pVector->getShortConst(position, len, buf);
+				column_[i].shortCol = new Column<short>(pVector, [=](const VectorSP &vector, INDEX position, int len, short *buf) {
+					return vector->getShortConst(position, len, buf);
 				});
 				break;
 			case DT_INT:
 				if (pVector->getType() == DT_SYMBOL) {
-					column_[i].stringCol = new Column<string*>(pVector, [=](const VectorSP &pVector, INDEX position, int len, string** buf) {
-						return pVector->getStringConst(position, len, buf);
+					column_[i].stringCol = new Column<std::string*>(pVector, [=](const VectorSP &vector, INDEX position, int len, std::string** buf) {
+						return vector->getStringConst(position, len, buf);
 					});
 				}
 				else {
-					column_[i].intCol = new Column<int>(pVector, [=](const VectorSP &pVector, INDEX position, int len, int *buf) {
-						return pVector->getIntConst(position, len, buf);
+					column_[i].intCol = new Column<int>(pVector, [=](const VectorSP &vector, INDEX position, int len, int *buf) {
+						return vector->getIntConst(position, len, buf);
 					});
 				}
 				break;
 			case DT_LONG:
-				column_[i].longCol = new Column<long long>(pVector, [=](const VectorSP &pVector, INDEX position, int len, long long *buf) {
-					return pVector->getLongConst(position, len, buf);
+				column_[i].longCol = new Column<long long>(pVector, [=](const VectorSP &vector, INDEX position, int len, long long *buf) {
+					return vector->getLongConst(position, len, buf);
 				});
 				break;
 			case DT_FLOAT:
-				column_[i].floatCol = new Column<float>(pVector, [=](const VectorSP &pVector, INDEX position, int len, float *buf) {
-					return pVector->getFloatConst(position, len, buf);
+				column_[i].floatCol = new Column<float>(pVector, [=](const VectorSP &vector, INDEX position, int len, float *buf) {
+					return vector->getFloatConst(position, len, buf);
 				});
 				break;
 			case DT_DOUBLE:
-				column_[i].doubleCol = new Column<double>(pVector, [=](const VectorSP &pVector, INDEX position, int len, double *buf) {
-					return pVector->getDoubleConst(position, len, buf);
+				column_[i].doubleCol = new Column<double>(pVector, [=](const VectorSP &vector, INDEX position, int len, double *buf) {
+					return vector->getDoubleConst(position, len, buf);
 				});
 				break;
 			case DT_BLOB:
 			case DT_STRING:
-				column_[i].stringCol = new Column<string*>(pVector, [=](const VectorSP &pVector, INDEX position, int len, string** buf) {
-					return pVector->getStringConst(position, len, buf);
+				column_[i].stringCol = new Column<std::string*>(pVector, [=](const VectorSP &vector, INDEX position, int len, std::string** buf) {
+					return vector->getStringConst(position, len, buf);
 				});
 				break;
 			case DT_INT128:
-				column_[i].int128Col = new Column<Guid>(pVector, [=](const VectorSP &pVector, INDEX position, int len, Guid *buf) {
-					return (const Guid*)pVector->getBinaryConst(position, len, sizeof(Guid), (unsigned char*)buf);
+				column_[i].int128Col = new Column<Guid>(pVector, [=](const VectorSP &vector, INDEX position, int len, Guid *buf) {
+					return (const Guid*)vector->getBinaryConst(position, len, sizeof(Guid), (unsigned char*)buf);
 				});
 				break;
 			case DT_DECIMAL32:
-				column_[i].decimal32Col = new Column<int32_t>(pVector, [=](const VectorSP &pVector, INDEX position, int len, int32_t *buf) {
-					return (const int32_t*)pVector->getBinaryConst(position, len, sizeof(int32_t), (unsigned char*)buf);
+				column_[i].decimal32Col = new Column<int32_t>(pVector, [=](const VectorSP &vector, INDEX position, int len, int32_t *buf) {
+					return (const int32_t*)vector->getBinaryConst(position, len, sizeof(int32_t), (unsigned char*)buf);
 				});
 				break;
 			case DT_DECIMAL64:
-				column_[i].decimal64Col = new Column<int64_t>(pVector, [=](const VectorSP &pVector, INDEX position, int len, int64_t *buf) {
-					return (const int64_t*)pVector->getBinaryConst(position, len, sizeof(int64_t), (unsigned char*)buf);
+				column_[i].decimal64Col = new Column<int64_t>(pVector, [=](const VectorSP &vector, INDEX position, int len, int64_t *buf) {
+					return (const int64_t*)vector->getBinaryConst(position, len, sizeof(int64_t), (unsigned char*)buf);
 				});
 				break;
 			case DT_DECIMAL128:
-				column_[i].decimal128Col = new Column<wide_integer::int128>(pVector, [=](const VectorSP &pVector, INDEX position, int len, wide_integer::int128 *buf) {
-					return (const wide_integer::int128*)pVector->getBinaryConst(position, len, sizeof(wide_integer::int128), (unsigned char*)buf);
+				column_[i].decimal128Col = new Column<wide_integer::int128>(pVector, [=](const VectorSP &vector, INDEX position, int len, wide_integer::int128 *buf) {
+					return (const wide_integer::int128*)vector->getBinaryConst(position, len, sizeof(wide_integer::int128), (unsigned char*)buf);
 				});
 				break;
 			default:
@@ -466,11 +468,11 @@ public:
 	INDEX position() {
 		return position_;
 	}
-	void position(INDEX position) {
-		if (position >= rows_ || position < 0) {
+	void position(INDEX pos) {
+		if (pos >= rows_ || pos < 0) {
 			throw RuntimeException("Position exceed row limit.");
 		}
-		position_ = position;
+		position_ = pos;
 	}
 	bool next() {
 		if (position_ < rows_) {
@@ -536,7 +538,7 @@ public:
 		assert(column_[col].doubleCol != nullptr);
 		return column_[col].doubleCol->getValue(position_);
 	}
-	const string& getString(int col) const {
+	const std::string& getString(int col) const {
 		assert(column_[col].stringCol != nullptr);
 		return *column_[col].stringCol->getValue(position_);
 	}
@@ -618,7 +620,7 @@ private:
 		Column<long long> *longCol = nullptr;
 		Column<float> *floatCol = nullptr;
 		Column<double> *doubleCol = nullptr;
-		Column<string*> *stringCol = nullptr;
+		Column<std::string*> *stringCol = nullptr;
 		Column<Guid> *int128Col = nullptr;
 		Column<int32_t> *decimal32Col = nullptr;
 		Column<int64_t> *decimal64Col = nullptr;
@@ -647,7 +649,7 @@ private:
 template <class T>
 class DdbVector {
 public:
-	DdbVector(int size, int capacity = 0) : size_(size), capacity_(capacity), dataNeedRelease_(true), containNull_(false){
+	DdbVector(int sz, int capacity = 0) : size_(sz), capacity_(capacity), dataNeedRelease_(true), containNull_(false){
 		if (capacity_ < size_)
 			capacity_ = size_;
 		if (capacity_ < 1) {
@@ -656,7 +658,7 @@ public:
 		data_ = new T[capacity_];
 	}
 	//DdbVector own data and it will be released, don't delete data in the future.
-	DdbVector(T *data, int size, int capacity = 0) : data_(data), size_(size), capacity_(capacity), dataNeedRelease_(true), containNull_(false) {
+	DdbVector(T *dt, int sz, int capacity = 0) : data_(dt), size_(sz), capacity_(capacity), dataNeedRelease_(true), containNull_(false) {
 		if (capacity_ < size_)
 			capacity_ = size_;
 	}
@@ -697,7 +699,7 @@ public:
 		}
 		data_[size_++] = std::move(value);
 	}
-	void appendString(const string *buf, int len) {
+	void appendString(const std::string *buf, int len) {
 		assert(dataNeedRelease_);
 		assert(size_ + len <= capacity_);
 		for (auto i = 0; i < len; i++) {
@@ -707,7 +709,7 @@ public:
 			data_[size_++] = std::move(buf[i]);
 		}
 	}
-	void appendString(string *buf, int len) {
+	void appendString(std::string *buf, int len) {
 		assert(dataNeedRelease_);
 		assert(size_ + len <= capacity_);
 		for (auto i = 0; i < len; i++) {
@@ -752,7 +754,7 @@ public:
 		}
 		data_[index] = std::move(value);
 	}
-	void setString(int start, int len, const string *buf) {
+	void setString(int start, int len, const std::string *buf) {
 		assert(dataNeedRelease_);
 		assert(start < size_);
 		assert(start + len <= size_);
@@ -763,7 +765,7 @@ public:
 			data_[index] = std::move(buf[i]);
 		}
 	}
-	void setString(int start, int len, string *buf) {
+	void setString(int start, int len, std::string *buf) {
 		assert(dataNeedRelease_);
 		assert(start < size_);
 		assert(start + len <= size_);
@@ -802,7 +804,7 @@ public:
 		}
 		else {
 			Vector* pVector = Util::createVector(type, 0, size_, true, extraParam);
-			pVector->appendString((string*)data_, size_);
+			pVector->appendString((std::string*)data_, size_);
 			return pVector;
 		}
 	}
@@ -813,6 +815,6 @@ private:
 	bool dataNeedRelease_, containNull_;
 };
 
-};
+}
 
 #endif /* UTIL_H_ */

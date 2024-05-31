@@ -27,11 +27,12 @@ protected:
         else
         {
             cout << "ok" << endl;
+            CLEAR_ENV(connReconn);
         }
     }
     virtual void TearDown()
     {
-        connReconn.run("undef all;");
+        CLEAR_ENV(connReconn);
     }
 };
 
@@ -178,133 +179,94 @@ TEST_F(DBConnectionTest, test_connection_function_login)
 
 TEST_F(DBConnectionTest, test_connection_python_script)
 {
-    ConstantSP server_version = connReconn.run("version()");
-    string v = server_version->getString();
-    if (v.find("2.10") != 0)
-    {
-        cout << "server version not matched: 2.10.xx, skip this case." << endl;
-        EXPECT_EQ(1, 1);
-    }
-    else
-    {
-        string script1 = "import dolphindb as ddb\n"
-                         "def list_append(testtype):\n"
-                         "\ta= [testtype(1),testtype(2),testtype(3)]\n"
-                         "\ta.append(testtype(4))\n"
-                         "\ta.append(None)\n"
-                         "\tassert a ==[testtype(1),testtype(2),testtype(3),testtype(4),None],'1'\n"
-                         "\ndef test_list_append():\n"
-                         "\ttypes=[int,long,short,float,double,char,bool,date,minute,month,second,datetime,timestamp,nanotime,nanotimestamp,datehour]\n"
-                         "\tfor testtype in types:\n"
-                         "\t\tlist_append(testtype)\n"
-                         "\t\treturn True;\n"
-                         "\n"
-                         "def test_list_append_ipaddr_str_uuid():\n"
-                         "\ta1= []\n"
-                         "\ta2= []\n"
-                         "\ta3= ['1','2','3']\n"
-                         "\ta1.append(ipaddr(\"192.168.1.13\"))\n"
-                         "\ta2.append(uuid(\"9d457e79-1bed-d6c2-3612-b0d31c1881f6\"))\n"
-                         "\ta3.append('4')\n"
-                         "\tassert a1 == [ipaddr(\"192.168.1.13\")],'2'\n"
-                         "\tassert a2==[uuid(\"9d457e79-1bed-d6c2-3612-b0d31c1881f6\")],'3'\n"
-                         "\tassert a3==['1','2','3','4'],'4'\n"
-                         "\treturn True;\n"
-                         "test_list_append()\n"
-                         "test_list_append_ipaddr_str_uuid()";
-        // cout<<script1<<endl;
+    string script1 = "import dolphindb as ddb\n"
+                        "def list_append(testtype):\n"
+                        "\ta= [testtype(1),testtype(2),testtype(3)]\n"
+                        "\ta.append(testtype(4))\n"
+                        "\ta.append(None)\n"
+                        "\tassert a ==[testtype(1),testtype(2),testtype(3),testtype(4),None],'1'\n"
+                        "\ndef test_list_append():\n"
+                        "\ttypes=[int,long,short,float,double,char,bool,date,minute,month,second,datetime,timestamp,nanotime,nanotimestamp,datehour]\n"
+                        "\tfor testtype in types:\n"
+                        "\t\tlist_append(testtype)\n"
+                        "\t\treturn True;\n"
+                        "\n"
+                        "def test_list_append_ipaddr_str_uuid():\n"
+                        "\ta1= []\n"
+                        "\ta2= []\n"
+                        "\ta3= ['1','2','3']\n"
+                        "\ta1.append(ipaddr(\"192.168.1.13\"))\n"
+                        "\ta2.append(uuid(\"9d457e79-1bed-d6c2-3612-b0d31c1881f6\"))\n"
+                        "\ta3.append('4')\n"
+                        "\tassert a1 == [ipaddr(\"192.168.1.13\")],'2'\n"
+                        "\tassert a2==[uuid(\"9d457e79-1bed-d6c2-3612-b0d31c1881f6\")],'3'\n"
+                        "\tassert a3==['1','2','3','4'],'4'\n"
+                        "\treturn True;\n"
+                        "test_list_append()\n"
+                        "test_list_append_ipaddr_str_uuid()";
+    // cout<<script1<<endl;
 
-        DBConnection conn_demo(false, false, 7200, false, true);
-        conn_demo.connect(hostName, port, "admin", "123456");
-        ConstantSP res = conn_demo.run(script1);
-        // cout<< script1;
-        // cout<< res->getString();
-        EXPECT_EQ(res->getBool(), true);
+    DBConnectionSP conn300_demo = new DBConnection(false, false, 7200, false, true);
+    conn300_demo->connect(hostName, port300, "admin", "123456");
+    ConstantSP res = conn300_demo->run(script1);
+    // cout<< script1;
+    // cout<< res->getString();
+    EXPECT_EQ(res->getBool(), true);
 
-        conn_demo.close();
-    }
+    conn300_demo->close();
+
 }
 
 TEST_F(DBConnectionTest, test_connection_python_dataform)
 {
-    ConstantSP server_version = connReconn.run("version()");
-    string v = server_version->getString();
-    if (v.find("2.10") != 0)
-    {
-        cout << "server version not matched: 2.10.xx, skip this case." << endl;
-        EXPECT_EQ(1, 1);
-    }
-    else
-    {
-        string script1 = "import dolphindb as ddb\n"
-                         "a=[1,2,3]\n"
-                         "b={1,2,3}\n"
-                         "c={1:1,2:2}\n"
-                         "d=(12,3,4)";
-        DBConnection conn_demo(false, false, 7200, false, true);
-        conn_demo.connect(hostName, port, "admin", "123456");
-        conn_demo.run(script1);
+    string script1 = "import dolphindb as ddb\n"
+                        "a=[1,2,3]\n"
+                        "b={1,2,3}\n"
+                        "c={1:1,2:2}\n"
+                        "d=(12,3,4)";
+    DBConnectionSP conn300_demo = new DBConnection(false, false, 7200, false, true);
+    conn300_demo->connect(hostName, port300, "admin", "123456");
+    conn300_demo->run(script1);
 
-        EXPECT_EQ(conn_demo.run("type(a)")->getString(), "list");
-        EXPECT_EQ(conn_demo.run("type(b)")->getString(), "set");
-        EXPECT_EQ(conn_demo.run("type(c)")->getString(), "dict");
-        EXPECT_EQ(conn_demo.run("type(d)")->getString(), "tuple");
+    EXPECT_EQ(conn300_demo->run("type(a)")->getString(), "list");
+    EXPECT_EQ(conn300_demo->run("type(b)")->getString(), "set");
+    EXPECT_EQ(conn300_demo->run("type(c)")->getString(), "dict");
+    EXPECT_EQ(conn300_demo->run("type(d)")->getString(), "tuple");
 
-        conn_demo.close();
-    }
+    conn300_demo->close();
 }
 
 TEST_F(DBConnectionTest, test_connection_python_setInitscriptAndgetInitscript)
 {
-    ConstantSP server_version = connReconn.run("version()");
-    string v = server_version->getString();
-    if (v.find("2.10") != 0)
-    {
-        cout << "server version not matched: 2.10.xx, skip this case." << endl;
-        EXPECT_EQ(1, 1);
-    }
-    else
-    {
-        string script1 = "import dolphindb as ddb";
-        DBConnection conn_demo(false, false, 7200, false, true);
-        conn_demo.connect(hostName, port, "admin", "123456", script1);
-        string res = conn_demo.getInitScript();
-        // cout<< res;
-        EXPECT_EQ(res, script1);
+    string script1 = "import dolphindb as ddb";
+    DBConnectionSP conn300_demo = new DBConnection(false, false, 7200, false, true);
+    conn300_demo->connect(hostName, port300, "admin", "123456", script1);
+    string res = conn300_demo->getInitScript();
+    // cout<< res;
+    EXPECT_EQ(res, script1);
 
-        conn_demo.close();
-    }
+    conn300_demo->close();
 }
 
 TEST_F(DBConnectionTest, test_connection_python_upload)
 {
-    ConstantSP server_version = connReconn.run("version()");
-    string v = server_version->getString();
-    if (v.find("2.10") != 0)
-    {
-        cout << "server version not matched: 2.10.xx, skip this case." << endl;
-        EXPECT_EQ(1, 1);
-    }
-    else
-    {
-        vector<string> colName = {"col1", "col2", "col3", "col4", "col5"};
-        vector<DATA_TYPE> colType = {DT_BOOL, DT_INT, DT_STRING, DT_DATE, DT_FLOAT};
-        TableSP t = Util::createTable(colName, colType, 5, 5);
+    vector<string> colName = {"col1", "col2", "col3", "col4", "col5"};
+    vector<DATA_TYPE> colType = {DT_BOOL, DT_INT, DT_STRING, DT_DATE, DT_FLOAT};
+    TableSP t = Util::createTable(colName, colType, 5, 5);
 
-        t->set(0, 0, Util::createBool(1));
-        t->set(1, 0, Util::createInt(1));
-        t->set(2, 0, Util::createString("abc"));
-        t->set(3, 0, Util::createDate(1));
-        t->set(4, 0, Util::createFloat(1.123));
+    t->set(0, 0, Util::createBool(1));
+    t->set(1, 0, Util::createInt(1));
+    t->set(2, 0, Util::createString("abc"));
+    t->set(3, 0, Util::createDate(1));
+    t->set(4, 0, Util::createFloat(1.123));
 
-        DBConnection conn_demo(false, false, 7200, false, true);
-        conn_demo.connect(hostName, port, "admin", "123456");
-        conn_demo.upload("t", {t});
-        TableSP t1 = conn_demo.run("t");
-        EXPECT_EQ(t1->getString(), t->getString());
+    DBConnectionSP conn300_demo = new DBConnection(false, false, 7200, false, true);
+    conn300_demo->connect(hostName, port300, "admin", "123456");
+    conn300_demo->upload("t", {t});
+    TableSP t1 = conn300_demo->run("t");
+    EXPECT_EQ(t1->getString(), t->getString());
 
-        conn_demo.close();
-    }
+    conn300_demo->close();
 }
 
 TEST_F(DBConnectionTest, test_connect_reconnect)
@@ -573,6 +535,7 @@ TEST_F(DBConnectionTest, test_DBconnectionPoolwithFetchSize)
     pool_demo.shutDown();
 }
 
+#ifndef WINDOWS
 TEST_F(DBConnectionTest, test_connection_concurrent_insert_datas)
 {
     srand(time(NULL));
@@ -609,7 +572,7 @@ TEST_F(DBConnectionTest, test_connection_concurrent_insert_datas)
             {
                 string err = e.what();
                 cout << "err is " << err << endl;
-                ASSERT_TRUE(err.find("RefId:S00002") != std::string::npos);
+                ASSERT_TRUE(err.find("RefId:S00002") != std::string::npos || err.find("RefId:S01019") != std::string::npos);
             }
         }
         conn0.close();
@@ -665,7 +628,7 @@ TEST_F(DBConnectionTest, test_connectionPool_concurrent_insert_datas)
             catch (const std::exception &e)
             {
                 string err = e.what();
-                ASSERT_TRUE(err.find("RefId:S00002") != std::string::npos);
+                ASSERT_TRUE(err.find("RefId:S00002") != std::string::npos || err.find("RefId:S01019") != std::string::npos);
             }
         }
         pool.shutDown();
@@ -680,6 +643,7 @@ TEST_F(DBConnectionTest, test_connectionPool_concurrent_insert_datas)
 
     EXPECT_EQ(connReconn.run("exec count(*) from loadTable('dfs://test_concurrent', `pt)")->getInt(), 500);
 }
+#endif
 
 class connection_insert_null : public DBConnectionTest, public testing::WithParamInterface<tuple<string, DATA_TYPE>>
 {

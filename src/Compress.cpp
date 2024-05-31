@@ -72,12 +72,12 @@ class mask {
 public:
 	unsigned long long MASK_ARRAY[64];
 	mask() {
-		unsigned long long mask = 1;
-		unsigned long long value = 0;
+		unsigned long long mask_ = 1;
+		unsigned long long value_ = 0;
 		for (int i = 0; i <64; i++) {
-			value = value | mask;
-			mask = mask << 1;
-			MASK_ARRAY[i] = value;
+			value_ = value_ | mask_;
+			mask_ = mask_ << 1;
+			MASK_ARRAY[i] = value_;
 		}
 	}
 	~mask() {}
@@ -643,28 +643,28 @@ IO_ERR CompressDeltaofDelta::decode(DataInputStreamSP compressSrc, DataOutputStr
 		
 		count = std::min((INDEX)maxDecompressedSize_ / unitLength, len - start);
 		memset(decompressedBuf, 0, maxDecompressedSize_);
-		int actualRead;
+		int readSize;
 		decompressedBufSize = count * unitLength;;
 		if (header.unitLength == 4) {
 			DeltaDecompressor<int> decoder(INT_MIN);
-			actualRead = decoder.readData((long long *)compressedBuf, blockSize / sizeof(long long), (int *)decompressedBuf, count);
+			readSize = decoder.readData((long long *)compressedBuf, blockSize / sizeof(long long), (int *)decompressedBuf, count);
 		}
 		else if (header.unitLength == 8) {
 			DeltaDecompressor<long long> decoder(LLONG_MIN);
-			actualRead = decoder.readData((long long *)compressedBuf, blockSize / sizeof(long long), (long long *)decompressedBuf, count);
+			readSize = decoder.readData((long long *)compressedBuf, blockSize / sizeof(long long), (long long *)decompressedBuf, count);
 		}
 		else {
 			DeltaDecompressor<short> decoder(SHRT_MIN);
-			actualRead = decoder.readData((long long *)compressedBuf, blockSize / sizeof(long long), (short *)decompressedBuf, count);
+			readSize = decoder.readData((long long *)compressedBuf, blockSize / sizeof(long long), (short *)decompressedBuf, count);
 		}
 
-		if (actualRead <= 0) {
+		if (readSize <= 0) {
 			std::cout << "Failed to decode. LZ4 block offset=" + std::to_string(fileCursor - blockSize) +
 				" fileLength=" + std::to_string(byteSize) + " decodedRows=" + std::to_string(start) + " totalRows=" + std::to_string(len) +
 				" blockSize=" + std::to_string(blockSize) + " bufSize=" + std::to_string(decompressedBufSize) << std::endl;
 			return INVALIDDATA;
 		}
-		count = actualRead;
+		count = readSize;
 		ret = out.start(decompressedBuf, count*unitLength);
 		if (ret != OK)
 			return ret;
@@ -975,4 +975,4 @@ IO_ERR CompressLZ4::encodeContent(const VectorSP &vec, const DataOutputStreamSP 
 	return OK;
 }
 
-};//dolphindb
+}//dolphindb

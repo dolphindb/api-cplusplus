@@ -37,10 +37,11 @@ protected:
 		}
 
         cout << "ok" << endl;
+        CLEAR_ENV(conn);
     }
     virtual void TearDown()
     {
-        conn.run("undef all;");
+        CLEAR_ENV(conn);
     }
 };
 
@@ -2781,4 +2782,105 @@ TEST_F(DataformMatrixTest, test_IndexedSeries_gt1048576)
         ASSERT_EQ(row_labelv->get(i)->getString(), Util::createDate(i + 1)->getString());
     }
     EXPECT_EQ(series->getString(), "           #0\n           --\n1970.01.02|  \n1970.01.03|  \n1970.01.04|  \n1970.01.05|  \n1970.01.06|  \n1970.01.07|  \n1970.01.08|  \n1970.01.09|  \n1970.01.10|  \n1970.01.11|  \n1970.01.12|  \n1970.01.13|  \n1970.01.14|  \n1970.01.15|  \n1970.01.16|  \n1970.01.17|  \n1970.01.18|  \n1970.01.19|  \n1970.01.20|  \n1970.01.21|  \n1970.01.22|  \n1970.01.23|  \n1970.01.24|  \n1970.01.25|  \n1970.01.26|  \n1970.01.27|  \n1970.01.28|  \n1970.01.29|  \n1970.01.30|  \n1970.01.31|  \n...\n");
+}
+
+class DataformMatrixTest_funcs : public DataformMatrixTest, public testing::WithParamInterface<string>
+{
+public:
+    static const vector<string> getData(){
+        return {
+            "matrix(true false, true false)",
+            "matrix(1c 2c, 3c 4c)",
+            "matrix(1h 2h, 3h 4h)",
+            "matrix(1 2, 3 4)",
+            "matrix(1l 2l, 4l 5l)",
+            "matrix(1.0f 2.2f, 3.3f 4.4f)",
+            "matrix(1.0 2.2, 3.3 4.4)",
+            "matrix(2020.01.01 2020.01.02, 2020.01.03 2020.01.04)",
+            "matrix(2020.01.01T00:00:01 2020.01.01T00:00:02, 2020.01.01T00:00:03 2020.01.01T00:00:04)",
+            "matrix(datehour(1234 5555), datehour(7894 1346))",
+            "matrix(2020.01M 2020.02M, 2020.03M 2020.04M)",
+            "matrix(00:00:01.000 00:00:02.000, 00:00:03.000 00:00:04.000)",
+            "matrix(00:00:01 00:00:02, 00:00:03 00:00:04)",
+            "matrix(00:01m 00:02m, 00:03m 00:04m)",
+            "matrix(00:00:01.000000000 00:00:02.000000000, 00:00:03.000000000 00:00:04.000000000)",
+            "matrix(2020.01.01T00:00:01.000 2020.01.01T00:00:02.000, 2020.01.01T00:00:03.000 2020.01.01T00:00:04.000)",
+            "matrix(2020.01.01T00:00:01.000000000 2020.01.01T00:00:02.000000000, 2020.01.01T00:00:03.000000000 2020.01.01T00:00:04.000000000)",
+        };
+    }
+};
+
+INSTANTIATE_TEST_SUITE_P(, DataformMatrixTest_funcs, testing::ValuesIn(DataformMatrixTest_funcs::getData()));
+TEST_P(DataformMatrixTest_funcs, test_getWindow_getRow_getColumn){
+    VectorSP m = conn.run("x="+GetParam()+";x");
+    cout << m->getString() << endl;
+    string *res = new string();
+    string *ex = new string();
+
+    /* getWindow */
+    *res = m->getWindow(0, -1, 1, 0)->getString();
+    // cout << *res << endl;
+    *ex = conn.run("x[0:0,-1:0]")->getString();
+    EXPECT_EQ(*res, *ex);
+
+    *res = m->getWindow(0, -1, 1, 1)->getString();
+    // cout << *res << endl;
+    *ex = conn.run("x[1:2,1:2]")->getString();
+    EXPECT_EQ(*res, *ex);
+
+    *res = m->getWindow(0, -1, 1, 2)->getString();
+    // cout << *res << endl;
+    *ex = conn.run("x[1:2,1:3]")->getString();
+    EXPECT_EQ(*res, *ex);
+
+    *res = m->getWindow(0, -1, 0, -1)->getString();
+    // cout << *res << endl;
+    *ex = conn.run("x[[1],[1]]")->getString();
+    EXPECT_EQ(*res, *ex);
+
+    /* getRow */
+    *res = m->getRow(1)->getString();
+    // cout << *res << endl;
+    *ex = conn.run("flatten(x[[1],])")->getString();
+    EXPECT_EQ(*res, *ex);
+
+
+    *res = m->getRow(2)->getString();
+    // cout << *res << endl;
+    *ex = conn.run("flatten(x[[2],])")->getString();
+    EXPECT_EQ(*res, *ex);
+
+    /* getColumn */
+    *res = m->getColumn(1)->getString();
+    // cout << *res << endl;
+    *ex = conn.run("flatten(x[,[1]])")->getString();
+    EXPECT_EQ(*res, *ex);
+
+    *res = m->getColumn(2)->getString();
+    // cout << *res << endl;
+    *ex = conn.run("flatten(x[,[2]])")->getString();
+
+    // setLabel
+    VectorSP rowLabel = Util::createVector(DT_STRING, 2);
+    VectorSP colLabel = Util::createVector(DT_STRING, 2);
+    colLabel->setString(0, "c1");
+    colLabel->setString(1, "c2");
+    m->setColumnLabel(colLabel);
+    rowLabel->setString(0, "r1");
+    rowLabel->setString(1, "r2");
+    m->setRowLabel(rowLabel);
+    conn.run("x.rename!(`r1`r2, `c1`c2)");
+
+
+    *res = m->getColumn(1)->getString();
+    *ex = conn.run("flatten(x[,[1]])")->getString();
+    EXPECT_EQ(*res, *ex);
+
+    *res = m->getRow(1)->getString();
+    *ex = conn.run("flatten(x[[1],])")->getString();
+    EXPECT_EQ(*res, *ex);
+
+
+    delete res, ex;
+
 }

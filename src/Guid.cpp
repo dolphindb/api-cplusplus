@@ -101,9 +101,9 @@ uint32_t murmur32(const char *key, size_t len){
 
     switch(len)
     {
-    case 3: h ^= data[2] << 16;
+    case 3: h ^= data[2] << 16;   //falls through
     /* no break */
-    case 2: h ^= data[1] << 8;
+    case 2: h ^= data[1] << 8;   //falls through
     /* no break */
     case 1: h ^= data[0];
             h *= m;
@@ -148,14 +148,14 @@ bool Guid::isZero() const {
     return (*(long long*)a) == 0 && (*(long long*)(a + 8)) == 0;
 }
 
-string Guid::getString() const {
+std::string Guid::getString() const {
     return getString(uuid_);
 }
 
-string Guid::getString(const unsigned char* uuid) {
+std::string Guid::getString(const unsigned char* uuid) {
     char buf[36];
     Util::toGuid(uuid, buf);
-    return string(buf, 36);
+    return std::string(buf, 36);
 }
 
 uint64_t GuidHash::operator()(const Guid& guid) const {

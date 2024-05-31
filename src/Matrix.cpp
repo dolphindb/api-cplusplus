@@ -48,15 +48,15 @@ bool Matrix::reshape(INDEX cols, INDEX rows) {
         rowLabel_ = Constant::void_;
     return true;
 }
-string Matrix::getString() const {
+std::string Matrix::getString() const {
     int rows = (std::min)(Util::DISPLAY_ROWS, rows_);
     int limitColMaxWidth = 25;
     std::size_t length = 0;
     int curCol = 0;
     int i;
-    vector<string> list(rows + 1);
-    vector<string> listTmp(rows + 1);
-    string separator;
+    std::vector<std::string> list(rows + 1);
+    std::vector<std::string> listTmp(rows + 1);
+    std::string separator;
     std::size_t maxColWidth, curSize;
 
     // display row label
@@ -131,7 +131,7 @@ string Matrix::getString() const {
         separator.append(3, '-');
     }
 
-    string resultStr(list[0]);
+    std::string resultStr(list[0]);
     resultStr.append("\n");
     resultStr.append(separator);
     resultStr.append("\n");
@@ -144,9 +144,9 @@ string Matrix::getString() const {
     return resultStr;
 }
 
-string Matrix::getString(INDEX index) const {
+std::string Matrix::getString(INDEX index) const {
     int len = (std::min)(Util::DISPLAY_ROWS, rows_);
-    string str("{");
+    std::string str("{");
 
     if (len > 0)
         str.append(getString(index, 0));

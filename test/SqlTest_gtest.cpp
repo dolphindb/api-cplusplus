@@ -40,7 +40,7 @@ protected:
     }
     virtual void TearDown()
     {
-        conn.run("undef all;");
+		CLEAR_ENV(conn);
     }
 };
 

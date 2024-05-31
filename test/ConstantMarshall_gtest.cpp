@@ -6,6 +6,371 @@ class MarshallTest:public testing::Test
 
 #ifdef LINUX
 
+TEST_F(MarshallTest, ScalarUnmarshallStart){
+    conn.connect(hostName, port, "admin", "123456");
+    ConstantSP t = conn.run("def cacusum(mutable t){return t}; cacusum");
+    EXPECT_EQ(t->getString(), "cacusum");
+    conn.close();
+
+    ConstantSP scalar = Util::createDecimal32(3, 100);
+    DataOutputStreamSP outStream = new DataOutputStream(1024);
+    ConstantMarshallSP marshall = ConstantMarshallFactory::getInstance(scalar->getForm(), outStream);
+    IO_ERR ret;
+    marshall->start(scalar, false, false, ret);
+
+    std::string binary(outStream->getBuffer(), outStream->size());
+    DataInputStreamSP inStream = new DataInputStream(binary.data(), 3);
+    short flag;
+    inStream->readShort(flag);
+    DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
+    auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    std::string copy = binary;
+    int invalid = -1;
+    memcpy(&copy[2], &invalid, 4);
+    inStream = new DataInputStream(copy.data(), 6);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+}
+
+TEST_F(MarshallTest, ChunkUnmarshallStart){
+    IO_ERR ret;
+    vector<string> sites = {"192.168.0.16:9002:datanode1", "192.168.0.16:9003:datanode2", "192.168.0.16:9004:datanode3", "192.168.0.16:9005:datanode4"};
+    Guid id("314");
+    DFSChunkMetaSP chunk = new DFSChunkMeta("/home/appadmin/data", id, 3, 1, FILE_CHUNK, sites, 315);
+    DataOutputStreamSP outStream = new DataOutputStream(1024);
+    ConstantMarshallSP marshall = ConstantMarshallFactory::getInstance(chunk->getForm(), outStream);
+    marshall->start(chunk, false, false, ret);
+    marshall->reset();
+
+    std::string binary(outStream->getBuffer(), outStream->size());
+    DataInputStreamSP inStream = new DataInputStream(binary.data(), 3);
+    short flag;
+    inStream->readShort(flag);
+    DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
+    ConstantUnmarshallFactory unmarshallFactory(inStream);
+    auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    std::string copy = binary;
+    short invalid = -1;
+    memcpy(&copy[2], &invalid, 2);
+    inStream = new DataInputStream(copy.data(), 4);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    copy = binary;
+    invalid = 5000;
+    memcpy(&copy[2], &invalid, 2);
+    inStream = new DataInputStream(copy.data(), 4);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    inStream = new DataInputStream(binary.data(), 6);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    copy = binary;
+    invalid = 1;
+    memcpy(&copy[2], &invalid, 2);
+    inStream = new DataInputStream(copy.data(), copy.size());
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    copy = binary;
+    invalid = 45;
+    memcpy(&copy[2], &invalid, 2);
+    inStream = new DataInputStream(copy.data(), copy.size());
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    copy = binary;
+    invalid = 46;
+    memcpy(&copy[2], &invalid, 2);
+    inStream = new DataInputStream(copy.data(), copy.size());
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    copy = binary;
+    invalid = 165;
+    memcpy(&copy[2], &invalid, 2);
+    inStream = new DataInputStream(copy.data(), copy.size());
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+}
+TEST_F(MarshallTest, DictionaryUnmarshallStart){
+    IO_ERR ret;
+    DictionarySP dict = Util::createDictionary(DT_INT, DT_INT);
+    dict->set(Util::createInt(3), Util::createInt(14));
+    DataOutputStreamSP outStream = new DataOutputStream(1024);
+    ConstantMarshallSP marshall = ConstantMarshallFactory::getInstance(DF_CHART, outStream);
+    marshall->start(dict, false, false, ret);
+
+    std::string binary(outStream->getBuffer(), outStream->size());
+    DataInputStreamSP inStream = new DataInputStream(binary.data(), 3);
+    short flag;
+    inStream->readShort(flag);
+    DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
+    auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    inStream = new DataInputStream(binary.data(), 5);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(DF_CHART, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    inStream = new DataInputStream(binary.data(), 17);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    inStream = new DataInputStream(binary.data(), 20);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+}
+
+TEST_F(MarshallTest, SetUnmarshallStart){
+    IO_ERR ret;
+    SetSP set = Util::createSet(DT_INT, 9);
+    set->append(Util::createInt(9));
+    DataOutputStreamSP outStream = new DataOutputStream(1024);
+    ConstantMarshallSP marshall = ConstantMarshallFactory::getInstance(set->getForm(), outStream);
+    marshall->start(set, false, false, ret);
+
+    std::string binary(outStream->getBuffer(), outStream->size());
+    DataInputStreamSP inStream = new DataInputStream(binary.data(), 3);
+    short flag;
+    inStream->readShort(flag);
+    DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
+
+    auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //key vector read fail
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    inStream = new DataInputStream(binary.data(), 6);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //vector unmarshal fail
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+}
+
+TEST_F(MarshallTest, TableUnmarshallStart){
+    IO_ERR ret;
+    std::vector<std::string> colNames{"id"};
+    std::string specialName(5, 'c');
+    colNames.push_back(specialName);
+    colNames.push_back("name");
+    std::vector<std::string> names{"Tom", "Bob", "Lucy"};
+    long long* ids = new long long[3]{1, 2, 3};
+    int* ages = new int[3]{22, 23, 24};
+    VectorSP idVec = Util::createVector(DT_LONG, 3, 3, true, 0, ids);
+    VectorSP nameVec = Util::createVector(DT_STRING, 0, 3);
+    nameVec->appendString(names.data(), names.size());
+    VectorSP ageVec = Util::createVector(DT_INT, 3, 3, true, 0, ages);
+    std::vector<ConstantSP> cols{idVec, nameVec, ageVec};
+    TableSP table = Util::createTable(colNames, cols);
+    DataOutputStreamSP outStream = new DataOutputStream(1024);
+    ConstantMarshallSP marshall = ConstantMarshallFactory::getInstance(table->getForm(), outStream);
+    marshall->start(table, false, false, ret);
+
+    std::string binary(outStream->getBuffer(), outStream->size());
+    DataInputStreamSP inStream = new DataInputStream(binary.data(), 3);
+    short flag;
+    inStream->readShort(flag);
+    DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
+
+    ConstantUnmarshallFactory unmarshallFactory(inStream);
+    auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //TableUnmarshall::start in_->readInt(rows_) return false
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+
+    std::string copy = binary;
+    int valid = -1;
+    memcpy(&copy[2], &valid, 4);
+    inStream = new DataInputStream(copy.data(), 10);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //TableUnmarshall::start rows_ < 0
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+    
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 7);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //TableUnmarshall::start in_->readInt(columns_) return false
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    memcpy(&copy[6], &valid, 4);
+    inStream = new DataInputStream(copy.data(), 10);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //TableUnmarshall::start columns_ < 0
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 10);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //TableUnmarshall::start read table name fail
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 11);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //TableUnmarshall::start read column name fail
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 25);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //TableUnmarshall::start read column flag fail
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 27);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //TableUnmarshall::start unmarshal column fail
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+}
+
+TEST_F(MarshallTest, MatrixUnmarshallStart){
+    IO_ERR ret;
+    int* pData = new int[9]{1, 2, 3, 4, 5, 6, 7, 8, 9};
+    VectorSP matrix = Util::createMatrix(DT_INT, 3, 3, 9, 0, pData);
+    VectorSP rowLabelVec = Util::createVector(DT_STRING, 0, 3);
+    VectorSP colLabelVec = Util::createVector(DT_STRING, 0, 3);
+    std::vector<std::string> rowData{"row1", "row2", "row3"};
+    std::vector<std::string> colData{"col1", "col2", "col3"};
+    rowLabelVec->appendString(rowData.data(), rowData.size());
+    colLabelVec->appendString(colData.data(), colData.size());
+    matrix->setRowLabel(rowLabelVec);
+    matrix->setColumnLabel(colLabelVec);
+
+    DataOutputStreamSP outStream = new DataOutputStream(1024);
+    ConstantMarshallSP marshall = ConstantMarshallFactory::getInstance(matrix->getForm(), outStream);
+
+    marshall->start(matrix, false, false, ret);
+    marshall->reset();
+
+    std::string binary(outStream->getBuffer(), outStream->size());
+    DataInputStreamSP inStream = new DataInputStream(binary.data(), 2);
+    
+    short flag;
+    inStream->readShort(flag);
+    DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
+
+    ConstantUnmarshallFactory unmarshallFactory(inStream);
+    auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //MatrixUnmarshall::start in_->readChar(labelFlag_) return false
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    std::string copy(binary);
+    copy[2] = -1;
+    inStream = new DataInputStream(copy.data(), 3);
+
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //MatrixUnmarshall::start labelFlag_ < 0
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 4);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //MatrixUnmarshall::start labelFlag&1 in_->readShort(flag) return false
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 5);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //MatrixUnmarshall::start labelFlag&1 vectorUnmarshall_.start return false
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 29);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //MatrixUnmarshall::start labelFlag&2 in_->readShort(flag) return false
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 30);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //MatrixUnmarshall::start labelFlag&2 vectorUnmarshall_.start return false
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 54);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //MatrixUnmarshall::start in_->readShort(flag) return false
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    copy = binary;
+    inStream = new DataInputStream(copy.data(), 57);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    //MatrixUnmarshall::start vectorUnmarshall_.start return false
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+}
+
 TEST_F(MarshallTest, VectorUnmarshallStartSymbolbaseUnmarshallStart){
     //VectorUnmarshall::start symbaseUnmarshall_->start(blocking, ret) return false
     IO_ERR ret;
@@ -31,9 +396,33 @@ TEST_F(MarshallTest, VectorUnmarshallStartSymbolbaseUnmarshallStart){
     short flag;
     inStream->readShort(flag);
     DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
-
     auto unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
     EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    std::string copy = binary;
+    int invalid = -1;
+    mempcpy(&copy[10], &invalid, 4);
+    inStream = new DataInputStream(copy.data(), 14);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    inStream = new DataInputStream(binary.data(), 16);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
+
+    inStream = new DataInputStream(binary.data(), 19);
+    inStream->readShort(flag);
+    form = static_cast<DATA_FORM>(flag >> 8);
+    unmarshall = ConstantUnmarshallFactory::getInstance(form, inStream);
+    EXPECT_FALSE(unmarshall->start(flag, false, ret));
+    unmarshall->reset();
 }
 
 TEST_F(MarshallTest, VectorUnmarshallObjDeserializeFail){

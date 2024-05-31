@@ -201,7 +201,7 @@ class SharedMemStream {
 
 class IPCInMemTable : public BasicTable {
   public:
-    IPCInMemTable(bool create, std::string shmPath, std::string tableName, const vector<ConstantSP>& cols, const vector<string>& colNames, size_t bufSize);
+    IPCInMemTable(bool create, std::string shmPath, std::string tableName, const std::vector<ConstantSP>& cols, const std::vector<std::string>& colNames, size_t bufSize);
     virtual ~IPCInMemTable();
   
     virtual TABLE_TYPE getTableType() const {return IPCTBL;}

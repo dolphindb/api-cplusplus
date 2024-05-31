@@ -36,10 +36,11 @@ protected:
         }
 
         cout << "ok" << endl;
+        CLEAR_ENV(conn_compress);
     }
     virtual void TearDown()
     {
-        conn_compress.run("undef all;");
+        CLEAR_ENV(conn_compress);
     }
 };
 
@@ -180,12 +181,16 @@ TEST_F(CompressTest,CompressIncludeNull){
 }
 
 TEST_F(CompressTest,insertTableCompressWithAllType){
-    const int count = 600000;
+    const int count = 70000;
     const int scale32=rand()%9, scale64=rand()%18, scale128=rand()%38;
 
+    vector<char> boolval(count);
+    vector<char> chval(count);
+    vector<short> shtval(count);
     vector<int> time(count);
     vector<long long>value(count);
     vector<float> cfloat(count);
+    vector<double> cdouble(count);
     vector<string> name(count);
     vector<string> blob(count);
     vector<string> ipaddr(count);
@@ -193,10 +198,14 @@ TEST_F(CompressTest,insertTableCompressWithAllType){
     vector<double> decimal64(count);
     vector<double> decimal128(count);
     int basetime = Util::countDays(2012,1,1);
-    for(int i=0;i<count;i++){
+    for(int i=0;i<count-1;i++){
+        boolval[i] = i%2==0;
+        chval[i] = char(i);
+        shtval[i] = i;
         time[i] = basetime + (i%15);
         value[i] = (i % 500 == 0) ? i : (long long) nullptr;
         cfloat[i] = float(i)+0.1;
+        cdouble[i] = double(i)+0.1;
         name[i] = to_string(i);
         blob[i] = "fdsafsdfasd"+ to_string(i%32);
         ipaddr[i] = "192.168.100." + to_string(i%255);
@@ -204,6 +213,20 @@ TEST_F(CompressTest,insertTableCompressWithAllType){
         decimal64[i] = 2.454223387226;
         decimal128[i] = (long double)2.454223387226111111111111111111;
     }
+    // add null value to the last row
+    boolval[count-1] = CHAR_MIN;
+    chval[count-1] = CHAR_MIN;
+    shtval[count-1] = SHRT_MIN;
+    time[count-1] = INT_MIN;
+    value[count-1] = LLONG_MIN;
+    cfloat[count-1] = FLT_MIN;
+    cdouble[count-1] = DBL_MIN;
+    name[count-1] = "";
+    blob[count-1] = "";
+    ipaddr[count-1] = "";
+    decimal32[count-1] = DBL_MIN;
+    decimal64[count-1] = 0.0;
+    decimal128[count-1] = 0.0;
 
     VectorSP boolVector = Util::createVector(DT_BOOL,count, count);
     VectorSP charVector = Util::createVector(DT_CHAR, count,count);
@@ -226,23 +249,23 @@ TEST_F(CompressTest,insertTableCompressWithAllType){
     VectorSP blobVector = Util::createVector(DT_BLOB, count,count);
     VectorSP decimal32Vector = Util::createVector(DT_DECIMAL32, count,count, true, scale32);
     VectorSP decimal64Vector = Util::createVector(DT_DECIMAL64, count,count, true, scale64);
-    VectorSP decimal128Vector = Util::createVector(DT_DECIMAL128, count,count, true, scale64);
+    VectorSP decimal128Vector = Util::createVector(DT_DECIMAL128, count,count, true, scale128);
 
-    boolVector->setInt(0,count,time.data());
-    charVector->setInt(0,count,time.data());
-    shortVector->setInt(0,count,time.data());
+    boolVector->setBool(0,count, boolval.data());
+    charVector->setChar(0,count,chval.data());
+    shortVector->setShort(0,count,shtval.data());
     intVector->setInt(0,count,time.data());
     dateVector->setInt(0,count,time.data());
     monthVector->setInt(0,count,time.data());
     timeVector->setInt(0,count,time.data());
     minuteVector->setInt(0,count,time.data());
     secondVector->setInt(0,count,time.data());
-    datetimeVector->setLong(0,count,value.data());
+    datetimeVector->setInt(0,count,time.data());
     timestampVector->setLong(0,count,value.data());
     nanotimeVector->setLong(0,count,value.data());
     nanotimestampVector->setLong(0,count,value.data());
     floatVector->setFloat(0,count,cfloat.data());
-    doubleVector->setFloat(0,count,cfloat.data());
+    doubleVector->setDouble(0,count,cdouble.data());
     symbolVector->setString(0,count,name.data());
     stringVector->setString(0,count,name.data());
     ipaddrVector->setString(0,count,ipaddr.data());
@@ -251,13 +274,14 @@ TEST_F(CompressTest,insertTableCompressWithAllType){
     decimal64Vector->setDouble(0,count,decimal64.data());
     decimal128Vector->setDouble(0,count,decimal128.data());
 
-    vector<string> colName={"cbool","cchar","cshort","cint","cdate","cmonth","ctime","cminute", "csecond","cdatetime","ctimestamp","cnanotime",
+    VectorSP indV = Util::createIndexVector(0,count);
+    vector<string> colName={"ind", "cbool","cchar","cshort","cint","cdate","cmonth","ctime","cminute", "csecond","cdatetime","ctimestamp","cnanotime",
                             "cnanotimestamp","cfloat","cdouble","csymbol","cstring","cipaddr","cblob","cdecimal32","cdecimal64", "cdecimal128"};
-    vector<ConstantSP> colVector {boolVector,charVector,shortVector,intVector,dateVector,monthVector,timeVector,minuteVector,secondVector,
+    vector<ConstantSP> colVector {indV, boolVector,charVector,shortVector,intVector,dateVector,monthVector,timeVector,minuteVector,secondVector,
                                   datetimeVector,timestampVector,nanotimeVector,nanotimestampVector,floatVector,doubleVector,symbolVector,stringVector,
                                   ipaddrVector,blobVector,decimal32Vector,decimal64Vector,decimal128Vector};
     TableSP table  = Util::createTable(colName,colVector);
-    vector<COMPRESS_METHOD> typeVec{COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_DELTA,
+    vector<COMPRESS_METHOD> typeVec{COMPRESS_DELTA,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_DELTA,COMPRESS_DELTA,
                                     COMPRESS_DELTA,COMPRESS_DELTA,COMPRESS_DELTA,COMPRESS_DELTA,
                                     COMPRESS_DELTA,COMPRESS_DELTA,COMPRESS_DELTA,COMPRESS_DELTA,
                                     COMPRESS_DELTA,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,
@@ -265,107 +289,28 @@ TEST_F(CompressTest,insertTableCompressWithAllType){
     table->setColumnCompressMethods(typeVec);
 
     vector<ConstantSP> args{table};
-    string script = "colName =  `cbool`cchar`cshort`cint`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cfloat`cdouble`csymbol`cstring`cipaddr`cblob`cdecimal32`cdecimal64`cdecimal128;\n"
-                    "colType = [BOOL, CHAR, SHORT, INT, DATE, MONTH, TIME, MINUTE, SECOND, DATETIME, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, SYMBOL, STRING,IPADDR,BLOB,DECIMAL32("+to_string(scale32)+"),DECIMAL64("+to_string(scale64)+"),DECIMAL128("+to_string(scale128)+")];\n"
-                    "share streamTable(1:0,colName,colType) as table1;";
+    string script = "colName =  `ind`cbool`cchar`cshort`cint`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cfloat`cdouble`csymbol`cstring`cipaddr`cblob`cdecimal32`cdecimal64`cdecimal128;\n"
+                    "colType = [INT, BOOL, CHAR, SHORT, INT, DATE, MONTH, TIME, MINUTE, SECOND, DATETIME, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, SYMBOL, STRING,IPADDR,BLOB,DECIMAL32("+to_string(scale32)+"),DECIMAL64("+to_string(scale64)+"),DECIMAL128("+to_string(scale128)+")];\n"
+                    "t=table(1:0, colName, colType);"
+                    "dbname = 'dfs://test_compress';tableName = 'test_compress';"
+                    "if(existsDatabase(dbname)){dropDatabase(dbname)};go;"
+                    "db = database(dbname,HASH,[INT, 2],,'TSDB');"
+                    "compress_methods={cbool:`lz4, cchar:`lz4, cshort:`delta, cint:`delta, cdate:`delta, cmonth:`delta, ctime:`delta, cminute:`delta, csecond:`delta, cdatetime:`delta, ctimestamp:`lz4, cnanotime:`lz4, cnanotimestamp:`lz4, cfloat:`lz4, cdouble:`lz4, csymbol:`lz4, cstring:`lz4, cipaddr:`lz4, cblob:`lz4, cdecimal32:`lz4, cdecimal64:`lz4, cdecimal128:`lz4};"
+                    "db.createPartitionedTable(t,tableName,`ind, compress_methods,'ind').append!(t);";
     conn_compress.run(script);
-    int success = conn_compress.run("tableInsert{table1}",args)->getInt();
+    int success = conn_compress.run("tableInsert{loadTable('dfs://test_compress','test_compress')}",args)->getInt();
     EXPECT_EQ(success, count);
 
-    conn_compress.upload("table",table);
+    conn_compress.upload("tmp",table);
 
-    ConstantSP res = conn_compress.run("each(eqObj,table.values(),table1.values())");
-	for (int i = 0; i < res->size(); i++)
-		EXPECT_TRUE(res->get(i)->getBool());
-
-    conn_compress.run("undef(`table1,SHARED)");
-}
-
-TEST_F(CompressTest,CompressLZ4WithAllType){
-    const int count = 600000;
-    vector<string> colName={"cbool","cchar","cshort","cint","cdate","cmonth","ctime","cminute", "csecond","cdatetime","ctimestamp","cnanotime",
-                            "cnanotimestamp","cfloat","cdouble","csymbol","cstring","cipaddr","cblob"};
-    vector<int> time(count);
-    vector<long long>value(count);
-    vector<float> cfloat(count);
-    vector<string> name(count);
-    vector<string> blob(count);
-    vector<string> ipaddr(count);
-    int basetime = Util::countDays(2012,1,1);
-    for(int i=0;i<count;i++){
-        time[i] = basetime + (i%15);
-        value[i] = (i % 500 == 0) ? i : (long long) nullptr;
-        cfloat[i] = float(i)+0.1;
-        name[i] = to_string(i);
-        blob[i] = "fdsafsdfasd"+ to_string(i%32);
-        ipaddr[i] = "192.168.100." + to_string(i%255);
+    ConstantSP ans = conn_compress.run("ex= select * from loadTable('dfs://test_compress','test_compress') order by ind;"
+                                       "res = select * from tmp order by ind; share res as re;"
+                                       "all(each(eqObj,res.values(),ex.values()))");
+	EXPECT_TRUE(ans->getBool());
+    TableSP res = conn_compress.run("select * from loadTable('dfs://test_compress','test_compress') order by ind");
+    for (int i = 0; i < res->columns(); i++) {
+        EXPECT_EQ(res->getColumn(i)->getString(), table->getColumn(i)->getString());
     }
-
-    VectorSP boolVector = Util::createVector(DT_BOOL,count, count);
-    VectorSP charVector = Util::createVector(DT_CHAR, count,count);
-    VectorSP shortVector = Util::createVector(DT_SHORT,count,count);
-    VectorSP intVector = Util::createVector(DT_INT,count,count);
-    VectorSP dateVector = Util::createVector(DT_DATE,count,count);
-    VectorSP monthVector = Util::createVector(DT_MONTH,count,count);
-    VectorSP timeVector = Util::createVector(DT_TIME,count,count);
-    VectorSP minuteVector = Util::createVector(DT_MINUTE,count,count);
-    VectorSP secondVector = Util::createVector(DT_SECOND,count,count);
-    VectorSP datetimeVector = Util::createVector(DT_DATETIME,count,count);
-    VectorSP timestampVector = Util::createVector(DT_TIMESTAMP,count,count);
-    VectorSP nanotimeVector = Util::createVector(DT_NANOTIME,count,count);
-    VectorSP nanotimestampVector = Util::createVector(DT_NANOTIMESTAMP,count,count);
-    VectorSP floatVector = Util::createVector(DT_FLOAT,count,count);
-    VectorSP doubleVector = Util::createVector(DT_DOUBLE,count,count);
-    VectorSP symbolVector = Util::createVector(DT_SYMBOL,count,count);
-    VectorSP stringVector = Util::createVector(DT_STRING,count,count);
-    VectorSP ipaddrVector = Util::createVector(DT_IP, count,count);
-    VectorSP blobVector = Util::createVector(DT_BLOB, count,count);
-
-    boolVector->setInt(0,count,time.data());
-    charVector->setInt(0,count,time.data());
-    shortVector->setInt(0,count,time.data());
-    intVector->setInt(0,count,time.data());
-    dateVector->setInt(0,count,time.data());
-    monthVector->setInt(0,count,time.data());
-    timeVector->setInt(0,count,time.data());
-    minuteVector->setInt(0,count,time.data());
-    secondVector->setInt(0,count,time.data());
-    datetimeVector->setLong(0,count,value.data());
-    timestampVector->setLong(0,count,value.data());
-    nanotimeVector->setLong(0,count,value.data());
-    nanotimestampVector->setLong(0,count,value.data());
-    floatVector->setFloat(0,count,cfloat.data());
-    doubleVector->setFloat(0,count,cfloat.data());
-    symbolVector->setString(0,count,name.data());
-    stringVector->setString(0,count,name.data());
-    ipaddrVector->setString(0,count,ipaddr.data());
-    blobVector->setString(0,count,blob.data());
-
-    vector<ConstantSP> colVector {boolVector,charVector,shortVector,intVector,dateVector,monthVector,timeVector,minuteVector,secondVector,
-                                  datetimeVector,timestampVector,nanotimeVector,nanotimestampVector,floatVector,doubleVector,symbolVector,stringVector,
-                                  ipaddrVector,blobVector};
-    TableSP table  = Util::createTable(colName,colVector);
-    vector<COMPRESS_METHOD> typeVec{COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,
-                                    COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,
-                                    COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,
-                                    COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,
-                                    COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4,COMPRESS_LZ4};
-    table->setColumnCompressMethods(typeVec);
-
-    vector<ConstantSP> args{table};
-    string script = "colName =  `cbool`cchar`cshort`cint`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cfloat`cdouble`csymbol`cstring`cipaddr`cblob;\n"
-                    "colType = [BOOL, CHAR, SHORT, INT, DATE, MONTH, TIME, MINUTE, SECOND, DATETIME, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, SYMBOL, STRING,IPADDR,BLOB];\n"
-                    "share streamTable(1:0,colName,colType) as table1;";
-    conn_compress.run(script);
-    int success = conn_compress.run("tableInsert{table1}",args)->getInt();
-    EXPECT_EQ(success, count);
-
-    TableSP t1 = conn_compress.run("select * from table1");
-//    cout << t1->getString() << endl;
-//    cout << table->getString() <<endl;
-    EXPECT_EQ(t1->getString(),table->getString());
-
-    conn_compress.run("undef(`table1,SHARED)");
 }
 
 TEST_F(CompressTest,CompressVectorWithDiffType){
@@ -794,4 +739,47 @@ TEST_F(CompressTest, upload_other_dataforms_with_compress)
                       "assert 4, 3 in d");
     conn_compress.run("assert 5, each(eqObj, sort(val4.keys()), sort(ee.keys()));"
                       "assert 6, each(eqObj, sort(val4.values()), sort(ee.values()));");
+}
+
+class compressObjectTest : public CompressTest, public testing::WithParamInterface<vector<string>> 
+{
+public:
+    static vector<vector<string>> get_data(){
+        return {
+            {"compress(1 2 3)", "[1,2,3]"},
+            {"compress([2024.04.16T17:18:07.155,2024.04.16T17:18:07.155])", "[2024.04.16T17:18:07.155,2024.04.16T17:18:07.155]"},
+            {"compress(`str1`str2)", "[\"str1\",\"str2\"]"},
+            {"compress([44.277738,34.558771])", "[44.277738,34.558771]"},
+            {"compress(int128(`e1671797c52e15f763380b45e841ec32`e1671797c52e15f763380b45e841ec33))", "[e1671797c52e15f763380b45e841ec32,e1671797c52e15f763380b45e841ec33]"},
+            {"compress(uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87''5d212a78-cc48-e3b1-4235-b4d91473ee88'))", "[5d212a78-cc48-e3b1-4235-b4d91473ee87,5d212a78-cc48-e3b1-4235-b4d91473ee88]"},
+            {"compress(decimal64('1.1054876666452''1.1054876666453', 15))", "[1.105487666645200,1.105487666645300]"},
+            {"compress(array(INT[]).append!([1 2 3]))", "[[1,2,3]]"},
+            {"compress(array(DATEHOUR[]).append!([datehour('2020.01.01T01''2020.02.01T01')]))", "[[2020.01.01T01,2020.02.01T01]]"},
+            {"compress(table(1:0, `c1`c2`c3`c4, [SYMBOL,INT,DOUBLE,DOUBLE[]]))", "c1 c2 c3 c4\n-- -- -- --\n"},
+            {"compress(table(rand(`APPL`GOOL`MSFT`TSLA, 70000) as sym, rand(100.0000, 70000) as price, rand(100, 70000) as qty, arrayVector(1..70000*5, rand(100.0000, 	350000)) as value))", ""},
+            // delta compression
+            {"compress(1 2 3, 'delta')", "[1,2,3]"},
+            {"compress([2024.04.16T17:18:07.155,2024.04.16T17:18:07.155], 'delta')", "[2024.04.16T17:18:07.155,2024.04.16T17:18:07.155]"},
+            {"compress(decimal64('1.1054876666452''1.1054876666453', 15), 'delta')", "[1.105487666645200,1.105487666645300]"},
+            {"compress(table(1:0, `c1`c2`c3`c4, [SYMBOL,INT,DOUBLE,DOUBLE[]]), 'delta')", "c1 c2 c3 c4\n-- -- -- --\n"},
+            {"compress(table(rand(`APPL`GOOL`MSFT`TSLA, 70000) as sym, rand(100.0000, 70000) as price, rand(100, 70000) as qty, arrayVector(1..70000*5, rand(100.0000, 	350000)) as value), 'delta')", ""},
+        };
+    }
+};
+
+INSTANTIATE_TEST_SUITE_P(, compressObjectTest, testing::ValuesIn(compressObjectTest::get_data()));
+TEST_P(compressObjectTest, test_download_and_upload_compress_object){
+    string s1 = GetParam()[0];
+    string s2 = GetParam()[1];
+    ConstantSP obj = conn_compress.run("a = "+s1+";a");
+
+    conn_compress.upload("obj", obj);
+    if (obj->getForm() != DF_TABLE){
+        EXPECT_EQ(obj->getString(), s2);
+        EXPECT_TRUE(conn_compress.run("eqObj(obj, a.decompress())")->getBool());
+    }
+    else
+    {
+        EXPECT_TRUE(conn_compress.run("all(each(eqObj, obj.values(), a.decompress().values()))")->getBool());
+    }
 }

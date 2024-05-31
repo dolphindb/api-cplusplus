@@ -324,7 +324,7 @@ bool TableMarshall::sendMeta(const char* requestHeader, size_t headerSize, const
 
 	//serialize column names
 	while(columnNamesSent_ < cols){
-		const string& name = table->getColumnName(columnNamesSent_);
+		const std::string& name = table->getColumnName(columnNamesSent_);
 		size_t strLen = name.size() + 1;
 		if(headerSize + strLen <= MARSHALL_BUFFER_SIZE){
 #ifdef _MSC_VER
@@ -895,7 +895,7 @@ bool TableUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 	nextColumn_ = 0;
 	colNames_.clear();
 
-	string name;
+	std::string name;
 	while(nextColumn_ < columns_){
 		ret = in_->readString(name);
 		if(ret != OK)
@@ -1012,23 +1012,23 @@ bool ChunkUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 		return false;
 	}
 
-	vector<char> buf(size_);
+	std::vector<char> buf(size_);
 	ret = in_->read(buf.data(), size_);
 	if(ret != OK)
-		return ret;
+		return false;
 
 	return parsing(buf.data()) == OK;
 }
 
 IO_ERR  ChunkUnmarshall::parsing(const char* buf){
 	DataInputStreamSP in(new DataInputStream(buf, size_, false));
-	string path;
+	std::string path;
 	char guid[16];
 	int version;
 	int size;
 	char chunkType;
 	long long cid;
-	vector<string> sites;
+	std::vector<std::string> sites;
 
 	IO_ERR ret = in->readString(path);
 	if(ret != OK)
@@ -1044,7 +1044,7 @@ IO_ERR  ChunkUnmarshall::parsing(const char* buf){
 		return ret;
 	sites.reserve(copyCount);
 	for(char i=0; i<copyCount; ++i){
-		string site;
+		std::string site;
 		if((ret = in->readString(site)) != OK)
 			return ret;
 		sites.push_back(site);
@@ -1141,4 +1141,4 @@ ConstantUnmarshallFactory::~ConstantUnmarshallFactory(){
 	delete arrUnmarshall[DF_CHUNK];
 }
 
-};
+}

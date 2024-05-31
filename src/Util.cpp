@@ -46,14 +46,18 @@
 
 namespace dolphindb{
 
+using std::string;
+using std::vector;
+
 static SmartPointer<ConstantFactory> s_constFactory(new ConstantFactory());
 const bool Util::LITTLE_ENDIAN_ORDER = isLittleEndian();
-string Util::VER = "3.00.0.0";
-int Util::VERNUM = 30000;
-string Util::BUILD = "2024.04.01";
+string Util::VER = "3.00.0.1";
 #ifndef _MSC_VER
-const int Util::BUF_SIZE = 1024;
+constexpr int Util::BUF_SIZE;
 #endif
+int Util::VERNUM = 30001;
+string Util::BUILD = "2024.05.31";
+
 int Util::SEQUENCE_SEARCH_NUM_THRESHOLD = 10;
 int Util::MAX_LENGTH_FOR_ANY_VECTOR = 1048576;
 double Util::SEQUENCE_SEARCH_RATIO_THRESHOLD = 200000;
@@ -1830,4 +1834,4 @@ void Util::writeFile(const char *pfilepath, const void *pbytes, std::size_t byte
 	fclose(pf);
 }
 
-};
+}

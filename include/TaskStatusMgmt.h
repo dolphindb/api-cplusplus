@@ -9,10 +9,10 @@ class TaskStatusMgmt{
 public:
     enum TASK_STAGE{WAITING, FINISHED, ERRORED};
     struct Result{
-        Result(TASK_STAGE s = WAITING, const ConstantSP c = Constant::void_, const string &msg = "") : stage(s), result(c), errMsg(msg){}
+        Result(TASK_STAGE s = WAITING, const ConstantSP c = Constant::void_, const std::string &msg = "") : stage(s), result(c), errMsg(msg){}
         TASK_STAGE stage;
         ConstantSP result;
-        string errMsg;
+        std::string errMsg;
     };
 
     bool isFinished(int identity);

@@ -34,10 +34,11 @@ protected:
 		}
 
         cout<<"ok"<<endl;
+		CLEAR_ENV(conn);
     }
     virtual void TearDown()
     {
-        conn.run("undef all;");
+		CLEAR_ENV(conn);
     }
 };
 
@@ -48,6 +49,17 @@ static T round(T src, int bits)
     ss << fixed << setprecision(bits) << src;
     ss >> src;
     return src;
+}
+
+TEST_F(ScalarTest,testCreateObjectDecimal128){
+    ConstantSP d1 = Util::createObject(dolphindb::DT_DECIMAL128, (float)1, nullptr, 2);
+    EXPECT_EQ(d1->getString(), "1.00");
+    ConstantSP d2 = Util::createObject(dolphindb::DT_DECIMAL128, (float)1, nullptr, -2);
+    EXPECT_EQ(d2->getString(), "1");
+    ConstantSP d3 = Util::createObject(dolphindb::DT_DECIMAL128, (double)1, nullptr, 2);
+    EXPECT_EQ(d3->getString(), "1.00");
+    ConstantSP d4 = Util::createObject(dolphindb::DT_DECIMAL128, (double)1, nullptr, -2);
+    EXPECT_EQ(d4->getString(), "1");
 }
 
 TEST_F(ScalarTest,testScalar){
@@ -333,12 +345,15 @@ TEST_F(ScalarTest,testGuid){
     GuidHash(ghash);
 }
 
-TEST_F(ScalarTest,testDecimal32){
+TEST_F(ScalarTest,test_decimal32){
     ConstantSP decimal32_normal = conn.run("a=3.1626$DECIMAL32(8);a");
     ConstantSP decimal32_null = conn.run("b=NULL$DECIMAL32(8);b");
     EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal32(-1, 3.1626));
-    EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal32(0, 10000000000)); //scale + value's places must less than 10
-    EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal32(10, 3.1626)); //scale + value's places must less than 10
+    EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal32(0, 10000000000)); //scale + value's places must less than 11
+    ConstantSP d0 = Util::createConstant(DT_DECIMAL32, 0);
+    EXPECT_ANY_THROW(d0->setString("1000000000.0")); // scale + value's places must less than 11
+    EXPECT_ANY_THROW(d0->setString("-1000000000.0")); // scale + value's places must less than 11
+    EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal32(10, 3.1626)); //scale + value's places must less than 11
     EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal32(9, 3.1626));
     ConstantSP decimalval1 = Util::createDecimal32(8, 3.1626);
     ConstantSP decimalval2 = Util::createNullConstant(DT_DECIMAL32, 8);
@@ -426,6 +441,10 @@ TEST_F(ScalarTest,testDecimal32){
 	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal64(8,0.999999999)),1);
 	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal64(10,2.00001)),-1);
 	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal64(1,1)),0);
+    EXPECT_EQ(decimalval1->compare(0,Util::createNullConstant(DT_DECIMAL64)), 1);
+    EXPECT_EQ(decimalval1->compare(0, Util::createFloat(1.001)), -1);
+    EXPECT_EQ(decimalval1->compare(0, Util::createDouble(0.99)), 1);
+    EXPECT_EQ(decimalval1->compare(0, Util::createDouble(1)), 0);
 	EXPECT_ANY_THROW(decimalval1->compare(0,Util::createBlob("blob1")));
 
     ConstantSP decimalval3 = Util::createDecimal32(0, 100);
@@ -439,13 +458,19 @@ TEST_F(ScalarTest,testDecimal32){
     decimalval3->setNull();
     EXPECT_EQ(decimalval3->getString(),"");
     EXPECT_TRUE(decimalval3->isNull());
+
+    EXPECT_EQ(decimalval3->compare(0, Util::createNullConstant(DT_INT)), 0);
+    EXPECT_EQ(decimalval3->compare(0, Util::createFloat(1.234)), -1);
 }
 
-TEST_F(ScalarTest,testDecimal64){
+TEST_F(ScalarTest,test_decimal64){
     ConstantSP decimal64_normal = conn.run("a=13.1626$DECIMAL64(16);a");
     ConstantSP decimal64_null = conn.run("b=NULL$DECIMAL64(16);b");
     EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal64(-1, 13.1626));
     EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal64(0, 10000000000000000000.0)); //scale + value's places must less than 20
+    ConstantSP d0 = Util::createConstant(DT_DECIMAL64, 0);
+    EXPECT_ANY_THROW(d0->setString("1000000000000000000.0")); // scale + value's places must less than 20
+    EXPECT_ANY_THROW(d0->setString("-1000000000000000000.0")); // scale + value's places must less than 20
     EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal64(19, 13.1626)); //scale + value's places must less than 20
     EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal64(18, 13.1626));
     ConstantSP decimalval1 = Util::createDecimal64(16, 13.1626);
@@ -539,6 +564,10 @@ TEST_F(ScalarTest,testDecimal64){
 	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal64(18,0.999999999)),1);
 	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal64(10,2.00001)),-1);
 	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal64(11,1)),0);
+    EXPECT_EQ(decimalval1->compare(0,Util::createNullConstant(DT_DECIMAL64)), 1);
+    EXPECT_EQ(decimalval1->compare(0, Util::createFloat(1.001)), -1);
+    EXPECT_EQ(decimalval1->compare(0, Util::createDouble(0.99)), 1);
+    EXPECT_EQ(decimalval1->compare(0, Util::createDouble(1)), 0);
 	EXPECT_ANY_THROW(decimalval1->compare(0,Util::createBlob("blob1")));
 
     ConstantSP decimalval4 = Util::createDecimal64(0, 100);
@@ -551,14 +580,17 @@ TEST_F(ScalarTest,testDecimal64){
     decimalval4->setNull();
     EXPECT_EQ(decimalval4->getString(),"");
     EXPECT_TRUE(decimalval4->isNull());
+    EXPECT_EQ(decimalval4->compare(0, Util::createNullConstant(DT_INT)), 0);
+    EXPECT_EQ(decimalval4->compare(0, Util::createFloat(1.234)), -1);
 }
 
-TEST_F(ScalarTest,testDecimal128){
+TEST_F(ScalarTest,test_decimal128){
     ConstantSP decimal128_normal = conn.run("a=13.1626$DECIMAL128(26);a");
     ConstantSP decimal128_null = conn.run("b=NULL$DECIMAL128(26);b");
     EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal128(-1, 13.1626));
     ConstantSP d0 = Util::createConstant(DT_DECIMAL128, 0);
     EXPECT_ANY_THROW(d0->setString("100000000000000000000000000000000000000.0")); // scale + value's places must less than 40
+    EXPECT_ANY_THROW(d0->setString("-100000000000000000000000000000000000000.0")); // scale + value's places must less than 40
     EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal128(38, 13.1626)); // scale + value's places must less than 40
     EXPECT_ANY_THROW(ConstantSP decimalval1 = Util::createDecimal128(37, 113.1626));
     ConstantSP decimalval1 = Util::createDecimal128(26, 13.1626);
@@ -658,6 +690,10 @@ TEST_F(ScalarTest,testDecimal128){
 	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal128(18,0.999999999)),1);
 	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal128(10,2.00001)),-1);
 	EXPECT_EQ(decimalval1->compare(0,Util::createDecimal128(11,1)),0);
+    EXPECT_EQ(decimalval1->compare(0,Util::createNullConstant(DT_DECIMAL128)), 1);
+    EXPECT_EQ(decimalval1->compare(0, Util::createFloat(1.001)), -1);
+    EXPECT_EQ(decimalval1->compare(0, Util::createDouble(0.99)), 1);
+    EXPECT_EQ(decimalval1->compare(0, Util::createDouble(1)), 0);
 	EXPECT_ANY_THROW(decimalval1->compare(0,Util::createBlob("blob1")));
 
     ConstantSP decimalval4 = Util::createDecimal128(0, 100);
@@ -670,6 +706,9 @@ TEST_F(ScalarTest,testDecimal128){
     decimalval4->setNull();
     EXPECT_EQ(decimalval4->getString(),"");
     EXPECT_TRUE(decimalval4->isNull());
+
+    EXPECT_EQ(decimalval4->compare(0, Util::createNullConstant(DT_INT)), 0);
+    EXPECT_EQ(decimalval4->compare(0, Util::createFloat(1.234)), -1);
 }
 
 TEST_F(ScalarTest, test_convertType_decimal32){
@@ -684,6 +723,131 @@ TEST_F(ScalarTest, test_convertType_decimal32){
 
     dcmVal->setString("987.213");
     EXPECT_EQ(dcmVal->getString(), "987.21300");
+    cout<< dcmVal->getString()<<endl;
+
+    const char* str = "+0.9998495";
+    dcmVal->setString(str);
+    EXPECT_EQ(dcmVal->getString(), "0.99985");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("-*0.9998495");
+    EXPECT_EQ(dcmVal->getString(), "0.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("*123456");
+    EXPECT_EQ(dcmVal->getString(), "");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("abc");
+    EXPECT_EQ(dcmVal->getString(), "");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("-abc");
+    EXPECT_EQ(dcmVal->getString(), "0.00000");
+    cout<< dcmVal->getString()<<endl;  
+
+    dcmVal->setString(".3");
+    EXPECT_EQ(dcmVal->getString(), "0.30000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("-.3");
+    EXPECT_EQ(dcmVal->getString(), "-0.30000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("\n9876.321");
+    EXPECT_EQ(dcmVal->getString(), "");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString(" 9876.321");
+    EXPECT_EQ(dcmVal->getString(), "9876.32100");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("\t9876.321");
+    EXPECT_EQ(dcmVal->getString(), "9876.32100");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("\r9876.321");
+    EXPECT_EQ(dcmVal->getString(), "");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("9876.321  \n\t");
+    EXPECT_EQ(dcmVal->getString(), "9876.32100");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("9876.321\t\t");
+    EXPECT_EQ(dcmVal->getString(), "9876.32100");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("-\n9876.321");
+    EXPECT_EQ(dcmVal->getString(), "0.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("- 9876.321");
+    EXPECT_EQ(dcmVal->getString(), "-9876.32100");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("-\t9876.321");
+    EXPECT_EQ(dcmVal->getString(), "-9876.32100");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("-\r9876.321");
+    EXPECT_EQ(dcmVal->getString(), "0.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("98 76.321");
+    EXPECT_EQ(dcmVal->getString(), "9876.32100");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("98\t76.321");
+    EXPECT_EQ(dcmVal->getString(), "9876.32100");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("98\n76.321");
+    EXPECT_EQ(dcmVal->getString(), "98.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("-9876.321  \n\t");
+    EXPECT_EQ(dcmVal->getString(), "-9876.32100");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("-9876.321\t\t");
+    EXPECT_EQ(dcmVal->getString(), "-9876.32100");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("0000.321\t\t");
+    EXPECT_EQ(dcmVal->getString(), "0.32100");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("1111\t");
+    EXPECT_EQ(dcmVal->getString(), "1111.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("1234\n");
+    EXPECT_EQ(dcmVal->getString(), "1234.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("1111 ");
+    EXPECT_EQ(dcmVal->getString(), "1111.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("3.*");
+    EXPECT_EQ(dcmVal->getString(), "3.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("5.abc");
+    EXPECT_EQ(dcmVal->getString(), "5.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("4.\n");
+    EXPECT_EQ(dcmVal->getString(), "4.00000");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("123.456\t");
+    EXPECT_EQ(dcmVal->getString(), "123.45600");
+    cout<< dcmVal->getString()<<endl;
+
+    dcmVal->setString("-123.456  ");
+    EXPECT_EQ(dcmVal->getString(), "-123.45600");
     cout<< dcmVal->getString()<<endl;
 
     dcmVal->setBool(false);

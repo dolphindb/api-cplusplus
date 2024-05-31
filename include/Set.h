@@ -17,7 +17,7 @@ public:
     virtual bool isSuperset(const ConstantSP& target) const = 0;
     virtual ConstantSP interaction(const ConstantSP& target) const = 0;
     virtual ConstantSP getSubVector(INDEX start, INDEX length) const = 0;
-    virtual string getScript() const {return "set()";}
+    virtual std::string getScript() const {return "set()";}
     virtual bool isLargeConstant() const {return true;}
 };
 typedef SmartPointer<Set> SetSP;

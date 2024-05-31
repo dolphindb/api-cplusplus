@@ -5,7 +5,7 @@
 namespace dolphindb{
 
 
-vector<int> HashDomain::getPartitionKeys(const ConstantSP& partitionColTable) const {
+std::vector<int> HashDomain::getPartitionKeys(const ConstantSP& partitionColTable) const {
     if(partitionColTable->getCategory() != partitionColCategory_)
         throw RuntimeException("Data category incompatible.");
     ConstantSP partitionCol = partitionColTable;
@@ -15,7 +15,7 @@ vector<int> HashDomain::getPartitionKeys(const ConstantSP& partitionColTable) co
     		throw new RuntimeException("Can't convert partition column");
     }
     int rows = partitionCol->rows();
-    vector<int> keys(rows);
+    std::vector<int> keys(rows);
     INDEX count = 0;
     INDEX start = 0;
     int *pbuf;
@@ -52,7 +52,7 @@ ListDomain::ListDomain(DATA_TYPE partitionColType, ConstantSP partitionSchema) :
     }
 }
 
-vector<int> ListDomain::getPartitionKeys(const ConstantSP& partitionColTable) const {
+std::vector<int> ListDomain::getPartitionKeys(const ConstantSP& partitionColTable) const {
     if(partitionColTable->getCategory() != partitionColCategory_)
         throw RuntimeException("Data category incompatible.");
     ConstantSP partitionCol = partitionColTable;
@@ -62,7 +62,7 @@ vector<int> ListDomain::getPartitionKeys(const ConstantSP& partitionColTable) co
             throw new RuntimeException("Can't convert partition column");
     }
     int rows = partitionCol->rows();
-    vector<int> keys(rows);
+    std::vector<int> keys(rows);
     for(int i=0; i<rows; ++i){
         ConstantSP index = dict_->getMember(partitionCol->get(i));
         if(index->isNull())
@@ -73,7 +73,7 @@ vector<int> ListDomain::getPartitionKeys(const ConstantSP& partitionColTable) co
     return keys;
 }
 	
-vector<int> ValueDomain::getPartitionKeys(const ConstantSP& partitionColTable) const {
+std::vector<int> ValueDomain::getPartitionKeys(const ConstantSP& partitionColTable) const {
     if(partitionColTable->getCategory() != partitionColCategory_)
         throw RuntimeException("Data category incompatible.");
     ConstantSP partitionCol = partitionColTable;
@@ -85,7 +85,7 @@ vector<int> ValueDomain::getPartitionKeys(const ConstantSP& partitionColTable) c
     if(partitionColType_ == DT_LONG)
         throw RuntimeException("Long type value can't be used as a partition column.");
     int rows = partitionCol->rows();
-    vector<int> keys(rows);
+    std::vector<int> keys(rows);
     INDEX count = 0;
     INDEX start = 0;
     int *pbuf;
@@ -100,7 +100,7 @@ vector<int> ValueDomain::getPartitionKeys(const ConstantSP& partitionColTable) c
     return keys;
 }
 
-vector<int> RangeDomain::getPartitionKeys(const ConstantSP& partitionColTable) const {
+std::vector<int> RangeDomain::getPartitionKeys(const ConstantSP& partitionColTable) const {
     if(partitionColTable->getCategory() != partitionColCategory_)
         throw RuntimeException("Data category incompatible.");
     ConstantSP partitionCol = partitionColTable;
@@ -111,7 +111,7 @@ vector<int> RangeDomain::getPartitionKeys(const ConstantSP& partitionColTable) c
     }
     int rows = partitionCol->rows();
     int partitions = range_->size() - 1;
-    vector<int> keys(rows);
+    std::vector<int> keys(rows);
     for(int i=0; i<rows; ++i){
         int index = range_->asof(partitionCol->get(i));
         if(index >= partitions)
@@ -121,4 +121,4 @@ vector<int> RangeDomain::getPartitionKeys(const ConstantSP& partitionColTable) c
     }
     return keys;
 }
-};
+}

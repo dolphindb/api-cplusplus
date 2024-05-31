@@ -26,7 +26,8 @@
 #include "Domain.h"
 #include "DBConnectionPoolImpl.h"
 using std::ifstream;
-
+using std::string;
+using std::vector;
 #ifdef INDEX64
 namespace std {
 int min(int a, INDEX b) {
@@ -159,7 +160,7 @@ bool DBConnection::connect(const string& hostName, int port, const string& userI
 		while (closed_ == false) {
 			while(conn_->isConnected()==false && closed_ == false) {
 				for (auto &one : nodes_) {
-					if (connectNode(one.hostName, one.port, keepAliveTime)) {
+					if (connectNode(one.hostName_, one.port_, keepAliveTime)) {
 						connectedNode = one;
 						break;
 					}
@@ -170,21 +171,21 @@ bool DBConnection::connect(const string& hostName, int port, const string& userI
 				table = conn_->run("rpc(getControllerAlias(), getClusterPerf)");
                 break;
 			}
-			catch (exception& e) {
+			catch (std::exception& e) {
 				std::cerr << "ERROR getting other data nodes, exception: " << e.what() << std::endl;
 				string host;
-				int port = 0;
+				int portNumber = 0;
 				if (connected()) {
-					ExceptionType type = parseException(e.what(), host, port);
+					ExceptionType type = parseException(e.what(), host, portNumber);
 					if (type == ET_IGNORE)
 						continue;
 					else if (type == ET_NEWLEADER || type == ET_NODENOTAVAIL) {
-						switchDataNode(host, port);
+						switchDataNode(host, portNumber);
 					}
 				}
 				else {
-                    parseException(e.what(), host, port);
-					switchDataNode(host, port);
+                    parseException(e.what(), host, portNumber);
+					switchDataNode(host, portNumber);
 				}
 			}
 		}
@@ -206,8 +207,8 @@ bool DBConnection::connect(const string& hostName, int port, const string& userI
 				Node *pexistNode = NULL;
 				if (!highAvailabilitySites.empty()) {
 					for (auto &node : nodes_) {
-						if (node.hostName.compare(nodeHost) == 0 &&
-							node.port == nodePort) {
+						if (node.hostName_.compare(nodeHost) == 0 &&
+							node.port_ == nodePort) {
 							pexistNode = &node;
 							break;
 						}
@@ -226,7 +227,7 @@ bool DBConnection::connect(const string& hostName, int port, const string& userI
 					load = DBL_MAX;
 				}
 				if (pexistNode != NULL) {
-					pexistNode->load = load;
+					pexistNode->load_ = load;
 				}
 				else {
 					nodes_.push_back(Node(colHost->get(i)->getString(), colPort->get(i)->getInt(), load));
@@ -236,7 +237,7 @@ bool DBConnection::connect(const string& hostName, int port, const string& userI
 		Node *pMinNode=NULL;
 		for (auto &one : nodes_) {
 			if (pMinNode == NULL || 
-				(one.load >= 0 && pMinNode->load > one.load)) {
+				(one.load_ >= 0 && pMinNode->load_ > one.load_)) {
 				pMinNode = &one;
 			}
 		}
@@ -244,7 +245,7 @@ bool DBConnection::connect(const string& hostName, int port, const string& userI
 		
 		if (!pMinNode->isEqual(connectedNode)) {
 			conn_->close();
-			switchDataNode(pMinNode->hostName, pMinNode->port);
+			switchDataNode(pMinNode->hostName_, pMinNode->port_);
 			return true;
 		}
     } else {
@@ -268,13 +269,12 @@ bool DBConnection::connected() {
     try {
         ConstantSP ret = conn_->run("1+1");
         return !ret.isNull() && (ret->getInt() == 2);
-    } catch (exception&) {
+    } catch (std::exception&) {
         return false;
     }
 }
 
 bool DBConnection::connectNode(string hostName, int port, int keepAliveTime) {
-	DLOG("Connect to",hostName ,":",port,".");
 	//int attempt = 0;
 	while (closed_ == false) {
 		try {
@@ -331,11 +331,11 @@ DBConnection::ExceptionType DBConnection::parseException(const string &msg, stri
 }
 
 void DBConnection::switchDataNode(const string &host, int port) {
-    bool connected = false;
-    while (connected == false && closed_ == false){
+    bool isConnected = false;
+    while (isConnected == false && closed_ == false){
         if (!host.empty()) {
             if (connectNode(host, port)) {
-                connected = true;
+                isConnected = true;
                 break;
             }
         }
@@ -344,15 +344,15 @@ void DBConnection::switchDataNode(const string &host, int port) {
         }
         for (int i = static_cast<int>(nodes_.size() - 1); i >= 0; i--) {
             lastConnNodeIndex_ = (lastConnNodeIndex_ + 1) % nodes_.size();
-            if (connectNode(nodes_[lastConnNodeIndex_].hostName, nodes_[lastConnNodeIndex_].port)) {
-                connected = true;
+            if (connectNode(nodes_[lastConnNodeIndex_].hostName_, nodes_[lastConnNodeIndex_].port_)) {
+                isConnected = true;
                 break;
             }
         }
-        if(connected) break;
+        if(isConnected) break;
         Thread::sleep(1000);
     }
-    if (connected && initialScript_.empty() == false)
+    if (isConnected && initialScript_.empty() == false)
         run(initialScript_);
 }
 
@@ -522,8 +522,8 @@ void DBConnection::initClientID(){
 }
 
 DBConnection::Node::Node(const string &ipport, double loadValue) {
-	DBConnection::parseIpPort(ipport, hostName, port);
-	load = loadValue;
+	DBConnection::parseIpPort(ipport, hostName_, port_);
+	load_ = loadValue;
 }
 
 void DBConnection::close() {
@@ -545,12 +545,12 @@ void DBConnection::setInitScript(const std::string & script) {
 }
 
 BlockReader::BlockReader(const DataInputStreamSP& in ) : in_(in), total_(0), currentIndex_(0){
-    int rows, cols;
-    if(in->readInt(rows) != OK)
+    int rowNum, colNum;
+    if(in->readInt(rowNum) != OK)
         throw IOException("Failed to read rows for data block.");
-    if(in->readInt(cols) != OK)
+    if(in->readInt(colNum) != OK)
         throw IOException("Faield to read col for data block.");
-    total_ = (long long)rows * (long long)cols;
+    total_ = (long long)rowNum * (long long)colNum;
 }
 
 BlockReader::~BlockReader(){
@@ -706,7 +706,7 @@ void PartitionedTableAppender::init(string dbUrl, string tableName, string parti
         }
         
         domain_ = Util::createDomain((PARTITION_TYPE)partitionType, partitionColType, partitionSchema);
-    } catch (exception& e) {
+    } catch (std::exception& e) {
         throw e;
     } 
 }
@@ -805,7 +805,7 @@ AutoFitTableAppender::AutoFitTableAppender(string dbUrl, string tableName, DBCon
             columnNames_[i] = colNames->getString(i);
         }
         
-    } catch (exception& e) {
+    } catch (std::exception& e) {
         throw e;
     } 
 }
@@ -908,7 +908,7 @@ AutoFitTableUpsert::AutoFitTableUpsert(string dbUrl, string tableName, DBConnect
             columnNames_[i] = colNames->getString(i);
         }
         
-    } catch (exception& e) {
+    } catch (std::exception& e) {
         throw e;
     } 
 }
@@ -1067,5 +1067,5 @@ void ErrorCodeInfo::set(const ErrorCodeInfo &src) {
 	set(src.errorCode, src.errorInfo);
 }
 
-};    // namespace dolphindb
+}    // namespace dolphindb
 

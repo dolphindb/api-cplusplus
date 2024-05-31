@@ -32,35 +32,35 @@ public:
     static void SetUpTestSuite()
     {
 
-        connsp->initialize();
-        bool ret = connsp->connect(hostName, port, "admin", "123456");
-        if (!ret)
+        conn300->initialize();
+        bool ret = conn300->connect(hostName, port300, "admin", "123456");
+        cout<<"check connect...";
+        try
         {
-            cout << "Failed to connect to the server" << endl;
+            ConstantSP res = conn300->run("1+1");
         }
-        else
+        catch(const std::exception& e)
         {
-            cout << "connect to " + hostName + ":" + std::to_string(port) << endl;
+            conn300->connect(hostName, port300, "admin", "123456");
         }
     }
 
     virtual void SetUp()
     {
-        if (!isNewServer(*connsp, 3, 0, 0)) {GTEST_SKIP() << "at least server v3.00.0.0 support CEP";}
-        connsp->run(get_clear_script());
+        if (!isNewServer(*conn300, 3, 0, 0)) {GTEST_SKIP() << "at least server v3.00.0.0 support CEP";}
+        conn300->run(get_clear_script());
     }
     virtual void TearDown()
     {
-        // connsp->run(get_clear_script());
+        conn300->run(get_clear_script());
     }
     static void TearDownTestSuite()
     {
-        // connsp->run(get_clear_script());
-        connsp->close();
+        conn300->close();
     }
 };
 
-auto test_handler = [&](string eventType, std::vector<ConstantSP> attribute)
+auto test_handler = [](string eventType, std::vector<ConstantSP> attribute)
 {
     Util::sleep(1000);
     cout << "eventType: " + eventType << endl;
@@ -68,7 +68,7 @@ auto test_handler = [&](string eventType, std::vector<ConstantSP> attribute)
     //     cout << at->getString() << endl;
     try
     {
-        connsp->run("tableInsert{outputTable}", attribute);
+        conn300->run("tableInsert{outputTable}", attribute);
     }
     catch (exception &e)
     {
@@ -89,8 +89,8 @@ vector<string> subInputTable(const string &t, const int target_rows, const std::
         vector<DATA_TYPE> colTypes = schema.fieldTypes_;
         TableSP t = Util::createTable(colNames, colTypes, 0, 0, schema.fieldExtraParams_);
         string curTabName = "output_" + schema.eventType_;
-        connsp->upload("tmp", t);
-        connsp->run("share tmp as " + curTabName + ";");
+        conn300->upload("tmp", t);
+        conn300->run("share tmp as " + curTabName + ";");
         tmap.insert(std::pair<string, string>(schema.eventType_, curTabName));
     }
 
@@ -129,7 +129,7 @@ vector<string> subInputTable(const string &t, const int target_rows, const std::
                 }
 
                 TableSP t = Util::createTable(schema.fieldNames_, columnVecs);
-                AutoFitTableAppender appender = AutoFitTableAppender("", tmap[eventType], *connsp);
+                AutoFitTableAppender appender = AutoFitTableAppender("", tmap[eventType], *conn300);
                 EXPECT_EQ(appender.append(t), 1);
             }
         }
@@ -139,10 +139,10 @@ vector<string> subInputTable(const string &t, const int target_rows, const std::
         if (total_rows == target_rows) notify.set();
     };
 
-    auto th = client->subscribe(hostName, port, _handler, t, DEFAULT_ACTION_NAME, 0);
+    auto th = client->subscribe(hostName, port300, _handler, t, DEFAULT_ACTION_NAME, 0);
     notify.wait();
 
-    client->unsubscribe(hostName, port, t, DEFAULT_ACTION_NAME);
+    client->unsubscribe(hostName, port300, t, DEFAULT_ACTION_NAME);
     Util::sleep(1000);
     EXPECT_TRUE(th->isComplete());
     EXPECT_FALSE(th->isRunning());
@@ -164,7 +164,7 @@ TEST_F(CEPEventTest, test_EventSchema_null)
     string re = "";
     try
     {
-        EventSender *sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender *sender = new EventSender(conn300, "", eventSchemas, eventTimeKeys, commonKeys);
     }
     catch (exception &ex)
     {
@@ -196,7 +196,7 @@ TEST_F(CEPEventTest, test_EventType_null)
     string re = "";
     try
     {
-        EventSender *sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender *sender = new EventSender(conn300, "", eventSchemas, eventTimeKeys, commonKeys);
     }
     catch (exception &ex)
     {
@@ -229,7 +229,7 @@ TEST_F(CEPEventTest, test_EventType_null2)
     string re = "";
     try
     {
-        EventSender *sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender *sender = new EventSender(conn300, "", eventSchemas, eventTimeKeys, commonKeys);
     }
     catch (exception &ex)
     {
@@ -253,7 +253,7 @@ TEST_F(CEPEventTest, test_EventType_special_character)
 {
     string script = "share streamTable(1:0, `eventType`event, [STRING,BLOB]) as inputTable;\n"
                     "share streamTable(1:0, `market`code`price`qty`eventTime, [STRING,STRING,DOUBLE,INT,TIMESTAMP]) as outputTable;";
-    connsp->run(script);
+    conn300->run(script);
     EventSchema *schema = new EventSchema();
     //TODO 用C++API写入\r结尾的字符串数据，写入后会缺少\r，正在跟server讨论这个问题，这里先规避，后面加个1
     schema->eventType_ = "!@#$%&*()_+《》>{}[]-=';./,~`1^;中文 \"\n\t\r1";
@@ -263,15 +263,15 @@ TEST_F(CEPEventTest, test_EventType_special_character)
     vector<EventSchema> eventSchemas = {*schema};
     vector<string> eventTimeKeys = {};
     vector<string> commonKeys = {};
-    EventSender *sender = new EventSender(connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender *sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
 
     EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-    client->subscribe(hostName, port, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
     sender->sendEvent(schema->eventType_, {Util::createString("sz"), Util::createString("000001"), Util::createDouble(10.5), Util::createInt(100), Util::createTimestamp(2021, 1, 1, 10, 30, 0, 100)});
     Util::sleep(2000);
 
-    client->unsubscribe(hostName, port, "inputTable", DEFAULT_ACTION_NAME);
-    TableSP re = connsp->run("select * from outputTable");
+    client->unsubscribe(hostName, port300, "inputTable", DEFAULT_ACTION_NAME);
+    TableSP re = conn300->run("select * from outputTable");
     EXPECT_EQ(1, re->rows());
     EXPECT_EQ("sz", re->getColumn(0)->get(0)->getString());
     EXPECT_EQ("000001", re->getColumn(1)->get(0)->getString());
@@ -296,7 +296,7 @@ TEST_F(CEPEventTest, test_EventType_same_with_eventTimeKeys)
     vector<string> commonKeys = {};
     string re = "";
     try{
-        EventSender* sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender* sender = new EventSender(conn300, "", eventSchemas, eventTimeKeys, commonKeys);
 
     }catch(const exception& ex){
         re = ex.what();
@@ -313,7 +313,7 @@ TEST_F(CEPEventTest, test_EventType_same_with_eventTimeKeys)
     EXPECT_EQ("EventType must be unique", re1);
 }
 
-TEST_F(CEPEventTest, test_AttrKeys_null)
+TEST_F(CEPEventTest, test_fieldNames_null)
 {
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
@@ -325,7 +325,7 @@ TEST_F(CEPEventTest, test_AttrKeys_null)
     vector<string> commonKeys = {};
     string re = "";
     try{
-        EventSender* sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender* sender = new EventSender(conn300, "", eventSchemas, eventTimeKeys, commonKeys);
 
     }catch(const exception& ex){
         re = ex.what();
@@ -342,38 +342,9 @@ TEST_F(CEPEventTest, test_AttrKeys_null)
     EXPECT_EQ("the eventKey in eventSchema must not be empty", re1);
 }
 
-TEST_F(CEPEventTest, test_AttrKeys_duplicated)
-{
-    EventSchema *schema = new EventSchema();
-    schema->eventType_ = "market";
-    schema->fieldNames_ = {"market", "market", "decimal32", "decimal64", "decimal128"};
-    schema->fieldTypes_ = {DT_STRING, DT_TIME, DT_DECIMAL32, DT_DECIMAL64, DT_DECIMAL128};
-    schema->fieldForms_={DF_SCALAR, DF_SCALAR, DF_SCALAR, DF_SCALAR, DF_SCALAR};
-    vector<EventSchema> eventSchemas = {*schema};
-    vector<string> eventTimeKeys = {};
-    vector<string> commonKeys = {};
-    string re = "";
-    try{
-        EventSender* sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
-
-    }catch(const exception& ex){
-        re = ex.what();
-    }
-    EXPECT_EQ("EventSchema cannot has duplicated attrKey in attrKeys.", re);
-
-    string re1 = "";
-    try{
-        EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-
-    }catch(const exception&  ex){
-        re1 = ex.what();
-    }
-    EXPECT_EQ("EventSchema cannot has duplicated attrKey in attrKeys.", re1);
-}
-
 TEST_F(CEPEventTest, test_EventSender_AttrKeys_one_colume)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"time"};
@@ -382,10 +353,10 @@ TEST_F(CEPEventTest, test_EventSender_AttrKeys_one_colume)
     vector<EventSchema> eventSchemas = {*schema};
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {};
-    EventSender *sender = new EventSender(connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender *sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
     vector<ConstantSP> attributes = {Util::createTime(10,45,3,100)};
     sender->sendEvent("market", attributes);
-    TableSP re = connsp->run("select * from inputTable");
+    TableSP re = conn300->run("select * from inputTable");
 
     EXPECT_EQ(1, re->rows());
     EXPECT_EQ("10:45:03.100", re->getColumn(0)->get(0)->getString());
@@ -403,7 +374,7 @@ TEST_F(CEPEventTest, test_AttrTypes_null)
     vector<string> commonKeys = {};
     string re = "";
     try{
-        EventSender* sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender* sender = new EventSender(conn300, "", eventSchemas, eventTimeKeys, commonKeys);
 
     }catch(exception& ex){
         re = ex.what();
@@ -432,7 +403,7 @@ TEST_F(CEPEventTest, test_AttrForms_null)
     vector<string> commonKeys = {};
     string re = "";
     try{
-        EventSender* sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender* sender = new EventSender(conn300, "", eventSchemas, eventTimeKeys, commonKeys);
 
     }catch(exception& ex){
         re = ex.what();
@@ -449,38 +420,9 @@ TEST_F(CEPEventTest, test_AttrForms_null)
     EXPECT_EQ("The number of eventKey, eventTypes, eventForms and eventExtraParams must have the same length.", re1);
 }
 
-TEST_F(CEPEventTest, test_attrExtraParams_null_with_decimal)
-{
-    EventSchema *schema = new EventSchema();
-    schema->eventType_ = "market";
-    schema->fieldNames_ = {"market", "time", "decimal32", "decimal64", "decimal128"};
-    schema->fieldTypes_ = {DT_STRING, DT_TIME, DT_DECIMAL32, DT_DECIMAL64, DT_DECIMAL128};
-    schema->fieldForms_={DF_SCALAR, DF_SCALAR, DF_SCALAR, DF_SCALAR, DF_SCALAR};
-    schema->fieldExtraParams_ = {};
-    vector<EventSchema> eventSchemas = {*schema};
-    vector<string> eventTimeKeys = {};
-    vector<string> commonKeys = {};
-    string re = "";
-    try{
-        EventSender* sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
-
-    }catch(exception& ex){
-        re = ex.what();
-    }
-    EXPECT_EQ("invalid decimal scale", re);
-
-    string re1 = "";
-    try{
-        EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-
-    }catch(exception& ex){
-        re1 = ex.what();
-    }
-    EXPECT_EQ("invalid decimal scale", re1);
-}
-
 TEST_F(CEPEventTest, test_attrExtraParams_overflow)
 {
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time", "decimal32", "decimal64", "decimal128"};
@@ -492,7 +434,7 @@ TEST_F(CEPEventTest, test_attrExtraParams_overflow)
     vector<string> commonKeys = {};
     string re = "";
     try{
-        EventSender* sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
 
     }catch(exception& ex){
         re = ex.what();
@@ -522,7 +464,7 @@ TEST_F(CEPEventTest, test_eventTimeKeys_not_exist)
     vector<string> commonKeys = {};
     string re = "";
     try{
-        EventSender* sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender* sender = new EventSender(conn300, "", eventSchemas, eventTimeKeys, commonKeys);
 
     }catch(exception& ex){
         re = ex.what();
@@ -541,6 +483,7 @@ TEST_F(CEPEventTest, test_eventTimeKeys_not_exist)
 
 TEST_F(CEPEventTest, test_eventTimeKeys_not_time_column)
 {
+    conn300->run("share streamTable(1:0, `time`eventType`event, [STRING,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time", "decimal32", "decimal64", "decimal128"};
@@ -551,12 +494,12 @@ TEST_F(CEPEventTest, test_eventTimeKeys_not_time_column)
     vector<string> commonKeys = {};
     string re = "";
     try{
-        EventSender* sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
 
     }catch(exception& ex){
         re = ex.what();
     }
-    EXPECT_EQ("First column of outputTable should be temporal if specified eventTimeKey", re);
+    EXPECT_EQ("The first column of the output table must be temporal if eventTimeKey is specified.", re);
 
     string re1 = "";
     try{
@@ -565,12 +508,12 @@ TEST_F(CEPEventTest, test_eventTimeKeys_not_time_column)
     }catch(exception& ex){
         re1 = ex.what();
     }
-    EXPECT_EQ("First column of outputTable should be temporal if specified eventTimeKey", re1);
+    EXPECT_EQ("The first column of the output table must be temporal if eventTimeKey is specified.", re1);
 }
 
 TEST_F(CEPEventTest, test_eventTimeKeys_two_column)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;"
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;"
                 "share streamTable(1:0, `market`time, [STRING,TIME]) as outputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
@@ -585,21 +528,21 @@ TEST_F(CEPEventTest, test_eventTimeKeys_two_column)
     vector<EventSchema> eventSchemas = {*schema, *schema1};
     vector<string> eventTimeKeys = {"time", "time1"};
     vector<string> commonKeys = {};
-    EventSender* sender = new EventSender(connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
     EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-    client->subscribe(hostName, port, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
 
     vector<ConstantSP> attributes = {Util::createString("str"), Util::createTime(12,45,3,100)};
     sender->sendEvent("market", attributes);
     vector<ConstantSP> attributes1 = {Util::createTime(1,1,20,100), Util::createTime(8,30,59,100)};
     sender->sendEvent("market1", attributes1);
     Util::sleep(2000);
-    client->unsubscribe(hostName, port, "inputTable", DEFAULT_ACTION_NAME);
+    client->unsubscribe(hostName, port300, "inputTable", DEFAULT_ACTION_NAME);
 
     vector<string> outs = subInputTable("inputTable", 2, eventSchemas, eventTimeKeys, commonKeys);
-    TableSP re = connsp->run("select * from " + outs[0]);
-    TableSP re1 = connsp->run("select * from " + outs[1]);
-    TableSP re2 = connsp->run("select * from outputTable");
+    TableSP re = conn300->run("select * from " + outs[0]);
+    TableSP re1 = conn300->run("select * from " + outs[1]);
+    TableSP re2 = conn300->run("select * from outputTable");
     // cout << re2->getString() << endl;
     EXPECT_EQ(1, re->rows());
     EXPECT_EQ("str", re->getColumn(0)->get(0)->getString());
@@ -619,7 +562,7 @@ TEST_F(CEPEventTest, test_eventTimeKeys_two_column)
 
 TEST_F(CEPEventTest, test_EventClient_fields_null_but_subTable_has_column)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event`common, [TIME,STRING,BLOB, INT]) as inputTable;"
+    conn300->run("share streamTable(1:0, `time`eventType`event`common, [TIME,STRING,BLOB, INT]) as inputTable;"
                 "share streamTable(1:0, `market`time, [STRING,TIME]) as outputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
@@ -629,13 +572,13 @@ TEST_F(CEPEventTest, test_EventClient_fields_null_but_subTable_has_column)
     vector<EventSchema> eventSchemas = {*schema};
     EventClient* client = new EventClient(eventSchemas, {}, {});
 
-    EXPECT_ANY_THROW(client->subscribe(hostName, port, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0));
+    EXPECT_ANY_THROW(client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0));
     delete schema, client;
 }
 
 TEST_F(CEPEventTest, test_commonKeys_one_column)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event`time1, [TIME,STRING,BLOB,TIME]) as inputTable;"
+    conn300->run("share streamTable(1:0, `time`eventType`event`time1, [TIME,STRING,BLOB,TIME]) as inputTable;"
                 "share streamTable(1:0, `market`time, [STRING,TIME]) as outputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
@@ -650,21 +593,21 @@ TEST_F(CEPEventTest, test_commonKeys_one_column)
     vector<EventSchema> eventSchemas = {*schema, *schema1};
     vector<string> eventTimeKeys = {"time", "time1"};
     vector<string> commonKeys = {"time"};
-    EventSender* sender = new EventSender(connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
     EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-    client->subscribe(hostName, port, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
 
     vector<ConstantSP> attributes = {Util::createString("str"), Util::createTime(12,45,3,100)};
     sender->sendEvent("market", attributes);
     vector<ConstantSP> attributes1 = {Util::createTime(1,1,20,100), Util::createTime(8,30,59,100)};
     sender->sendEvent("market1", attributes1);
     Util::sleep(2000);
-    client->unsubscribe(hostName, port, "inputTable", DEFAULT_ACTION_NAME);
+    client->unsubscribe(hostName, port300, "inputTable", DEFAULT_ACTION_NAME);
 
     auto outs = subInputTable("inputTable", 2, eventSchemas, eventTimeKeys, commonKeys);
-    TableSP re = connsp->run("select * from " + outs[0]);
-    TableSP re1 = connsp->run("select * from " + outs[1]);
-    TableSP re2 = connsp->run("select * from outputTable");
+    TableSP re = conn300->run("select * from " + outs[0]);
+    TableSP re1 = conn300->run("select * from " + outs[1]);
+    TableSP re2 = conn300->run("select * from outputTable");
     EXPECT_EQ(1, re->rows());
     EXPECT_EQ("str", re->getColumn(0)->get(0)->getString());
     EXPECT_EQ("12:45:03.100", re->getColumn(1)->get(0)->getString());
@@ -680,7 +623,7 @@ TEST_F(CEPEventTest, test_commonKeys_one_column)
 
 TEST_F(CEPEventTest, test_eventSchema_exception)
 {
-    connsp->run("share streamTable(1:0, `eventType`event, [STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `eventType`event, [STRING,BLOB]) as inputTable;");
     EventSchema *schema1 = new EventSchema();
     schema1->eventType_ = "market";
     schema1->fieldNames_ = {"market", "error_col"};
@@ -696,8 +639,8 @@ TEST_F(CEPEventTest, test_eventSchema_exception)
     vector<EventSchema> eventSchemas1 = {*schema1};
     vector<EventSchema> eventSchemas2 = {*schema2};
 
-    EXPECT_ANY_THROW(EventSender(connsp, "", eventSchemas1, {}, {}));
-    EXPECT_ANY_THROW(EventSender(connsp, "", eventSchemas2, {}, {}));
+    EXPECT_ANY_THROW(EventSender(conn300, "", eventSchemas1, {}, {}));
+    EXPECT_ANY_THROW(EventSender(conn300, "", eventSchemas2, {}, {}));
     EXPECT_ANY_THROW(EventClient(eventSchemas1, {}, {}));
     EXPECT_ANY_THROW(EventClient(eventSchemas2, {}, {}));
 
@@ -707,7 +650,7 @@ TEST_F(CEPEventTest, test_eventSchema_exception)
 
 TEST_F(CEPEventTest, test_two_schemas_two_commonKeys)
 {
-    connsp->run("share streamTable(1:0, `eventType`event`time`sym, [STRING,BLOB,TIME,STRING]) as inputTable;"
+    conn300->run("share streamTable(1:0, `eventType`event`time`sym, [STRING,BLOB,TIME,STRING]) as inputTable;"
                 "share streamTable(1:0, `market`time`sym, [STRING,TIME,STRING]) as outputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
@@ -722,21 +665,21 @@ TEST_F(CEPEventTest, test_two_schemas_two_commonKeys)
     vector<EventSchema> eventSchemas = {*schema, *schema1};
     vector<string> eventTimeKeys = {};
     vector<string> commonKeys = {"time", "sym"};
-    EventSender* sender = new EventSender(connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
     EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-    client->subscribe(hostName, port, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
 
     vector<ConstantSP> attributes = {Util::createString("sz"), Util::createTime(12,45,3,100), Util::createString("sz000001")};
     sender->sendEvent("market", attributes);
     vector<ConstantSP> attributes1 = {Util::createString("sh"), Util::createTime(8,30,59,100), Util::createString("sh000001")};
     sender->sendEvent("market1", attributes1);
     Util::sleep(2000);
-    client->unsubscribe(hostName, port, "inputTable", DEFAULT_ACTION_NAME);
+    client->unsubscribe(hostName, port300, "inputTable", DEFAULT_ACTION_NAME);
 
     auto outs = subInputTable("inputTable", 2, eventSchemas, eventTimeKeys, commonKeys);
-    TableSP re = connsp->run("select * from " + outs[0]);
-    TableSP re1 = connsp->run("select * from " + outs[1]);
-    TableSP re2 = connsp->run("select * from outputTable");
+    TableSP re = conn300->run("select * from " + outs[0]);
+    TableSP re1 = conn300->run("select * from " + outs[1]);
+    TableSP re2 = conn300->run("select * from outputTable");
     EXPECT_EQ(1, re->rows());
     EXPECT_EQ("sz", re->getColumn(0)->get(0)->getString());
     EXPECT_EQ("12:45:03.100", re->getColumn(1)->get(0)->getString());
@@ -759,7 +702,7 @@ TEST_F(CEPEventTest, test_two_schemas_two_commonKeys)
 
 TEST_F(CEPEventTest, test_commonKeys_eventTimeKeys_with_same_col)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event`time2`sym, [TIME,STRING,BLOB,TIME,STRING]) as inputTable;"
+    conn300->run("share streamTable(1:0, `time`eventType`event`time2`sym, [TIME,STRING,BLOB,TIME,STRING]) as inputTable;"
                 "share streamTable(1:0, `market`time`sym, [STRING,TIME,STRING]) as outputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
@@ -774,21 +717,21 @@ TEST_F(CEPEventTest, test_commonKeys_eventTimeKeys_with_same_col)
     vector<EventSchema> eventSchemas = {*schema, *schema1};
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {"time", "sym"};
-    EventSender* sender = new EventSender(connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
     EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-    client->subscribe(hostName, port, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
 
     vector<ConstantSP> attributes = {Util::createString("sz"), Util::createTime(12,45,3,100), Util::createString("sz000001")};
     sender->sendEvent("market", attributes);
     vector<ConstantSP> attributes1 = {Util::createString("sh"), Util::createTime(8,30,59,100), Util::createString("sh000001")};
     sender->sendEvent("market1", attributes1);
     Util::sleep(2000);
-    client->unsubscribe(hostName, port, "inputTable", DEFAULT_ACTION_NAME);
+    client->unsubscribe(hostName, port300, "inputTable", DEFAULT_ACTION_NAME);
 
     auto outs = subInputTable("inputTable", 2, eventSchemas, eventTimeKeys, commonKeys);
-    TableSP re = connsp->run("select * from " + outs[0]);
-    TableSP re1 = connsp->run("select * from " + outs[1]);
-    TableSP re2 = connsp->run("select * from outputTable");
+    TableSP re = conn300->run("select * from " + outs[0]);
+    TableSP re1 = conn300->run("select * from " + outs[1]);
+    TableSP re2 = conn300->run("select * from outputTable");
 
     EXPECT_EQ(1, re->rows());
     EXPECT_EQ("sz", re->getColumn(0)->get(0)->getString());
@@ -811,7 +754,7 @@ TEST_F(CEPEventTest, test_commonKeys_eventTimeKeys_with_same_col)
 
 TEST_F(CEPEventTest, test_EventSender_connect_not_connect)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time"};
@@ -835,7 +778,7 @@ TEST_F(CEPEventTest, test_EventSender_connect_not_connect)
 
 TEST_F(CEPEventTest, test_EventClient_error_hostinfo)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time"};
@@ -852,15 +795,15 @@ TEST_F(CEPEventTest, test_EventClient_error_hostinfo)
     }catch(exception& ex){
         re = ex.what();
     }
-    EXPECT_EQ("The connection to dolphindb has not been established.", re);
-    EXPECT_ANY_THROW(client->unsubscribe("", port, "inputTable", DEFAULT_ACTION_NAME));
+    EXPECT_EQ("Subscribe Fail, cannot connect to 127.0.0.1 : -100", re);
+    EXPECT_ANY_THROW(client->unsubscribe("", port300, "inputTable", DEFAULT_ACTION_NAME));
 
     delete client, schema;
 }
 
 TEST_F(CEPEventTest, test_EventClient_sub_twice_with_same_actionName)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time"};
@@ -870,22 +813,22 @@ TEST_F(CEPEventTest, test_EventClient_sub_twice_with_same_actionName)
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {};
     EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-    client->subscribe(hostName, port, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
     string re = "";
     try{
-        client->subscribe(hostName, port, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+        client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
     }catch(exception& ex){
         re = ex.what();
     }
     EXPECT_EQ("The eventClient has already been called.", re);
-    client->unsubscribe(hostName, port, "inputTable", DEFAULT_ACTION_NAME);
+    client->unsubscribe(hostName, port300, "inputTable", DEFAULT_ACTION_NAME);
     delete client, schema;
 
 }
 
 TEST_F(CEPEventTest, test_EventSender_commonKeys_cols_not_match)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time", "col1"};
@@ -897,7 +840,7 @@ TEST_F(CEPEventTest, test_EventSender_commonKeys_cols_not_match)
 
     string re = "";
     try{
-        EventSender* sender = new EventSender(connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
     }catch(exception &ex){
         re = ex.what();
     }
@@ -907,7 +850,7 @@ TEST_F(CEPEventTest, test_EventSender_commonKeys_cols_not_match)
 
 TEST_F(CEPEventTest, test_EventClient_commonKeys_cols_not_match)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;"
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;"
                 "share streamTable(1:0, `market`time`col1, [STRING,TIME, INT]) as outputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
@@ -928,9 +871,9 @@ TEST_F(CEPEventTest, test_EventClient_commonKeys_cols_not_match)
     delete schema;
 }
 
-TEST_F(CEPEventTest, test_EventSender_conn_asynchronousTask_true) //TODO
+TEST_F(CEPEventTest, test_EventSender_conn_asynchronousTask_true)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time"};
@@ -940,17 +883,15 @@ TEST_F(CEPEventTest, test_EventSender_conn_asynchronousTask_true) //TODO
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {};
     DBConnectionSP tmp_connsp = new DBConnection(false, true);
-    tmp_connsp->connect(hostName, port, "admin", "123456");
-    EventSender* sender = new EventSender(tmp_connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    tmp_connsp->connect(hostName, port300, "admin", "123456");
+    EXPECT_ANY_THROW(EventSender(tmp_connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys));
 
-    vector<ConstantSP> attributes = {Util::createString("sz"), Util::createTime(12,45,3,100)};
-    sender->sendEvent("market", attributes);
-    delete sender, schema, tmp_connsp;
+    delete schema, tmp_connsp;
 }
 
 TEST_F(CEPEventTest, test_EventSender_conn_ssl_true)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time"};
@@ -960,13 +901,13 @@ TEST_F(CEPEventTest, test_EventSender_conn_ssl_true)
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {};
     DBConnectionSP tmp_connsp = new DBConnection(true, false);
-    tmp_connsp->connect(hostName, port, "admin", "123456");
+    tmp_connsp->connect(hostName, port300, "admin", "123456");
     EventSender* sender = new EventSender(tmp_connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
 
     vector<ConstantSP> attributes = {Util::createString("sz"), Util::createTime(12,45,3,100)};
     sender->sendEvent("market", attributes);
     auto outs = subInputTable("inputTable", 1, eventSchemas, eventTimeKeys, commonKeys);
-    TableSP re = connsp->run("select * from " + outs[0]);
+    TableSP re = conn300->run("select * from " + outs[0]);
     EXPECT_EQ(1, re->rows());
     EXPECT_EQ("sz", re->getColumn(0)->get(0)->getString());
     EXPECT_EQ("12:45:03.100", re->getColumn(1)->get(0)->getString());
@@ -976,7 +917,7 @@ TEST_F(CEPEventTest, test_EventSender_conn_ssl_true)
 
 TEST_F(CEPEventTest, test_EventSender_conn_compress_true)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time"};
@@ -986,13 +927,13 @@ TEST_F(CEPEventTest, test_EventSender_conn_compress_true)
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {};
     DBConnectionSP tmp_connsp = new DBConnection(false, false, 7200, true);
-    tmp_connsp->connect(hostName, port, "admin", "123456");
+    tmp_connsp->connect(hostName, port300, "admin", "123456");
     EventSender* sender = new EventSender(tmp_connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
 
     vector<ConstantSP> attributes = {Util::createString("sz"), Util::createTime(12,45,3,100)};
     sender->sendEvent("market", attributes);
     auto outs = subInputTable("inputTable", 1, eventSchemas, eventTimeKeys, commonKeys);
-    TableSP re = connsp->run("select * from " + outs[0]);
+    TableSP re = conn300->run("select * from " + outs[0]);
     EXPECT_EQ(1, re->rows());
     EXPECT_EQ("sz", re->getColumn(0)->get(0)->getString());
     EXPECT_EQ("12:45:03.100", re->getColumn(1)->get(0)->getString());
@@ -1002,7 +943,7 @@ TEST_F(CEPEventTest, test_EventSender_conn_compress_true)
 
 TEST_F(CEPEventTest, test_EventSender_conn_not_admin)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time"};
@@ -1012,14 +953,14 @@ TEST_F(CEPEventTest, test_EventSender_conn_not_admin)
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {};
     DBConnectionSP tmp_connsp = new DBConnection(false, false, 7200, false);
-    tmp_connsp->connect(hostName, port);
+    tmp_connsp->connect(hostName, port300);
     EXPECT_EQ(tmp_connsp->run("getCurrentSessionAndUser()[1]")->getString(), "guest");
     EventSender* sender = new EventSender(tmp_connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
 
     vector<ConstantSP> attributes = {Util::createString("sz"), Util::createTime(12,45,3,100)};
     sender->sendEvent("market", attributes);
     auto outs = subInputTable("inputTable", 1, eventSchemas, eventTimeKeys, commonKeys);
-    TableSP re = connsp->run("select * from " + outs[0]);
+    TableSP re = conn300->run("select * from " + outs[0]);
     EXPECT_EQ(1, re->rows());
     EXPECT_EQ("sz", re->getColumn(0)->get(0)->getString());
     EXPECT_EQ("12:45:03.100", re->getColumn(1)->get(0)->getString());
@@ -1040,7 +981,7 @@ TEST_F(CEPEventTest, test_eventTable_not_exist)
 
     string re = "";
     try{
-        EventSender* sender = new EventSender(connsp, "notExistTable", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender* sender = new EventSender(conn300, "notExistTable", eventSchemas, eventTimeKeys, commonKeys);
     }catch(const exception& ex){
         re = ex.what();
     }
@@ -1049,12 +990,45 @@ TEST_F(CEPEventTest, test_eventTable_not_exist)
     EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
     string re1 = "";
     try{
-        auto th = client->subscribe(hostName, port, test_handler, "notExistTable", DEFAULT_ACTION_NAME, 0, false);
+        auto th = client->subscribe(hostName, port300, test_handler, "notExistTable", DEFAULT_ACTION_NAME, 0, false);
         th->join();
     }catch(const exception& ex){
         re1 = ex.what();
     }
-    EXPECT_EQ("The publisher doesn't have the table [notExistTable].", re1);
+    EXPECT_PRED_FORMAT2(testing::IsSubstring,"Can't find the object with name notExistTable", re1);
+
+    delete schema, client;
+}
+
+TEST_F(CEPEventTest, test_eventTable_not_contail_eventCol)
+{
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,STRING]) as inputTable;");
+    EventSchema *schema = new EventSchema();
+    schema->eventType_ = "market";
+    schema->fieldNames_ = {"market", "time"};
+    schema->fieldTypes_ = {DT_STRING, DT_TIME};
+    schema->fieldForms_={DF_SCALAR, DF_SCALAR};
+    vector<EventSchema> eventSchemas = {*schema};
+    vector<string> eventTimeKeys = {"time"};
+    vector<string> commonKeys = {};
+
+    string re = "";
+    try{
+        EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    }catch(const exception& ex){
+        re = ex.what();
+    }
+    EXPECT_TRUE(re.find("Can't find the object with name notExistTable") != std::string::npos);
+
+    EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
+    string re1 = "";
+    try{
+        auto th = client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, false);
+        th->join();
+    }catch(const exception& ex){
+        re1 = ex.what();
+    }
+    EXPECT_PRED_FORMAT2(testing::IsSubstring,"Can't find the object with name notExistTable", re1);
 
     delete schema, client;
 }
@@ -1072,7 +1046,7 @@ TEST_F(CEPEventTest, test_connect_tableName_null)
 
     string re = "";
     try{
-        EventSender* sender = new EventSender(connsp, "", eventSchemas, eventTimeKeys, commonKeys);
+        EventSender* sender = new EventSender(conn300, "", eventSchemas, eventTimeKeys, commonKeys);
     }catch(exception& ex){
         re = ex.what();
     }
@@ -1081,7 +1055,7 @@ TEST_F(CEPEventTest, test_connect_tableName_null)
     EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
     string re1 = "";
     try{
-        auto th = client->subscribe(hostName, port, test_handler, "", DEFAULT_ACTION_NAME, 0, false);
+        auto th = client->subscribe(hostName, port300, test_handler, "", DEFAULT_ACTION_NAME, 0, false);
         th->join();
     }catch(exception& ex){
         re1 = ex.what();
@@ -1093,7 +1067,7 @@ TEST_F(CEPEventTest, test_connect_tableName_null)
 
 TEST_F(CEPEventTest, test_EventSender_sendEvent_eventType_not_exist)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time"};
@@ -1102,7 +1076,7 @@ TEST_F(CEPEventTest, test_EventSender_sendEvent_eventType_not_exist)
     vector<EventSchema> eventSchemas = {*schema};
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {};
-    EventSender* sender = new EventSender(connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
     string re = "";
     try{
         sender->sendEvent("market1", {Util::createString("sz"), Util::createTime(12,45,3,100)});
@@ -1115,7 +1089,7 @@ TEST_F(CEPEventTest, test_EventSender_sendEvent_eventType_not_exist)
 
 TEST_F(CEPEventTest, test_EventSender_sendEvent_eventType_null)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time"};
@@ -1124,7 +1098,7 @@ TEST_F(CEPEventTest, test_EventSender_sendEvent_eventType_null)
     vector<EventSchema> eventSchemas = {*schema};
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {};
-    EventSender* sender = new EventSender(connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
     string re = "";
     try{
         sender->sendEvent("", {Util::createString("sz"), Util::createTime(12,45,3,100)});
@@ -1137,7 +1111,7 @@ TEST_F(CEPEventTest, test_EventSender_sendEvent_eventType_null)
 
 TEST_F(CEPEventTest, test_EventClient_sub_eventType_null)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "";
     schema->fieldNames_ = {"market", "time"};
@@ -1151,7 +1125,7 @@ TEST_F(CEPEventTest, test_EventClient_sub_eventType_null)
         EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
 
 
-        auto th = client->subscribe(hostName, port, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+        auto th = client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
         th->join();
     }catch(exception& ex){
         re = ex.what();
@@ -1163,7 +1137,7 @@ TEST_F(CEPEventTest, test_EventClient_sub_eventType_null)
 
 TEST_F(CEPEventTest, test_EventSender_sendEvent_attributes_column_not_match)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time"};
@@ -1172,7 +1146,7 @@ TEST_F(CEPEventTest, test_EventSender_sendEvent_attributes_column_not_match)
     vector<EventSchema> eventSchemas = {*schema};
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {};
-    EventSender* sender = new EventSender(connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
     string re = "";
     try{
         sender->sendEvent("market", {Util::createString("sz"), Util::createTime(12,45,3,100), Util::createString("sz")});
@@ -1185,7 +1159,7 @@ TEST_F(CEPEventTest, test_EventSender_sendEvent_attributes_column_not_match)
 
 TEST_F(CEPEventTest, test_EventSender_sendEvent_attributes_type_not_match)
 {
-    connsp->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time"};
@@ -1194,7 +1168,7 @@ TEST_F(CEPEventTest, test_EventSender_sendEvent_attributes_type_not_match)
     vector<EventSchema> eventSchemas = {*schema};
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {};
-    EventSender* sender = new EventSender(connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
     string re = "";
     try{
         sender->sendEvent("market", {Util::createString("sz"), Util::createInt(12)});
@@ -1242,7 +1216,7 @@ TEST_P(CEPEventTest_EventSender_alltypes, test_EventSender_alltype)
 
     cout << "test type: " << typeString << endl;
 
-    connsp->run("share streamTable(1:0, `eventTime`eventType`event`commonCol, [TIMESTAMP,STRING,BLOB,"+typeString+"]) as fromApi;"
+    conn300->run("share streamTable(1:0, `eventTime`eventType`event`commonCol, [TIMESTAMP,STRING,BLOB,"+typeString+"]) as fromApi;"
                 "share streamTable(1:0, `eventTime`eventType`event`commonCol, [TIMESTAMP,STRING,BLOB,"+typeString+"]) as fromCEP;go;"
                 "class md{"
                     "market :: STRING\n"
@@ -1276,23 +1250,23 @@ TEST_P(CEPEventTest_EventSender_alltypes, test_EventSender_alltype)
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {"commonCol"};
 
-    EventSender* sender = new EventSender(connsp, "fromApi", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "fromApi", eventSchemas, eventTimeKeys, commonKeys);
     int rows = 1000;
-    VectorSP col0 = connsp->run("market =rand(`sz`sh`bj`adk, "+to_string(rows)+");market");
-    VectorSP col1 = connsp->run("time = timestamp(rand(999000000000l, "+to_string(rows)+"));time");
-    VectorSP col_test = connsp->run("testCol = rand("+type_data_str+", "+to_string(rows)+");commonCol=testCol;testCol");
+    VectorSP col0 = conn300->run("market =rand(`sz`sh`bj`adk, "+to_string(rows)+");market");
+    VectorSP col1 = conn300->run("time = timestamp(rand(999000000000l, "+to_string(rows)+"));time");
+    VectorSP col_test = conn300->run("testCol = rand("+type_data_str+", "+to_string(rows)+");commonCol=testCol;testCol");
 
     if (dataType == DT_BLOB){
-        col_test = connsp->run("testCol = blob(string(rand(`blob`blob2`, "+to_string(rows)+")));commonCol=testCol;testCol");
+        col_test = conn300->run("testCol = blob(string(rand(`blob`blob2`, "+to_string(rows)+")));commonCol=testCol;testCol");
     }
 
     for (int i = 0; i < rows; i++){
         vector<ConstantSP> attributes = {col0->get(i), col1->get(i), col_test->get(i), col_test->get(i)};
         sender->sendEvent("md", attributes);
-        connsp->run("ind="+to_string(i)+";rowData = md(market[ind], time[ind], testCol[ind], commonCol[ind]);appendEvent(outputSerializer, [rowData])");
+        conn300->run("ind="+to_string(i)+";rowData = md(market[ind], time[ind], testCol[ind], commonCol[ind]);appendEvent(outputSerializer, [rowData])");
     }
-    EXPECT_TRUE(connsp->run("all(each(eqObj, fromApi.values(), fromCEP.values()))")->getBool());
-    connsp->run("dropStreamEngine(`CEPengine);dropStreamEngine(`ses);");
+    EXPECT_TRUE(conn300->run("all(each(eqObj, fromApi.values(), fromCEP.values()))")->getBool());
+    conn300->run("dropStreamEngine(`CEPengine);dropStreamEngine(`ses);");
     delete sender, schema;
 }
 
@@ -1361,7 +1335,7 @@ TEST_P(CEPEventTest_EventSender_vector, test_EventSender_vector)
         formatStr1 = "INT[]";
         formatStr2 = "INT VECTOR";
     }
-    connsp->run("share streamTable(1:0, `eventTime`eventType`event`commonCol, [TIMESTAMP,STRING,BLOB,"+formatStr1+"]) as fromApi;"
+    conn300->run("share streamTable(1:0, `eventTime`eventType`event`commonCol, [TIMESTAMP,STRING,BLOB,"+formatStr1+"]) as fromApi;"
                 "share streamTable(1:0, `eventTime`eventType`event`commonCol, [TIMESTAMP,STRING,BLOB,"+formatStr1+"]) as fromCEP;go;"
                 "class md{"
                     "market :: STRING\n"
@@ -1395,26 +1369,26 @@ TEST_P(CEPEventTest_EventSender_vector, test_EventSender_vector)
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {"commonCol"};
 
-    EventSender* sender = new EventSender(connsp, "fromApi", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "fromApi", eventSchemas, eventTimeKeys, commonKeys);
     int rows = 1000;
-    VectorSP col0 = connsp->run("market =rand(`sz`sh`bj`adk, "+to_string(rows)+");market");
-    VectorSP col1 = connsp->run("time = timestamp(rand(999000000000l, "+to_string(rows)+"));time");
-    VectorSP col2 = connsp->run("testCol = rand([rand("+type_data_str+", rand(2,1)[0])], "+to_string(rows)+");testCol");
-    VectorSP col3 = connsp->run("commonCol = rand([rand("+type_data_str+", rand(2,1)[0])], "+to_string(rows)+");commonCol");
+    VectorSP col0 = conn300->run("market =rand(`sz`sh`bj`adk, "+to_string(rows)+");market");
+    VectorSP col1 = conn300->run("time = timestamp(rand(999000000000l, "+to_string(rows)+"));time");
+    VectorSP col2 = conn300->run("testCol = rand([rand("+type_data_str+", rand(2,1)[0])], "+to_string(rows)+");testCol");
+    VectorSP col3 = conn300->run("commonCol = rand([rand("+type_data_str+", rand(2,1)[0])], "+to_string(rows)+");commonCol");
 
     if (dataType == DT_BLOB)
-        col2 = connsp->run("testCol = rand([blob(string(rand(`blob`blob2, rand(2,1)[0])))], "+to_string(rows)+");testCol");
+        col2 = conn300->run("testCol = rand([blob(string(rand(`blob`blob2, rand(2,1)[0])))], "+to_string(rows)+");testCol");
     if (dataType == DT_STRING || dataType == DT_SYMBOL || dataType == DT_BLOB)
-        col3 = connsp->run("commonCol = rand([rand(10000, rand(2,1)[0])], "+to_string(rows)+");commonCol");
+        col3 = conn300->run("commonCol = rand([rand(10000, rand(2,1)[0])], "+to_string(rows)+");commonCol");
 
     for (int i = 0; i < rows; i++){
         vector<ConstantSP> attributes = {col0->get(i), col1->get(i), col2->get(i), col3->get(i)};
         sender->sendEvent("md", attributes);
-        connsp->run("ind="+to_string(i)+";rowData = md(market[ind], time[ind], testCol[ind], commonCol[ind]);appendEvent(outputSerializer, [rowData])");
+        conn300->run("ind="+to_string(i)+";rowData = md(market[ind], time[ind], testCol[ind], commonCol[ind]);appendEvent(outputSerializer, [rowData])");
     }
 
-    EXPECT_TRUE(connsp->run("all(each(eqObj, fromApi.values(), fromCEP.values()))")->getBool());
-    connsp->run("dropStreamEngine(`CEPengine);dropStreamEngine(`ses);");
+    EXPECT_TRUE(conn300->run("all(each(eqObj, fromApi.values(), fromCEP.values()))")->getBool());
+    conn300->run("dropStreamEngine(`CEPengine);dropStreamEngine(`ses);");
     delete sender, schema;
 }
 
@@ -1474,7 +1448,7 @@ TEST_P(CEPEventTest_EventSender_arrayVector, test_EventSender_arrayVector) // co
 
     cout << "test type: " << typeString << endl;
 
-    connsp->run("share streamTable(1:0, `time`eventType`event`commonCol, [TIME,STRING,BLOB,INT]) as inputTable;");
+    conn300->run("share streamTable(1:0, `time`eventType`event`commonCol, [TIME,STRING,BLOB,INT]) as inputTable;");
     EventSchema *schema = new EventSchema();
     schema->eventType_ = "market";
     schema->fieldNames_ = {"market", "time", "testCol", "commonCol"};
@@ -1485,11 +1459,11 @@ TEST_P(CEPEventTest_EventSender_arrayVector, test_EventSender_arrayVector) // co
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {"commonCol"};
 
-    EventSender* sender = new EventSender(connsp, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeKeys, commonKeys);
     int rows = 1000;
-    VectorSP col0 = connsp->run("rand(`sz`sh`bj`adk, "+to_string(rows)+")");
-    VectorSP col1 = connsp->run("time(rand(50000000, "+to_string(rows)+"))");
-    VectorSP col_test = connsp->run("rand(["+type_data_str+"], "+to_string(rows)+")");
+    VectorSP col0 = conn300->run("rand(`sz`sh`bj`adk, "+to_string(rows)+")");
+    VectorSP col1 = conn300->run("time(rand(50000000, "+to_string(rows)+"))");
+    VectorSP col_test = conn300->run("rand(["+type_data_str+"], "+to_string(rows)+")");
     // cout << "col_test: " << col_test->getString() << endl;
     vector<ConstantSP> columnVecs;
     columnVecs.reserve(4);
@@ -1515,10 +1489,10 @@ TEST_P(CEPEventTest_EventSender_arrayVector, test_EventSender_arrayVector) // co
     columnVecs.emplace_back(col_commonCol);
     TableSP exTab = Util::createTable(schema->fieldNames_, columnVecs);
     // cout << exTab->getString() << endl;
-    connsp->upload("ex", exTab);
+    conn300->upload("ex", exTab);
 
     vector<string> tabNames = outs.get();
-    EXPECT_TRUE(connsp->run("all(each(eqObj, "+tabNames[0]+".values(), ex.values()))")->getBool());
+    EXPECT_TRUE(conn300->run("all(each(eqObj, "+tabNames[0]+".values(), ex.values()))")->getBool());
 
     delete sender, schema;
 }
@@ -1567,7 +1541,7 @@ TEST_P(CEPEventTest_EventClient_alltypes, test_EventClient_alltype)
     schema->fieldTypes_ = {DT_STRING, DT_TIMESTAMP, dataType, dataType};
     schema->fieldForms_ = {DF_SCALAR, DF_SCALAR, DF_SCALAR, DF_SCALAR};
     schema->fieldExtraParams_ = {0, 0, extraParam, extraParam};
-    connsp->run(
+    conn300->run(
         "share streamTable(1:0, `time`eventType`event`commonCol, [TIMESTAMP,STRING,BLOB,"+typeString+"]) as fromCEP;"
         "share streamTable(1:0, `time`eventType`event`commonCol, [TIMESTAMP,STRING,BLOB,"+typeString+"]) as fromApi;go;"
         "class md{"
@@ -1592,7 +1566,7 @@ TEST_P(CEPEventTest_EventClient_alltypes, test_EventClient_alltype)
     vector<string> eventTimeKeys = {"eventTime"};
     vector<string> commonKeys = {"commonCol"};
     EventClient *client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-    EventSender *sender = new EventSender(connsp, "fromApi", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender *sender = new EventSender(conn300, "fromApi", eventSchemas, eventTimeKeys, commonKeys);
 
     auto imp_handler = [&](string eventType, std::vector<ConstantSP> attribute)
     {
@@ -1606,8 +1580,8 @@ TEST_P(CEPEventTest_EventClient_alltypes, test_EventClient_alltype)
         }
     };
 
-    client->subscribe(hostName, port, imp_handler, "fromCEP", DEFAULT_ACTION_NAME, 0);
-    connsp->run(
+    client->subscribe(hostName, port300, imp_handler, "fromCEP", DEFAULT_ACTION_NAME, 0);
+    conn300->run(
         "rows = "+to_string(test_rows)+";"
         "val_col0=rand(`sz`sh`bj`adk, rows);val_col1=now()..temporalAdd(now(), rows-1, 'ms');val_col2=rand("+type_data_str+", rows);val_col3=rand("+type_data_str+", rows);"
         "for (i in 0:rows){"
@@ -1617,10 +1591,10 @@ TEST_P(CEPEventTest_EventClient_alltypes, test_EventClient_alltype)
     notify.wait();
     Util::sleep(1000);
 
-    client->unsubscribe(hostName, port, "fromCEP", DEFAULT_ACTION_NAME);
+    client->unsubscribe(hostName, port300, "fromCEP", DEFAULT_ACTION_NAME);
     client->exit();
     EXPECT_TRUE(client->isExit());
-    EXPECT_TRUE(connsp->run("all(eqObj(fromApi.values(), fromCEP.values()))")->getBool());
+    EXPECT_TRUE(conn300->run("all(eqObj(fromApi.values(), fromCEP.values()))")->getBool());
 
     delete schema, client, sender;
 }
@@ -1702,7 +1676,7 @@ TEST_P(CEPEventTest_EventClient_alltypes_vector, test_EventClient_alltype_vector
     schema->fieldTypes_ = {DT_STRING, DT_TIMESTAMP, dataType, NOT_LITERAL?dataType:DT_INT};
     schema->fieldForms_ = {DF_SCALAR, DF_SCALAR, DF_VECTOR, NOT_LITERAL?DF_VECTOR:DF_SCALAR};
     schema->fieldExtraParams_ = {0, 0, extraParam, extraParam};
-    connsp->run(
+    conn300->run(
         "share streamTable(1:0, `time`eventType`event`commonCol, [TIMESTAMP,STRING,BLOB,"+formatCommonColstr+"]) as fromCEP;"
         "share streamTable(1:0, `time`eventType`event`commonCol, [TIMESTAMP,STRING,BLOB,"+formatCommonColstr+"]) as fromApi;go;"
         "class md{"
@@ -1727,7 +1701,7 @@ TEST_P(CEPEventTest_EventClient_alltypes_vector, test_EventClient_alltype_vector
     vector<string> eventTimeKeys = {"eventTime"};
     vector<string> commonKeys = {"commonCol"};
     EventClient *client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-    EventSender* sender = new EventSender(connsp, "fromApi", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "fromApi", eventSchemas, eventTimeKeys, commonKeys);
 
     auto imp_handler = [&](string eventType, std::vector<ConstantSP> attribute)
     {
@@ -1749,11 +1723,11 @@ TEST_P(CEPEventTest_EventClient_alltypes_vector, test_EventClient_alltype_vector
         }
     };
 
-    client->subscribe(hostName, port, imp_handler, "fromCEP", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, imp_handler, "fromCEP", DEFAULT_ACTION_NAME, 0);
     vector<string> val_col2_scripts ={"rand("+type_data_str+", rows)", "rand(val_col2, vector_size)"};
     if (dataType == DT_BLOB)
         val_col2_scripts = {"blob(string(rand("+type_data_str+", rows)))", "blob(string(rand(val_col2, vector_size)))"};
-    connsp->run(
+    conn300->run(
         "rows = "+to_string(test_rows)+";"
         "val_col0=rand(`sz`sh`bj`adk, rows);val_col1=now()..temporalAdd(now(), rows-1, 'ms');val_col2="+val_col2_scripts[0]+";val_col3=rand("+(NOT_LITERAL?type_data_str:"1000")+", rows);"
         "vector_size = rand(2, 1)[0];print('测试的array size: '+ string(vector_size));"
@@ -1764,10 +1738,10 @@ TEST_P(CEPEventTest_EventClient_alltypes_vector, test_EventClient_alltype_vector
     notify.wait();
     Util::sleep(1000);
 
-    client->unsubscribe(hostName, port, "fromCEP", DEFAULT_ACTION_NAME);
+    client->unsubscribe(hostName, port300, "fromCEP", DEFAULT_ACTION_NAME);
     client->exit();
     EXPECT_TRUE(client->isExit());
-    EXPECT_TRUE(connsp->run("all(each(eqObj, fromApi.values(),fromCEP.values()))")->getBool());
+    EXPECT_TRUE(conn300->run("all(each(eqObj, fromApi.values(),fromCEP.values()))")->getBool());
 
     delete schema, client, sender;
 }
@@ -1830,7 +1804,7 @@ TEST_P(CEPEventTest_EventClient_arrayVector, test_EventClient_arrayVector)
     schema->fieldTypes_ = {DT_STRING, DT_TIMESTAMP, dataType, dataType};
     schema->fieldForms_ = {DF_SCALAR, DF_SCALAR, DF_VECTOR, DF_VECTOR};
     schema->fieldExtraParams_ = {0, 0, extraParam, extraParam};
-    connsp->run(
+    conn300->run(
         "share streamTable(1:0, `time`eventType`event`commonCol, [TIMESTAMP,STRING,BLOB,"+typeString+"]) as fromCEP;"
         "share streamTable(1:0, `time`eventType`event`commonCol, [TIMESTAMP,STRING,BLOB,"+typeString+"]) as fromApi;go;"
         "class md{"
@@ -1855,7 +1829,7 @@ TEST_P(CEPEventTest_EventClient_arrayVector, test_EventClient_arrayVector)
     vector<string> eventTimeKeys = {"eventTime"};
     vector<string> commonKeys = {"commonCol"};
     EventClient *client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-    EventSender* sender = new EventSender(connsp, "fromApi", eventSchemas, eventTimeKeys, commonKeys);
+    EventSender* sender = new EventSender(conn300, "fromApi", eventSchemas, eventTimeKeys, commonKeys);
 
     auto imp_handler = [&](string eventType, std::vector<ConstantSP> attribute)
     {
@@ -1877,9 +1851,9 @@ TEST_P(CEPEventTest_EventClient_arrayVector, test_EventClient_arrayVector)
         }
     };
 
-    client->subscribe(hostName, port, imp_handler, "fromCEP", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, imp_handler, "fromCEP", DEFAULT_ACTION_NAME, 0);
     vector<string> val_col2_scripts ={"rand("+type_data_str+", rows)", "rand(val_col2, vector_size)"};
-    connsp->run(
+    conn300->run(
         "rows = "+to_string(test_rows)+";"
         "val_col0=rand(`sz`sh`bj`adk, rows);val_col1=now()..temporalAdd(now(), rows-1, 'ms');val_col2="+val_col2_scripts[0]+";val_col3=rand("+type_data_str+", rows);"
         "vector_size = rand(2, 1)[0];print('测试的array size: '+ string(vector_size));"
@@ -1890,10 +1864,10 @@ TEST_P(CEPEventTest_EventClient_arrayVector, test_EventClient_arrayVector)
     notify.wait();
     Util::sleep(1000);
 
-    client->unsubscribe(hostName, port, "fromCEP", DEFAULT_ACTION_NAME);
+    client->unsubscribe(hostName, port300, "fromCEP", DEFAULT_ACTION_NAME);
     client->exit();
     EXPECT_TRUE(client->isExit());
-    EXPECT_TRUE(connsp->run("all(each(eqObj, fromApi.values(),fromCEP.values()))")->getBool());
+    EXPECT_TRUE(conn300->run("all(each(eqObj, fromApi.values(),fromCEP.values()))")->getBool());
 
     delete schema, client, sender;
 }

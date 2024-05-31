@@ -5,6 +5,7 @@
 
 #define APIMinVersionRequirement 300
 
+using std::string;
 namespace dolphindb {
 
 DdbInit DBConnectionImpl::ddbInit_;
@@ -47,7 +48,6 @@ bool DBConnectionImpl::connect(const string& hostName, int port, const string& u
 }
 
 bool DBConnectionImpl::connect() {
-    DLOG("Imp.connect start");
     close();
 
     SocketSP conn = new Socket(hostName_, port_, true, keepAliveTime_, sslEnable_);
@@ -55,7 +55,6 @@ bool DBConnectionImpl::connect() {
     if (ret != OK) {
         return false;
     }
-    DLOG("Imp.connect socket ready");
 
     string body = "connect\n";
     if (!userId_.empty() && !encrypted_)
@@ -76,7 +75,7 @@ bool DBConnectionImpl::connect() {
     if (ret != OK)
         throw IOException("Failed to read message from the socket with IO error type " + std::to_string(ret));
 
-    vector<string> headers;
+    std::vector<string> headers;
     Util::split(line.c_str(), ' ', headers);
     if (headers.size() != 3)
         throw IOException("Received invalid header");
@@ -161,9 +160,8 @@ void DBConnectionImpl::login(const string& userId, const string& password, bool 
 }
 
 void DBConnectionImpl::login() {
-    DLOG("Imp.connect login");
     // TODO: handle the case of encryption.
-    vector<ConstantSP> args;
+    std::vector<ConstantSP> args;
     args.push_back(new String(userId_));
     args.push_back(new String(pwd_));
     args.push_back(new Bool(false));
@@ -173,22 +171,22 @@ void DBConnectionImpl::login() {
 }
 
 ConstantSP DBConnectionImpl::run(const string& script, int priority, int parallelism, int fetchSize, bool clearMemory, long seqNum) {
-    vector<ConstantSP> args;
+    std::vector<ConstantSP> args;
     return run(script, "script", args, priority, parallelism, fetchSize, clearMemory, seqNum);
 }
 
-ConstantSP DBConnectionImpl::run(const string& funcName, vector<ConstantSP>& args, int priority, int parallelism, int fetchSize, bool clearMemory, long seqNum) {
+ConstantSP DBConnectionImpl::run(const string& funcName, std::vector<ConstantSP>& args, int priority, int parallelism, int fetchSize, bool clearMemory, long seqNum) {
     return run(funcName, "function", args, priority, parallelism, fetchSize, clearMemory, seqNum);
 }
 
 ConstantSP DBConnectionImpl::upload(const string& name, const ConstantSP& obj) {
     if (!Util::isVariableCandidate(name))
         throw RuntimeException(name + " is not a qualified variable name.");
-    vector<ConstantSP> args(1, obj);
+    std::vector<ConstantSP> args(1, obj);
     return run(name, "variable", args);
 }
 
-ConstantSP DBConnectionImpl::upload(vector<string>& names, vector<ConstantSP>& objs) {
+ConstantSP DBConnectionImpl::upload(std::vector<string>& names, std::vector<ConstantSP>& objs) {
     if (names.size() != objs.size())
         throw RuntimeException("the size of variable names doesn't match the size of objects.");
     if (names.empty())
@@ -232,9 +230,8 @@ long DBConnectionImpl::generateRequestFlag(bool clearSessionMemory, bool disable
     return flag;
 }
 
-ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType, vector<ConstantSP>& args,
+ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType, std::vector<ConstantSP>& args,
             int priority, int parallelism, int fetchSize, bool clearMemory, long seqNum) {
-    DLOG("run1",script,"start");
     if (!isConnected_)
         throw IOException("Couldn't send script/function to the remote host because the connection has been closed");
 
@@ -259,7 +256,6 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
     }
     out.append(1, '\n');
     out.append(body);
-    DLOG("run1",script,"header",out);
 
     IO_ERR ret;
     if (argCount > 0) {
@@ -291,7 +287,7 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
         }
     } else {
         size_t actualLength;
-        IO_ERR ret = conn_->write(out.c_str(), out.size(), actualLength);
+        ret = conn_->write(out.c_str(), out.size(), actualLength);
         if (ret != OK) {
             close();
             throw IOException("Couldn't send script/function to the remote host because the connection has been closed, IO error type " + std::to_string(ret));
@@ -300,7 +296,6 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
     
     if(asynTask_)
         return new Void();
-    DLOG("run1",script,"read");
     
     if (littleEndian_ != (char)Util::isLittleEndian())
         inputStream_->enableReverseIntegerByteOrder();
@@ -321,7 +316,7 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
             throw IOException("Failed to read response header from the socket with IO error type " + std::to_string(ret));
         }
     }
-    vector<string> headers;
+    std::vector<string> headers;
     Util::split(line.c_str(), ' ', headers);
     if (headers.size() != 3) {
         close();
@@ -369,7 +364,6 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
 
     ConstantSP result = unmarshall->getConstant();
     unmarshall->reset();
-    DLOG("run1",script,"end");
     return result;
 }
 

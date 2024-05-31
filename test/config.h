@@ -36,7 +36,7 @@ using std::endl;
 
 extern string hostName;
 extern string errCode;
-extern int port, ctl_port;
+extern int port, ctl_port, port300, ctl_port300;
 extern string table;
 extern vector<int> listenPorts;
 extern string alphas;
@@ -57,9 +57,30 @@ extern DBConnection conn;
 extern DBConnection connReconn;
 extern DBConnection conn_compress;
 extern DBConnectionSP connsp;
+extern DBConnectionSP conn300;
 
 // check server version
 bool isNewServer(DBConnection &conn, const int &major, const int &minor, const int &revision);
 
 void checkAPIVersion();
 string getRandString(int len);
+TableSP AnyVectorToTable(VectorSP vec);
+
+// clear all memory variables and database in DolphinDB
+#define CLEAR_ENV(_session) \
+    _session.run("\
+        def clear_env(){\
+            for (name in (exec name from objs(true) where shared=true))\
+            {\
+                try{dropStreamTable(name, true)}catch(ex){};go;\
+                try{undef(name, SHARED)}catch(ex){};go;\
+            };\
+        };\
+        pnodeRun(clear_env);\
+        for(db in getClusterDFSDatabases())\
+        {\
+            try{dropDatabase(db)}catch(ex){};go;\
+        };\
+        undef all;go");
+
+

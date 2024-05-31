@@ -30,9 +30,6 @@
 #include "Dictionary.h"
 #include "Table.h"
 
-using std::string;
-using std::vector;
-
 namespace dolphindb {
 
 class DBConnectionImpl;
@@ -61,8 +58,8 @@ public:
 	 * will be performed along with connecting. If one would send userId and password in encrypted mode,
 	 * please use the login function for authentication separately.
 	 */
-	bool connect(const string& hostName, int port, const string& userId = "", const string& password = "", const string& initialScript = "",
-		bool highAvailability = false, const vector<string>& highAvailabilitySites = vector<string>(), int keepAliveTime=7200, bool reconnect = false);
+	bool connect(const std::string& hostName, int port, const std::string& userId = "", const std::string& password = "", const std::string& initialScript = "",
+		bool highAvailability = false, const std::vector<std::string>& highAvailabilitySites = std::vector<std::string>(), int keepAliveTime=7200, bool reconnect = false);
 
 	/**
 	 * Log onto the DolphinDB server using the given userId and password. If the parameter enableEncryption
@@ -70,32 +67,32 @@ public:
 	 * using the public key. If the parameter enableEncryption is false, userId and password are communicated
 	 * in plain text.
 	 */
-	void login(const string& userId, const string& password, bool enableEncryption);
+	void login(const std::string& userId, const std::string& password, bool enableEncryption);
 
 	/**
 	 * Run the script on the DolphinDB server and return the result to the client.If nothing returns,
 	 * the function returns a void object. If error is raised on the server, the function throws an
 	 * exception.
 	 */
-	ConstantSP run(const string& script, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
+	ConstantSP run(const std::string& script, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
 
 	/**
 	 * Run the given function on the DolphinDB server using the local objects as the arguments
 	 * for the function and return the result to the client. If nothing returns, the function
 	 * returns a void object. If error is raised on the server, the function throws an exception.
 	 */
-	ConstantSP run(const string& funcName, vector<ConstantSP>& args, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
+	ConstantSP run(const std::string& funcName, std::vector<ConstantSP>& args, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
 
 	/**
 	 * upload a local object to the DolphinDB server and assign the given name in the session.
 	 */
-	ConstantSP upload(const string& name, const ConstantSP& obj);
+	ConstantSP upload(const std::string& name, const ConstantSP& obj);
 
 	/**
 	 * upload multiple local objects to the DolphinDB server and assign each object the given
 	 * name in the session.
 	 */
-	ConstantSP upload(vector<string>& names, vector<ConstantSP>& objs);
+	ConstantSP upload(std::vector<std::string>& names, std::vector<ConstantSP>& objs);
 
 	/**
 	 * Close the current session and release all resources.
@@ -107,9 +104,9 @@ public:
 	 */
 	static void initialize(){}
 
-	void setInitScript(const string& script);
+	void setInitScript(const std::string& script);
 
-	const string& getInitScript() const;
+	const std::string& getInitScript() const;
 
 	DataInputStreamSP getDataInputStream();
 private:
@@ -123,42 +120,42 @@ private:
 		ET_NEWLEADER = 2,
 		ET_NODENOTAVAIL = 3,
 	};
-    void switchDataNode(const string &host = "", int port = -1);
-	bool connectNode(string hostName, int port, int keepAliveTime = -1);
+    void switchDataNode(const std::string &host = "", int port = -1);
+	bool connectNode(std::string hostName, int port, int keepAliveTime = -1);
     bool connected();
 	//0 - ignored exception, eg : other data node not avail;
 	//1 - throw exception;
 	//2 - new leader, host&port is valid
 	//3 - this data node not avail
-	ExceptionType parseException(const string &msg, string &host, int &port);
+	ExceptionType parseException(const std::string &msg, std::string &host, int &port);
 
 private:
 	struct Node{
-		string hostName;
-		int port;
-		double load;//DBL_MAX : unknow
+		std::string hostName_;
+		int port_;
+		double load_;//DBL_MAX : unknow
 
 		bool isEqual(const Node &node) {
-			return hostName.compare(node.hostName) == 0 && port == node.port;
+			return hostName_.compare(node.hostName_) == 0 && port_ == node.port_;
 		}
 		Node(){}
-		Node(const string &hostName, int port, double load = DBL_MAX): hostName(hostName), port(port), load(load){}
-		Node(const string &ipport, double loadValue = DBL_MAX);
+		Node(const std::string &hostName, int port, double load = DBL_MAX): hostName_(hostName), port_(port), load_(load){}
+		Node(const std::string &ipport, double loadValue = DBL_MAX);
 	};
-	static void parseIpPort(const string &ipport, string &ip, int &port);
+	static void parseIpPort(const std::string &ipport, std::string &ip, int &port);
 	long nextSeqNo();
 	void initClientID();
 
 
     std::unique_ptr<DBConnectionImpl> conn_;
-    string uid_;
-    string pwd_;
-    string initialScript_;
+    std::string uid_;
+    std::string pwd_;
+    std::string initialScript_;
     bool ha_;
 	bool enableSSL_;
     bool asynTask_;
     bool compress_;
-	vector<Node> nodes_;
+	std::vector<Node> nodes_;
 	int lastConnNodeIndex_;
 	bool enablePickle_, python_;
 	bool reconnect_, closed_;
@@ -188,12 +185,12 @@ private:
 
 class EXPORT_DECL DBConnectionPool{
 public:
-    DBConnectionPool(const string& hostName, int port, int threadNum = 10, const string& userId = "", const string& password = "",
+    DBConnectionPool(const std::string& hostName, int port, int threadNum = 10, const std::string& userId = "", const std::string& password = "",
 		bool loadBalance = false, bool highAvailability = false, bool compress = false, bool reConnect = false, bool python = false);
 	virtual ~DBConnectionPool();
-	void run(const string& script, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
+	void run(const std::string& script, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
 	
-	void run(const string& functionName, const vector<ConstantSP>& args, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
+	void run(const std::string& functionName, const std::vector<ConstantSP>& args, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
     
 	bool isFinished(int identity);
 
@@ -212,35 +209,35 @@ private:
 
 class EXPORT_DECL PartitionedTableAppender {
 public:
-	PartitionedTableAppender(string dbUrl, string tableName, string partitionColName, DBConnectionPool& pool);
+	PartitionedTableAppender(std::string dbUrl, std::string tableName, std::string partitionColName, DBConnectionPool& pool);
 
-	PartitionedTableAppender(string dbUrl, string tableName, string partitionColName, string appendFunction, DBConnectionPool& pool);
+	PartitionedTableAppender(std::string dbUrl, std::string tableName, std::string partitionColName, std::string appendFunction, DBConnectionPool& pool);
 	virtual ~PartitionedTableAppender();
 	int append(TableSP table);
 
 private:
- 	void init(string dbUrl, string tableName, string partitionColName, string appendFunction);
+ 	void init(std::string dbUrl, std::string tableName, std::string partitionColName, std::string appendFunction);
 
 	void checkColumnType(int col, DATA_CATEGORY category, DATA_TYPE type);
 
 private:
 	std::shared_ptr<DBConnectionPoolImpl> pool_;
-	string appendScript_;
+	std::string appendScript_;
 	int threadCount_;
     DictionarySP tableInfo_;
 	int partitionColumnIdx_;
 	int cols_;
     DomainSP domain_;
-    vector<DATA_CATEGORY> columnCategories_;
- 	vector<DATA_TYPE> columnTypes_;
+    std::vector<DATA_CATEGORY> columnCategories_;
+ 	std::vector<DATA_TYPE> columnTypes_;
 	int identity_ = -1;
-    vector<vector<int>> chunkIndices_;
+    std::vector<std::vector<int>> chunkIndices_;
 };
 
 
 class EXPORT_DECL AutoFitTableAppender {
 public:
-	AutoFitTableAppender(string dbUrl, string tableName, DBConnection& conn);
+	AutoFitTableAppender(std::string dbUrl, std::string tableName, DBConnection& conn);
 	virtual ~AutoFitTableAppender() = default;
 	int append(TableSP table);
 
@@ -249,17 +246,17 @@ private:
 
 private:
     DBConnection& conn_;
-	string appendScript_;
+	std::string appendScript_;
 	int cols_;
-    vector<DATA_CATEGORY> columnCategories_;
- 	vector<DATA_TYPE> columnTypes_;
-	vector<string> columnNames_;
+    std::vector<DATA_CATEGORY> columnCategories_;
+ 	std::vector<DATA_TYPE> columnTypes_;
+	std::vector<std::string> columnNames_;
 };
 
 class EXPORT_DECL AutoFitTableUpsert {
 public:
-	AutoFitTableUpsert(string dbUrl, string tableName, DBConnection& conn,bool ignoreNull=false,
-                                        vector<string> *pkeyColNames=nullptr,vector<string> *psortColumns=nullptr);
+	AutoFitTableUpsert(std::string dbUrl, std::string tableName, DBConnection& conn,bool ignoreNull=false,
+                                        std::vector<std::string> *pkeyColNames=nullptr,std::vector<std::string> *psortColumns=nullptr);
 	virtual ~AutoFitTableUpsert() = default;
 	int upsert(TableSP table);
 
@@ -268,25 +265,25 @@ private:
 
 private:
     DBConnection& conn_;
-	string upsertScript_;
+	std::string upsertScript_;
 	int cols_;
-    vector<DATA_CATEGORY> columnCategories_;
- 	vector<DATA_TYPE> columnTypes_;
-	vector<string> columnNames_;
+    std::vector<DATA_CATEGORY> columnCategories_;
+ 	std::vector<DATA_TYPE> columnTypes_;
+	std::vector<std::string> columnNames_;
 };
 
 
 class RecordTime {
 public:
-	RecordTime(const string &name);
+	RecordTime(const std::string &name);
 	~RecordTime();
 	static std::string printAllTime();
 private:
-	const string name_;
+	const std::string name_;
 	long recordOrder_;
 	long long startTime_;
 	struct Node {
-		string name;
+		std::string name;
 		long minOrder;
 		std::vector<long long> costTime;//ns
 	};

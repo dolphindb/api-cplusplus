@@ -7,11 +7,11 @@ namespace dolphindb {
 class DBConnectionPoolImpl{
 public:
     struct Task{
-        Task(const string& sc = "", int id = 0, int pr = 4, int pa = 2, bool clearM = false)
+        Task(const std::string& sc = "", int id = 0, int pr = 4, int pa = 2, bool clearM = false)
                 : script(sc), identity(id), priority(pr), parallelism(pa), clearMemory(clearM){}
-        Task(const string& function, const std::vector<ConstantSP>& args, int id = 0, int pr = 4, int pa = 2, bool clearM = false) 
+        Task(const std::string& function, const std::vector<ConstantSP>& args, int id = 0, int pr = 4, int pa = 2, bool clearM = false) 
             : script(function), arguments(args), identity(id), priority(pr), parallelism(pa), clearMemory(clearM){ isFunc = true; }
-        string script;
+        std::string script;
         std::vector<ConstantSP> arguments;
         int identity;
         int priority;
@@ -20,7 +20,7 @@ public:
         bool isFunc = false;
     };
     
-    DBConnectionPoolImpl(const string& hostName, int port, int threadNum = 10, const string& userId = "", const string& password = "",
+    DBConnectionPoolImpl(const std::string& hostName, int port, int threadNum = 10, const std::string& userId = "", const std::string& password = "",
         bool loadBalance = true, bool highAvailability = true, bool compress = false, bool reConnect=false, bool python = false);
     
     ~DBConnectionPoolImpl(){
@@ -32,12 +32,12 @@ public:
             work->join();
         }
     }
-    void run(const string& script, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false){
+    void run(const std::string& script, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false){
         queue_->push(Task(script, identity, priority, parallelism, clearMemory));
         taskStatus_.setResult(identity, TaskStatusMgmt::Result());
     }
 
-    void run(const string& functionName, const std::vector<ConstantSP>& args, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false){
+    void run(const std::string& functionName, const std::vector<ConstantSP>& args, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false){
         queue_->push(Task(functionName, args, identity, priority, parallelism, clearMemory));
         taskStatus_.setResult(identity, TaskStatusMgmt::Result());
     }

@@ -13,7 +13,6 @@
 #include "Constant.h"
 #include "Util.h"
 #include "Guid.h"
-using std::ostringstream;
 
 namespace dolphindb {
 
@@ -30,9 +29,9 @@ public:
 	virtual DATA_TYPE getType() const {return DT_VOID;}
 	virtual DATA_TYPE getRawType() const { return DT_VOID;}
 	virtual DATA_CATEGORY getCategory() const {return NOTHING;}
-	virtual string getString() const {return Constant::EMPTY;}
-	virtual string getScript() const {return isNothing() ? Constant::EMPTY : Constant::NULL_STR;}
-	virtual const string& getStringRef() const {return Constant::EMPTY;}
+	virtual std::string getString() const {return Constant::EMPTY;}
+	virtual std::string getScript() const {return isNothing() ? Constant::EMPTY : Constant::NULL_STR;}
+	virtual const std::string& getStringRef() const {return Constant::EMPTY;}
 	virtual char getBool() const {return CHAR_MIN;}
 	virtual char getChar() const {return CHAR_MIN;}
 	virtual short getShort() const {return SHRT_MIN;}
@@ -60,8 +59,8 @@ public:
 	virtual const float* getFloatConst(INDEX start, int len, float* buf) const;
 	virtual bool getDouble(INDEX start, int len, double* buf) const;
 	virtual const double* getDoubleConst(INDEX start, int len, double* buf) const;
-	virtual bool getString(INDEX start, int len, string** buf) const;
-	virtual string** getStringConst(INDEX start, int len, string** buf) const;
+	virtual bool getString(INDEX start, int len, std::string** buf) const;
+	virtual std::string** getStringConst(INDEX start, int len, std::string** buf) const;
 	virtual long long getAllocatedMemory() const;
 	virtual int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const;
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
@@ -75,7 +74,7 @@ public:
 	Int128(const unsigned char* data);
 	virtual ~Int128(){}
 	inline const unsigned char* bytes() const { return uuid_;}
-	virtual string getString() const { return toString(uuid_);}
+	virtual std::string getString() const { return toString(uuid_);}
 	virtual const Guid getInt128() const { return uuid_;}
 	virtual const unsigned char* getBinary() const {return uuid_;}
 	virtual bool isNull() const;
@@ -109,7 +108,7 @@ public:
 	virtual int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const;
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
 	virtual int getHash(int buckets) const { return murmur32_16b(uuid_) % buckets;}
-	static string toString(const unsigned char* data);
+	static std::string toString(const unsigned char* data);
 	static Int128* parseInt128(const char* str, size_t len);
 	static bool parseInt128(const char* str, size_t len, unsigned char *buf);
 
@@ -131,7 +130,7 @@ public:
 	virtual ConstantSP getValue() const {return new Uuid(uuid_);}
 	virtual DATA_TYPE getType() const {return DT_UUID;}
 	virtual DATA_TYPE getRawType() const { return DT_INT128;}
-	virtual string getString() const { return Guid::getString(uuid_);}
+	virtual std::string getString() const { return Guid::getString(uuid_);}
 	static Uuid* parseUuid(const char* str, size_t len);
 };
 
@@ -145,8 +144,8 @@ public:
 	virtual ConstantSP getValue() const {return new IPAddr(uuid_);}
 	virtual DATA_TYPE getType() const {return DT_IP;}
 	virtual DATA_TYPE getRawType() const { return DT_INT128;}
-	virtual string getString() const { return toString(uuid_);}
-	static string toString(const unsigned char* data);
+	virtual std::string getString() const { return toString(uuid_);}
+	static std::string toString(const unsigned char* data);
 	static IPAddr* parseIPAddr(const char* str, size_t len);
 	static bool parseIPAddr(const char* str, size_t len, unsigned char* buf);
 
@@ -157,7 +156,7 @@ private:
 
 class String: public Constant{
 public:
-	String(string val="", bool blob=false):val_(val), blob_(blob){}
+	String(std::string val="", bool blob=false):val_(val), blob_(blob){}
 	virtual ~String(){}
 	virtual char getBool() const {throw IncompatibleTypeException(DT_BOOL,DT_STRING);}
 	virtual char getChar() const {throw IncompatibleTypeException(DT_CHAR,DT_STRING);}
@@ -167,12 +166,12 @@ public:
 	virtual INDEX getIndex() const {throw IncompatibleTypeException(DT_INDEX,DT_STRING);}
 	virtual float getFloat() const {throw IncompatibleTypeException(DT_FLOAT,DT_STRING);}
 	virtual double getDouble() const {throw IncompatibleTypeException(DT_DOUBLE,DT_STRING);}
-	virtual string getString() const {return val_;}
-	virtual string getScript() const {return Util::literalConstant(val_);}
-	virtual const string& getStringRef() const {return val_;}
-	virtual const string& getStringRef(INDEX index) const {return val_;}
+	virtual std::string getString() const {return val_;}
+	virtual std::string getScript() const {return Util::literalConstant(val_);}
+	virtual const std::string& getStringRef() const {return val_;}
+	virtual const std::string& getStringRef(INDEX index) const {return val_;}
 	virtual bool isNull() const {return val_.empty();}
-	virtual void setString(const string& val) {val_=val;}
+	virtual void setString(const std::string& val) {val_=val;}
 	virtual void setNull(){val_="";}
 	virtual void nullFill(const ConstantSP& val){
 		if(isNull())
@@ -190,12 +189,12 @@ public:
 			buf[i]=valid;
 		return true;
 	}
-	virtual bool getString(INDEX start, int len, string** buf) const {
+	virtual bool getString(INDEX start, int len, std::string** buf) const {
 		for(int i=0;i<len;++i)
 			buf[i]=&val_;
 		return true;
 	}
-	virtual string** getStringConst(INDEX start, int len, string** buf) const {
+	virtual std::string** getStringConst(INDEX start, int len, std::string** buf) const {
 		for(int i=0;i<len;++i)
 			buf[i]=&val_;
 		return buf;
@@ -211,7 +210,7 @@ public:
 	virtual DATA_TYPE getType() const {return blob_ == false ? DT_STRING : DT_BLOB;}
 	virtual DATA_TYPE getRawType() const {return blob_ == false ? DT_STRING : DT_BLOB;}
 	virtual DATA_CATEGORY getCategory() const {return LITERAL;}
-	virtual long long getAllocatedMemory() const {return sizeof(string)+val_.size();}
+	virtual long long getAllocatedMemory() const {return sizeof(std::string)+val_.size();}
 	virtual int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const;
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
 	virtual int compare(INDEX index, const ConstantSP& target) const {
@@ -220,7 +219,7 @@ public:
 	virtual int getHash(int buckets) const { return murmur32(val_.data(), val_.size()) % buckets;}
 
 private:
-	mutable string val_;
+	mutable std::string val_;
     bool blob_;
 };
 
@@ -246,11 +245,11 @@ public:
 	virtual void setIndex(INDEX val){if(val != INDEX_MIN) val_=(T)val; else setNull();}
 	virtual void setFloat(float val){if(val != FLT_NMIN) val_=(T)val; else setNull();}
 	virtual void setDouble(double val){if(val != DBL_NMIN) val_=(T)val; else setNull();}
-	virtual void setString(const string& val){}
+	virtual void setString(const std::string& val){}
 	virtual bool isNull() const = 0;
-	virtual string getScript() const {
+	virtual std::string getScript() const {
 		if(isNull()){
-			string str("00");
+			std::string str("00");
 			return str.append(1, Util::getDataTypeSymbol(getType()));
 		}
 		else
@@ -465,12 +464,12 @@ public:
 	virtual ConstantSP getInstance() const {return ConstantSP(new Bool());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Bool(val_));}
 	virtual DATA_CATEGORY getCategory() const {return LOGICAL;}
-	virtual string getString() const { return toString(val_);}
+	virtual std::string getString() const { return toString(val_);}
 	virtual bool add(INDEX start, INDEX length, long long inc) { return false;}
 	virtual bool add(INDEX start, INDEX length, double inc) { return false;}
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
-	static Bool* parseBool(const string& str);
-	static string toString(char val){
+	static Bool* parseBool(const std::string& str);
+	static std::string toString(char val){
 		if(val == CHAR_MIN)
 			return "";
 		else if(val)
@@ -492,12 +491,12 @@ public:
 	virtual ConstantSP getInstance() const {return ConstantSP(new Char());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Char(val_));}
 	virtual DATA_CATEGORY getCategory() const {return INTEGRAL;}
-	virtual string getString() const { return toString(val_);}
-	virtual string getScript() const;
+	virtual std::string getString() const { return toString(val_);}
+	virtual std::string getScript() const;
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
 	virtual int getHash(int buckets) const { return val_ == CHAR_MIN ? -1 : ((unsigned int)val_) % buckets;}
-	static Char* parseChar(const string& str);
-	static string toString(char val);
+	static Char* parseChar(const std::string& str);
+	static std::string toString(char val);
 };
 
 class Short: public AbstractScalar<short>{
@@ -512,11 +511,11 @@ public:
 	virtual ConstantSP getInstance() const {return ConstantSP(new Short());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Short(val_));}
 	virtual DATA_CATEGORY getCategory() const {return INTEGRAL;}
-	virtual string getString() const { return toString(val_);}
+	virtual std::string getString() const { return toString(val_);}
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
 	virtual int getHash(int buckets) const { return val_ == SHRT_MIN ? -1 : ((unsigned int)val_) % buckets;}
-	static Short* parseShort(const string& str);
-	static string toString(short val);
+	static Short* parseShort(const std::string& str);
+	static std::string toString(short val);
 };
 
 class Int: public AbstractScalar<int>{
@@ -531,24 +530,24 @@ public:
 	virtual ConstantSP getInstance() const {return ConstantSP(new Int());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Int(val_));}
 	virtual DATA_CATEGORY getCategory() const {return INTEGRAL;}
-	virtual string getString() const { return toString(val_);}
+	virtual std::string getString() const { return toString(val_);}
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
 	virtual int getHash(int buckets) const { return val_ == INT_MIN ? -1 : ((uint32_t)val_) % buckets;}
-	static Int* parseInt(const string& str);
-	static string toString(int val);
+	static Int* parseInt(const std::string& str);
+	static std::string toString(int val);
 };
 
 class EnumInt : public Int {
 public:
-	EnumInt(const string& desc, int val):Int(val), desc_(desc){}
+	EnumInt(const std::string& desc, int val):Int(val), desc_(desc){}
 	virtual ~EnumInt(){}
-	virtual string getScript() const {return desc_;}
+	virtual std::string getScript() const {return desc_;}
 	virtual ConstantSP getValue() const {return ConstantSP(new EnumInt(desc_, val_));}
 	virtual ConstantSP getInstance() const {return ConstantSP(new EnumInt(desc_, val_));}
-	virtual string getString() const {return desc_;}
+	virtual std::string getString() const {return desc_;}
 
 private:
-	string desc_;
+	std::string desc_;
 };
 
 class Long: public AbstractScalar<long long>{
@@ -562,12 +561,12 @@ public:
 	virtual DATA_TYPE getRawType() const { return DT_LONG;}
 	virtual ConstantSP getInstance() const {return ConstantSP(new Long());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Long(val_));}
-	virtual string getString() const { return toString(val_);}
+	virtual std::string getString() const { return toString(val_);}
 	virtual DATA_CATEGORY getCategory() const {return INTEGRAL;}
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
 	virtual int getHash(int buckets) const { return val_ == LLONG_MIN ? -1 : ((uint64_t)val_) % buckets;}
-	static Long* parseLong(const string& str);
-	static string toString(long long val);
+	static Long* parseLong(const std::string& str);
+	static std::string toString(long long val);
 };
 
 class Float: public AbstractScalar<float>{
@@ -594,10 +593,10 @@ public:
 	virtual const int* getIntConst(INDEX start, int len, int* buf) const;
 	virtual bool getLong(INDEX start, int len, long long* buf) const;
 	virtual const long long* getLongConst(INDEX start, int len, long long* buf) const;
-	virtual string getString() const { return toString(val_);}
+	virtual std::string getString() const { return toString(val_);}
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
-	static Float* parseFloat(const string& str);
-	static string toString(float val);
+	static Float* parseFloat(const std::string& str);
+	static std::string toString(float val);
 };
 
 class Double: public AbstractScalar<double>{
@@ -624,23 +623,23 @@ public:
 	virtual const int* getIntConst(INDEX start, int len, int* buf) const;
 	virtual bool getLong(INDEX start, int len, long long* buf) const;
 	virtual const long long* getLongConst(INDEX start, int len, long long* buf) const;
-	virtual string getString() const {return toString(val_);}
+	virtual std::string getString() const {return toString(val_);}
 	virtual IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement);
-	static Double* parseDouble(const string& str);
-	static string toString(double val);
+	static Double* parseDouble(const std::string& str);
+	static std::string toString(double val);
 };
 
 class EnumDouble : public Double {
 public:
-	EnumDouble(const string& desc, double val):Double(val), desc_(desc){}
+	EnumDouble(const std::string& desc, double val):Double(val), desc_(desc){}
 	virtual ~EnumDouble(){}
-	virtual string getScript() const {return desc_;}
+	virtual std::string getScript() const {return desc_;}
 	virtual ConstantSP getValue() const {return ConstantSP(new EnumDouble(desc_, val_));}
 	virtual ConstantSP getInstance() const {return ConstantSP(new EnumDouble(desc_, val_));}
-	virtual string getString() const { return desc_;}
+	virtual std::string getString() const { return desc_;}
 
 private:
-	string desc_;
+	std::string desc_;
 };
 
 class TemporalScalar:public Int{
@@ -658,9 +657,9 @@ public:
 	virtual DATA_TYPE getType() const {return DT_DATE;}
 	virtual ConstantSP getInstance() const {return ConstantSP(new Date());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Date(val_));}
-	virtual string getString() const { return toString(val_);}
-	static Date* parseDate(const string& str);
-	static string toString(int val);
+	virtual std::string getString() const { return toString(val_);}
+	static Date* parseDate(const std::string& str);
+	static std::string toString(int val);
 	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
@@ -673,9 +672,9 @@ public:
 	virtual DATA_TYPE getType() const {return DT_MONTH;}
 	virtual ConstantSP getInstance() const {return ConstantSP(new Month());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Month(val_));}
-	virtual string getString() const { return toString(val_);}
-	static Month* parseMonth(const string& str);
-	static string toString(int val);
+	virtual std::string getString() const { return toString(val_);}
+	static Month* parseMonth(const std::string& str);
+	static std::string toString(int val);
 	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
@@ -687,10 +686,10 @@ public:
 	virtual DATA_TYPE getType() const {return DT_TIME;}
 	virtual ConstantSP getInstance() const {return ConstantSP(new Time());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Time(val_));}
-	virtual string getString() const { return toString(val_);}
+	virtual std::string getString() const { return toString(val_);}
 	virtual void validate();
-	static Time* parseTime(const string& str);
-	static string toString(int val);
+	static Time* parseTime(const std::string& str);
+	static std::string toString(int val);
 	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
@@ -704,10 +703,10 @@ public:
 	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 	virtual ConstantSP getInstance() const {return ConstantSP(new NanoTime());}
 	virtual ConstantSP getValue() const {return ConstantSP(new NanoTime(val_));}
-	virtual string getString() const { return toString(val_);}
+	virtual std::string getString() const { return toString(val_);}
 	virtual void validate();
-	static NanoTime* parseNanoTime(const string& str);
-	static string toString(long long val);
+	static NanoTime* parseNanoTime(const std::string& str);
+	static std::string toString(long long val);
 };
 
 class Timestamp:public Long{
@@ -720,9 +719,9 @@ public:
 	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 	virtual ConstantSP getInstance() const {return ConstantSP(new Timestamp());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Timestamp(val_));}
-	virtual string getString() const { return toString(val_);}
-	static Timestamp* parseTimestamp(const string& str);
-	static string toString(long long val);
+	virtual std::string getString() const { return toString(val_);}
+	static Timestamp* parseTimestamp(const std::string& str);
+	static std::string toString(long long val);
 };
 
 class NanoTimestamp:public Long{
@@ -735,9 +734,9 @@ public:
 	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 	virtual ConstantSP getInstance() const {return ConstantSP(new NanoTimestamp());}
 	virtual ConstantSP getValue() const {return ConstantSP(new NanoTimestamp(val_));}
-	virtual string getString() const { return toString(val_);}
-	static NanoTimestamp* parseNanoTimestamp(const string& str);
-	static string toString(long long val);
+	virtual std::string getString() const { return toString(val_);}
+	static NanoTimestamp* parseNanoTimestamp(const std::string& str);
+	static std::string toString(long long val);
 };
 
 class Minute:public TemporalScalar{
@@ -748,10 +747,10 @@ public:
 	virtual DATA_TYPE getType() const {return DT_MINUTE;}
 	virtual ConstantSP getInstance() const {return ConstantSP(new Minute());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Minute(val_));}
-	virtual string getString() const { return toString(val_);}
+	virtual std::string getString() const { return toString(val_);}
 	virtual void validate();
-	static Minute* parseMinute(const string& str);
-	static string toString(int val);
+	static Minute* parseMinute(const std::string& str);
+	static std::string toString(int val);
 	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
@@ -763,10 +762,10 @@ public:
 	virtual DATA_TYPE getType() const {return DT_SECOND;}
 	virtual ConstantSP getInstance() const {return ConstantSP(new Second());}
 	virtual ConstantSP getValue() const {return ConstantSP(new Second(val_));}
-	virtual string getString() const { return toString(val_);}
+	virtual std::string getString() const { return toString(val_);}
 	virtual void validate();
-	static Second* parseSecond(const string& str);
-	static string toString(int val);
+	static Second* parseSecond(const std::string& str);
+	static std::string toString(int val);
 	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
@@ -778,9 +777,9 @@ public:
 	virtual DATA_TYPE getType() const {return DT_DATETIME;}
 	virtual ConstantSP getInstance() const {return ConstantSP(new DateTime());}
 	virtual ConstantSP getValue() const {return ConstantSP(new DateTime(val_));}
-	virtual string getString() const { return toString(val_);}
-	static DateTime* parseDateTime(const string& str);
-	static string toString(int val);
+	virtual std::string getString() const { return toString(val_);}
+	static DateTime* parseDateTime(const std::string& str);
+	static std::string toString(int val);
 	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
@@ -792,11 +791,11 @@ public:
     virtual DATA_TYPE getType() const {return DT_DATEHOUR;}
     virtual ConstantSP getInstance() const {return ConstantSP(new DateHour());}
     virtual ConstantSP getValue() const {return ConstantSP(new DateHour(val_));}
-    virtual string getString() const { return toString(val_);}
-    static DateHour* parseDateHour(const string& str);
-    static string toString(int val);
+    virtual std::string getString() const { return toString(val_);}
+    static DateHour* parseDateHour(const std::string& str);
+    static std::string toString(int val);
 	virtual ConstantSP castTemporal(DATA_TYPE expectType);
 };
 
-};
+}
 #endif /* SCALARIMP_H_ */

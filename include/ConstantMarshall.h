@@ -280,8 +280,8 @@ private:
 	bool inProgress_;
 	int rows_;
 	int columns_;
-	string tableName_;
-	std::vector<string> colNames_;
+	std::string tableName_;
+	std::vector<std::string> colNames_;
 	std::vector<ConstantSP> colObjs_;
 	VectorUnmarshall vectorUnmarshall_;
 };
@@ -346,5 +346,5 @@ private:
 	ConstantUnmarshall* arrUnmarshall[9];
 };
 
-};
+}
 #endif /* CONSTANTMARSHALL_H_ */

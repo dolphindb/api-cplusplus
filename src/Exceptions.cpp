@@ -13,7 +13,7 @@ IncompatibleTypeException::IncompatibleTypeException(DATA_TYPE expected, DATA_TY
 	errMsg_.append("Incompatible type. Expected: " + Util::getDataTypeString(expected_) + ", Actual: " + Util::getDataTypeString(actual_));
 }
 
-string IOException::getCodeDescription(IO_ERR errCode) const {
+std::string IOException::getCodeDescription(IO_ERR errCode) const {
 	switch(errCode){
 	case OK :
 		return "";
@@ -44,4 +44,4 @@ string IOException::getCodeDescription(IO_ERR errCode) const {
 	}
 }
 
-};
+}

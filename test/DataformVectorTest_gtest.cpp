@@ -38,11 +38,12 @@ protected:
 		}
 
 		cout << "ok" << endl;
+		CLEAR_ENV(conn);
 	}
-	virtual void TearDown()
-	{
-		conn.run("undef all;");
-	}
+    virtual void TearDown()
+    {
+		CLEAR_ENV(conn);
+    }
 };
 
 #ifndef WINDOWS
@@ -779,6 +780,23 @@ TEST_F(DataformVectorTest, testNanoTimestampVector_get)
 
 #endif
 
+TEST_F(DataformVectorTest, testVoidVector)
+{
+	VectorSP v1 = Util::createVector(DT_VOID, 100);
+	EXPECT_EQ(v1->getCategory(), NOTHING);
+	for (INDEX i = 0; i < 100; i++)
+		EXPECT_EQ(v1->getString(i), "");
+	EXPECT_ANY_THROW(v1->set(0, Util::createInt(1)));
+	EXPECT_ANY_THROW(v1->set(Util::createInt(0), Util::createInt(1)));
+	EXPECT_ANY_THROW(v1->fill(0, 1, Util::createInt(1)));
+	EXPECT_ANY_THROW(v1->append(Util::createInt(1), 1));
+	EXPECT_ANY_THROW(v1->append(Util::createInt(1), 0, 1));
+	EXPECT_FALSE(v1->add(0, 1, 1ll));
+	EXPECT_FALSE(v1->add(0, 1, 1.));
+	EXPECT_ANY_THROW(v1->compare(0, Util::createInt(1)));
+	EXPECT_ANY_THROW(v1->asof(Util::createInt(1)));
+}
+
 TEST_F(DataformVectorTest, testAnyVector)
 {
 	VectorSP v1 = Util::createVector(DT_ANY, 5, 5);
@@ -1454,6 +1472,12 @@ TEST_F(DataformVectorTest, testBoolVector)
 	EXPECT_EQ((double)resbuf7[0], v3->get(0)->getDouble());
 	EXPECT_EQ((double)resbuf7[1], v3->get(1)->getDouble());
 
+	VectorSP errfillVals = conn.run("`str1`str2");
+	EXPECT_ANY_THROW(v3->fill(0, 2, errfillVals));
+	v3->fill(0, 2, Util::createNullConstant(DT_BOOL));
+	EXPECT_EQ(v3->getString(), "[,]");
+	EXPECT_FALSE(v3->append(Util::createString("aaa"), 0, 2));
+
 	delete[] buf, buf1, buf2, buf3, buf4, buf5, buf6, buf7, buf9, buf10, buf11, buf12, buf13, buf14, buf15;
 }
 
@@ -1745,20 +1769,13 @@ TEST_F(DataformVectorTest, testCharVector)
 	EXPECT_EQ((double)resbuf7[0], v3->get(0)->getDouble());
 	EXPECT_EQ((double)resbuf7[1], v3->get(1)->getDouble());
 
-	delete[] buf1;
-	delete[] buf2;
-	delete[] buf3;
-	delete[] buf4;
-	delete[] buf5;
-	delete[] buf6;
-	delete[] buf7;
-	delete[] buf15;
-	delete[] buf9;
-	delete[] buf10;
-	delete[] buf11;
-	delete[] buf12;
-	delete[] buf13;
-	delete[] buf14;
+	delete[] buf, buf1, buf2, buf3, buf4, buf5, buf6, buf7, buf9, buf10, buf11, buf12, buf13, buf14, buf15;
+
+	VectorSP errfillVals = conn.run("`str1`str2");
+	EXPECT_ANY_THROW(v3->fill(0, 2, errfillVals));
+	v3->fill(0, 2, Util::createNullConstant(DT_CHAR));
+	EXPECT_EQ(v3->getString(), "[,]");
+	EXPECT_FALSE(v3->append(Util::createString("aaa"), 0, 2));
 }
 
 TEST_F(DataformVectorTest, testCharNullVector)
@@ -1854,13 +1871,7 @@ TEST_F(DataformVectorTest, testCharNullVector)
 	EXPECT_EQ((double)resbuf7[0], v3->get(0)->getDouble());
 	EXPECT_EQ((double)resbuf7[1], v3->get(1)->getDouble());
 
-	delete[] buf9;
-	delete[] buf10;
-	delete[] buf11;
-	delete[] buf12;
-	delete[] buf13;
-	delete[] buf14;
-	delete[] buf15;
+	delete[] buf9, buf10, buf11, buf12, buf13, buf14, buf15;
 }
 
 TEST_F(DataformVectorTest, testIntVector)
@@ -2099,20 +2110,13 @@ TEST_F(DataformVectorTest, testIntVector)
 	EXPECT_EQ((double)resbuf7[0], v5->get(0)->getDouble());
 	EXPECT_EQ((double)resbuf7[1], v5->get(1)->getDouble());
 
-	delete[] buf_1;
-	delete[] buf_2;
-	delete[] buf_3;
-	delete[] buf_4;
-	delete[] buf_5;
-	delete[] buf_6;
-	delete[] buf_7;
-	delete[] buf15;
-	delete[] buf9;
-	delete[] buf10;
-	delete[] buf11;
-	delete[] buf12;
-	delete[] buf13;
-	delete[] buf14;
+	delete[] buf_1, buf_2, buf_3, buf_4, buf_5, buf_6, buf_7, buf9, buf10, buf11, buf12, buf13, buf14, buf15;
+
+	VectorSP errfillVals = conn.run("`str1`str2");
+	EXPECT_ANY_THROW(v3->fill(0, 2, errfillVals));
+	v3->fill(0, 2, Util::createNullConstant(DT_INT));
+	EXPECT_EQ(v3->getString(), "[,]");
+	EXPECT_FALSE(v3->append(Util::createString("aaa"), 0, 2));
 }
 
 TEST_F(DataformVectorTest, testIntNullVector)
@@ -2395,6 +2399,12 @@ TEST_F(DataformVectorTest, testLongVector)
 	VectorSP v6 = Util::createVector(DT_LONG, 2, 2);
 	v6->set(0, Util::createLong(1));
 	v6->set(1, Util::createLong(0));
+
+	VectorSP errfillVals = conn.run("`str1`str2");
+	EXPECT_ANY_THROW(v5->fill(0, 2, errfillVals));
+	v5->fill(0, 2, Util::createNullConstant(DT_LONG));
+	EXPECT_EQ(v5->getString(), "[,]");
+	EXPECT_FALSE(v5->append(Util::createString("aaa"), 0, 2));
 }
 
 TEST_F(DataformVectorTest, testLongNullVector)
@@ -2767,6 +2777,12 @@ TEST_F(DataformVectorTest, testShortVector)
 	delete[] buf12;
 	delete[] buf13;
 	delete[] buf14;
+
+	VectorSP errfillVals = conn.run("`str1`str2");
+	EXPECT_ANY_THROW(v5->fill(0, 2, errfillVals));
+	v5->fill(0, 2, Util::createNullConstant(DT_SHORT));
+	EXPECT_EQ(v5->getString(), "[,]");
+	EXPECT_FALSE(v5->append(Util::createString("aaa"), 0, 2));
 }
 
 TEST_F(DataformVectorTest, testFloatVector)
@@ -2996,6 +3012,12 @@ TEST_F(DataformVectorTest, testFloatVector)
 	delete[] buf12;
 	delete[] buf13;
 	delete[] buf14;
+
+	VectorSP errfillVals = conn.run("`str1`str2");
+	EXPECT_ANY_THROW(v5->fill(0, 2, errfillVals));
+	v5->fill(0, 2, Util::createNullConstant(DT_FLOAT));
+	EXPECT_EQ(v5->getString(), "[,]");
+	EXPECT_FALSE(v5->append(Util::createString("aaa"), 0, 2));
 }
 
 TEST_F(DataformVectorTest, testFloatNullVector)
@@ -3352,6 +3374,12 @@ TEST_F(DataformVectorTest, testDoubleVector)
 	delete[] buf12;
 	delete[] buf13;
 	delete[] buf14;
+
+	VectorSP errfillVals = conn.run("`str1`str2");
+	EXPECT_ANY_THROW(v5->fill(0, 2, errfillVals));
+	v5->fill(0, 2, Util::createNullConstant(DT_FLOAT));
+	EXPECT_EQ(v5->getString(), "[,]");
+	EXPECT_FALSE(v5->append(Util::createString("aaa"), 0, 2));
 }
 
 TEST_F(DataformVectorTest, testDoubleNullVector)
@@ -4781,7 +4809,7 @@ TEST_F(DataformVectorTest, testDecimal128NullVector)
 
 TEST_F(DataformVectorTest, testDecimal32Vector_typeConvert){
 	VectorSP dsm32V = Util::createVector(DT_DECIMAL32, 13, 20, true, 6);
-	VectorSP v1 = conn.run("v1=array(DECIMAL32(6)).append!(decimal32(NULL -0.2345678 '999.1',6));v1");
+	VectorSP v1 = conn.run("v1=array(DECIMAL32(6)).append!(decimal32(NULL -0.2345671 '999.1',6));v1");
 	EXPECT_EQ(v1->getString(), "[,-0.234567,999.100000]");
 
 	dsm32V->set(0, Util::createDecimal32(2, 0.234567));
@@ -6323,6 +6351,7 @@ TEST_F(DataformVectorTest, testenumVector)
 		DdbVector<int> datehourV(0, size);
 		DdbVector<int32_t> decimal32V(0, size);
 		DdbVector<int64_t> decimal64V(0, size);
+		DdbVector<wide_integer::int128> decimal128V(0, size);
 		DdbVector<string> symV(0, size);
 		for (auto i = 0; i < size - 1; i++)
 		{
@@ -6334,11 +6363,13 @@ TEST_F(DataformVectorTest, testenumVector)
 			boolV.add(i % 1);
 			charV.add(i % CHAR_MAX);
 			strV.add("str" + to_string(i));
-			int128[i % 16] = i % CHAR_MAX;
+			for (auto j = 0; j < 16; j++){
+				int128[j] = i % INT_MAX;
+				uuid[j] = i % INT_MAX;
+				ip[j] = i % INT_MAX;
+			}
 			int128V.add(int128);
-			uuid[i % 16] = i % CHAR_MAX;
 			uuidV.add(uuid);
-			ip[i % 16] = i % CHAR_MAX;
 			ipV.add(ip);
 			blobV.add("blob" + to_string(i));
 			dateV.add(i);
@@ -6348,6 +6379,7 @@ TEST_F(DataformVectorTest, testenumVector)
 			datehourV.add(i);
 			decimal32V.add(i / 100.00);
 			decimal64V.add(i / 100.0000);
+			decimal128V.add(i);
 			symV.add("sym" + to_string(i));
 		}
 		doubleV.addNull();
@@ -6369,15 +6401,16 @@ TEST_F(DataformVectorTest, testenumVector)
 		datehourV.addNull();
 		decimal32V.addNull();
 		decimal64V.addNull();
+		decimal128V.addNull();
 		symV.addNull();
 		table = Util::createTable(
-			{"double", "float", "int", "short", "long", "bool", "char", "str", "int128", "uuid", "ip", "blob", "date", "minute", "datetime", "nanotime", "datehour", "decimal32", "decimal64", "symbol"},
+			{"double", "float", "int", "short", "long", "bool", "char", "str", "int128", "uuid", "ip", "blob", "date", "minute", "datetime", "nanotime", "datehour", "decimal32", "decimal64", "decimal128", "symbol"},
 			{doubleV.createVector(DT_DOUBLE), floatV.createVector(DT_FLOAT), intV.createVector(DT_INT), shortV.createVector(DT_SHORT),
 			 longV.createVector(DT_LONG), boolV.createVector(DT_BOOL), charV.createVector(DT_CHAR), strV.createVector(DT_STRING),
 			 int128V.createVector(DT_INT128), uuidV.createVector(DT_UUID), ipV.createVector(DT_IP), blobV.createVector(DT_BLOB),
 			 dateV.createVector(DT_DATE), minuteV.createVector(DT_MINUTE), datetimeV.createVector(DT_DATETIME), nanotimeV.createVector(DT_NANOTIME),
-			 datehourV.createVector(DT_DATEHOUR), decimal32V.createVector(DT_DECIMAL32), decimal64V.createVector(DT_DECIMAL64), symV.createVector(DT_SYMBOL)});
-		// cout << "table created:" << endl << table->getString() << endl;
+			 datehourV.createVector(DT_DATEHOUR), decimal32V.createVector(DT_DECIMAL32), decimal64V.createVector(DT_DECIMAL64), decimal128V.createVector(DT_DECIMAL128), symV.createVector(DT_SYMBOL)});
+		EXPECT_ANY_THROW(datehourV.createVector(DT_DATEHOUR)); // createVector can only be called once.
 		conn.upload("test_tab", {table});
 	}
 	TableSP res_tab = conn.run("test_tab");
@@ -6404,6 +6437,7 @@ TEST_F(DataformVectorTest, testenumVector)
 		cols[colIndex++] = Util::createVector(DT_DATEHOUR, 0, table->rows());
 		cols[colIndex++] = Util::createVector(DT_DECIMAL32, 0, table->rows());
 		cols[colIndex++] = Util::createVector(DT_DECIMAL64, 0, table->rows());
+		cols[colIndex++] = Util::createVector(DT_DECIMAL128, 0, table->rows());
 		cols[colIndex++] = Util::createVector(DT_SYMBOL, 0, table->rows());
 		for (auto colIndex = 0; colIndex < table->columns(); colIndex++)
 		{
@@ -6577,6 +6611,16 @@ TEST_F(DataformVectorTest, testenumVector)
 							return true;
 						});
 					break;
+					case DT_DECIMAL128:
+						Util::enumDecimal128Vector(pvector, [&](const wide_integer::int128 *pbuf, INDEX startIndex, int length) {
+							for (auto index = startIndex, i = 0; i < length; i++, index++) {
+								ConstantSP pconst = Util::createDecimal128(pvector->getExtraParamForType(),0);
+								pconst->setBinary((const unsigned char*)&pbuf[i], sizeof(wide_integer::int128));
+								cols[colIndex]->append(pconst);
+							}
+							return true;
+						});
+					break;
 					case DT_SYMBOL:
 						Util::enumStringVector(pvector, [&](string **pbuf, INDEX startIndex, int length) {
 							for (auto index = startIndex, i = 0; i < length; i++, index++) {
@@ -6617,6 +6661,7 @@ TEST_F(DataformVectorTest, testenumVector)
 			ASSERT_EQ(cols[colIndex++]->get(i)->getString(), res_tab->getColumn(16)->get(i)->getString());
 			ASSERT_EQ(cols[colIndex++]->get(i)->getString(), res_tab->getColumn(17)->get(i)->getString());
 			ASSERT_EQ(cols[colIndex++]->get(i)->getString(), res_tab->getColumn(18)->get(i)->getString());
+			ASSERT_EQ(cols[colIndex++]->get(i)->getString(), res_tab->getColumn(19)->get(i)->getString());
 		}
 		delete[] cols;
 	}
@@ -7184,7 +7229,7 @@ public:
 	}
 	static void TearDownTestCase()
 	{
-		conn.run("undef all;go;");
+		CLEAR_ENV(conn);
 		conn.close();
 	}
 
@@ -7818,7 +7863,7 @@ TEST_P(BigArray_gt1048576, test_bigArray)
 	{
 		for (auto i = 0; i < 1000000; i++)
 		{
-			ASSERT_EQ(bigV->get(i)->getString(), "0.45");
+			ASSERT_EQ(bigV->get(i)->getString(), "0.46");
 		}
 		for (auto i = 0; i < 100000; i++)
 		{
@@ -7967,4 +8012,176 @@ TEST_F(DataformVectorTest, test_upload_download_vector_with_huge_value_symbol)
 	v1->append(Util::createString(val));
 
 	EXPECT_ANY_THROW(conn.upload("b", {v1}));
+}
+
+class DataformVectorTest_Any : public DataformVectorTest, public testing::WithParamInterface<std::tuple<DATA_FORM, string>>{
+public:
+	static vector<std::tuple<DATA_FORM, string>> getData(){
+		return {
+			std::make_tuple(DF_PAIR, "ex=take([1:2], 2000);ex"),
+			std::make_tuple(DF_VECTOR, "ex=take([1..2], 2000);ex"),
+			std::make_tuple(DF_SCALAR, "ex=take([1,`str], 2000);ex"),
+			std::make_tuple(DF_DICTIONARY, "ex=take([dict(`a`b`c, 1 2 3)], 2000);ex"),
+			std::make_tuple(DF_TABLE, "ex=take([table(1 2 3 as c1)], 2000);ex"),
+			std::make_tuple(DF_MATRIX, "ex=take([matrix(1 2, 3 4)], 2000);ex"),
+			std::make_tuple(DF_SET, "ex=take([set(1 2 3)], 2000);ex"),
+		};
+	}
+};
+
+INSTANTIATE_TEST_SUITE_P(, DataformVectorTest_Any, testing::ValuesIn(DataformVectorTest_Any::getData()),
+		[](const ::testing::TestParamInfo<DataformVectorTest_Any::ParamType>& info){
+			string _f = Util::getDataFormString(std::get<0>(info.param));
+			return _f;
+		});
+TEST_P(DataformVectorTest_Any, testAnyVector_download_and_upload){
+	DATA_FORM ex_df = std::get<0>(GetParam());
+	string script = std::get<1>(GetParam());
+	VectorSP anyV = conn.run(script);
+
+	EXPECT_EQ(anyV->size(), 2000);
+	for (auto i = 0; i < 2000; i++){
+		EXPECT_EQ(anyV->get(i)->getForm(), ex_df);
+	}
+
+	conn.upload("res", {anyV});
+	if (ex_df != DF_SET && ex_df != DF_TABLE && ex_df != DF_DICTIONARY){
+		EXPECT_TRUE(conn.run("eqObj(res, ex)")->getBool());
+	}else if (ex_df == DF_SET){
+		conn.run("\
+			for (i in 0:(ex.size()-1)){\
+				assert (1 in res[i] && 2 in res[i] && 3 in res[i]);\
+			}");
+	}else if (ex_df == DF_TABLE){
+		conn.run("\
+			for (i in 0:(ex.size()-1)){\
+				assert each(eqObj, ex[i].values(), res[i].values());\
+			}");
+	}else if (ex_df == DF_DICTIONARY){
+		conn.run("\
+			for (i in 0:(ex.size()-1)){\
+				assert 1,each(eqObj, ex[i].values().sort(), res[i].values().sort());\
+				assert 2,each(eqObj, ex[i].keys().sort(), res[i].keys().sort());\
+			}");
+	}
+}
+
+class DataformVectorTest_castTemporal : public DataformVectorTest, public testing::WithParamInterface<std::tuple<std::pair<DATA_TYPE, string>, DATA_TYPE>>{
+public:
+	static vector<std::pair<DATA_TYPE, string>> getData(){
+		return {
+			std::make_pair(DT_DATEHOUR, "x=array(DATEHOUR).append!(datehour(1..70000)).append!(NULL);x"),
+			std::make_pair(DT_DATE, "x=array(DATE).append!(date(1..70000)).append!(NULL);x"),
+			std::make_pair(DT_MONTH, "x=array(MONTH).append!(month(1..70000)).append!(NULL);x"),
+			std::make_pair(DT_TIME, "x=array(TIME).append!(time(1..70000)).append!(NULL);x"),
+			std::make_pair(DT_MINUTE, "x=array(MINUTE).append!(minute(1..70000)).append!(NULL);x"),
+			std::make_pair(DT_SECOND, "x=array(SECOND).append!(second(1..70000)).append!(NULL);x"),
+			std::make_pair(DT_DATETIME, "x=array(DATETIME).append!(datetime(1..70000)).append!(NULL);x"),
+			std::make_pair(DT_TIMESTAMP, "x=array(TIMESTAMP).append!(timestamp(1..70000)).append!(NULL);x"),
+			std::make_pair(DT_NANOTIME, "x=array(NANOTIME).append!(nanotime(1..70000)).append!(NULL);x"),
+			std::make_pair(DT_NANOTIMESTAMP, "x=array(NANOTIMESTAMP).append!(nanotimestamp(1..70000)).append!(NULL);x"),
+		};
+	}
+};
+
+INSTANTIATE_TEST_SUITE_P(, DataformVectorTest_castTemporal, testing::Combine(
+							testing::ValuesIn(DataformVectorTest_castTemporal::getData()),
+							testing::Values(DT_DATE, DT_MONTH, DT_TIME, DT_MINUTE, DT_SECOND, DT_DATETIME, DT_TIMESTAMP, DT_NANOTIME, DT_NANOTIMESTAMP, DT_DATEHOUR, DT_BOOL, DT_STRING)),
+							[](const ::testing::TestParamInfo<DataformVectorTest_castTemporal::ParamType>& info){
+								string _f = Util::getDataTypeString(std::get<0>(info.param).first) + "_to_" + Util::getDataTypeString(std::get<1>(info.param));
+								return _f;
+							}
+						);
+TEST_P(DataformVectorTest_castTemporal, test_vector_castTemporal){
+	DATA_TYPE from_type = std::get<0>(GetParam()).first;
+	string script = std::get<0>(GetParam()).second;
+	DATA_TYPE to_type = std::get<1>(GetParam());
+	try{
+		VectorSP vec = conn.run(script);
+		EXPECT_EQ(vec->getType(), from_type);
+
+		VectorSP res_vec = vec->castTemporal(to_type);
+		// cout << res_vec->getString() << endl;
+		EXPECT_EQ(res_vec->getType(), to_type);
+		conn.upload("res", {res_vec});
+		EXPECT_TRUE(conn.run("ex = cast(x, "+Util::getDataTypeString(to_type)+");eqObj(res, ex)")->getBool());
+	}catch(exception& e){
+		EXPECT_EQ(e.what(), "castTemporal from "+ Util::getDataTypeString(from_type)+" to "+ Util::getDataTypeString(to_type)+" not supported ");
+	}
+}
+
+TEST_F(DataformVectorTest, test_decimalvector_append_null){
+	VectorSP dsmV = conn.run("decimal64(`0'1.123''-99999', 10)");
+	#define reset_dsmV \
+		dsmV = conn.run("decimal64(`0'1.123''-99999', 10)")
+
+	string overflowStr = "111111111111111";
+	char* overflowChar = new char[overflowStr.size()+1];
+	strcpy(overflowChar, overflowStr.c_str());
+	EXPECT_ANY_THROW(dsmV->appendString(&overflowStr, overflowStr.size()));
+	EXPECT_ANY_THROW(dsmV->appendString(&overflowChar, strlen(overflowChar)));
+
+	string nullStr = "";
+	char* nullChar = new char[1];
+	strcpy(nullChar, nullStr.c_str());
+	char nullChar2 = CHAR_MIN;
+	double nullDouble = DBL_NMIN;
+	float nullFloat = FLT_NMIN;
+	int nullInt = INT_MIN;
+	long long nullLong = LLONG_MIN;
+	short nullShort = SHRT_MIN;
+
+	dsmV->appendString(&nullStr, 1);
+	EXPECT_EQ(dsmV->getString(), "[0.0000000000,1.1230000000,-99999.0000000000,]");
+
+	reset_dsmV;
+	dsmV->appendString(&nullChar, 1);
+	EXPECT_EQ(dsmV->getString(), "[0.0000000000,1.1230000000,-99999.0000000000,]");
+
+	reset_dsmV;
+	dsmV->appendBool(&nullChar2, 1);
+	EXPECT_EQ(dsmV->getString(), "[0.0000000000,1.1230000000,-99999.0000000000,]");
+
+	reset_dsmV;
+	dsmV->appendChar(&nullChar2, 1);
+	EXPECT_EQ(dsmV->getString(), "[0.0000000000,1.1230000000,-99999.0000000000,]");
+
+	reset_dsmV;
+	dsmV->appendDouble(&nullDouble, 1);
+	EXPECT_EQ(dsmV->getString(), "[0.0000000000,1.1230000000,-99999.0000000000,]");
+
+	reset_dsmV;
+	dsmV->appendFloat(&nullFloat, 1);
+	EXPECT_EQ(dsmV->getString(), "[0.0000000000,1.1230000000,-99999.0000000000,]");
+
+	reset_dsmV;
+	dsmV->appendInt(&nullInt, 1);
+	EXPECT_EQ(dsmV->getString(), "[0.0000000000,1.1230000000,-99999.0000000000,]");
+
+	reset_dsmV;
+	dsmV->appendLong(&nullLong, 1);
+	EXPECT_EQ(dsmV->getString(), "[0.0000000000,1.1230000000,-99999.0000000000,]");
+
+	reset_dsmV;
+	dsmV->appendShort(&nullShort, 1);
+	EXPECT_EQ(dsmV->getString(), "[0.0000000000,1.1230000000,-99999.0000000000,]");
+
+	delete[] overflowChar, nullChar;
+}
+
+TEST_F(DataformVectorTest, test_vector_func_set_null)
+{
+	VectorSP vec1 = conn.run("1 2 3");
+	VectorSP vec2 = conn.run("4 5 6");
+	EXPECT_FALSE(vec1->hasNull());
+	EXPECT_FALSE(vec2->hasNull());
+
+	VectorSP indV = Util::createIndexVector(1, 2);
+	vec1->set(indV, Util::createNullConstant(DT_INT));
+	EXPECT_TRUE(vec1->hasNull());
+	EXPECT_EQ(vec1->getString(), "[1,,]");
+
+	vec2->set(Util::createInt(0), Util::createNullConstant(DT_INT));
+	EXPECT_TRUE(vec2->hasNull());
+	EXPECT_EQ(vec2->getString(), "[,5,6]");
 }

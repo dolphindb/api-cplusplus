@@ -31,20 +31,20 @@ public:
 	virtual DATA_TYPE getRawType() const {return type_ == DT_SYMBOL ? DT_INT : Util::convertToIntegralDataType(type_);}
 	virtual DATA_CATEGORY getCategory() const {return category_;}
 	virtual long long getAllocatedMemory() const { return sizeof(T) * data_.bucket_count();}
-	virtual string getString() const {
+	virtual std::string getString() const {
 		int len=(std::min)(Util::DISPLAY_ROWS,size());
-		ConstantSP keys = getSubVector(0, len);
-		string str("set(");
+		ConstantSP key = getSubVector(0, len);
+		std::string str("set(");
 
 		if(len>0){
-			if(len == 1 && keys->isNull(0))
-				str.append(keys->get(0)->getScript());
+			if(len == 1 && key->isNull(0))
+				str.append(key->get(0)->getScript());
 			else{
 				if(isNull(0)){
 					//do nothing
 				}
 				else
-					str.append(keys->get(0)->getScript());
+					str.append(key->get(0)->getScript());
 			}
 		}
 		for(int i=1;i<len;++i){
@@ -53,7 +53,7 @@ public:
 				//do nothing
 			}
 			else
-				str.append(keys->get(i)->getScript());
+				str.append(key->get(i)->getScript());
 		}
 		if(size()>len)
 			str.append("...");
@@ -62,7 +62,7 @@ public:
 	}
 	virtual void clear(){ data_.clear();}
 	virtual ConstantSP get(const ConstantSP& index) const {throw RuntimeException("set doesn't support random access.");}
-	virtual const string& getStringRef() const {throw RuntimeException("set doesn't support random access.");}
+	virtual const std::string& getStringRef() const {throw RuntimeException("set doesn't support random access.");}
 	virtual ConstantSP get(INDEX index) const {throw RuntimeException("set doesn't support random access.");}
 	virtual ConstantSP get(INDEX column, INDEX row) const {throw RuntimeException("set doesn't support random access.");}
 	virtual ConstantSP getColumn(INDEX index) const {throw RuntimeException("set doesn't support random access.");}
@@ -171,10 +171,10 @@ public:
 	bool manipulate(const ConstantSP& value, bool deletion);
 };
 
-class StringSet : public AbstractSet<string> {
+class StringSet : public AbstractSet<std::string> {
 public:
-	StringSet(INDEX capacity = 0) : AbstractSet<string>(DT_STRING, capacity){}
-	StringSet(const std::unordered_set<string>& data) : AbstractSet<string>(DT_STRING, data){}
+	StringSet(INDEX capacity = 0) : AbstractSet<std::string>(DT_STRING, capacity){}
+	StringSet(const std::unordered_set<std::string>& data) : AbstractSet<std::string>(DT_STRING, data){}
 	virtual ConstantSP getInstance() const { return new StringSet();}
 	virtual ConstantSP getValue() const { return new StringSet(data_);}
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
@@ -203,5 +203,5 @@ public:
 	bool manipulate(const ConstantSP& value, bool deletion);
 };
 
-};
+}
 #endif /* SETIMP_H_ */

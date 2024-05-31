@@ -14,8 +14,6 @@ class EXPORT_DECL SymbolBase{
 public:
     SymbolBase(int id):id_(id){}
 
-    SymbolBase(const DataInputStreamSP& in, IO_ERR& ret);
-
     SymbolBase(int id, const DataInputStreamSP& in, IO_ERR& ret);
 
     const std::string& getSymbol(int index) const { return syms_[index];}
