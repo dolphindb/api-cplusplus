@@ -156,7 +156,13 @@ private:
 
 class String: public Constant{
 public:
-	String(std::string val="", bool blob=false):val_(val), blob_(blob){}
+	String(std::string val="", bool blob=false):val_(val), blob_(blob){
+		if(!blob_){
+			if(val_.find('\0') != std::string::npos){
+				throw RuntimeException("A String cannot contain the character '\\0'");
+			}
+		}
+	}
 	virtual ~String(){}
 	virtual char getBool() const {throw IncompatibleTypeException(DT_BOOL,DT_STRING);}
 	virtual char getChar() const {throw IncompatibleTypeException(DT_CHAR,DT_STRING);}
@@ -171,7 +177,14 @@ public:
 	virtual const std::string& getStringRef() const {return val_;}
 	virtual const std::string& getStringRef(INDEX index) const {return val_;}
 	virtual bool isNull() const {return val_.empty();}
-	virtual void setString(const std::string& val) {val_=val;}
+	virtual void setString(const std::string& val) {
+		if(!blob_){
+			if(val.find('\0') != std::string::npos){
+				throw RuntimeException("A String cannot contain the character '\\0'");
+			}
+		}
+		val_=val;
+	}
 	virtual void setNull(){val_="";}
 	virtual void nullFill(const ConstantSP& val){
 		if(isNull())

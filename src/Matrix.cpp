@@ -48,6 +48,42 @@ bool Matrix::reshape(INDEX cols, INDEX rows) {
         rowLabel_ = Constant::void_;
     return true;
 }
+
+void Matrix::calculateInvalidLength(INDEX colStart, int colLength,INDEX rowStart, int rowLength, int& invalidLenBeginning, int& invalidLenEnding) const{
+    invalidLenBeginning = 0;
+    invalidLenEnding = 0;
+
+    int rowEnd = rowStart + rowLength;
+    if(rowLength > 0){
+        if(rowStart >= rows_ || rowEnd <= 0){
+            invalidLenBeginning = 0;
+            invalidLenEnding = 0;
+        }
+        else{
+            if(rowStart < 0){
+                invalidLenBeginning = -rowStart; 
+            }
+            if(rowEnd > rows_){
+                invalidLenEnding = rowEnd - rows_;
+            }
+        }
+    }
+    else if(rowLength < 0){
+        if(rowStart < 0 || rowEnd + 1 >= rows_){
+            invalidLenBeginning = 0;
+            invalidLenEnding = 0;
+        }
+        else{
+            if(rowStart >= rows_){
+                invalidLenBeginning = rowStart - rows_ + 1; 
+            }
+            if(rowEnd < 0){
+                invalidLenEnding = -rowEnd - 1;
+            }
+        }
+    }
+}
+
 std::string Matrix::getString() const {
     int rows = (std::min)(Util::DISPLAY_ROWS, rows_);
     int limitColMaxWidth = 25;

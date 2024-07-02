@@ -261,8 +261,8 @@ void AbstractTable::setColumnCompressMethods(const vector<COMPRESS_METHOD> &colC
 	for (INDEX i = 0; i < static_cast<INDEX>(colCompresses.size()); i++) {
 		if (colCompresses[i] == COMPRESS_DELTA) {
 			DATA_TYPE dataType = getColumn(i)->getRawType();
-			if (dataType != DT_SHORT && dataType != DT_INT && dataType != DT_LONG) {
-				throw RuntimeException("Cannot apply compression method DELTA to column "+colNames_->at(i)+", Only SHORT/INT/LONG or temporal data supports DELTA compression");
+			if (dataType != DT_SHORT && dataType != DT_INT && dataType != DT_LONG && dataType != DT_DECIMAL32 && dataType != DT_DECIMAL64) {
+				throw RuntimeException("Cannot apply compression method DELTA to column "+colNames_->at(i)+", Only integral and temporal and Decimal32/Decimal64 data supports DELTA compression");
 			}
 			if (((Vector*)getColumn(i).get())->getVectorType() == VECTOR_TYPE::ARRAYVECTOR) {
 				throw RuntimeException("Cannot apply compression method DELTA to array vector at column "+colNames_->at(i));

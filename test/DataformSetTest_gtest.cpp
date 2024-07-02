@@ -64,7 +64,77 @@ TEST_F(DataformSetTest,testDecimal128Set){
 
 TEST_F(DataformSetTest,testBlobSet){
 	SetSP v1 = Util::createSet(DT_BLOB,5);
-	EXPECT_EQ(v1.isNull(),true);
+    v1->append(Util::createBlob("123abc"));
+    v1->append(Util::createBlob("中文*……%#￥#！a"));
+
+	string script = "a=set(blob([`123abc, '中文*……%#￥#！a']));a";
+	SetSP res_v = conn.run(script);
+	conn.upload("v1",{v1});
+	EXPECT_EQ(v1->getInstance()->getString(),"set()");
+	EXPECT_EQ(v1->getValue()->getString(),"set(\"中文*……%#￥#！a\",\"123abc\")");
+
+	EXPECT_EQ(v1->getScript(), res_v->getScript());
+	EXPECT_EQ(v1->getType(), res_v->getType());
+    EXPECT_EQ(conn.run("v1")->isSet(),true);
+	EXPECT_EQ(v1->sizeable(),true);
+	EXPECT_EQ(v1->keys()->get(0)->getString(),res_v->keys()->get(1)->getString());
+	EXPECT_EQ(v1->keys()->get(1)->getString(),res_v->keys()->get(0)->getString());
+
+	v1->remove(Util::createString("中文*……%#￥#！a"));
+	EXPECT_EQ(v1->getValue()->getString(),"set(\"123abc\")");
+	ConstantSP res=Util::createConstant(DT_BOOL);
+	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
+	v1->contain(Util::createString("123abc"),res);
+	EXPECT_TRUE(res->getBool());
+	res1->setNull();
+	v1->contain(v1,res1);
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
+	EXPECT_FALSE(v1->inverse(Util::createString("abc")));
+	SetSP temp = Util::createSet(DT_NANOTIME,1);
+	SetSP temp1 = Util::createSet(DT_BLOB,1);
+	temp1->append(Util::createString("dolphindb"));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
+	v1->inverse(v1);
+	EXPECT_EQ(v1->getString(),"set()");
+
+	SetSP v2 = Util::createSet(DT_BLOB,5);
+    v2->append(Util::createString("123abc"));
+    v2->append(Util::createString("中文*……%#￥#！a"));
+	EXPECT_TRUE(v2->isSuperset(v1));
+	EXPECT_FALSE(v1->isSuperset(v2));
+	EXPECT_TRUE(v2->isSuperset(v2->keys()->get(0)));
+	EXPECT_FALSE(v1->isSuperset(v2->keys()->get(0)));
+
+	EXPECT_EQ(v2->interaction(Util::createString("123abc"))->getString(),"set(\"123abc\")");
+	EXPECT_EQ(v2->interaction(Util::createString("中文*……%#￥#！a"))->getString(),"set(\"中文*……%#￥#！a\")");
+	EXPECT_EQ(v2->interaction(Util::createString("444"))->getString(),"set()");
+	VectorSP judge_res = Util::createVector(DT_BOOL, v2->size());
+	for(auto i=0;i<v2->size();i++){
+		v2->contain(v2->interaction(v2), judge_res);
+	}
+	EXPECT_EQ(judge_res->getString(),"[1,1]");
+
+	cout<<v2->getString()<<endl;
+	v1->append(v2);
+
+	ConstantSP result = Util::createNullConstant(DT_BOOL);
+	for(auto i=0;i<v2->size();i++){
+		v1->contain(v2->keys()->get(i), result);
+		EXPECT_EQ(result->getBool(), true);
+	}
+
+	v1->remove(v2);
+	EXPECT_EQ(v1->size(), 0);
+	EXPECT_EQ(v2->getSubVector(1,1)->get(0)->getString(),v2->keys()->get(1)->getString());
+
+	v2->clear();
+	EXPECT_EQ(v2->size(), 0);
 }
 
 TEST_F(DataformSetTest,testStringSet){
@@ -160,7 +230,77 @@ TEST_F(DataformSetTest,testStringNullSet){
 
 TEST_F(DataformSetTest,testSymbolSet){
 	SetSP v1 = Util::createSet(DT_SYMBOL,5);
-	EXPECT_TRUE(v1.isNull()); // symbol set doesn't supported yet
+    v1->append(Util::createString("123abc"));
+    v1->append(Util::createString("中文*……%#￥#！a"));
+
+	string script = "a=set(symbol([`123abc, '中文*……%#￥#！a']));a";
+	SetSP res_v = conn.run(script);
+	conn.upload("v1",{v1});
+	EXPECT_EQ(v1->getInstance()->getString(),"set()");
+	EXPECT_EQ(v1->getValue()->getString(),"set(\"中文*……%#￥#！a\",\"123abc\")");
+
+	EXPECT_EQ(v1->getScript(), res_v->getScript());
+	EXPECT_EQ(DT_STRING, res_v->getType());
+    EXPECT_EQ(conn.run("v1")->isSet(),true);
+	EXPECT_EQ(v1->sizeable(),true);
+	EXPECT_EQ(v1->keys()->get(0)->getString(),res_v->keys()->get(1)->getString());
+	EXPECT_EQ(v1->keys()->get(1)->getString(),res_v->keys()->get(0)->getString());
+
+	v1->remove(Util::createString("中文*……%#￥#！a"));
+	EXPECT_EQ(v1->getValue()->getString(),"set(\"123abc\")");
+	ConstantSP res=Util::createConstant(DT_BOOL);
+	ConstantSP res1=Util::createConstant(DT_BOOL);
+	res->setNull();
+	v1->contain(Util::createString("123abc"),res);
+	EXPECT_TRUE(res->getBool());
+	res1->setNull();
+	v1->contain(v1,res1);
+	EXPECT_TRUE(res1->getBool());
+	res1->setNull();
+	v1->contain(v1->keys(),res1);
+	EXPECT_TRUE(res1->getBool());
+
+	EXPECT_FALSE(v1->inverse(Util::createString("abc")));
+	SetSP temp = Util::createSet(DT_NANOTIME,1);
+	SetSP temp1 = Util::createSet(DT_SYMBOL,1);
+	temp1->append(Util::createString("dolphindb"));
+	EXPECT_FALSE(v1->inverse(temp));
+	EXPECT_TRUE(v1->inverse(temp1));
+	v1->inverse(v1);
+	EXPECT_EQ(v1->getString(),"set()");
+
+	SetSP v2 = Util::createSet(DT_SYMBOL,5);
+    v2->append(Util::createString("123abc"));
+    v2->append(Util::createString("中文*……%#￥#！a"));
+	EXPECT_TRUE(v2->isSuperset(v1));
+	EXPECT_FALSE(v1->isSuperset(v2));
+	EXPECT_TRUE(v2->isSuperset(v2->keys()->get(0)));
+	EXPECT_FALSE(v1->isSuperset(v2->keys()->get(0)));
+
+	EXPECT_EQ(v2->interaction(Util::createString("123abc"))->getString(),"set(\"123abc\")");
+	EXPECT_EQ(v2->interaction(Util::createString("中文*……%#￥#！a"))->getString(),"set(\"中文*……%#￥#！a\")");
+	EXPECT_EQ(v2->interaction(Util::createString("444"))->getString(),"set()");
+	VectorSP judge_res = Util::createVector(DT_BOOL, v2->size());
+	for(auto i=0;i<v2->size();i++){
+		v2->contain(v2->interaction(v2), judge_res);
+	}
+	EXPECT_EQ(judge_res->getString(),"[1,1]");
+
+	cout<<v2->getString()<<endl;
+	v1->append(v2);
+
+	ConstantSP result = Util::createNullConstant(DT_BOOL);
+	for(auto i=0;i<v2->size();i++){
+		v1->contain(v2->keys()->get(i), result);
+		EXPECT_EQ(result->getBool(), true);
+	}
+
+	v1->remove(v2);
+	EXPECT_EQ(v1->size(), 0);
+	EXPECT_EQ(v2->getSubVector(1,1)->get(0)->getString(),v2->keys()->get(1)->getString());
+
+	v2->clear();
+	EXPECT_EQ(v2->size(), 0);
 }
 
 TEST_F(DataformSetTest,testBoolSet){
@@ -1769,4 +1909,55 @@ TEST_F(DataformSetTest,testDatehourSetMoreThan1048576){
 	conn.upload("v1",{v1});
 	EXPECT_EQ(conn.run("v1.size()")->getInt(),res_v->size());
 	EXPECT_EQ(conn.run("v1")->getScript(),conn.run("z")->getScript());
+}
+
+
+TEST_F(DataformSetTest, test_stringSet_exception){
+	std::string ss("123\0 123", 8);
+	{
+		try{
+			SetSP v = Util::createSet(dolphindb::DT_STRING, 0);
+			v->append(Util::createString(ss));
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+	}
+	{
+		SetSP v = Util::createSet(dolphindb::DT_STRING, 0);
+		v->append(Util::createString("aaa"));
+		try{
+			v->setString(ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->setString(0, ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->setString(0, 1, &ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+	}
+	{
+		SetSP v = Util::createSet(dolphindb::DT_SYMBOL, 0);
+		v->append(Util::createString("aaa"));
+		try{
+			v->setString(ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->setString(0, ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->setString(0, 1, &ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+	}
 }

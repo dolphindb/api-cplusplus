@@ -205,8 +205,8 @@ public:
 	IO_ERR deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
 		IO_ERR ret=OK;
 		INDEX end = indexStart + targetNumElement;
-		if(end > capacity_ && !checkCapacity(end - size_))
-			return NOSPACE;
+		checkCapacity(end - size_);
+
 		INDEX i=indexStart;
 		size_t unitLength = sizeof(T);
 		if(!in->isIntegerReversed()){
@@ -693,11 +693,6 @@ public:
 		return appendData<long long>(buf, len, type, LLONG_MIN);
 	}
 
-	virtual bool appendInt128(wide_integer::int128* buf, int len){
-		DATA_TYPE type = getRawType()== DT_DECIMAL128 ? getType() : DT_DECIMAL128;
-		return appendData<wide_integer::int128>(buf, len, type, std::numeric_limits<wide_integer::int128>::min());
-	}
-
 	virtual bool appendIndex(INDEX* buf, int len){
 		DATA_TYPE type = getRawType()== DT_INDEX ? getType() : DT_INDEX;
 		return appendData<INDEX>(buf, len, type, INDEX_MIN);
@@ -950,8 +945,7 @@ protected:
 
 	template<typename Y>
 	inline bool appendData(Y* buf, int len, DATA_TYPE sourceType, Y sourceNullVal){
-		if(!checkCapacity(len))
-			return false;
+		checkCapacity(len);
 		if(getType() == sourceType)
 			memcpy(data_+size_, buf, sizeof(Y) * len);
 		else
@@ -961,7 +955,7 @@ protected:
 		return true;
 	}
 
-	bool checkCapacity(int appendSize){
+	void checkCapacity(int appendSize){
 		if(size_+appendSize>capacity_){
 			INDEX newCapacity= static_cast<INDEX>((size_ + appendSize) * 1.2);
 			T* newData = new T[newCapacity];
@@ -970,7 +964,6 @@ protected:
 			capacity_=newCapacity;
 			data_=newData;
 		}
-		return true;
 	}
 
 	T* getDataArray(const Vector* indexVector, bool& haveNull) const {
@@ -1060,14 +1053,27 @@ protected:
 	}
 
 	void getDataArray(INDEX start, INDEX length, T* buf) const {
-		if(length>0)
-			memcpy(buf,data_+start,length*sizeof(T));
+		if(length>0){
+			if(start >= 0 && start + length <= size_){
+				memcpy(buf,data_ + start,length * sizeof(T));
+			}
+			else{
+				for(INDEX i = 0; i < length; ++i){
+					buf[i] = (start + i >= 0 && start + i < size_) ? data_[start + i] : getNullValue<T>();
+				}
+			}
+		}
 		else{
 			T* src=data_+start;
 			T* dest=buf;
 			length=std::abs(length);
 			while(length>0){
-				*dest=*src;
+				if(src >= data_ && src < data_ + size_){
+					*dest = *src;
+				}
+				else{
+					*dest = getNullValue<T>();
+				}
 				++dest;
 				--src;
 				--length;
@@ -1090,27 +1096,6 @@ protected:
 	bool containNull_;
 	DATA_TYPE dataType_;
 };
-
-template<>
-template<typename Y>
-inline bool AbstractFastVector<wide_integer::int128>::setData(int start, int len, DATA_TYPE sourceType, Y sourceNullVal, const Y* buf){
-	(void)sourceType;
-    for(int i = 0; i < len; ++i)
-        data_[start + i] = (buf[i] == sourceNullVal) ? nullVal_ : static_cast<wide_integer::int128>(buf[i]);
-    return true;
-}
-
-template<>
-template<typename Y>
-inline bool AbstractFastVector<wide_integer::int128>::appendData(Y* buf, int len, DATA_TYPE sourceType, Y sourceNullVal){
-	(void)sourceType;
-    if(!checkCapacity(len))
-        return false;
-    for(int i = 0; i < len; ++i)
-        data_[size_ + i]=(buf[i] == sourceNullVal)? nullVal_ : static_cast<wide_integer::int128>(buf[i]);
-    size_ += len;
-    return true;
-}
 
 class FastVoidVector:public AbstractFastVector<char>{
 	public:
@@ -1752,16 +1737,6 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual std::string getString(INDEX index) const { return NanoTimestamp::toString(data_[index]);}
 	virtual ConstantSP castTemporal(DATA_TYPE expectType);
-};
-
-class FastCompressedVector : public FastCharVector {
-public:
-	FastCompressedVector(int sz, int capacity, char* srcData)
-		:FastCharVector(sz, capacity, srcData, false){}
-	virtual ~FastCompressedVector(){}
-	virtual DATA_TYPE getType() const {return DT_COMPRESS;}
-	virtual INDEX uncompressedRows() const;
-	virtual int asof(const ConstantSP& value) const {throw RuntimeException("asof not supported.");}
 };
 
 class FastBoolMatrix:public Matrix, public FastBoolVector{
@@ -2423,9 +2398,18 @@ public:
 	virtual bool getString(INDEX start, int len, char** buf) const;
 	virtual std::string** getStringConst(INDEX start, int len, std::string** buf) const;
 	virtual char** getStringConst(INDEX start, int len, char** buf) const;
-	virtual void setString(const std::string& val){data_[0]=val;}
-	virtual void setString(INDEX index, const std::string& val){data_[index]=val;}
+	virtual void setString(const std::string& val){
+		checkString(val);
+		data_[0]=val;
+	}
+	virtual void setString(INDEX index, const std::string& val){
+		checkString(val);
+		data_[index]=val;
+	}
 	virtual bool setString(INDEX start, int len, const std::string* buf){
+		for(int i = 0; i < len; ++i){
+			checkString(*(buf+i));
+		}
 		copy(buf,buf+len,data_.begin()+start);
 		return true;
 	}
@@ -2470,6 +2454,9 @@ public:
 		}
 		return end;
 	}
+
+private:
+	void checkString(const std::string& val);
 
 private:
 	mutable std::vector<std::string> data_;
@@ -2538,7 +2525,7 @@ public:
 	virtual void neg(){throw IncompatibleTypeException(DT_DOUBLE,type_);}
 
 protected:
-	bool checkCapacity(int appendSize);
+	void checkCapacity(int appendSize);
 	ConstantSP retrieve(Vector* index) const;
 	unsigned char* getDataArray(const Vector* indexVector, bool& hasNull) const;
 	unsigned char** getSegmentDataArray(const Vector* indexVector, bool& hasNull) const;
@@ -2660,8 +2647,7 @@ public:
 		setBinary(index, fixedLength_, buf);
 	}
 	virtual bool appendString(std::string* strarray, int len) {
-		if (!checkCapacity(len))
-			return false;
+		checkCapacity(len);
 		bool haveNull = false;
 		unsigned char *pdata = data_ + size_ * fixedLength_;
 		for (int i = 0; i < len; i++, strarray++, pdata += fixedLength_) {
@@ -2680,8 +2666,7 @@ public:
 		return true;
 	}
 	virtual bool appendString(char** buf, int len) {
-		if (!checkCapacity(len))
-			return false;
+		checkCapacity(len);
 		bool haveNull = false;
 		unsigned char *pdata = data_ + size_ * fixedLength_;
 		for (int i = 0; i < len; i++, pdata += fixedLength_) {
@@ -2721,8 +2706,7 @@ public:
 		setBinary(index, fixedLength_, buf);
 	}
 	virtual bool appendString(std::string* strarray, int len) {
-		if (!checkCapacity(len))
-			return false;
+		checkCapacity(len);
 		bool haveNull = false;
 		unsigned char *pdata = data_ + size_ * fixedLength_;
 		for (int i = 0; i < len; i++, strarray++, pdata += fixedLength_) {
@@ -2741,8 +2725,7 @@ public:
 		return true;
 	}
 	virtual bool appendString(char** buf, int len) {
-		if (!checkCapacity(len))
-			return false;
+		checkCapacity(len);
 		bool haveNull = false;
 		unsigned char *pdata = data_ + size_ * fixedLength_;
 		for (int i = 0; i < len; i++, pdata += fixedLength_) {
@@ -2776,8 +2759,7 @@ public:
 		setBinary(index, fixedLength_, buf);
 	}
 	virtual bool appendString(std::string* strarray, int len) {
-		if (!checkCapacity(len))
-			return false;
+		checkCapacity(len);
 		bool haveNull = false;
 		unsigned char *pdata = data_ + size_ * fixedLength_;
 		for (int i = 0; i < len; i++, strarray++, pdata += fixedLength_) {
@@ -2796,8 +2778,7 @@ public:
 		return true;
 	}
 	virtual bool appendString(char** buf, int len) {
-		if (!checkCapacity(len))
-			return false;
+		checkCapacity(len);
 		bool haveNull = false;
 		unsigned char *pdata = data_ + size_ * fixedLength_;
 		for (int i = 0; i < len; i++, pdata += fixedLength_) {
@@ -2868,8 +2849,7 @@ public:
 		return ConstantSP(new FastSymbolVector(base_, size_, capacity, data, false));
 	}
 	virtual bool append(const ConstantSP& value, INDEX appendSize){
-		if(!checkCapacity(appendSize))
-			return false;
+		checkCapacity(appendSize);
 
 		if(appendSize==1)
 			data_[size_] = base_->findAndInsert(value->getString(0));
@@ -2887,16 +2867,14 @@ public:
 		return true;
 	}
 	virtual bool appendString(std::string* buf, int len){
-		if(!checkCapacity(len))
-			return false;
+		checkCapacity(len);
 		for(int i=0;i<len;++i)
 			data_[size_+i] = base_->findAndInsert(buf[i]);
 		size_+=len;
 		return true;
 	}
 	virtual bool appendString(char** buf, int len){
-		if(!checkCapacity(len))
-			return false;
+		checkCapacity(len);
 		for(int i=0;i<len;++i)
 			data_[size_+i] = base_->findAndInsert(std::string(buf[i]));
 		size_+=len;
@@ -3942,10 +3920,7 @@ public:
         return append(value, 0, count);
     }
     bool append(const ConstantSP value, INDEX start, INDEX appendSize) override {
-        if (!this->checkCapacity(appendSize)) {
-            return false;
-        }
-        
+        this->checkCapacity(appendSize);
         // fast path 1: append one element
         if (appendSize == 1 || value->isScalar()) 
         {
@@ -3990,9 +3965,7 @@ public:
     }
 
     bool appendString(std::string *buf, int len) override {
-        if (!this->checkCapacity(len)) {
-            return false;
-        }
+        this->checkCapacity(len);
 
         std::string errMsg;
         for (int i = 0; i < len; ++i) {
@@ -4009,9 +3982,7 @@ public:
         return true;
     }
     bool appendString(char **buf, int len) override {
-        if (!this->checkCapacity(len)) {
-            return false;
-        }
+        this->checkCapacity(len);
 
         std::string errMsg;
         for (int i = 0; i < len; ++i) {
@@ -4029,9 +4000,7 @@ public:
     }
     bool appendBool (char* buf, int len) override
     {
-        if (!this->checkCapacity(len)) {
-            return false;
-        }
+        this->checkCapacity(len);
         for (int i = 0; i < len; ++i) {
             decimal_util::valueToDecimalraw(buf[i], scale_, data_ + size_ + i);
             if (!containNull_ && buf[i] == CHAR_MIN) {
@@ -4043,9 +4012,7 @@ public:
     }
     bool appendChar (char* buf, int len) override
     {
-        if (!this->checkCapacity(len)) {
-            return false;
-        }
+        this->checkCapacity(len);
         for (int i = 0; i < len; ++i) {
             decimal_util::valueToDecimalraw(buf[i], scale_, data_ + size_ + i);
             if (!containNull_ && buf[i] == CHAR_MIN) {
@@ -4057,9 +4024,7 @@ public:
     }
     bool appendDouble (double* buf, int len) override
     {
-        if (!this->checkCapacity(len)) {
-            return false;
-        }
+        this->checkCapacity(len);
         for (int i = 0; i < len; ++i) {
             decimal_util::valueToDecimalraw(buf[i], scale_, data_ + size_ + i);
             if (!containNull_ && buf[i] == DBL_NMIN) {
@@ -4071,9 +4036,7 @@ public:
     }
     bool appendFloat (float* buf, int len) override
     {
-        if (!this->checkCapacity(len)) {
-            return false;
-        }
+        this->checkCapacity(len);
         for (int i = 0; i < len; ++i) {
             decimal_util::valueToDecimalraw(buf[i], scale_, data_ + size_ + i);
             if (!containNull_ && buf[i] == FLT_NMIN) {
@@ -4085,9 +4048,7 @@ public:
     }
     bool appendInt (int* buf, int len) override
     {
-        if (!this->checkCapacity(len)) {
-            return false;
-        }
+        this->checkCapacity(len);
         for (int i = 0; i < len; ++i) {
             decimal_util::valueToDecimalraw(buf[i], scale_, data_ + size_ + i);
             if (!containNull_ && buf[i] == INT_MIN) {
@@ -4099,9 +4060,7 @@ public:
     }
     bool appendLong (long long* buf, int len) override
     {
-        if (!this->checkCapacity(len)) {
-            return false;
-        }
+        this->checkCapacity(len);
         for (int i = 0; i < len; ++i) {
             decimal_util::valueToDecimalraw(buf[i], scale_, data_ + size_ + i);
             if (!containNull_ && buf[i] == LLONG_MIN) {
@@ -4113,9 +4072,7 @@ public:
     }
     bool appendShort (short* buf, int len) override
     {
-        if (!this->checkCapacity(len)) {
-            return false;
-        }
+        this->checkCapacity(len);
         for (int i = 0; i < len; ++i) {
             decimal_util::valueToDecimalraw(buf[i], scale_, data_ + size_ + i);
             if (!containNull_ && buf[i] == SHRT_MIN) {
@@ -4298,9 +4255,7 @@ public:
     IO_ERR deserialize(DataInputStream *in, INDEX indexStart, INDEX targetNumElement,INDEX &numElement) override {
         IO_ERR ret=OK;
         INDEX end = indexStart + targetNumElement;
-        if (end > capacity_ && !this->checkCapacity(end - size_)) {
-            return NOSPACE;
-        }
+        this->checkCapacity(end - size_);
 
         INDEX i = indexStart;
         size_t unitLength = sizeof(T);

@@ -2610,3 +2610,24 @@ TEST_F(ScalarTest,testFunction_parseUUID){
     val = Util::parseConstant(DT_UUID, "5d212a78-cc48-e3b1-4235-b4d91473ee87");
     EXPECT_EQ(val->getString(), "5d212a78-cc48-e3b1-4235-b4d91473ee87");
 }
+
+TEST_F(ScalarTest,test_string_exception){
+    std::string ss("123\0 123", 8);
+    {
+        try{
+            Util::createString(ss);
+            EXPECT_TRUE(false);
+        }catch(const std::exception& e){
+            EXPECT_EQ(std::string(e.what()), "A String cannot contain the character '\\0'");
+        }
+    }
+    {
+        try{
+            ConstantSP s = Util::createString("aaa");
+            s->setString(ss);
+            EXPECT_TRUE(false);
+        }catch(const std::exception& e){
+            EXPECT_EQ(std::string(e.what()), "A String cannot contain the character '\\0'");
+        }
+    }
+}

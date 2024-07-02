@@ -67,9 +67,9 @@ int SymbolBase::find(const std::string& symbol){
 }
 
 int SymbolBase::findAndInsert(const std::string& symbol){
-    //remove following line to support empty symbol
-    //if(symbol == "")
-    //    throw RuntimeException("A symbol base key string can't be null.");
+    if(symbol.find('\0') != std::string::npos){
+        throw RuntimeException("A String cannot contain the character '\\0'");
+    }
     if(symMap_.empty()){
         if(syms_.size() > 0 && syms_[0] != "")
             throw RuntimeException("A symbol base's first key must be empty string.");

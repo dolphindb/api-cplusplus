@@ -20,6 +20,10 @@ public:
     virtual ConstantSP getColumn(INDEX index) const = 0;
     virtual bool setColumn(INDEX index, const ConstantSP& value)=0;
     virtual int asof(const ConstantSP& value) const {throw RuntimeException("asof not supported.");}
+
+protected:
+    void calculateInvalidLength(INDEX colStart, int colLength,INDEX rowStart, int rowLength, int& invalidLenBeginning, int& invalidLenEnding) const;
+
 protected:
     int cols_;
     int rows_;

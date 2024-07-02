@@ -173,10 +173,12 @@ public:
 
 class StringSet : public AbstractSet<std::string> {
 public:
-	StringSet(INDEX capacity = 0) : AbstractSet<std::string>(DT_STRING, capacity){}
-	StringSet(const std::unordered_set<std::string>& data) : AbstractSet<std::string>(DT_STRING, data){}
-	virtual ConstantSP getInstance() const { return new StringSet();}
-	virtual ConstantSP getValue() const { return new StringSet(data_);}
+	StringSet(INDEX capacity = 0, bool isBlob = false, bool isSymbol = false)
+		: AbstractSet<std::string>(isBlob ? DT_BLOB : isSymbol ? DT_SYMBOL : DT_STRING, capacity), isBlob_(isBlob), isSymbol_(isSymbol){}
+	StringSet(const std::unordered_set<std::string>& data, bool isBlob = false, bool isSymbol = false)
+		: AbstractSet<std::string>(isBlob ? DT_BLOB : isSymbol ? DT_SYMBOL : DT_STRING, data), isBlob_(isBlob), isSymbol_(isSymbol){}
+	virtual ConstantSP getInstance() const { return new StringSet(0, isBlob_, isSymbol_);}
+	virtual ConstantSP getValue() const { return new StringSet(data_, isBlob_, isSymbol_);}
 	virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const;
 	virtual bool remove(const ConstantSP& value) { return manipulate(value, true);}
 	virtual bool append(const ConstantSP& value) { return manipulate(value, false);}
@@ -185,6 +187,9 @@ public:
 	virtual ConstantSP interaction(const ConstantSP& target) const;
 	virtual ConstantSP getSubVector(INDEX start, INDEX length) const;
 	bool manipulate(const ConstantSP& value, bool deletion);
+private:
+	bool isBlob_;
+	bool isSymbol_;
 };
 
 class Int128Set : public AbstractSet<Guid> {

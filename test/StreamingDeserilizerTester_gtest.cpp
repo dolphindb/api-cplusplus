@@ -239,7 +239,7 @@ StreamDeserializerSP createStreamDeserializer_witharrayVector(const string &st, 
     return sdsp;
 }
 
-INSTANTIATE_TEST_SUITE_P(, StreamingDeserilizerTester_basic, testing::Values(0, rand() % 1000 + 13000));
+INSTANTIATE_TEST_SUITE_P(, StreamingDeserilizerTester_basic, testing::Values(-1, rand() % 1000 + 13000));
 TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeWithstreamDeserilizer)
 {
     int msg1_total = 0, msg2_total = 0;
@@ -287,7 +287,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(auto thread1 = threadedClient.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp););
@@ -361,7 +361,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, true, 1, 1.0, false, "admin", "123456", sdsp));
@@ -398,7 +398,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -511,7 +511,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_1_s
     };
 
 
-    ThreadPooledClient client(listenport, 1);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 1) : ThreadPooledClient(listenport, 1);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -584,7 +584,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_2_s
         }
     };
 
-    ThreadPooledClient client(listenport, 2);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 2) : ThreadPooledClient(listenport, 2);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -622,7 +622,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_with_msgAsTable_True)
         // cout << symbol << endl;
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     EXPECT_ANY_THROW(auto thread1 = threadedClient.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, true, false, "admin", "123456", sdsp));
 
     usedPorts.insert(listenport);
@@ -642,7 +642,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_with_msgAsTable_True
         // cout << symbol << endl;
     };
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0, true, nullptr, true, false, "admin", "123456", sdsp));
 
     usedPorts.insert(listenport);
@@ -661,7 +661,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_with_msgAsTable
         // cout << symbol << endl;
     };
 
-    ThreadPooledClient client(listenport, 1);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 1);
 
     EXPECT_ANY_THROW(auto threadVec = client.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, true, false, "admin", "123456", sdsp));
 
@@ -716,7 +716,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
     };
 
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -791,7 +791,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, true, 1, 1.0, false, "admin", "123456", sdsp));
@@ -828,7 +828,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -938,7 +938,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_1_s
         }
     };
 
-    ThreadPooledClient client(listenport, 1);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 1) : ThreadPooledClient(listenport, 1);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -1012,7 +1012,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_2_s
         }
     };
 
-    ThreadPooledClient client(listenport, 2);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 2) : ThreadPooledClient(listenport, 2);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -1050,7 +1050,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_with_msgAsTable_True_
         cout << symbol << endl;
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     EXPECT_ANY_THROW(auto thread1 = threadedClient.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, true, false, "admin", "123456", sdsp));
 
     usedPorts.insert(listenport);
@@ -1070,7 +1070,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_with_msgAsTable_True
         cout << symbol << endl;
     };
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0, true, nullptr, true, false, "admin", "123456", sdsp));
 
     usedPorts.insert(listenport);
@@ -1090,7 +1090,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_with_msgAsTable
         cout << symbol << endl;
     };
 
-    ThreadPooledClient client(listenport, 1);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 1);
 
     EXPECT_ANY_THROW(auto threadVec = client.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, true, false, "admin", "123456", sdsp));
 
@@ -1143,7 +1143,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -1218,7 +1218,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, true, 1, 1.0, false, "admin", "123456", sdsp));
@@ -1255,7 +1255,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -1365,7 +1365,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_1_s
         }
     };
 
-    ThreadPooledClient client(listenport, 1);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 1) : ThreadPooledClient(listenport, 1);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -1438,7 +1438,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_3_s
         }
     };
 
-    ThreadPooledClient client(listenport, 2);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -1446,7 +1446,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_3_s
     else
     {
         auto threadVec = client.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp);
-        EXPECT_EQ(threadVec.size(), 2);
+        EXPECT_EQ(threadVec.size(), 3);
         notify.wait();
 
         client.unsubscribe(hostName, port, st, "test_SD");
@@ -1476,7 +1476,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_with_msgAsTable_True_
         cout << symbol << endl;
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     EXPECT_ANY_THROW(auto thread1 = threadedClient.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, true, false, "admin", "123456", sdsp));
 
     usedPorts.insert(listenport);
@@ -1496,7 +1496,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_with_msgAsTable_True
         cout << symbol << endl;
     };
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0, true, nullptr, true, false, "admin", "123456", sdsp));
 
     usedPorts.insert(listenport);
@@ -1516,7 +1516,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_with_msgAsTable
         cout << symbol << endl;
     };
 
-    ThreadPooledClient client(listenport, 1);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 1);
 
     EXPECT_ANY_THROW(auto threadVec = client.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, true, false, "admin", "123456", sdsp));
 
@@ -1553,7 +1553,6 @@ public:
                 {DT_DECIMAL128, "decimal128(rand('-1.123''''2.123123123123123123123123123', 1)[0], 25)"},{DT_DECIMAL128, "decimal128(,26)"},
                 {DT_BLOB, "blob('abc')"},{DT_BLOB, "blob(`)"}};
     };
-    const string cur_type = Util::getDataTypeString(std::get<1>(GetParam()).first);
 };
 INSTANTIATE_TEST_SUITE_P(, StreamingDeserilizerTester_allTypes, testing::Combine(
     testing::Values(0, rand() % 1000 + 13000),
@@ -1609,7 +1608,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadclient_onehandler_subscri
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "test_SD", 0, false, nullptr, false, false, "admin", "123456", sdsp));
@@ -1685,7 +1684,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadclient_batchhandler_subsc
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, true, 1, 1.0, false, "admin", "123456", sdsp));
@@ -1724,7 +1723,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Pollingclient_subscribeWithstre
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -1837,7 +1836,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadpooledclient_subscribeWit
     };
 
     int threadCount = rand() % 10 + 1;
-    ThreadPooledClient client(listenport, threadCount);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, threadCount);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -1945,7 +1944,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadclient_onehandler_subs
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "test_SD", 0, false, nullptr, false, false, "admin", "123456", sdsp));
@@ -2021,7 +2020,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadclient_batchhandler_su
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, true, 1, 1.0, false, "admin", "123456", sdsp));
@@ -2060,7 +2059,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Pollingclient_subscribeWiths
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456", sdsp));
@@ -2173,7 +2172,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadpooledclient_subscribe
     };
 
     int threadCount = rand() % 10 + 1;
-    ThreadPooledClient client(listenport, threadCount);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, threadCount);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp));

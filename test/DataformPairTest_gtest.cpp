@@ -607,3 +607,63 @@ TEST_F(DataformPairTest,testDecimal128NullPair){
 	EXPECT_EQ(v1->getType(), res_v->getType());
     EXPECT_EQ(conn.run("v1")->isPair(),true);
 }
+
+TEST_F(DataformPairTest, test_stringPair_exception){
+	std::string ss("123\0 123", 8);
+	{
+		try{
+			VectorSP v = Util::createPair(dolphindb::DT_STRING);
+			v->appendString(&ss, 1);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+	}
+	{
+		VectorSP v = Util::createPair(dolphindb::DT_STRING);
+		v->append(Util::createString("aaa"));
+		try{
+			v->setString(ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->setString(0, ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->setString(0, 1, &ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->appendString(&ss, 1);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+	}
+	{
+		VectorSP v = Util::createPair(dolphindb::DT_SYMBOL);
+		v->append(Util::createString("aaa"));
+		try{
+			v->setString(ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->setString(0, ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->setString(0, 1, &ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->appendString(&ss, 1);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+	}
+}

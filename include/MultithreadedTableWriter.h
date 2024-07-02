@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <string>
 #include <vector>
-#include <memory>
+#include <list>
 #include <functional>
 #include <tuple>
 #include <cassert>
@@ -60,7 +60,7 @@ public:
     bool insert(ErrorCodeInfo &errorInfo, TArgs... args) {
         RWLockGuard<RWLock> guard(&insertRWLock_, false);
         if (hasError_.load()) {
-            throw RuntimeException("Thread is exiting.");
+            throw RuntimeException("Thread is exiting for " + errorInfo_.errorInfo);
         }
         {
             auto argSize = sizeof...(args);
@@ -82,28 +82,22 @@ public:
                 }
                 return false;
             }
-            std::vector<ConstantSP>* prow;
-            if (!unusedQueue_.pop(prow)) {
-                prow = new std::vector<ConstantSP>;
-            }
-            prow->resize(colIndex1);
-            for (int i = 0; i < colIndex1; i++) {
-                prow->at(i) = result[i];
-            }
-            return insert(&prow, 1, errorInfo);
+            std::vector<ConstantSP> oneRow(std::begin(result), std::end(result));
+            std::vector<ConstantSP>* pRow = &oneRow;
+            return insert(&pRow, 1, errorInfo);
         }
     }
 
 	void waitForThreadCompletion();
     void getStatus(Status &status);
     void getUnwrittenData(std::vector<std::vector<ConstantSP>*> &unwrittenData);
-	bool insertUnwrittenData(std::vector<std::vector<ConstantSP>*> &records, ErrorCodeInfo &errorInfo) { return insert(records.data(), static_cast<int>(records.size()), errorInfo); }
+	bool insertUnwrittenData(std::vector<std::vector<ConstantSP>*> &records, ErrorCodeInfo &errorInfo) { return insert(records.data(), static_cast<int>(records.size()), errorInfo, true); }
     
 	//bool isExit(){ return hasError_; }
     //const DATA_TYPE* getColType(){ return colTypes_.data(); }
     //int getColSize(){ return colTypes_.size(); }
 private:
-	bool insert(std::vector<ConstantSP> **records, int recordCount, ErrorCodeInfo &errorInfo);
+	bool insert(std::vector<ConstantSP> **records, int recordCount, ErrorCodeInfo &errorInfo, bool isNeedReleaseMemory = false);
 	void setError(int code, const std::string &info);
     void setError(const ErrorCodeInfo &errorInfo);
     DATA_TYPE getColDataType(int colIndex) {
@@ -113,20 +107,20 @@ private:
 		return dataType;
 	}
 	void insertThreadWrite(int threadhashkey, std::vector<ConstantSP> *prow);
-    static void callBack(std::function<void(ConstantSP)> callbackFunc, bool result, std::vector<std::vector<ConstantSP>*>& queue1);
-
+    static void callBack(std::function<void(ConstantSP)> callbackFunc, bool result, std::vector<ConstantSP>* block);
+    std::vector<ConstantSP>* createColumnBlock();
     struct WriterThread {
 		WriterThread() : nonemptySignal(false,true){}
 		SmartPointer<DBConnection> conn;
         
-        std::vector<std::vector<ConstantSP>*> writeQueue;
-        std::vector<std::vector<ConstantSP>*> failedQueue;
+        std::list<std::vector<ConstantSP>*> writeQueue_;   //每个元素都是一个子表，按列排好，最大行数为perVectorSize_
+        std::vector<std::vector<ConstantSP>*> failedQueue_;
         ThreadSP writeThread;
         Signal nonemptySignal;
 
         Mutex mutex_, writeQueueMutex_;
         unsigned int threadId;
-        long sentRows, sendingRows;
+        long sentRows;
 		bool exit;
     };
     class SendExecutor : public dolphindb::Runnable {
@@ -150,6 +144,7 @@ private:
     const std::string dbName_;
     const std::string tableName_;
     const int batchSize_;
+    int       perBlockSize_;               //每一段预分配的空间可以容纳的行数 perBlockSize_ = batchSize < 65535 ? 65535 : batchSize_
     const int throttleMilsecond_;
     bool isPartionedTable_, exited_;
 	std::atomic_bool hasError_;
@@ -170,7 +165,7 @@ private:
     std::vector<WriterThread> threads_;
 	ErrorCodeInfo errorInfo_;
     std::string scriptTableInsert_;
-    std::string scriptSaveTable_;
+
 	SynchronizedQueue<std::vector<ConstantSP>*> unusedQueue_;
     friend class PytoDdbRowPool;
     PytoDdbRowPool *pytoDdb_;

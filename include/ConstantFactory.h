@@ -169,8 +169,10 @@ public:
 			case DT_LONG : return new LongSet(keyType, capacity);
 			case DT_FLOAT : return new FloatSet(capacity);
 			case DT_DOUBLE : return new DoubleSet(capacity);
-			case DT_STRING : return new StringSet(capacity);
+			case DT_SYMBOL : return new StringSet(capacity, false, true);
+			case DT_STRING : return new StringSet(capacity, false);
 			case DT_INT128 : return new Int128Set(keyType, capacity);
+			case DT_BLOB: return new StringSet(capacity, true);
 			default : return NULL;
 		}
 	}

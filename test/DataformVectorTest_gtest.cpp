@@ -8185,3 +8185,71 @@ TEST_F(DataformVectorTest, test_vector_func_set_null)
 	EXPECT_TRUE(vec2->hasNull());
 	EXPECT_EQ(vec2->getString(), "[,5,6]");
 }
+
+TEST_F(DataformVectorTest, test_stringVector_exception){
+	std::string ss("123\0 123", 8);
+	{
+		try{
+			VectorSP v = Util::createVector(dolphindb::DT_STRING, 0);
+			v->appendString(&ss, 1);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+	}
+	{
+		try{
+			std::vector<std::string> vv{ss};
+			ConstantSP v = Util::createVector(DT_STRING, 1, 1, true, 0, &vv);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+	}
+	{
+		VectorSP v = Util::createVector(dolphindb::DT_STRING, 0);
+		v->append(Util::createString("aaa"));
+		try{
+			v->setString(ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->setString(0, ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->setString(0, 1, &ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->appendString(&ss, 1);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+	}
+	{
+		VectorSP v = Util::createVector(dolphindb::DT_SYMBOL, 0);
+		v->append(Util::createString("aaa"));
+		try{
+			v->setString(ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->setString(0, ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->setString(0, 1, &ss);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+		try{
+			v->appendString(&ss, 1);
+		}catch(exception& e){
+			EXPECT_EQ(string(e.what()), "A String cannot contain the character '\\0'");
+		}
+	}
+}

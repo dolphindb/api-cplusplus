@@ -134,7 +134,7 @@ namespace STCT
         conn.run(replayScript);
     }
 
-    INSTANTIATE_TEST_SUITE_P(, StreamingThreadedClientTester, testing::Values(0, rand() % 1000 + 13000));
+    INSTANTIATE_TEST_SUITE_P(, StreamingThreadedClientTester, testing::Values(-1, rand() % 1000 + 13000));
     TEST_P(StreamingThreadedClientTester, test_subscribe_onehandler)
     {
         string st = "outTables_" + getRandString(10);
@@ -169,7 +169,7 @@ namespace STCT
 
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0));
@@ -230,7 +230,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0));
@@ -258,7 +258,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, [](Message msg){}, "st_notExist", "actionTest", 0));
@@ -279,7 +279,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
 
         EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port, onehandler, "", "cppStreamingAPI", 0, false));
     }
@@ -291,7 +291,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port, batchhandler, "", "cppStreamingAPI", 0, false));
     }
 
@@ -310,7 +310,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", -1));
@@ -348,7 +348,7 @@ namespace STCT
 
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", -1));
@@ -408,7 +408,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 5));
@@ -473,7 +473,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 5));
@@ -534,7 +534,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         VectorSP filter = Util::createVector(DT_SYMBOL, 1, 1);
         filter->setString(0, "b");
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
@@ -595,7 +595,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         VectorSP filter = Util::createVector(DT_SYMBOL, 1, 1);
         filter->setString(0, "b");
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
@@ -656,7 +656,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, true));
@@ -722,7 +722,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, false, nullptr, false, 2000, 0.1, true));
@@ -779,7 +779,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         ThreadedClient threadedClient2(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
@@ -845,7 +845,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         ThreadedClient threadedClient2(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
@@ -881,7 +881,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port, batchhandler, "st", "actionTest", 0, false));
     }
 
@@ -901,7 +901,7 @@ namespace STCT
         conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "resubTest", 0, true));
@@ -963,7 +963,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, nullptr, false, 200));
@@ -1027,7 +1027,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, nullptr, false, 5000, 2.5));
@@ -1070,7 +1070,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         EXPECT_ANY_THROW(threadedClient.subscribe("", port, onehandler, st, "actionTest", 0));
 
         usedPorts.insert(listenport);
@@ -1094,7 +1094,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         EXPECT_ANY_THROW(threadedClient.subscribe("", port, batchhandler, st, "actionTest", 0));
 
         usedPorts.insert(listenport);
@@ -1115,7 +1115,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, NULL, onehandler, st, "actionTest", 0));
 
         usedPorts.insert(listenport);
@@ -1143,7 +1143,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "", 0));
@@ -1194,7 +1194,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "", 0));
@@ -1235,7 +1235,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0));
@@ -1271,7 +1271,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0));
@@ -1306,7 +1306,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0));
@@ -1349,7 +1349,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0));
@@ -1392,7 +1392,7 @@ namespace STCT
 
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false));
@@ -1437,7 +1437,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false));
@@ -1494,7 +1494,7 @@ namespace STCT
 
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0));
@@ -1554,7 +1554,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0));
@@ -1610,7 +1610,7 @@ namespace STCT
 
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "arrayVectorTableTest", 0));
@@ -1670,7 +1670,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "arrayVectorTableTest", 0));
@@ -1715,7 +1715,7 @@ namespace STCT
 
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0));
@@ -1763,7 +1763,7 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0));
@@ -1819,7 +1819,7 @@ namespace STCT
 
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false, nullptr, true));
@@ -1842,11 +1842,23 @@ namespace STCT
         usedPorts.insert(listenport);
     }
 
-    TEST_P(StreamingThreadedClientTester, test_subscribe_hugetable_batchhandler_msgAsTable)
+    TEST_P(StreamingThreadedClientTester, test_subscribe_hugetable_batchhandler_msgAsTable_batchSize_throttle)
     {
         string st = "outTables_" + getRandString(10);
         STCT::createSharedTableAndReplay(st, 1000000);
         int msg_total = 0;
+        int test_batchSize = rand() % 65535 + 1;
+        float test_throttle = (float)rand() / RAND_MAX * 10;
+
+        int actual_batchSize = 1024;
+        while (actual_batchSize <= test_batchSize) {
+            actual_batchSize += 1024;
+        }
+        int batch_count = 0;
+        int max_batch = 1000000 / actual_batchSize;
+        int remain_rows = 1000000 % actual_batchSize;
+        long long start_time;
+        long long end_time;
         Signal notify;
         Mutex mutex;
         AutoFitTableAppender appender("", "res_STCT", conn);
@@ -1856,7 +1868,10 @@ namespace STCT
             LockGuard<Mutex> lock(&mutex);
             for (auto &msg : msgs)
             {
-                msg_total += msg->rows();
+                batch_count++;
+                int rows = msg->rows();
+                EXPECT_TRUE(rows == actual_batchSize || rows == remain_rows);
+                msg_total += rows;
                 bool succeeded = false; 
                 while(!succeeded){
                     try
@@ -1869,8 +1884,12 @@ namespace STCT
                         Util::sleep(100);
                     }
                 }
+                if (batch_count == max_batch){
+                    start_time = Util::getEpochTime();
+                }
+
                 int first_offset = msg.getOffset();
-                int last_offset = first_offset + msg->rows() - 1;
+                int last_offset = first_offset + rows - 1;
                 if (last_offset == 999999)
                 {
                     notify.set();
@@ -1881,15 +1900,16 @@ namespace STCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        ThreadedClient threadedClient(listenport);
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, 1, 1.0, true));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, test_batchSize, 1.0, true));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, 1, 1.0, true);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, test_batchSize, test_throttle, true);
             notify.wait();
+            end_time = Util::getEpochTime();
 
             cout << "total size: " << msg_total << endl;
             threadedClient.unsubscribe(hostName, port, st, "mutiSchemaBatch");
@@ -1900,6 +1920,215 @@ namespace STCT
 
             EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
             EXPECT_EQ(msg_total, 1000000);
+        }
+        usedPorts.insert(listenport);
+        EXPECT_TRUE(end_time - start_time >= test_throttle * 1000);
+    }
+
+
+    class StreamingThreadedClientTester_realtime : public testing::Test, public ::testing::WithParamInterface<tuple<int, pair<DATA_TYPE, string>>>
+    {
+    public:
+        // Suite
+        static void SetUpTestCase()
+        {
+            // DBConnection conn;
+
+            conn.initialize();
+            bool ret = conn.connect(hostName, port, "admin", "123456");
+            if (!ret)
+            {
+                cout << "Failed to connect to the server" << endl;
+            }
+            else
+            {
+                cout << "connect to " + hostName + ":" + std::to_string(port) << endl;
+            }
+        }
+        static void TearDownTestCase()
+        {
+            usedPorts.clear();
+            conn.close();
+        }
+
+        // Case
+        virtual void SetUp()
+        {
+            cout << "check connect...";
+            try
+            {
+                ConstantSP res = conn.run("1+1");
+            }
+            catch(const std::exception& e)
+            {
+                conn.connect(hostName, port, "admin", "123456");
+            }
+
+            cout << "ok" << endl;
+            CLEAR_ENV(conn);
+        }
+        virtual void TearDown()
+        {
+            CLEAR_ENV(conn);
+        }
+        static vector<pair<DATA_TYPE, string>> getAVData()
+        {
+            return {
+                {DT_BOOL_ARRAY, "take([true false], row_num)"},{DT_BOOL_ARRAY, "take([[00i]], row_num)"},
+                {DT_CHAR_ARRAY, "take([10c 23c], row_num)"},{DT_CHAR_ARRAY, "take([[00i]], row_num)"},
+                {DT_SHORT_ARRAY, "take([10s 23s], row_num)"},{DT_SHORT_ARRAY, "take([[00i]], row_num)"},
+                {DT_INT_ARRAY, "take([10 23], row_num)"},{DT_INT_ARRAY, "take([[00i]], row_num)"},
+                {DT_LONG_ARRAY, "take([10l 23l], row_num)"},{DT_LONG_ARRAY, "take([[00i]], row_num)"},
+                {DT_DATE_ARRAY, "take([2021.01.01 2021.01.02], row_num)"},{DT_DATE_ARRAY, "take([[00i]], row_num)"},
+                {DT_MONTH_ARRAY, "take([2021.01M 2021.02M], row_num)"},{DT_MONTH_ARRAY, "take([[00i]], row_num)"},
+                {DT_TIME_ARRAY, "take([10:10:10 11:11:11], row_num)"},{DT_TIME_ARRAY, "take([[00i]], row_num)"},
+                {DT_MINUTE_ARRAY, "take([10:10m 11:11m], row_num)"},{DT_MINUTE_ARRAY, "take([[00i]], row_num)"},
+                {DT_SECOND_ARRAY, "take([10:10:10 11:11:11], row_num)"},{DT_SECOND_ARRAY, "take([[00i]], row_num)"},
+                {DT_DATETIME_ARRAY, "take([2021.01.01T10:10:10 2021.01.02T11:11:11], row_num)"},{DT_DATETIME_ARRAY, "take([[00i]], row_num)"},
+                {DT_TIMESTAMP_ARRAY, "take([2021.01.01T10:10:10.000 2021.01.02T11:11:11.000], row_num)"},{DT_TIMESTAMP_ARRAY, "take([[00i]], row_num)"},
+                {DT_NANOTIME_ARRAY, "take([10:10:10.000000000 11:11:11.000000000], row_num)"},{DT_NANOTIME_ARRAY, "take([[00i]], row_num)"},
+                {DT_NANOTIMESTAMP_ARRAY, "take([2021.01.01T10:10:10.000000000 2021.01.02T11:11:11.000000000], row_num)"},{DT_NANOTIMESTAMP_ARRAY, "take([[00i]], row_num)"},
+                {DT_DATEHOUR_ARRAY, "take([datehour(1000 2000)], row_num)"},{DT_DATEHOUR_ARRAY, "take([[00i]], row_num)"},
+                {DT_FLOAT_ARRAY, "take([10.00f 23.00f], row_num)"},{DT_FLOAT_ARRAY, "take([[00i]], row_num)"},
+                {DT_DOUBLE_ARRAY, "take([10.314 23.445], row_num)"},{DT_DOUBLE_ARRAY, "take([[00i]], row_num)"},
+                {DT_IP_ARRAY, "take([rand(ipaddr(), 2)], row_num)"},{DT_IP_ARRAY, "take([[ipaddr()]], row_num)"},
+                {DT_UUID_ARRAY, "take([rand(uuid(), 2)], row_num)"},{DT_UUID_ARRAY, "take([[uuid()]], row_num)"},
+                {DT_INT128_ARRAY, "take([rand(int128(), 2)], row_num)", }, {DT_INT128_ARRAY, "take([[int128()]], row_num)"},
+                {DT_DECIMAL32_ARRAY, "take([decimal32(rand('-1.123''''2.23468965412', 2), 8)], row_num)"}, {DT_DECIMAL32_ARRAY, "take([[00i]], row_num)"},
+                {DT_DECIMAL64_ARRAY, "take([decimal64(rand('-1.123''''2.123', 2), 15)], row_num)"}, {DT_DECIMAL64_ARRAY, "take([[00i]], row_num)"},
+                {DT_DECIMAL128_ARRAY, "take([decimal128(rand('-1.123''''2.123', 2), 25)], row_num)"}, {DT_DECIMAL128_ARRAY, "take([[00i]], row_num)"},
+            };
+        };
+        static vector<pair<DATA_TYPE, string>> getData()
+        {
+            return {
+                {DT_BOOL, "rand(true false, row_num)"}, {DT_BOOL, "take(bool(), row_num)"},
+                {DT_CHAR, "rand(127c, row_num)"}, {DT_CHAR, "take(char(), row_num)"},
+                {DT_SHORT, "rand(32767h, row_num)"}, {DT_SHORT, "take(short(), row_num)"},
+                {DT_INT, "rand(2147483647, row_num)"}, {DT_INT, "take(int(), row_num)"},
+                {DT_LONG, "rand(1000l, row_num)"}, {DT_LONG, "take(long(), row_num)"},
+                {DT_DATE, "rand(2019.01.01, row_num)"}, {DT_DATE, "take(date(), row_num)"},
+                {DT_MONTH, "rand(2019.01M, row_num)"}, {DT_MONTH, "take(month(), row_num)"},
+                {DT_TIME, "rand(12:00:00.123, row_num)"}, {DT_TIME, "take(time(), row_num)"},
+                {DT_MINUTE, "rand(12:00m, row_num)"}, {DT_MINUTE, "take(minute(), row_num)"},
+                {DT_SECOND, "rand(12:00:00, row_num)"}, {DT_SECOND, "take(second(), row_num)"},
+                {DT_DATETIME, "rand(2019.01.01 12:00:00, row_num)"}, {DT_DATETIME, "take(datetime(), row_num)"},
+                {DT_DATEHOUR, "rand(datehour(1000), row_num)"}, {DT_DATETIME, "take(datehour(), row_num)"},
+                {DT_TIMESTAMP, "rand(2019.01.01 12:00:00.123, row_num)"}, {DT_TIMESTAMP, "take(timestamp(), row_num)"},
+                {DT_NANOTIME, "rand(12:00:00.123456789, row_num)"}, {DT_NANOTIME, "take(nanotime(), row_num)"},
+                {DT_NANOTIMESTAMP, "rand(2019.01.01 12:00:00.123456789, row_num)"}, {DT_NANOTIMESTAMP, "take(nanotimestamp(), row_num)"},
+                {DT_DATEHOUR, "rand(datehour(100), row_num)"}, {DT_DATEHOUR, "take(datehour(), row_num)"},
+                {DT_FLOAT, "rand(10.00f, row_num)"}, {DT_FLOAT, "take(float(), row_num)"},
+                {DT_DOUBLE, "rand(10.00, row_num)"}, {DT_DOUBLE, "take(double(), row_num)"},
+                {DT_IP, "rand(ipaddr(), row_num)"}, {DT_IP, "take(ipaddr(), row_num)"},
+                {DT_UUID, "rand(uuid(), row_num)"}, {DT_UUID, "take(uuid(), row_num)"},
+                {DT_INT128, "rand(int128(), row_num)"}, {DT_INT128, "take(int128(), row_num)"},
+                {DT_DECIMAL32, "decimal32(rand('-1.123''''2.23468965412', row_num), 8)"}, {DT_DECIMAL32, "take(decimal32(NULL, 8), row_num)"},
+                {DT_DECIMAL64, "decimal64(rand('-1.123''''2.123123123123123123', row_num), 15)"}, {DT_DECIMAL64, "take(decimal64(NULL, 15), row_num)"},
+                {DT_DECIMAL128, "decimal128(rand('-1.123''''2.123', row_num), 25)"}, {DT_DECIMAL128, "take(decimal128(NULL, 25), row_num)"},
+                {DT_STRING, "rand(`str1`str2, row_num)"}, {DT_STRING, "take(string(), row_num)"},
+                {DT_SYMBOL, "rand(symbol(`sym1`sym2), row_num)"}, {DT_SYMBOL, "symbol(take(string(), row_num))"},
+                {DT_BLOB, "rand(blob(`b1`b2`b3), row_num)"}, {DT_BLOB, "take(blob(''), row_num)"},
+                };
+        };
+        void createST(DBConnection& conn, const string& name, const string& dtStr){
+            string s = 
+                "colName = `ts`testCol;"
+                "colType = [TIMESTAMP, "+dtStr+"];"
+                "share streamTable(1:0, colName, colType) as "+name+";"
+                "share table(1:0, colName, colType) as res_STCT;go;";
+            conn.run(s);
+        };
+        void insertData(DBConnection& conn, const string& name, const string& colScript){
+            string s = 
+                "row_num = 1000;"
+                "col0 = now()..(now()+row_num-1);"
+                "col1 = "+colScript+";"
+                "for (i in 0..(row_num-1)){insert into "+name+" values([col0[i]], [col1[i]]);};";
+            conn.run(s);
+        };
+
+    };
+    INSTANTIATE_TEST_SUITE_P(basicTypes, StreamingThreadedClientTester_realtime, testing::Combine(
+        testing::Values(0, rand() % 1000 + 13000),
+        testing::ValuesIn(StreamingThreadedClientTester_realtime::getData())));
+    INSTANTIATE_TEST_SUITE_P(arrayVectorTypes, StreamingThreadedClientTester_realtime, testing::Combine(
+        testing::Values(0, rand() % 1000 + 13000),
+        testing::ValuesIn(StreamingThreadedClientTester_realtime::getAVData())));
+    TEST_P(StreamingThreadedClientTester_realtime, test_realtime)
+    {
+        DATA_TYPE ttp = std::get<1>(GetParam()).first;
+        string typeString = Util::getDataTypeString(ttp);
+        if (typeString.compare(0, 9, "DECIMAL32") == 0)
+            typeString = typeString.substr(0, 9) + "(8)";
+        else if (typeString.compare(0, 9, "DECIMAL64") == 0)
+            typeString = typeString.substr(0, 9) + "(15)";
+        else if (typeString.compare(0, 10, "DECIMAL128") == 0)
+            typeString = typeString.substr(0, 10) + "(25)";
+        
+        if (ttp > ARRAY_TYPE_BASE && typeString.compare(0, 7, "DECIMAL") == 0){
+            typeString = typeString + "[]";
+        }
+        cout << "test type: " << typeString << endl;
+
+        const string st = "test_SD_" + getRandString(10);
+        createST(conn, st, typeString);
+
+        int msg_total = 0;
+
+        Signal notify;
+        Mutex mutex;
+        AutoFitTableAppender appender("", "res_STCT", conn);
+
+        auto onehandler = [&](Message msg)
+        {
+            LockGuard<Mutex> lock(&mutex);
+            bool succeeded = false; 
+            TableSP tmp = AnyVectorToTable(msg);
+            while(!succeeded){
+                try
+                {
+                    appender.append(tmp);
+                    succeeded = true;
+                }
+                catch(const std::exception& e)
+                {
+                    Util::sleep(100);
+                }
+            }
+            msg_total+=1;
+            if (msg.getOffset() == 999){
+                notify.set();
+            }
+        };
+
+        int listenport = std::get<0>(GetParam());
+        cout << "current listenport is " << listenport << endl;
+
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
+        if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
+        {
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "test_realtime", 0));
+        }
+        else
+        {
+            string dataScript = std::get<1>(GetParam()).second;
+            std::thread th = std::thread([&]() {
+                insertData(conn, st, dataScript);
+            });
+
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "test_realtime", 0);
+            th.join();
+            notify.wait();
+            cout << "total size: " << msg_total << endl;
+            threadedClient.unsubscribe(hostName, port, st, "test_realtime");
+
+            EXPECT_TRUE(conn.run("re = select * from res_STCT order by ts;\
+                                ex = select * from "+st+" order by ts;\
+                                all(each(eqObj, re.values(), ex.values()))")->getBool());
+            EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
+            EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
+            EXPECT_EQ(msg_total, 1000);
         }
         usedPorts.insert(listenport);
     }

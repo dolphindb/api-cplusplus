@@ -134,7 +134,7 @@ namespace SPCT
         conn.run(replayScript);
     }
 
-    INSTANTIATE_TEST_SUITE_P(, StreamingPollingClientTester, testing::Values(0, rand() % 1000 + 13000));
+    INSTANTIATE_TEST_SUITE_P(, StreamingPollingClientTester, testing::Values(-1, rand() % 1000 + 13000));
     TEST_P(StreamingPollingClientTester, test_subscribeUnsubscribe_normal)
     {
         string st = "outTables_" + getRandString(10);
@@ -143,7 +143,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0));
@@ -206,7 +206,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, "st_notExist", "actionTest", 0));
@@ -226,7 +226,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         EXPECT_ANY_THROW(client.subscribe("", port, "st", "actionTest", 0, false));
     }
 
@@ -236,7 +236,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         EXPECT_ANY_THROW(client.subscribe(hostName, NULL, "st", "actionTest", 0, false));
     }
 
@@ -246,7 +246,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         EXPECT_ANY_THROW(auto queue = client.subscribe(hostName, port, "", "actionTest", 0, false));
     }
 
@@ -258,7 +258,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "", 0));
@@ -323,7 +323,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", -1, false));
@@ -389,7 +389,7 @@ namespace SPCT
         VectorSP filter = Util::createVector(DT_SYMBOL, 1, 1);
         filter->setString(0, "a");
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0, true, filter));
@@ -454,7 +454,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0, true, nullptr, true));
@@ -517,7 +517,7 @@ namespace SPCT
     {
         GTEST_SKIP() << "server还没有修复allowExists的问题, jira: https://dolphindb1.atlassian.net/browse/D20-14283";
         int listenport = GetParam();
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         string st = "outTables_" + getRandString(10);
         SPCT::createSharedTableAndReplay(st, 1000);
         int msg_total = 0, msg_total2 = 0;
@@ -572,7 +572,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         EXPECT_ANY_THROW(auto queue = client.subscribe(hostName, port, "st", "actionTest", 0, false));
 
         usedPorts.insert(listenport);
@@ -586,7 +586,7 @@ namespace SPCT
         conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "resubTest", 0, true));
@@ -631,7 +631,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0));
@@ -680,7 +680,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0));
@@ -729,7 +729,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0));
@@ -776,7 +776,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0));
@@ -826,7 +826,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0, false));
@@ -873,7 +873,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0));
@@ -942,7 +942,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "arrayVectorTableTest", 0));
@@ -1008,7 +1008,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0));
@@ -1075,7 +1075,7 @@ namespace SPCT
         int listenport = GetParam();
         cout << "current listenport is " << listenport << endl;
 
-        PollingClient client(listenport);
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
             EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0, false, nullptr, true));
@@ -1132,4 +1132,209 @@ namespace SPCT
         }
         usedPorts.insert(listenport);
     }
+
+
+    class StreamingPollingClientTester_realtime : public testing::Test, public ::testing::WithParamInterface<tuple<int, pair<DATA_TYPE, string>>>
+    {
+    public:
+        // Suite
+        static void SetUpTestCase()
+        {
+            // DBConnection conn;
+
+            conn.initialize();
+            bool ret = conn.connect(hostName, port, "admin", "123456");
+            if (!ret)
+            {
+                cout << "Failed to connect to the server" << endl;
+            }
+            else
+            {
+                cout << "connect to " + hostName + ":" + std::to_string(port) << endl;
+            }
+        }
+        static void TearDownTestCase()
+        {
+            usedPorts.clear();
+            conn.close();
+        }
+
+        // Case
+        virtual void SetUp()
+        {
+            cout << "check connect...";
+            try
+            {
+                ConstantSP res = conn.run("1+1");
+            }
+            catch(const std::exception& e)
+            {
+                conn.connect(hostName, port, "admin", "123456");
+            }
+
+            cout << "ok" << endl;
+            CLEAR_ENV(conn);
+        }
+        virtual void TearDown()
+        {
+            CLEAR_ENV(conn);
+        }
+        static vector<pair<DATA_TYPE, string>> getAVData()
+        {
+            return {
+                {DT_BOOL_ARRAY, "take([true false], row_num)"},{DT_BOOL_ARRAY, "take([[00i]], row_num)"},
+                {DT_CHAR_ARRAY, "take([10c 23c], row_num)"},{DT_CHAR_ARRAY, "take([[00i]], row_num)"},
+                {DT_SHORT_ARRAY, "take([10s 23s], row_num)"},{DT_SHORT_ARRAY, "take([[00i]], row_num)"},
+                {DT_INT_ARRAY, "take([10 23], row_num)"},{DT_INT_ARRAY, "take([[00i]], row_num)"},
+                {DT_LONG_ARRAY, "take([10l 23l], row_num)"},{DT_LONG_ARRAY, "take([[00i]], row_num)"},
+                {DT_DATE_ARRAY, "take([2021.01.01 2021.01.02], row_num)"},{DT_DATE_ARRAY, "take([[00i]], row_num)"},
+                {DT_MONTH_ARRAY, "take([2021.01M 2021.02M], row_num)"},{DT_MONTH_ARRAY, "take([[00i]], row_num)"},
+                {DT_TIME_ARRAY, "take([10:10:10 11:11:11], row_num)"},{DT_TIME_ARRAY, "take([[00i]], row_num)"},
+                {DT_MINUTE_ARRAY, "take([10:10m 11:11m], row_num)"},{DT_MINUTE_ARRAY, "take([[00i]], row_num)"},
+                {DT_SECOND_ARRAY, "take([10:10:10 11:11:11], row_num)"},{DT_SECOND_ARRAY, "take([[00i]], row_num)"},
+                {DT_DATETIME_ARRAY, "take([2021.01.01T10:10:10 2021.01.02T11:11:11], row_num)"},{DT_DATETIME_ARRAY, "take([[00i]], row_num)"},
+                {DT_TIMESTAMP_ARRAY, "take([2021.01.01T10:10:10.000 2021.01.02T11:11:11.000], row_num)"},{DT_TIMESTAMP_ARRAY, "take([[00i]], row_num)"},
+                {DT_NANOTIME_ARRAY, "take([10:10:10.000000000 11:11:11.000000000], row_num)"},{DT_NANOTIME_ARRAY, "take([[00i]], row_num)"},
+                {DT_NANOTIMESTAMP_ARRAY, "take([2021.01.01T10:10:10.000000000 2021.01.02T11:11:11.000000000], row_num)"},{DT_NANOTIMESTAMP_ARRAY, "take([[00i]], row_num)"},
+                {DT_DATEHOUR_ARRAY, "take([datehour(1000 2000)], row_num)"},{DT_DATEHOUR_ARRAY, "take([[00i]], row_num)"},
+                {DT_FLOAT_ARRAY, "take([10.00f 23.00f], row_num)"},{DT_FLOAT_ARRAY, "take([[00i]], row_num)"},
+                {DT_DOUBLE_ARRAY, "take([10.314 23.445], row_num)"},{DT_DOUBLE_ARRAY, "take([[00i]], row_num)"},
+                {DT_IP_ARRAY, "take([rand(ipaddr(), 2)], row_num)"},{DT_IP_ARRAY, "take([[ipaddr()]], row_num)"},
+                {DT_UUID_ARRAY, "take([rand(uuid(), 2)], row_num)"},{DT_UUID_ARRAY, "take([[uuid()]], row_num)"},
+                {DT_INT128_ARRAY, "take([rand(int128(), 2)], row_num)", }, {DT_INT128_ARRAY, "take([[int128()]], row_num)"},
+                {DT_DECIMAL32_ARRAY, "take([decimal32(rand('-1.123''''2.23468965412', 2), 8)], row_num)"}, {DT_DECIMAL32_ARRAY, "take([[00i]], row_num)"},
+                {DT_DECIMAL64_ARRAY, "take([decimal64(rand('-1.123''''2.123', 2), 15)], row_num)"}, {DT_DECIMAL64_ARRAY, "take([[00i]], row_num)"},
+                {DT_DECIMAL128_ARRAY, "take([decimal128(rand('-1.123''''2.123', 2), 25)], row_num)"}, {DT_DECIMAL128_ARRAY, "take([[00i]], row_num)"},
+            };
+        };
+        static vector<pair<DATA_TYPE, string>> getData()
+        {
+            return {
+                {DT_BOOL, "rand(true false, row_num)"}, {DT_BOOL, "take(bool(), row_num)"},
+                {DT_CHAR, "rand(127c, row_num)"}, {DT_CHAR, "take(char(), row_num)"},
+                {DT_SHORT, "rand(32767h, row_num)"}, {DT_SHORT, "take(short(), row_num)"},
+                {DT_INT, "rand(2147483647, row_num)"}, {DT_INT, "take(int(), row_num)"},
+                {DT_LONG, "rand(1000l, row_num)"}, {DT_LONG, "take(long(), row_num)"},
+                {DT_DATE, "rand(2019.01.01, row_num)"}, {DT_DATE, "take(date(), row_num)"},
+                {DT_MONTH, "rand(2019.01M, row_num)"}, {DT_MONTH, "take(month(), row_num)"},
+                {DT_TIME, "rand(12:00:00.123, row_num)"}, {DT_TIME, "take(time(), row_num)"},
+                {DT_MINUTE, "rand(12:00m, row_num)"}, {DT_MINUTE, "take(minute(), row_num)"},
+                {DT_SECOND, "rand(12:00:00, row_num)"}, {DT_SECOND, "take(second(), row_num)"},
+                {DT_DATETIME, "rand(2019.01.01 12:00:00, row_num)"}, {DT_DATETIME, "take(datetime(), row_num)"},
+                {DT_DATEHOUR, "rand(datehour(1000), row_num)"}, {DT_DATETIME, "take(datehour(), row_num)"},
+                {DT_TIMESTAMP, "rand(2019.01.01 12:00:00.123, row_num)"}, {DT_TIMESTAMP, "take(timestamp(), row_num)"},
+                {DT_NANOTIME, "rand(12:00:00.123456789, row_num)"}, {DT_NANOTIME, "take(nanotime(), row_num)"},
+                {DT_NANOTIMESTAMP, "rand(2019.01.01 12:00:00.123456789, row_num)"}, {DT_NANOTIMESTAMP, "take(nanotimestamp(), row_num)"},
+                {DT_DATEHOUR, "rand(datehour(100), row_num)"}, {DT_DATEHOUR, "take(datehour(), row_num)"},
+                {DT_FLOAT, "rand(10.00f, row_num)"}, {DT_FLOAT, "take(float(), row_num)"},
+                {DT_DOUBLE, "rand(10.00, row_num)"}, {DT_DOUBLE, "take(double(), row_num)"},
+                {DT_IP, "rand(ipaddr(), row_num)"}, {DT_IP, "take(ipaddr(), row_num)"},
+                {DT_UUID, "rand(uuid(), row_num)"}, {DT_UUID, "take(uuid(), row_num)"},
+                {DT_INT128, "rand(int128(), row_num)"}, {DT_INT128, "take(int128(), row_num)"},
+                {DT_DECIMAL32, "decimal32(rand('-1.123''''2.23468965412', row_num), 8)"}, {DT_DECIMAL32, "take(decimal32(NULL, 8), row_num)"},
+                {DT_DECIMAL64, "decimal64(rand('-1.123''''2.123123123123123123', row_num), 15)"}, {DT_DECIMAL64, "take(decimal64(NULL, 15), row_num)"},
+                {DT_DECIMAL128, "decimal128(rand('-1.123''''2.123', row_num), 25)"}, {DT_DECIMAL128, "take(decimal128(NULL, 25), row_num)"},
+                {DT_STRING, "rand(`str1`str2, row_num)"}, {DT_STRING, "take(string(), row_num)"},
+                {DT_SYMBOL, "rand(symbol(`sym1`sym2), row_num)"}, {DT_SYMBOL, "symbol(take(string(), row_num))"},
+                {DT_BLOB, "rand(blob(`b1`b2`b3), row_num)"}, {DT_BLOB, "take(blob(''), row_num)"},
+                };
+        };
+        void createST(DBConnection& conn, const string& name, const string& dtStr){
+            string s = 
+                "colName = `ts`testCol;"
+                "colType = [TIMESTAMP, "+dtStr+"];"
+                "share streamTable(1:0, colName, colType) as "+name+";"
+                "share table(1:0, colName, colType) as res_SPCT;go;";
+            conn.run(s);
+        };
+        void insertData(DBConnection& conn, const string& name, const string& colScript){
+            string s = 
+                "row_num = 1000;"
+                "col0 = now()..(now()+row_num-1);"
+                "col1 = "+colScript+";"
+                "for (i in 0..(row_num-1)){insert into "+name+" values([col0[i]], [col1[i]]);};";
+            conn.run(s);
+        };
+
+    };
+    INSTANTIATE_TEST_SUITE_P(basicTypes, StreamingPollingClientTester_realtime, testing::Combine(
+        testing::Values(0, rand() % 1000 + 13000),
+        testing::ValuesIn(StreamingPollingClientTester_realtime::getData())));
+    INSTANTIATE_TEST_SUITE_P(arrayVectorTypes, StreamingPollingClientTester_realtime, testing::Combine(
+        testing::Values(0, rand() % 1000 + 13000),
+        testing::ValuesIn(StreamingPollingClientTester_realtime::getAVData())));
+    TEST_P(StreamingPollingClientTester_realtime, test_realtime)
+    {
+        DATA_TYPE ttp = std::get<1>(GetParam()).first;
+        string typeString = Util::getDataTypeString(ttp);
+        if (typeString.compare(0, 9, "DECIMAL32") == 0)
+            typeString = typeString.substr(0, 9) + "(8)";
+        else if (typeString.compare(0, 9, "DECIMAL64") == 0)
+            typeString = typeString.substr(0, 9) + "(15)";
+        else if (typeString.compare(0, 10, "DECIMAL128") == 0)
+            typeString = typeString.substr(0, 10) + "(25)";
+        
+        if (ttp > ARRAY_TYPE_BASE && typeString.compare(0, 7, "DECIMAL") == 0){
+            typeString = typeString + "[]";
+        }
+        cout << "test type: " << typeString << endl;
+
+        const string st = "test_SD_" + getRandString(10);
+        createST(conn, st, typeString);
+
+        int msg_total = 0;
+        Message msg;
+        AutoFitTableAppender appender("", "res_SPCT", conn);
+
+        int listenport = std::get<0>(GetParam());
+        cout << "current listenport is " << listenport << endl;
+
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
+        if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
+        {
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "actionTest", 0));
+        }
+        else
+        {
+            string dataScript = std::get<1>(GetParam()).second;
+            std::thread th = std::thread([&]() {
+                insertData(conn, st, dataScript);
+            });
+            
+            auto queue = client.subscribe(hostName, port, st, "actionTest", 0);
+            th.join();
+            thread th1 = thread([&]{
+                while (true)
+                {
+                    queue->pop(msg);
+                    bool succeeded = false; 
+                    TableSP tmp = AnyVectorToTable(msg);
+                    while(!succeeded){
+                        try
+                        {
+                            appender.append(tmp);
+                            succeeded = true;
+                        }
+                        catch(const std::exception& e)
+                        {
+                            Util::sleep(100);
+                        }
+                    }
+                    msg_total+=1;
+                    if (msg.getOffset() == 999) break;
+                }
+            });
+            th1.join();
+            cout << "total size:" << msg_total << endl;
+            client.unsubscribe(hostName, port, st, "actionTest");
+            EXPECT_TRUE(conn.run("re = select * from res_SPCT order by ts;\
+                                ex = select * from "+st+" order by ts;\
+                                all(each(eqObj, re.values(), ex.values()))")->getBool());
+            EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
+
+            EXPECT_EQ(msg_total, 1000);
+        }
+        usedPorts.insert(listenport);
+    }
+
 }

@@ -163,7 +163,7 @@ string createHAstreamTable(){
 }
 
 const int insert_total_rows = 2000; // total rows you want to insert and test.
-INSTANTIATE_TEST_SUITE_P(, StreamingSubscribeHighAvailableTest, testing::Values(0, rand() % 1000 + 13000));
+INSTANTIATE_TEST_SUITE_P(, StreamingSubscribeHighAvailableTest, testing::Values(-1, rand() % 1000 + 13000));
 TEST_P(StreamingSubscribeHighAvailableTest, test_Threadclient_onehandler_subscribeStreamTableHA_onFollower)
 {
     string HAtab = createHAstreamTable();
@@ -197,7 +197,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Threadclient_onehandler_subscri
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(followerHost, followerPort, onehandler, HAtab, "test_streamHA", 0, true, nullptr, false, false, "admin", "123456"));
@@ -260,7 +260,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Threadclient_onehandler_subscri
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(followerHost, followerPort, onehandler, HAtab, "test_streamHA", 0, true, nullptr, false, false, "admin", "123456"));
@@ -338,7 +338,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Threadclient_batchhandler_subsc
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(followerHost, followerPort, batchhandler, HAtab, "test_streamHA", 0, true, nullptr, true, 1, 1.0, false, "admin", "123456"));
@@ -384,7 +384,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_subscribeStreamTa
     int listenport = GetParam();
     cout << "current listenport is " << listenport << endl;
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(followerHost, followerPort, HAtab, "test_streamHA", 0, true, nullptr, false, false, "admin", "123456"));
@@ -447,7 +447,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_subscribeStreamTa
 
     int listenport = GetParam();
     cout << "current listenport is " << listenport << endl;
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(followerHost, followerPort, HAtab, "test_streamHA", 0, true, nullptr, false, false, "admin", "123456"));
@@ -539,7 +539,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Threadpooledclient_threadCount_
         }
     };
 
-    ThreadPooledClient client(listenport, 1);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 1) : ThreadPooledClient(listenport, 1);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(followerHost, followerPort, onehandler, HAtab, "test_streamHA", 0, true, nullptr, false, false, "admin", "123456"));
@@ -601,7 +601,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Threadpooledclient_threadCount_
         }
     };
 
-    ThreadPooledClient client(listenport, 2);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 2) : ThreadPooledClient(listenport, 2);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(followerHost, followerPort, onehandler, HAtab, "test_streamHA", 0, true, nullptr, false, false, "admin", "123456"));
@@ -675,7 +675,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Threadpooledclient_threadCount_
         }
     };
 
-    ThreadPooledClient client(listenport, 2);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 2) : ThreadPooledClient(listenport, 2);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(followerHost, followerPort, onehandler, HAtab, "test_streamHA", 0, true, nullptr, false, false, "admin", "123456"));
@@ -733,7 +733,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Threadclient_onehandler_subscri
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(leaderHost, leaderPort, onehandler, HAtab, "test_streamHA", 0, true, nullptr, false, false, "admin", "123456"));
@@ -794,7 +794,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Threadclient_batchhandler_subsc
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(leaderHost, leaderPort, batchhandler, HAtab, "test_streamHA", 0, true, nullptr, true, 1, 1.0, false, "admin", "123456"));
@@ -835,7 +835,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_subscribeStreamTa
     int listenport = GetParam();
     cout << "current listenport is " << listenport << endl;
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(leaderHost, leaderPort, HAtab, "test_streamHA", 0, true, nullptr, false, false, "admin", "123456"));
@@ -910,7 +910,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Threadpooledclient_threadCount_
         }
     };
 
-    ThreadPooledClient client(listenport, 1);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 1) : ThreadPooledClient(listenport, 1);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(leaderHost, leaderPort, onehandler, HAtab, "test_streamHA", 0, true, nullptr, false, false, "admin", "123456"));
@@ -966,7 +966,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Threadpooledclient_threadCount_
         }
     };
 
-    ThreadPooledClient client(listenport, 2);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 2) : ThreadPooledClient(listenport, 2);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(leaderHost, leaderPort, onehandler, HAtab, "test_streamHA", 0, true, nullptr, false, false, "admin", "123456"));
@@ -1009,7 +1009,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_backupSites)
     int listenport = GetParam();
     cout << "current listenport is " << listenport << endl;
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, HAtab, "test_backupSites", 0, true, nullptr, false, false, "admin", "123456", nullptr, backupSites));
@@ -1128,7 +1128,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadedClient_onehandler_backu
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, HAtab, "test_backupSites", 0, true, nullptr, false, false, "admin", "123456", nullptr, backupSites));
@@ -1219,7 +1219,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadedClient_batchhandler_bac
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, HAtab, "test_backupSites", 0, true, nullptr, false, 100, 1.0, false, "admin", "123456", nullptr, backupSites));
@@ -1307,7 +1307,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadPooledClient_backupSites)
         }
     };
 
-    ThreadPooledClient client(listenport, rand()%10+1);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, HAtab, "test_backupSites", 0, true, nullptr, false, false, "admin", "123456", nullptr, backupSites));
@@ -1370,7 +1370,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_backupSites_with_
     int listenport = GetParam();
     cout << "current listenport is " << listenport << endl;
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, 0, HAtab, "test_backupSites", 0, true, nullptr, false, false, "admin", "123456", nullptr, backupSites));
@@ -1490,7 +1490,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadedClient_backupSites_with
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, 0, onehandler, HAtab, "test_backupSites", 0, true, nullptr, false, false, "admin", "123456", nullptr, backupSites));
@@ -1579,7 +1579,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadPooledClient_backupSites_
         }
     };
 
-    ThreadPooledClient client(listenport, rand()%10+1);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, 0, onehandler, HAtab, "test_backupSites", 0, true, nullptr, false, false, "admin", "123456", nullptr, backupSites));
@@ -1643,7 +1643,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_backupSites_resub
     int listenport = GetParam();
     cout << "current listenport is " << listenport << endl;
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, HAtab, "test_backupSites", 0, false, nullptr, false, false, "admin", "123456", nullptr, backupSites));
@@ -1758,7 +1758,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadedClient_onehandler_backu
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, HAtab, "test_backupSites", 0, false, nullptr, false, false, "admin", "123456", nullptr, backupSites));
@@ -1846,7 +1846,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadedClient_batchhandler_bac
         }
     };
 
-    ThreadedClient threadedClient(listenport);
+    ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, HAtab, "test_backupSites", 0, false, nullptr, false, 100, 1.0, false, "admin", "123456", nullptr, backupSites));
@@ -1931,7 +1931,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadPooledClient_backupSites_
         }
     };
 
-    ThreadPooledClient client(listenport, rand()%10+1);
+    ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, HAtab, "test_backupSites", 0, false, nullptr, false, false, "admin", "123456", nullptr, backupSites));
@@ -1990,7 +1990,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_backupSites_subOn
     int listenport = GetParam();
     cout << "current listenport is " << listenport << endl;
 
-    PollingClient client(listenport);
+    PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
     if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
     {
         EXPECT_ANY_THROW(client.subscribe(hostName, port, HAtab, "test_backupSites", 0, true, nullptr, false, false, "admin", "123456", nullptr, backupSites));

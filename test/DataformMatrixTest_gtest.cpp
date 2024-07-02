@@ -2825,17 +2825,17 @@ TEST_P(DataformMatrixTest_funcs, test_getWindow_getRow_getColumn){
 
     *res = m->getWindow(0, -1, 1, 1)->getString();
     // cout << *res << endl;
-    *ex = conn.run("x[1:2,1:2]")->getString();
+    *ex = conn.run("x[1:2, 0:1]")->getString();
     EXPECT_EQ(*res, *ex);
 
     *res = m->getWindow(0, -1, 1, 2)->getString();
     // cout << *res << endl;
-    *ex = conn.run("x[1:2,1:3]")->getString();
+    *ex = conn.run("x[1:3, 0:1]")->getString();
     EXPECT_EQ(*res, *ex);
 
     *res = m->getWindow(0, -1, 0, -1)->getString();
     // cout << *res << endl;
-    *ex = conn.run("x[[1],[1]]")->getString();
+    *ex = conn.run("x[[0],[0]]")->getString();
     EXPECT_EQ(*res, *ex);
 
     /* getRow */

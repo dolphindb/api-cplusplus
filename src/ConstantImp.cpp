@@ -18,6 +18,9 @@ StringVector::StringVector(INDEX sz, INDEX capacity, bool blob) : blob_(blob){
 }
 
 StringVector::StringVector(const std::vector<std::string>& data, INDEX capacity, bool containNull, bool blob) : blob_(blob) {
+	for(const auto& val : data){
+		checkString(val);
+	}
 	data_.reserve((std::max)(data.size(), (size_t)capacity));
 	data_.assign(data.begin(), data.end());
 	containNull_ = containNull;
@@ -98,6 +101,14 @@ void StringVector::lower(){
 				ch += 32;
 		}
 		++it;
+	}
+}
+
+void StringVector::checkString(const std::string& val){
+	if(!blob_){
+		if(val.find('\0') != std::string::npos){
+			throw RuntimeException("A String cannot contain the character '\\0'");
+		}
 	}
 }
 
@@ -265,6 +276,9 @@ bool StringVector::append(const ConstantSP& value, INDEX len){
 }
 
 bool StringVector::appendString(std::string* buf, int len){
+	for(int i = 0; i < len; ++i){
+		checkString(buf[i]);
+	}
 	size_t newSize;
 	if((newSize = data_.size() + len) > data_.capacity())
 		data_.reserve(newSize);
@@ -1008,8 +1022,7 @@ void FastBoolVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 }
 
 bool FastBoolVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
-	if(!checkCapacity(appendSize))
-		return false;
+	checkCapacity(appendSize);
 
 	if(appendSize==1)
 		data_[size_] = value->getBool(0);
@@ -1090,8 +1103,7 @@ void FastCharVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 }
 
 bool FastCharVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
-	if(!checkCapacity(appendSize))
-		return false;
+	checkCapacity(appendSize);
 
 	if(appendSize==1)
 		data_[size_] = value->getChar(0);
@@ -1200,8 +1212,7 @@ void FastShortVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 }
 
 bool FastShortVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
-	if(!checkCapacity(appendSize))
-		return false;
+	checkCapacity(appendSize);
 
 	if(appendSize==1)
 		data_[size_] = value->getShort(0);
@@ -1296,8 +1307,7 @@ void  FastIntVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 }
 
 bool  FastIntVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
-	if(!checkCapacity(appendSize))
-		return false;
+	checkCapacity(appendSize);
 
 	if(appendSize == 1)
 		data_[size_] = value->getInt(0);
@@ -1392,8 +1402,7 @@ void FastLongVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 }
 
 bool FastLongVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
-	if(!checkCapacity(appendSize))
-		return false;
+	checkCapacity(appendSize);
 
 	if(appendSize==1)
 		data_[size_] = value->getLong(0);
@@ -1493,8 +1502,7 @@ void FastFloatVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 }
 
 bool FastFloatVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
-	if(!checkCapacity(appendSize))
-		return false;
+	checkCapacity(appendSize);
 
 	if(appendSize==1)
 		data_[size_] = value->getFloat(0);
@@ -1580,8 +1588,7 @@ void FastDoubleVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 }
 
 bool FastDoubleVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
-	if(!checkCapacity(appendSize))
-		return false;
+	checkCapacity(appendSize);
 	if(appendSize==1)
 		data_[size_] = value->getDouble(0);
 	else if(!value->getDouble(start, appendSize, data_+size_))
@@ -3418,8 +3425,14 @@ bool FastBoolMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastBoolMatrix::getRow(INDEX index) const {
 	char* data= new char[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = CHAR_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastBoolVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -3432,8 +3445,16 @@ ConstantSP FastBoolMatrix::getWindow(INDEX colStart, int colLength,INDEX rowStar
 	char* dest=data;
 	INDEX start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = CHAR_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = CHAR_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -3468,8 +3489,14 @@ bool FastCharMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastCharMatrix::getRow(INDEX index) const {
 	char* data= new char[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = CHAR_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastCharVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -3482,8 +3509,16 @@ ConstantSP FastCharMatrix::getWindow(INDEX colStart, int colLength,INDEX rowStar
 	char* dest=data;
 	INDEX start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = CHAR_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = CHAR_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -3518,8 +3553,14 @@ bool FastShortMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastShortMatrix::getRow(INDEX index) const {
 	short* data= new short[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = SHRT_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastShortVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -3532,8 +3573,16 @@ ConstantSP FastShortMatrix::getWindow(INDEX colStart, int colLength,INDEX rowSta
 	short* dest=data;
 	INDEX start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = SHRT_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = SHRT_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -3568,8 +3617,14 @@ bool FastIntMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastIntMatrix::getRow(INDEX index) const {
 	int* data = new int[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = INT_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastIntVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -3582,8 +3637,16 @@ ConstantSP FastIntMatrix::getWindow(INDEX colStart, int colLength,INDEX rowStart
 	int* dest=data;
 	INDEX start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = INT_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = INT_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -3618,8 +3681,14 @@ bool FastLongMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastLongMatrix::getRow(INDEX index) const {
 	long long* data = new long long[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = LLONG_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastLongVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -3632,8 +3701,16 @@ ConstantSP FastLongMatrix::getWindow(INDEX colStart, int colLength,INDEX rowStar
 	long long* dest=data;
 	INDEX start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = LLONG_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = LLONG_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -3668,8 +3745,14 @@ bool FastFloatMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastFloatMatrix::getRow(INDEX index) const {
 	float* data = new float[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = FLT_NMIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastFloatVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -3682,8 +3765,16 @@ ConstantSP FastFloatMatrix::getWindow(INDEX colStart, int colLength,INDEX rowSta
 	float* dest=data;
 	INDEX start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = FLT_NMIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = FLT_NMIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -3720,8 +3811,14 @@ bool FastDoubleMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastDoubleMatrix::getRow(INDEX index) const {
 	double* data = new double[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = DBL_NMIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastDoubleVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -3734,8 +3831,16 @@ ConstantSP FastDoubleMatrix::getWindow(INDEX colStart, int colLength,INDEX rowSt
 	double* dest=data;
 	INDEX start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = DBL_NMIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = DBL_NMIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -3770,8 +3875,14 @@ bool FastDateMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastDateMatrix::getRow(INDEX index) const {
 	int* data = new int[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = INT_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastDateVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -3784,8 +3895,16 @@ ConstantSP FastDateMatrix::getWindow(INDEX colStart, int colLength,INDEX rowStar
 	int* dest=data;
 	int start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = INT_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = INT_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -3820,8 +3939,14 @@ bool FastDateTimeMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastDateTimeMatrix::getRow(INDEX index) const {
 	int* data = new int[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = INT_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastDateTimeVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -3834,8 +3959,16 @@ ConstantSP FastDateTimeMatrix::getWindow(INDEX colStart, int colLength,INDEX row
 	int* dest=data;
 	int start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = INT_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = INT_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -3870,9 +4003,15 @@ bool FastDateHourMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastDateHourMatrix::getRow(INDEX index) const {
     int* data = new int[cols_];
-    for(int i=0;i<cols_;++i)
-        data[i]=data_[i*rows_+index];
-    VectorSP row=ConstantSP(new FastDateTimeVector(cols_,0,data,containNull_));
+    for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = INT_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
+    VectorSP row=ConstantSP(new FastDateHourVector(cols_,0,data,containNull_));
     if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
     return row;
 }
@@ -3884,15 +4023,23 @@ ConstantSP FastDateHourMatrix::getWindow(INDEX colStart, int colLength,INDEX row
     int* dest=data;
     int start=rowStart+colStart*rows_;
     bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
     for(int i=0;i<colNum;++i){
         getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = INT_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = INT_MIN;
+		}
         if(reverseCol)
             start-=rows_;
         else
             start+=rows_;
         dest+=rowNum;
     }
-    ConstantSP matrix=ConstantSP(new FastDateTimeMatrix(colNum,rowNum,colNum,data,containNull_));
+    ConstantSP matrix=ConstantSP(new FastDateHourMatrix(colNum,rowNum,colNum,data,containNull_));
     if(!rowLabel_->isNull()) matrix->setRowLabel(((Vector*)rowLabel_.get())->getSubVector(rowStart,rowLength));
     if(!colLabel_->isNull()) matrix->setColumnLabel(((Vector*)colLabel_.get())->getSubVector(colStart,colLength));
     return matrix;
@@ -3920,8 +4067,14 @@ bool FastMonthMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastMonthMatrix::getRow(INDEX index) const {
 	int* data = new int[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = INT_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastMonthVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -3934,8 +4087,16 @@ ConstantSP FastMonthMatrix::getWindow(INDEX colStart, int colLength,INDEX rowSta
 	int* dest=data;
 	int start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = INT_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = INT_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -3970,8 +4131,14 @@ bool FastTimeMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastTimeMatrix::getRow(INDEX index) const {
 	int* data = new int[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = INT_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastTimeVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -3984,8 +4151,16 @@ ConstantSP FastTimeMatrix::getWindow(INDEX colStart, int colLength,INDEX rowStar
 	int* dest=data;
 	int start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = INT_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = INT_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -4020,8 +4195,14 @@ bool FastSecondMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastSecondMatrix::getRow(INDEX index) const {
 	int* data = new int[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = INT_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastSecondVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -4034,8 +4215,16 @@ ConstantSP FastSecondMatrix::getWindow(INDEX colStart, int colLength,INDEX rowSt
 	int* dest=data;
 	int start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = INT_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = INT_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -4070,8 +4259,14 @@ bool FastMinuteMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastMinuteMatrix::getRow(INDEX index) const {
 	int* data = new int[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = INT_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastMinuteVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -4084,8 +4279,16 @@ ConstantSP FastMinuteMatrix::getWindow(INDEX colStart, int colLength,INDEX rowSt
 	int* dest=data;
 	int start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = INT_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = INT_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -4120,8 +4323,14 @@ bool FastNanoTimeMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastNanoTimeMatrix::getRow(INDEX index) const {
 	long long* data = new long long[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = LLONG_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastNanoTimeVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -4134,8 +4343,16 @@ ConstantSP FastNanoTimeMatrix::getWindow(INDEX colStart, int colLength,INDEX row
 	long long* dest=data;
 	int start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = LLONG_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = LLONG_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -4171,8 +4388,14 @@ bool FastTimestampMatrix::set(INDEX column, INDEX row, const ConstantSP& value){
 
 ConstantSP FastTimestampMatrix::getRow(INDEX index) const {
 	long long* data = new long long[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = LLONG_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastTimestampVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -4185,8 +4408,16 @@ ConstantSP FastTimestampMatrix::getWindow(INDEX colStart, int colLength,INDEX ro
 	long long* dest=data;
 	int start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = LLONG_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = LLONG_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -4221,8 +4452,14 @@ bool FastNanoTimestampMatrix::set(INDEX column, INDEX row, const ConstantSP& val
 
 ConstantSP FastNanoTimestampMatrix::getRow(INDEX index) const {
 	long long* data = new long long[cols_];
-	for(int i=0;i<cols_;++i)
-		data[i]=data_[i*rows_+index];
+	for(int i = 0; i < cols_; ++i){
+		if(index >= rows_){
+			data[i] = LLONG_MIN;
+		}
+		else{
+			data[i] = data_[i * rows_ + index];
+		}
+	}
 	VectorSP row=ConstantSP(new FastNanoTimestampVector(cols_,0,data,containNull_));
 	if(!rowLabel_->isNull()) row->setName(rowLabel_->getString(index));
 	return row;
@@ -4235,8 +4472,16 @@ ConstantSP FastNanoTimestampMatrix::getWindow(INDEX colStart, int colLength,INDE
 	long long* dest=data;
 	int start=rowStart+colStart*rows_;
 	bool reverseCol=colLength<0;
+	int invalidLenBeginning = 0, invalidLenEnding = 0;
+	calculateInvalidLength(colStart, colLength, rowStart, rowLength, invalidLenBeginning, invalidLenEnding);
 	for(int i=0;i<colNum;++i){
 		getDataArray(start,rowLength,dest);
+		for(int j = 0; j < invalidLenBeginning; ++j){
+			dest[j] = LLONG_MIN;
+		}
+		for(int j = 0; j < invalidLenEnding; ++j){
+			dest[rowNum - 1 - j] = LLONG_MIN;
+		}
 		if(reverseCol)
 			start-=rows_;
 		else
@@ -4381,7 +4626,7 @@ void FastFixedLengthVector::getDataArray(INDEX start, INDEX length, unsigned cha
 	}
 }
 
-bool FastFixedLengthVector::checkCapacity(int appendSize){
+void FastFixedLengthVector::checkCapacity(int appendSize){
 	if(size_+appendSize>capacity_){
 		INDEX newCapacity= static_cast<INDEX>((size_+appendSize)*1.2);
 		unsigned char* newData = new unsigned char[newCapacity * fixedLength_];
@@ -4390,7 +4635,6 @@ bool FastFixedLengthVector::checkCapacity(int appendSize){
 		capacity_=newCapacity;
 		data_=newData;
 	}
-	return true;
 }
 
 ConstantSP FastFixedLengthVector::getSubVector(INDEX start, INDEX length, INDEX capacity) const {
@@ -4407,8 +4651,7 @@ ConstantSP FastFixedLengthVector::getSubVector(INDEX start, INDEX length, INDEX 
 IO_ERR FastFixedLengthVector::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
 	IO_ERR ret=OK;
 	INDEX end = indexStart + targetNumElement;
-	if(end > capacity_ && !checkCapacity(end - size_))
-		return NOSPACE;
+	checkCapacity(end - size_);
 	INDEX i=indexStart;
 	size_t unitLength = fixedLength_;
 	if(!in->isIntegerReversed()){
@@ -4521,8 +4764,7 @@ void FastFixedLengthVector::fill(INDEX start, INDEX length, const ConstantSP& va
 }
 
 bool FastFixedLengthVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
-	if (!checkCapacity(appendSize))
-		return false;
+	checkCapacity(appendSize);
 	if (!value->getBinary(start, appendSize, fixedLength_, data_ + size_ * fixedLength_))
 		return false;
 	size_ += appendSize;
@@ -4532,8 +4774,7 @@ bool FastFixedLengthVector::append(const ConstantSP value, INDEX start, INDEX ap
 }
 
 bool FastFixedLengthVector::append(const ConstantSP& value, INDEX appendSize){
-	if(!checkCapacity(appendSize))
-		return false;
+	checkCapacity(appendSize);
 
 	if(!value->getBinary(0,appendSize,fixedLength_,data_ + size_ * fixedLength_))
 		return false;

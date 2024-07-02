@@ -46,7 +46,7 @@ class EXPORT_DECL ThreadedClient : public StreamingClient {
 public:
 	//listeningPort > 0 : listen mode, wait for server connection
 	//listeningPort = 0 : active mode, connect server by DBConnection socket
-    explicit ThreadedClient(int listeningPort);
+    explicit ThreadedClient(int listeningPort = 0);
     ~ThreadedClient() override = default;
     ThreadSP subscribe(std::string host, int port, const MessageHandler &handler, std::string tableName,
                        std::string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true,
@@ -67,7 +67,7 @@ class EXPORT_DECL ThreadPooledClient : public StreamingClient {
 public:
 	//listeningPort > 0 : listen mode, wait for server connection
 	//listeningPort = 0 : active mode, connect server by DBConnection socket
-    explicit ThreadPooledClient(int listeningPort, int threadCount);
+    explicit ThreadPooledClient(int listeningPort = 0, int threadCount = 3);
     ~ThreadPooledClient() override = default;
     std::vector<ThreadSP> subscribe(std::string host, int port, const MessageHandler &handler, std::string tableName,
                                std::string actionName, int64_t offset = -1, bool resub = true,
@@ -85,7 +85,7 @@ class EXPORT_DECL PollingClient : public StreamingClient {
 public:
 	//listeningPort > 0 : listen mode, wait for server connection
 	//listeningPort = 0 : active mode, connect server by DBConnection socket
-    explicit PollingClient(int listeningPort);
+    explicit PollingClient(int listeningPort = 0);
     ~PollingClient() override = default;
     MessageQueueSP subscribe(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME,
                              int64_t offset = -1, bool resub = true, const VectorSP &filter = nullptr,

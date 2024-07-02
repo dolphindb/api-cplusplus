@@ -1176,6 +1176,10 @@ MessageQueueSP StreamingClientImpl::subscribeInternal(const string &host, int po
     int _port = port;
     checkServerVersion(host, port, backupSites);
     init();
+    if(msgAsTable){
+        //因为如果msgAsTable，Message实际上是一个TableSP，其中可能会包含多条消息，因此设置batchSize为1，保证收到消息就会立刻处理
+        batchSize = 1;
+    }
     while (isExit()==false) {
         ++attempt;
         SubscribeInfo info(_id, _host, _port, tableName, actionName, offset, resubscribe, filter, msgAsTable, allowExists,
@@ -1331,18 +1335,49 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageBatchHand
         throttleTime = std::max(1, (int)(throttle * 1000));
     }
 	SmartPointer<StreamingClientImpl> impl=impl_;
-	ThreadSP thread = new Thread(new Executor([handler, queue, throttleTime, impl]() {
+	ThreadSP thread = new Thread(new Executor([handler, queue, msgAsTable, batchSize, throttleTime, impl]() {
         vector<Message> msgs;
-		bool foundnull = false;
+        vector<Message> tableMsg(1);
+        bool foundnull = false;
+        long long startTime = 0;
+        int       currentSize = 0;
         while (impl->isExit()==false && foundnull == false) {
-			if(queue->pop(msgs, throttleTime)){
-				while (msgs.empty() == false && msgs.back().isNull()) {
-					msgs.pop_back();
-					foundnull=true;
-                }
-                if(!msgs.empty()){
-                	handler(msgs);
+            if(msgAsTable){
+                startTime = Util::getEpochTime();
+                currentSize = 0;
+                //当msgAsTable为true的时候，queue的batchSize被设置为1，因此每次只能pop出来一条消息
+                if(queue->pop(msgs, throttleTime)){
+                    if(msgs[0].isNull()){
+                        foundnull = true;
+                        continue;
+                    }
+                    tableMsg[0] = msgs[0];
+                    currentSize = tableMsg[0]->size();
+                    long long leftTime = startTime + throttleTime - Util::getEpochTime();
+                    while(leftTime > 0 && currentSize < batchSize && queue->pop(msgs, leftTime)){
+                        if(msgs[0].isNull()){
+                            foundnull = true;
+                            break;
+                        }
+                        mergeTable(tableMsg[0], msgs);
+                        msgs.clear();
+                        leftTime = startTime + throttleTime - Util::getEpochTime();
+                        currentSize = tableMsg[0]->size();
+                    }
+                    handler(tableMsg);
                     msgs.clear();
+                }
+            }
+            else{
+                if(queue->pop(msgs, throttleTime)){
+                    while (msgs.empty() == false && msgs.back().isNull()) {
+                        msgs.pop_back();
+                        foundnull=true;
+                    }
+                    if(!msgs.empty()){
+                        handler(msgs);
+                        msgs.clear();
+                    }
                 }
             }
         }

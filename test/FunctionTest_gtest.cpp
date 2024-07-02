@@ -849,7 +849,7 @@ TEST_F(FunctionTest,test_Util_functions){
     vector<double> doubleconstVec = {1};
 
     for(int i =0;i<testTypes.size();i++){
-        VectorSP ddbval=Util::createObject((DATA_TYPE)testTypes[i],voidconstVec);
+        VectorSP ddbval=Util::createObject(testTypes[i],voidconstVec);
         EXPECT_EQ(ddbval->getForm(), DF_VECTOR);
         EXPECT_TRUE(ddbval->get(0)->getType()==(DATA_TYPE)testTypes[i] || ddbval->getType()==DT_STRING);
         EXPECT_TRUE(ddbval->get(0)->get(0)->isNull());

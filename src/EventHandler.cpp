@@ -172,6 +172,12 @@ bool EventHandler::checkSchema(const std::vector<EventSchema>& eventSchemas, con
                 return false;
             }
 
+            DATA_TYPE actualType = type > 64 ? static_cast<DATA_TYPE>(type - 64) : type;
+            if(Util::getCategory(actualType) == DENARY){
+                //check extra Param
+                ConstantSP tempDecimal = Util::createConstant(actualType, schema.fieldExtraParams_[j]);
+            }
+
             if((form == DF_SCALAR || form == DF_VECTOR) && type < ARRAY_TYPE_BASE && type != DT_ANY){
                 int unitLen = Util::getDataTypeSize(type);
                 if(type == DT_SYMBOL){

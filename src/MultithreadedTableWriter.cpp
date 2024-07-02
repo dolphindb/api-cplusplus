@@ -206,12 +206,13 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
         scriptTableInsert_ += "}";
     }
     // init done, start thread now.
+    perBlockSize_ = batchSize_ < 65535 ? 65535 : batchSize_;
     threads_.resize(threadCount);
     for (unsigned int i = 0; i < threads_.size(); i++) {
         WriterThread& writerThread = threads_[i];
         writerThread.threadId = 0;
         writerThread.sentRows = 0;
-        writerThread.sendingRows = 0;
+        writerThread.writeQueue_.push_back(createColumnBlock());
         writerThread.exit = false;
         LockGuard<Mutex> _(&writerThread.mutex_);
 
@@ -231,10 +232,10 @@ MultithreadedTableWriter::~MultithreadedTableWriter() {
         std::vector<ConstantSP>* pitem = nullptr;
         for (auto& thread : threads_) {
             LockGuard<Mutex> _(&thread.mutex_);
-            for (auto& one : thread.writeQueue) {
+            for (auto& one : thread.writeQueue_) {
                 delete one;
             }
-            for (auto& one : thread.failedQueue) {
+            for (auto& one : thread.failedQueue_) {
                 delete one;
             }
         }
@@ -283,7 +284,7 @@ bool MultithreadedTableWriter::SendExecutor::init() {
     return true;
 }
 
-bool MultithreadedTableWriter::insert(std::vector<ConstantSP>** records, int recordCount, ErrorCodeInfo& errorInfo) {
+bool MultithreadedTableWriter::insert(std::vector<ConstantSP>** records, int recordCount, ErrorCodeInfo& errorInfo, bool isNeedReleaseMemory) {
     if (hasError_.load()) {
         errorInfo.set(ErrorCodeInfo::EC_DestroyedObject, "Thread is exiting.");
         return false;
@@ -331,6 +332,11 @@ bool MultithreadedTableWriter::insert(std::vector<ConstantSP>** records, int rec
             insertThreadWrite(0, records[i]);
         }
     }
+    if(isNeedReleaseMemory){
+        for (int i = 0; i < recordCount; i++) {
+            delete records[i];
+        }
+    }
     return true;
 }
 
@@ -347,8 +353,8 @@ void MultithreadedTableWriter::getStatus(Status& status) {
         LockGuard<Mutex> _(&writeThread.mutex_);
         threadStatus.threadId = writeThread.threadId;
         threadStatus.sentRows = writeThread.sentRows;
-        threadStatus.unsentRows = static_cast<long>(writeThread.writeQueue.size() + writeThread.sendingRows);
-        threadStatus.sendFailedRows = static_cast<long>(writeThread.failedQueue.size());
+        threadStatus.unsentRows = static_cast<long>((writeThread.writeQueue_.size() - 1) * perBlockSize_ + writeThread.writeQueue_.back()->front()->size());
+        threadStatus.sendFailedRows = static_cast<long>(writeThread.failedQueue_.size());
         status.plus(threadStatus);
     }
 }
@@ -360,10 +366,21 @@ void MultithreadedTableWriter::getUnwrittenData(std::vector<std::vector<Constant
     RWLockGuard<RWLock> guard(&insertRWLock_, true);
     for (auto& writeThread : threads_) {
         LockGuard<Mutex> _(&writeThread.mutex_);
-        unwrittenData.insert(unwrittenData.end(), writeThread.failedQueue.begin(), writeThread.failedQueue.end());
-        writeThread.failedQueue.clear();
-        unwrittenData.insert(unwrittenData.end(), writeThread.writeQueue.begin(), writeThread.writeQueue.end());
-        writeThread.writeQueue.clear();
+        unwrittenData.insert(unwrittenData.end(), writeThread.failedQueue_.begin(), writeThread.failedQueue_.end());
+        writeThread.failedQueue_.clear();
+        size_t colNum = colTypes_.size();
+        for(std::vector<ConstantSP>* block : writeThread.writeQueue_){
+            int rows = block->front()->size();
+            for(int i = 0; i < rows; ++i){
+                std::vector<ConstantSP>* oneUnwrittenRow = new std::vector<ConstantSP>;
+                for(size_t j = 0; j < colNum; ++j){
+                    oneUnwrittenRow->push_back(block->at(j)->get(i));
+                }
+                unwrittenData.push_back(oneUnwrittenRow);
+            }
+        }
+        writeThread.writeQueue_.clear();
+        writeThread.writeQueue_.push_back(createColumnBlock());
     }
 }
 
@@ -375,27 +392,44 @@ void MultithreadedTableWriter::insertThreadWrite(int threadhashkey, std::vector<
     WriterThread& writerThread = threads_[threadIndex];
     {
         LockGuard<Mutex> _(&writerThread.writeQueueMutex_);
-        writerThread.writeQueue.push_back(prow);
+        if(writerThread.writeQueue_.back()->front()->size() > perBlockSize_){
+            writerThread.writeQueue_.push_back(createColumnBlock());
+        }
+        std::vector<ConstantSP>* q = writerThread.writeQueue_.back();
+        size_t size = prow->size();
+        for(size_t i = 0; i < size; ++i){
+            dynamic_cast<Vector*>(q->at(i).get())->append(prow->at(i));
+        }
     }
     writerThread.nonemptySignal.set();
 }
 
-void MultithreadedTableWriter::callBack(std::function<void(ConstantSP)> callbackFunc,bool result,vector<vector<ConstantSP>*> &queue1) {
+void MultithreadedTableWriter::callBack(std::function<void(ConstantSP)> callbackFunc,bool result,vector<ConstantSP>* block) {
     if (callbackFunc == nullptr)
         return;
-    INDEX size = static_cast<INDEX>(queue1.size());
+    INDEX size = block->front()->size();
     if (size < 1)
         return;
-    VectorSP callbackIds = Util::createVector(DT_STRING, 0, size);
-    for (auto& item : queue1) {
-        callbackIds->append(item->at(0));
-    }
+    VectorSP callbackIds = block->front();
     DdbVector<char> results(size);
     for (int i = 0; i < size; i++) {
         results.set(i, result);
     }
     TableSP table = Util::createTable({ "callbackId","isSuccess" }, { callbackIds,results.createVector(DT_BOOL) });
     callbackFunc(table);
+}
+
+std::vector<ConstantSP>* MultithreadedTableWriter::createColumnBlock(){
+    std::vector<ConstantSP>* res = nullptr;
+    if(unusedQueue_.pop(res)){
+        return res;
+    }
+    res = new std::vector<ConstantSP>;
+    size_t length = colTypes_.size();
+    for(size_t i = 0; i < length; ++i){
+        res->push_back(Util::createVector(colTypes_[i], 0, perBlockSize_, true, colExtras_[i]));
+    }
+    return res;
 }
 
 void MultithreadedTableWriter::SendExecutor::run(){
@@ -405,7 +439,7 @@ void MultithreadedTableWriter::SendExecutor::run(){
     long long batchWaitTimeout = 0, diff;
     while(isExit() == false){
         {
-            if(writeThread_.writeQueue.size() < 1){//Wait for first data
+            if(writeThread_.writeQueue_.back()->front()->size() < 1){     //Wait for first data
                 writeThread_.nonemptySignal.wait();
             }
             if (isExit())
@@ -413,7 +447,7 @@ void MultithreadedTableWriter::SendExecutor::run(){
             //wait for batchsize
             if (tableWriter_.batchSize_ > 1 && tableWriter_.throttleMilsecond_ > 0) {
                 batchWaitTimeout = Util::getEpochTime() + tableWriter_.throttleMilsecond_;
-                while (isExit() == false && writeThread_.writeQueue.size() < static_cast<std::size_t>(tableWriter_.batchSize_)) {//check batchsize
+                while (isExit() == false && (writeThread_.writeQueue_.size() - 1) * tableWriter_.perBlockSize_ + writeThread_.writeQueue_.back()->front()->size() < static_cast<std::size_t>(tableWriter_.batchSize_)) {//check batchsize
                     diff = batchWaitTimeout - Util::getEpochTime();
                     if (diff > 0) {
                         writeThread_.nonemptySignal.tryWait(static_cast<int>(diff));
@@ -431,98 +465,71 @@ void MultithreadedTableWriter::SendExecutor::run(){
     //call back
     {
         LockGuard<Mutex> _(&writeThread_.writeQueueMutex_);
-        MultithreadedTableWriter::callBack(tableWriter_.callbackFunc_, false, writeThread_.writeQueue);
+        for(auto block : writeThread_.writeQueue_){
+            MultithreadedTableWriter::callBack(tableWriter_.callbackFunc_, false, block);
+        }
     }
 }
 
 bool MultithreadedTableWriter::SendExecutor::writeAllData(){
     //reset idle
     LockGuard<Mutex> _(&writeThread_.mutex_);
-    std::vector<std::vector<ConstantSP>*> items;
+    std::vector<ConstantSP>* items = nullptr;
+    int size = 0;
     {
         LockGuard<Mutex> __(&writeThread_.writeQueueMutex_);
-        std::size_t size = writeThread_.writeQueue.size();
+        items = writeThread_.writeQueue_.front();
+        size = items->front()->size();
         if (size < 1){
             return false;
         }
-        items = writeThread_.writeQueue;
-        writeThread_.writeQueue.clear();
+        writeThread_.writeQueue_.pop_front();
+        if(writeThread_.writeQueue_.empty()){
+            writeThread_.writeQueue_.push_back(tableWriter_.createColumnBlock());
+        }
     }
-    int size = static_cast<int>(items.size());
-    if(size < 1){
-        return false;
-    }
-    writeThread_.sendingRows = size;
     string runscript;
     try{
         TableSP writeTable;
-		int addRowCount = 0;
-        VectorSP callBackIdCol;
-         {//create table
-            writeTable = Util::createTable(tableWriter_.saveColNames_, tableWriter_.saveColTypes_, 0, size, tableWriter_.saveColExtras_);
-			writeTable->setColumnCompressMethods(tableWriter_.saveCompressMethods_);
-            int itemStartColIndex = 0;
-            if (tableWriter_.callbackFunc_ != nullptr) {//skip first callback id
-                itemStartColIndex = 1;
-            }
-            INDEX colSize= static_cast<INDEX>(tableWriter_.saveColTypes_.size());
-			for (INDEX saveCol = 0; saveCol < colSize; saveCol++) {
-				Vector *pcol = (Vector*) writeTable->getColumn(saveCol).get();
-                INDEX itemColIndex = saveCol + itemStartColIndex;
-                std::vector<ConstantSP>** pcurRow = items.data();
-				for (int i = 0; i < size; i++, pcurRow++) {
-                    if (pcol->append((*pcurRow)->at(itemColIndex)) == false) {
-                        throw RuntimeException("insert "+ (*pcurRow)->at(itemColIndex)->getString()+" to column "+ tableWriter_.saveColNames_[saveCol]+" failed.");
-                    }
-				}
-			}
-            addRowCount += size;
+        //create table
+        if(tableWriter_.callbackFunc_ != nullptr){
+            writeTable = Util::createTable(tableWriter_.saveColNames_, {items->begin() + 1, items->end()});
         }
-        if (addRowCount > 0) {//save table
-            std::vector<ConstantSP> args(1);
-            args[0] = writeTable;
-            runscript = tableWriter_.scriptTableInsert_;
-            ConstantSP constsp = writeThread_.conn->run(runscript, args);
-            runscript.clear();
-            if (constsp->getType() == DT_INT && constsp->getForm() == DF_SCALAR) {
-                int addresult = constsp->getInt();
-                if (addresult != addRowCount) {
-                    std::cout << "Rows changed: " << addresult << " / " << addRowCount << std::endl;
-                }
-            }
-            else {
-                std::cout << "None row changed of " << addRowCount << std::endl;
-            }
-            if (tableWriter_.scriptSaveTable_.empty() == false) {
-                runscript = tableWriter_.scriptSaveTable_;
-                writeThread_.conn->run(runscript);
-                runscript.clear();
-            }
-            {
-                writeThread_.sentRows += addRowCount;
-                writeThread_.sendingRows = 0;
-            }
-            {
-                for (auto& one : items) {
-                    if (tableWriter_.unusedQueue_.size() < 65535) {
-                        tableWriter_.unusedQueue_.push(one);
-                    }
-                    else {
-                        delete one;
-                    }
-                }
-            }
+        else{
+            writeTable = Util::createTable(tableWriter_.saveColNames_, *items);
         }
+        writeTable->setColumnCompressMethods(tableWriter_.saveCompressMethods_);
+
+        std::vector<ConstantSP> args(1);
+        args[0] = writeTable;
+        runscript = tableWriter_.scriptTableInsert_;
+        ConstantSP constsp = writeThread_.conn->run(runscript, args);
+        writeThread_.sentRows += size;
         MultithreadedTableWriter::callBack(tableWriter_.callbackFunc_, true, items);
+        if (tableWriter_.unusedQueue_.size() < 10) {
+            for(ConstantSP& item : *items){
+                dynamic_cast<Vector*>(item.get())->clear();
+            }
+            tableWriter_.unusedQueue_.push(items);
+        }
+        else {
+            delete items;
+        }
     }catch (std::exception &e){//failed
-        writeThread_.sendingRows = 0;
         string errmsg=e.what();
         if(runscript.empty()==false && errmsg.find(" script:")==string::npos){
             errmsg+=" script: "+runscript;
         }
         DLogger::Error("threadid", writeThread_.threadId, "Failed to save the inserted data: ", errmsg);
         {
-            writeThread_.failedQueue.insert(writeThread_.failedQueue.end(), items.begin(), items.end());
+            size_t columnNum = items->size();
+            for(int i = 0; i < size; ++i){
+                std::vector<ConstantSP>* oneFailedRow = new std::vector<ConstantSP>;
+                for(size_t j = 0; j < columnNum; ++j){
+                    oneFailedRow->push_back(items->at(j)->get(i));
+                }
+                writeThread_.failedQueue_.push_back(oneFailedRow);
+            }
             MultithreadedTableWriter::callBack(tableWriter_.callbackFunc_, false, items);
         }
         tableWriter_.setError(ErrorCodeInfo::EC_Server, std::string("Failed to save the inserted data: ") + errmsg);

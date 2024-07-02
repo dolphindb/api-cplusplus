@@ -439,7 +439,7 @@ TEST_F(CEPEventTest, test_attrExtraParams_overflow)
     }catch(exception& ex){
         re = ex.what();
     }
-    EXPECT_EQ("Decimal math overflow", re);
+    EXPECT_EQ("Scale out of bound (valid range: [0, 9], but get: 10)", re);
 
     schema->fieldExtraParams_ = {0, 0, -1, -1, -1};
     string re1 = "";
@@ -449,7 +449,7 @@ TEST_F(CEPEventTest, test_attrExtraParams_overflow)
     }catch(exception& ex){
         re1 = ex.what();
     }
-    EXPECT_EQ("invalid decimal scale", re1);
+    EXPECT_EQ("Scale out of bound (valid range: [0, 9], but get: 10)", re1);
 }
 
 TEST_F(CEPEventTest, test_eventTimeKeys_not_exist)
@@ -504,7 +504,7 @@ TEST_F(CEPEventTest, test_eventTimeKeys_not_time_column)
     string re1 = "";
     try{
         EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-
+        client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
     }catch(exception& ex){
         re1 = ex.what();
     }
@@ -813,14 +813,15 @@ TEST_F(CEPEventTest, test_EventClient_sub_twice_with_same_actionName)
     vector<string> eventTimeKeys = {"time"};
     vector<string> commonKeys = {};
     EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
-    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, false);
     string re = "";
     try{
-        client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+        client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, false);
     }catch(exception& ex){
         re = ex.what();
     }
-    EXPECT_EQ("The eventClient has already been called.", re);
+    auto pos = re.find("already be subscribed");
+    EXPECT_TRUE(pos != std::string::npos);
     client->unsubscribe(hostName, port300, "inputTable", DEFAULT_ACTION_NAME);
     delete client, schema;
 
@@ -1018,7 +1019,7 @@ TEST_F(CEPEventTest, test_eventTable_not_contail_eventCol)
     }catch(const exception& ex){
         re = ex.what();
     }
-    EXPECT_TRUE(re.find("Can't find the object with name notExistTable") != std::string::npos);
+    EXPECT_TRUE(re.find("The event column of the output table must be BLOB type") != std::string::npos);
 
     EventClient* client = new EventClient(eventSchemas, eventTimeKeys, commonKeys);
     string re1 = "";
@@ -1028,7 +1029,7 @@ TEST_F(CEPEventTest, test_eventTable_not_contail_eventCol)
     }catch(const exception& ex){
         re1 = ex.what();
     }
-    EXPECT_PRED_FORMAT2(testing::IsSubstring,"Can't find the object with name notExistTable", re1);
+    EXPECT_PRED_FORMAT2(testing::IsSubstring,"The event column of the output table must be BLOB type.", re1);
 
     delete schema, client;
 }
@@ -1378,6 +1379,8 @@ TEST_P(CEPEventTest_EventSender_vector, test_EventSender_vector)
 
     if (dataType == DT_BLOB)
         col2 = conn300->run("testCol = rand([blob(string(rand(`blob`blob2, rand(2,1)[0])))], "+to_string(rows)+");testCol");
+    if (dataType == DT_SYMBOL)
+        col2 = conn300->run("testCol = rand([symbol(string(rand([\"blob\"], 10)))], "+to_string(rows)+");testCol");
     if (dataType == DT_STRING || dataType == DT_SYMBOL || dataType == DT_BLOB)
         col3 = conn300->run("commonCol = rand([rand(10000, rand(2,1)[0])], "+to_string(rows)+");commonCol");
 
@@ -1696,7 +1699,7 @@ TEST_P(CEPEventTest_EventClient_alltypes_vector, test_EventClient_alltype_vector
 
     Signal notify;
     Mutex mutex;
-    int sub_rows = 0, test_rows = 2;
+    int sub_rows = 0, test_rows = 100;
     vector<EventSchema> eventSchemas = {*schema};
     vector<string> eventTimeKeys = {"eventTime"};
     vector<string> commonKeys = {"commonCol"};
@@ -1727,10 +1730,12 @@ TEST_P(CEPEventTest_EventClient_alltypes_vector, test_EventClient_alltype_vector
     vector<string> val_col2_scripts ={"rand("+type_data_str+", rows)", "rand(val_col2, vector_size)"};
     if (dataType == DT_BLOB)
         val_col2_scripts = {"blob(string(rand("+type_data_str+", rows)))", "blob(string(rand(val_col2, vector_size)))"};
+    if (dataType == DT_SYMBOL)
+        val_col2_scripts = {"symbol(string(rand([\"blob\"], 10)))", "symbol(string(rand([\"blob\"], 10)))"};
     conn300->run(
         "rows = "+to_string(test_rows)+";"
         "val_col0=rand(`sz`sh`bj`adk, rows);val_col1=now()..temporalAdd(now(), rows-1, 'ms');val_col2="+val_col2_scripts[0]+";val_col3=rand("+(NOT_LITERAL?type_data_str:"1000")+", rows);"
-        "vector_size = rand(2, 1)[0];print('测试的array size: '+ string(vector_size));"
+        "vector_size = rand(2000 0, 1)[0];print('测试的array size: '+ string(vector_size));"
         "for (i in 0:rows){"
             "col2 = "+val_col2_scripts[1]+";col3="+(NOT_LITERAL?"rand(val_col3, vector_size)":"val_col3[i]")+";"
             "data = md(val_col0[i], val_col1[i], col2, col3);"
@@ -1824,7 +1829,7 @@ TEST_P(CEPEventTest_EventClient_arrayVector, test_EventClient_arrayVector)
 
     Signal notify;
     Mutex mutex;
-    int sub_rows = 0, test_rows = 2;
+    int sub_rows = 0, test_rows = 100;
     vector<EventSchema> eventSchemas = {*schema};
     vector<string> eventTimeKeys = {"eventTime"};
     vector<string> commonKeys = {"commonCol"};
@@ -1856,7 +1861,7 @@ TEST_P(CEPEventTest_EventClient_arrayVector, test_EventClient_arrayVector)
     conn300->run(
         "rows = "+to_string(test_rows)+";"
         "val_col0=rand(`sz`sh`bj`adk, rows);val_col1=now()..temporalAdd(now(), rows-1, 'ms');val_col2="+val_col2_scripts[0]+";val_col3=rand("+type_data_str+", rows);"
-        "vector_size = rand(2, 1)[0];print('测试的array size: '+ string(vector_size));"
+        "vector_size = rand(0 2000, 1)[0];print('测试的array size: '+ string(vector_size));"
         "for (i in 0:rows){"
             "col2 = "+val_col2_scripts[1]+";col3=rand(val_col3, vector_size);"
             "data = md(val_col0[i], val_col1[i], col2, col3);"
