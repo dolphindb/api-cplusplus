@@ -1,6 +1,6 @@
-本教程主要介绍以下内容：
+>注意：自 1.30.22.1 版本起，该 Readme 不再进行维护。用户可移步至[新 C++ API 手册](https://docs.dolphindb.cn/zh/api/cpp/cpp_api.html)。
 
->注意：自 1.30.22.1 版本起，该 Readme 不再进行维护。用户可移步至新 [C++ API 手册](https://docs.dolphindb.cn/zh/api/cpp/cpp_api.html)。
+本教程主要介绍以下内容：
 
 - [DolphinDB C++ API](#dolphindb-c-api)
     - [1. 项目编译](#1-项目编译)
