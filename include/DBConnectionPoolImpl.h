@@ -32,12 +32,12 @@ public:
             work->join();
         }
     }
-    void run(const std::string& script, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false){
+    void run(const std::string& script, int identity, int priority=4, int parallelism=64, int fetchSize=0, bool clearMemory = false){
         queue_->push(Task(script, identity, priority, parallelism, clearMemory));
         taskStatus_.setResult(identity, TaskStatusMgmt::Result());
     }
 
-    void run(const std::string& functionName, const std::vector<ConstantSP>& args, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false){
+    void run(const std::string& functionName, const std::vector<ConstantSP>& args, int identity, int priority=4, int parallelism=64, int fetchSize=0, bool clearMemory = false){
         queue_->push(Task(functionName, args, identity, priority, parallelism, clearMemory));
         taskStatus_.setResult(identity, TaskStatusMgmt::Result());
     }

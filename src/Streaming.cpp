@@ -1345,7 +1345,7 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageBatchHand
             if(msgAsTable){
                 startTime = Util::getEpochTime();
                 currentSize = 0;
-                //当msgAsTable为true的时候，queue的batchSize被设置为1，因此每次只能pop出来一条消息
+                //when msgAsTable is true, the batchSize of the queue is set to 1, so only can pop one msg
                 if(queue->pop(msgs, throttleTime)){
                     if(msgs[0].isNull()){
                         foundnull = true;

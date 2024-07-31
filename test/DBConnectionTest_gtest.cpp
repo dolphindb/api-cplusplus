@@ -691,3 +691,84 @@ TEST_P(connection_insert_null, test_append_empty_table)
     connReconn.run("undef(`att, SHARED)");
     EXPECT_ANY_THROW(connReconn.run("append!{att}", args));
 }
+
+
+TEST_F(DBConnectionTest, test_connection_parallel)
+{
+    connReconn.run("login(`admin,`123456);try{createUser(`test1, `123456)}catch(ex){};go;setMaxJobParallelism(`test1, 10);");
+    { // TestConnectionParallel_lt_MaxJobParallelism
+        int priority = 3;
+        int parallel = 1;
+        DBConnectionSP _tmpC = new DBConnection(false, false);
+        _tmpC->connect(hostName, port, "test1", "123456");
+        TableSP res = _tmpC->run("getConsoleJobs()", priority, parallel);
+        EXPECT_EQ(res->getColumn(5)->get(0)->getInt(), 3);
+        EXPECT_EQ(res->getColumn(6)->get(0)->getInt(), 1);
+
+    }
+    { // TestConnectionParallel_gt_MaxJobParallelism
+        int priority = 1;
+        int parallel = 12;
+        DBConnectionSP _tmpC = new DBConnection(false, false);
+        _tmpC->connect(hostName, port, "test1", "123456");
+        TableSP res = _tmpC->run("getConsoleJobs()", priority, parallel);
+        EXPECT_EQ(res->getColumn(5)->get(0)->getInt(), 1);
+        EXPECT_EQ(res->getColumn(6)->get(0)->getInt(), 10);
+    }
+    { // TestConnectionParallel_default
+        DBConnectionSP _tmpC = new DBConnection(false, false);
+        _tmpC->connect(hostName, port, "test1", "123456");
+        TableSP res = _tmpC->run("getConsoleJobs()");
+        EXPECT_EQ(res->getColumn(5)->get(0)->getInt(), 4);
+        EXPECT_EQ(res->getColumn(6)->get(0)->getInt(), 10);
+    }
+
+}
+
+
+TEST_F(DBConnectionTest, test_connectionPool_parallel)
+{
+    connReconn.run("login(`admin,`123456);try{createUser(`test1, `123456)}catch(ex){};go;setMaxJobParallelism(`test1, 10);");
+    { // TestConnectionParallel_lt_MaxJobParallelism
+        int priority = 3;
+        int parallel = rand() % 10;
+        DBConnectionPoolSP _tmpP = new DBConnectionPool(hostName, port, 10, "test1", "123456");
+        int id = rand() % 1000;
+        _tmpP->run("getConsoleJobs()", id, priority, parallel);
+        while (!_tmpP->isFinished(id))
+        {
+            Util::sleep(500);
+        }
+        TableSP res = _tmpP->getData(id);
+        EXPECT_EQ(res->getColumn(5)->get(0)->getInt(), priority);
+        EXPECT_EQ(res->getColumn(6)->get(0)->getInt(), parallel);
+
+    }
+    { // TestConnectionParallel_gt_MaxJobParallelism
+        int priority = 1;
+        int parallel = rand() % 64 + 11;
+        DBConnectionPoolSP _tmpP = new DBConnectionPool(hostName, port, 10, "test1", "123456");
+        int id = rand() % 1000;
+        _tmpP->run("getConsoleJobs()", id, priority, parallel);
+        while (!_tmpP->isFinished(id))
+        {
+            Util::sleep(500);
+        }
+        TableSP res = _tmpP->getData(id);
+        EXPECT_EQ(res->getColumn(5)->get(0)->getInt(), priority);
+        EXPECT_EQ(res->getColumn(6)->get(0)->getInt(), 10);
+    }
+    { // TestConnectionParallel_default
+        DBConnectionPoolSP _tmpP = new DBConnectionPool(hostName, port, 10, "test1", "123456");
+        int id = rand() % 1000;
+        _tmpP->run("getConsoleJobs()", id);
+        while (!_tmpP->isFinished(id))
+        {
+            Util::sleep(500);
+        }
+        TableSP res = _tmpP->getData(id);
+        EXPECT_EQ(res->getColumn(5)->get(0)->getInt(), 4);
+        EXPECT_EQ(res->getColumn(6)->get(0)->getInt(), 10);
+    }
+
+}

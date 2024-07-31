@@ -74,14 +74,14 @@ public:
 	 * the function returns a void object. If error is raised on the server, the function throws an
 	 * exception.
 	 */
-	ConstantSP run(const std::string& script, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
+	ConstantSP run(const std::string& script, int priority=4, int parallelism=64, int fetchSize=0, bool clearMemory = false);
 
 	/**
 	 * Run the given function on the DolphinDB server using the local objects as the arguments
 	 * for the function and return the result to the client. If nothing returns, the function
 	 * returns a void object. If error is raised on the server, the function throws an exception.
 	 */
-	ConstantSP run(const std::string& funcName, std::vector<ConstantSP>& args, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
+	ConstantSP run(const std::string& funcName, std::vector<ConstantSP>& args, int priority=4, int parallelism=64, int fetchSize=0, bool clearMemory = false);
 
 	/**
 	 * upload a local object to the DolphinDB server and assign the given name in the session.
@@ -188,9 +188,9 @@ public:
     DBConnectionPool(const std::string& hostName, int port, int threadNum = 10, const std::string& userId = "", const std::string& password = "",
 		bool loadBalance = false, bool highAvailability = false, bool compress = false, bool reConnect = false, bool python = false);
 	virtual ~DBConnectionPool();
-	void run(const std::string& script, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
+	void run(const std::string& script, int identity, int priority=4, int parallelism=64, int fetchSize=0, bool clearMemory = false);
 	
-	void run(const std::string& functionName, const std::vector<ConstantSP>& args, int identity, int priority=4, int parallelism=2, int fetchSize=0, bool clearMemory = false);
+	void run(const std::string& functionName, const std::vector<ConstantSP>& args, int identity, int priority=4, int parallelism=64, int fetchSize=0, bool clearMemory = false);
     
 	bool isFinished(int identity);
 

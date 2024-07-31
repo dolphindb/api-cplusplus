@@ -21,6 +21,7 @@ using MessageHandler = std::function<void(Message)>;
 using MessageBatchHandler = std::function<void(std::vector<Message>)>;
 using EventMessageHandler = std::function<void(const std::string&, std::vector<ConstantSP>&)>;
 using IPCInMemoryTableReadHandler = std::function<void(ConstantSP)>;
+using MessageBatchHandlerUDP = std::function<void(MessageQueue)>;
 
 #define DEFAULT_ACTION_NAME "cppStreamingAPI"
 
@@ -73,6 +74,8 @@ public:
     Message() : offset_(-1) {
     }
     Message(const ConstantSP &sp, int offset = -1) : ConstantSP(sp), offset_(offset) {
+    }
+    Message(const ConstantSP &sp, const std::string & symbol, int offset = -1) : ConstantSP(sp), symbol_(symbol), offset_(offset) {
     }
     Message(const ConstantSP &sp, const std::string &symbol, const StreamDeserializerSP &sd, int offset = -1)
             : ConstantSP(sp), symbol_(symbol), sd_(sd), offset_(offset) {
