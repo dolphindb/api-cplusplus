@@ -936,7 +936,7 @@ protected:
 		if(buf == (Y*)data_+start)
 			return true;
 		else if(getType() == sourceType)
-			memcpy(data_+start,buf,sizeof(Y)*len);
+			memcpy(reinterpret_cast<void *>(data_ + start), reinterpret_cast<const void *>(buf), sizeof(Y) * len);
 		else
 			for(int i=0;i<len;++i)
 				data_[start+i]=(buf[i] == sourceNullVal)? nullVal_: static_cast<T>(buf[i]);
@@ -947,7 +947,7 @@ protected:
 	inline bool appendData(Y* buf, int len, DATA_TYPE sourceType, Y sourceNullVal){
 		checkCapacity(len);
 		if(getType() == sourceType)
-			memcpy(data_+size_, buf, sizeof(Y) * len);
+			memcpy(reinterpret_cast<void *>(data_ + size_), reinterpret_cast<const void *>(buf), sizeof(Y) * len);
 		else
 			for(int i=0;i<len;++i)
 				data_[size_+i]=(buf[i] == sourceNullVal)? nullVal_ : static_cast<T>(buf[i]);

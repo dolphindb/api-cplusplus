@@ -1018,11 +1018,8 @@ namespace SPCT
             auto queue = client.subscribe(hostName, port, st, "actionTest", 0);
 
             Message msg;
-            Signal notify;
-            Mutex mutex;
             // AutoFitTableAppender appender("", "res_SPCT", conn);
             thread th1 = thread([&]{
-                LockGuard<Mutex> lock(&mutex);
                 while (true)
                 {
                     queue->pop(msg);
@@ -1045,8 +1042,6 @@ namespace SPCT
                         //     }
                         // }
                         msg_total+=1;
-                        if(msg.getOffset() == 999)
-                            notify.set();
                     }
                 }
             });

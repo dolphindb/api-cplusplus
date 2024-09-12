@@ -46,7 +46,7 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
     if (pCompressMethods != nullptr && pCompressMethods->size() > 0) {
         for (auto one : *pCompressMethods) {
             if (one != COMPRESS_DELTA && one != COMPRESS_LZ4) {
-                throw RuntimeException("Unsupported compression method " + one);
+                throw RuntimeException("Unsupported compression method " + std::to_string(one));
             }
         }
         saveCompressMethods_ = *pCompressMethods;

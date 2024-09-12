@@ -460,7 +460,7 @@ void Thread::setAffinity(int id) {
 	CPU_ZERO(&mask);
 	CPU_SET(id, &mask);
 	if (sched_setaffinity(0, sizeof(mask), &mask) == -1) {
-		throw RuntimeException("BindCore failed, error code " + errno);
+		throw RuntimeException("BindCore failed, error code " + std::to_string(errno));
 	}
 #endif
 }

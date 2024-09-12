@@ -1,5 +1,5 @@
 #ifndef __SharedMem_H
-#define __IpcMem_H
+#define __SharedMem_H
 
 #ifdef LINUX
 

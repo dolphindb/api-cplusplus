@@ -14,6 +14,7 @@
 #include <ws2tcpip.h>
 #include <map>
 #endif
+#include <atomic>
 
 #ifdef WINDOWS
 namespace {
@@ -236,8 +237,6 @@ bool mergeTable(const Message &dest, const vector<Message> &src) {
 	Table *table = (Table*)dest.get();
 	INDEX colSize = table->columns();
 	for(auto &one : src) {
-		if (one.isNull())
-			return false;
 		Table *t = (Table*)one.get();
 		for (INDEX colIndex = 0; colIndex < colSize; colIndex++) {
 			((Vector*)table->getColumn(colIndex).get())->append(t->getColumn(colIndex));
@@ -312,7 +311,9 @@ class StreamingClientImpl {
 			  resubTimeout_(resubTimeout),
 			  subOnce_(subOnce),
 			  lastSiteIndex_(-1),
-              batchSize_(batchSize){
+              batchSize_(batchSize),
+              stopped_(std::make_shared<std::atomic<bool>>(false))
+        {
 		}
 
         string ID_;
@@ -339,16 +340,15 @@ class StreamingClientImpl {
         bool subOnce_;
         int lastSiteIndex_;
         int batchSize_;
+        std::shared_ptr<std::atomic<bool>> stopped_;
 
-		void setExitFlag() {
-			queue_->push(Message());
-		}
 		void exit() {
 			if (!socket_.isNull()) {
 				socket_->close();
 			}
 			if(queue_.isNull())
 				return;
+			*stopped_ = true;
 			queue_->push(Message());
 			for (auto &one : handleThread_) {
 				one->join();
@@ -464,7 +464,7 @@ public:
 	inline bool isExit() {
 		return exit_;
 	}
-	MessageQueueSP subscribeInternal(const string &host, int port, const string &tableName,
+	SubscribeQueue subscribeInternal(const string &host, int port, const string &tableName,
                                      const string &actionName = DEFAULT_ACTION_NAME, int64_t offset = -1,
                                      bool resubscribe = true, const VectorSP &filter = nullptr, bool msgAsTable = false,
                                      bool allowExists = false, int batchSize  = 1,
@@ -1160,7 +1160,7 @@ bool StreamingClientImpl::delMeta(const string &topic, bool exitFlag) {
 	return true;
 }
 
-MessageQueueSP StreamingClientImpl::subscribeInternal(const string &host, int port, const string &tableName,
+SubscribeQueue StreamingClientImpl::subscribeInternal(const string &host, int port, const string &tableName,
                                                       const string &actionName, int64_t offset, bool resubscribe,
                                                       const VectorSP &filter, bool msgAsTable, bool allowExists, int batchSize,
 													  const string &userName, const string &password,
@@ -1199,13 +1199,13 @@ MessageQueueSP StreamingClientImpl::subscribeInternal(const string &host, int po
 			LockGuard<Mutex> lock(&readyMutex_);
 			topic = subscribeInternal(conn, info);
 			insertMeta(info, topic);
-            return info.queue_;
+            return SubscribeQueue(info.queue_, info.stopped_);
         } catch (std::exception &e) {
             if(!backupSites.empty()){
                 LockGuard<Mutex> _(&mtx_);
                 initResub_.push(info);
                 insertMeta(info, topic);
-                return info.queue_;
+                return SubscribeQueue(info.queue_, info.stopped_);
             }
             else if (attempt <= 10 && getNewLeader(e.what(), _host, _port)) {
                 cerr << "Got NotLeaderException, switch to leader node [" << _host << ":" << _port << "] for subscription"  << endl;
@@ -1215,13 +1215,13 @@ MessageQueueSP StreamingClientImpl::subscribeInternal(const string &host, int po
                 LockGuard<Mutex> _(&mtx_);
                 initResub_.push(info);
                 insertMeta(info, topic);
-                return info.queue_;
+                return SubscribeQueue(info.queue_, info.stopped_);
             } else {
                 throw;
             }
         }
     }
-	return nullptr;
+	return SubscribeQueue();
 }
 
 void StreamingClientImpl::unsubscribeInternal(const string &host, int port, const string &tableName,
@@ -1291,7 +1291,7 @@ bool StreamingClient::isExit() {
 	return impl_->isExit();
 }
 
-MessageQueueSP StreamingClient::subscribeInternal(string host, int port, string tableName, string actionName,
+SubscribeQueue StreamingClient::subscribeInternal(string host, int port, string tableName, string actionName,
                                                   int64_t offset, bool resubscribe, const dolphindb::VectorSP &filter,
                                                   bool msgAsTable, bool allowExists, int batchSize,
 												  string userName, string password,
@@ -1318,11 +1318,10 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageBatchHand
                                    bool allowExists, int batchSize, double throttle, bool msgAsTable,
 									string userName, string password,
 								   const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubTimeout, bool subOnce) {
-    MessageQueueSP queue;
-    queue = subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset,
+    auto subscribeQueue = subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset,
                               resub, filter, msgAsTable, allowExists, batchSize, userName, password, blobDeserializer,
                               backupSites, false, resubTimeout, subOnce);
-    if (queue.isNull()) {
+    if (subscribeQueue.queue_.isNull()) {
         cerr << "Subscription already made, handler loop not created." << endl;
         ThreadSP t = new Thread(new Executor([]() {}));
         t->start();
@@ -1335,28 +1334,28 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageBatchHand
         throttleTime = std::max(1, (int)(throttle * 1000));
     }
 	SmartPointer<StreamingClientImpl> impl=impl_;
-	ThreadSP thread = new Thread(new Executor([handler, queue, msgAsTable, batchSize, throttleTime, impl]() {
+	ThreadSP thread = new Thread(new Executor([handler, subscribeQueue, msgAsTable, batchSize, throttleTime, impl]() {
         vector<Message> msgs;
         vector<Message> tableMsg(1);
         bool foundnull = false;
         long long startTime = 0;
         int       currentSize = 0;
+        MessageQueueSP queue{subscribeQueue.queue_};
+        std::shared_ptr<std::atomic<bool>> stopped{subscribeQueue.stopped_};
         while (impl->isExit()==false && foundnull == false) {
             if(msgAsTable){
                 startTime = Util::getEpochTime();
                 currentSize = 0;
                 //when msgAsTable is true, the batchSize of the queue is set to 1, so only can pop one msg
                 if(queue->pop(msgs, throttleTime)){
-                    if(msgs[0].isNull()){
-                        foundnull = true;
-                        continue;
+                    if(*stopped){
+                        break;
                     }
                     tableMsg[0] = msgs[0];
                     currentSize = tableMsg[0]->size();
                     long long leftTime = startTime + throttleTime - Util::getEpochTime();
                     while(leftTime > 0 && currentSize < batchSize && queue->pop(msgs, leftTime)){
-                        if(msgs[0].isNull()){
-                            foundnull = true;
+                        if(*stopped){
                             break;
                         }
                         mergeTable(tableMsg[0], msgs);
@@ -1370,9 +1369,9 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageBatchHand
             }
             else{
                 if(queue->pop(msgs, throttleTime)){
-                    while (msgs.empty() == false && msgs.back().isNull()) {
-                        msgs.pop_back();
-                        foundnull=true;
+                    if (*stopped) {
+                        msgs.clear();
+                        break;
                     }
                     if(!msgs.empty()){
                         handler(msgs);
@@ -1383,33 +1382,32 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageBatchHand
         }
 		queue->push(Message());
     }));
-	impl_->addHandleThread(queue, thread);
+	impl_->addHandleThread(subscribeQueue.queue_, thread);
 	thread->start();
     return thread;
 }
 
-ThreadSP newHandleThread(const MessageHandler handler, MessageQueueSP queue, bool msgAsTable, SmartPointer<StreamingClientImpl> impl) {
-	ThreadSP thread = new Thread(new Executor([handler, queue, msgAsTable, impl]() {
+ThreadSP newHandleThread(const MessageHandler handler, SubscribeQueue subscribeQueue, bool msgAsTable, SmartPointer<StreamingClientImpl> impl) {
+	ThreadSP thread = new Thread(new Executor([handler, subscribeQueue, msgAsTable, impl]() {
 		vector<Message> tables;
-		bool foundnull = false;
-		while (foundnull == false && impl->isExit() == false) {
+		auto queue = subscribeQueue.queue_;
+		while (impl->isExit() == false && !*subscribeQueue.stopped_) {
             Message msg;
 			queue->pop(msg);
 			// quit handler loop if msg is nullptr
-			if (UNLIKELY(msg.isNull())){
-				foundnull = true;
+			if (UNLIKELY(*subscribeQueue.stopped_)) {
 				break;
 			}
 			if (msgAsTable && queue->pop(tables, 0)) {
-				if (!mergeTable(msg, tables)) {
-					foundnull = true;
+				if (*subscribeQueue.stopped_ || !mergeTable(msg, tables)) {
+					break;
 				}
 			}
 			handler(msg);
 		}
 		queue->push(Message());
 	}));
-	impl->addHandleThread(queue,thread);
+	impl->addHandleThread(subscribeQueue.queue_,thread);
 	return thread;
 }
 
@@ -1418,16 +1416,16 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageHandler &
                                    bool msgAsTable, bool allowExists, 
 									string userName, string password,
 									const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubTimeout, bool subOnce) {
-    MessageQueueSP queue = subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset,
+    auto subscribeQueue = subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset,
                                              resub, filter, msgAsTable, false,1, userName, password, blobDeserializer, backupSites, false, resubTimeout, subOnce);
-    if (queue.isNull()) {
+    if (subscribeQueue.queue_.isNull()) {
         cerr << "Subscription already made, handler loop not created." << endl;
         ThreadSP t = new Thread(new Executor([]() {}));
         t->start();
         return t;
     }
 
-	ThreadSP t = newHandleThread(handler, queue, msgAsTable, impl_);
+	ThreadSP t = newHandleThread(handler, subscribeQueue, msgAsTable, impl_);
     t->start();
     return t;
 }
@@ -1444,7 +1442,7 @@ MessageQueueSP PollingClient::subscribe(string host, int port, string tableName,
 										string userName, string password,
 										const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubTimeout, bool subOnce) {
     return subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset, resub, filter,
-                             msgAsTable, allowExists,1, userName, password, blobDeserializer, backupSites, false, resubTimeout, subOnce);
+                             msgAsTable, allowExists,1, userName, password, blobDeserializer, backupSites, false, resubTimeout, subOnce).queue_;
 }
 
 void PollingClient::unsubscribe(string host, int port, string tableName, string actionName) {
@@ -1502,25 +1500,24 @@ ThreadSP EventClient::subscribe(const string& host, int port, const EventMessage
     }
     tempConn.close();
 
-    MessageQueueSP queue = subscribeInternal(host, port, tableName, actionName, offset, resub, nullptr, false, false, 1, userName, password, nullptr, std::vector<std::string>(), true, 100, false);
-    if (queue.isNull()) {
+    SubscribeQueue subscribeQueue = subscribeInternal(host, port, tableName, actionName, offset, resub, nullptr, false, false, 1, userName, password, nullptr, std::vector<std::string>(), true, 100, false);
+    if (subscribeQueue.queue_.isNull()) {
         cerr << "Subscription already made, handler loop not created." << endl;
         return nullptr;
     }
 
     SmartPointer<StreamingClientImpl> impl = impl_;
-    ThreadSP thread = new Thread(new Executor([this, handler, queue, impl]() {
+    ThreadSP thread = new Thread(new Executor([this, handler, subscribeQueue, impl]() {
+		auto queue = subscribeQueue.queue_;
 		Message msg;
 		vector<Message> tables;
-		bool foundnull = false;
         std::vector<std::string> eventTypes;
         std::vector<std::vector<ConstantSP>> attributes;
         ErrorCodeInfo errorInfo;
-		while (foundnull == false && impl->isExit() == false) {
+		while (impl->isExit() == false && !*subscribeQueue.stopped_) {
 			queue->pop(msg);
 			// quit handler loop if msg is nullptr
-			if (UNLIKELY(msg.isNull())){
-				foundnull = true;
+			if (UNLIKELY(*subscribeQueue.stopped_)){
 				break;
 			}
             eventTypes.clear();
@@ -1537,7 +1534,7 @@ ThreadSP EventClient::subscribe(const string& host, int port, const EventMessage
 		}
 		queue->push(Message());
 	}));
-	impl_->addHandleThread(queue,thread);
+	impl_->addHandleThread(subscribeQueue.queue_, thread);
 	thread->start();
     return thread;
 }

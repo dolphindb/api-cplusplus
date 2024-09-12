@@ -7,15 +7,16 @@ namespace dolphindb {
 class DBConnectionPoolImpl{
 public:
     struct Task{
-        Task(const std::string& sc = "", int id = 0, int pr = 4, int pa = 2, bool clearM = false)
-                : script(sc), identity(id), priority(pr), parallelism(pa), clearMemory(clearM){}
-        Task(const std::string& function, const std::vector<ConstantSP>& args, int id = 0, int pr = 4, int pa = 2, bool clearM = false) 
-            : script(function), arguments(args), identity(id), priority(pr), parallelism(pa), clearMemory(clearM){ isFunc = true; }
+        Task(const std::string& sc = "", int id = 0, int pr = 4, int pa = 2, int fetchSize = 0, bool clearM = false)
+                : script(sc), identity(id), priority(pr), parallelism(pa), fetchSize(fetchSize), clearMemory(clearM) {}
+        Task(const std::string& function, const std::vector<ConstantSP>& args, int id = 0, int pr = 4, int pa = 2, int fetchSize = 0, bool clearM = false)
+            : script(function), arguments(args), identity(id), priority(pr), parallelism(pa), fetchSize(fetchSize), clearMemory(clearM){ isFunc = true; }
         std::string script;
         std::vector<ConstantSP> arguments;
         int identity;
         int priority;
         int parallelism;
+        int fetchSize;
         bool clearMemory;
         bool isFunc = false;
     };
@@ -33,12 +34,12 @@ public:
         }
     }
     void run(const std::string& script, int identity, int priority=4, int parallelism=64, int fetchSize=0, bool clearMemory = false){
-        queue_->push(Task(script, identity, priority, parallelism, clearMemory));
+        queue_->push(Task(script, identity, priority, parallelism, fetchSize, clearMemory));
         taskStatus_.setResult(identity, TaskStatusMgmt::Result());
     }
 
     void run(const std::string& functionName, const std::vector<ConstantSP>& args, int identity, int priority=4, int parallelism=64, int fetchSize=0, bool clearMemory = false){
-        queue_->push(Task(functionName, args, identity, priority, parallelism, clearMemory));
+        queue_->push(Task(functionName, args, identity, priority, parallelism, fetchSize, clearMemory));
         taskStatus_.setResult(identity, TaskStatusMgmt::Result());
     }
 

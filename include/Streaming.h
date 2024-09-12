@@ -10,6 +10,15 @@ namespace dolphindb {
 class DBConnection;
 class StreamingClientImpl;
 
+struct SubscribeQueue {
+	MessageQueueSP queue_;
+	std::shared_ptr<std::atomic<bool>> stopped_{nullptr};
+	SubscribeQueue()
+		:queue_(nullptr), stopped_(nullptr) {}
+	SubscribeQueue(MessageQueueSP queue, std::shared_ptr<std::atomic<bool>> stopped)
+		:queue_(queue), stopped_(stopped) {}
+};
+
 class EXPORT_DECL StreamingClient {
 public:
 	//listeningPort > 0 : listen mode, wait for server connection
@@ -20,7 +29,7 @@ public:
 	void exit();
 
 protected:
-    MessageQueueSP subscribeInternal(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME,
+    SubscribeQueue subscribeInternal(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME,
                                      int64_t offset = -1, bool resubscribe = true, const VectorSP &filter = nullptr,
                                      bool msgAsTable = false, bool allowExists = false, int batchSize  = 1,
 									 std::string userName="", std::string password="",

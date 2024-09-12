@@ -22,10 +22,10 @@ namespace dolphindb {
         while(true) {
             try {
                 if(task.isFunc){
-                    result = conn_->run(task.script, task.arguments, task.priority, task.parallelism, 0, task.clearMemory);
+                    result = conn_->run(task.script, task.arguments, task.priority, task.parallelism, task.fetchSize, task.clearMemory);
                 }
                 else{
-                    result = conn_->run(task.script, task.priority, task.parallelism, 0, task.clearMemory);
+                    result = conn_->run(task.script, task.priority, task.parallelism, task.fetchSize, task.clearMemory);
                 }
                 break;
             }

@@ -497,41 +497,42 @@ TEST_F(DBConnectionTest, test_DBconnectionPoolwithFetchSize)
     DBConnectionPool pool_demo(hostName, port, 10, "admin", "123456");
     EXPECT_EQ(pool_demo.getConnectionCount(), 10);
     vector<int> ids = {1, 10, 100, 1000};
-    string srcipt1 = "tb = table(100:0,`col1`col2`col3,[INT,INT,INT]);share tb as tmp;";
-    connReconn.run(srcipt1);
-    pool_demo.run("for(i in 1..10000){tableInsert(tmp,rand(100,1),rand(100,1),rand(100,1));};select * from tmp", ids[1], 4, 2, 2000); // fetchSize is useless
+    string dbpath = "dfs://test_"+getRandString(10);
+    string tab = "pt";
+    connReconn.run("dbpath = '" + dbpath +
+                   "';tab =`" + tab +
+                   ";if(existsDatabase(dbpath))"
+                   "    {dropDatabase(dbpath)};"
+                   "t=table(1:0, `c1`c2`c3`c4`c5, [INT, SYMBOL, TIMESTAMP, DOUBLE, DOUBLE[]]);share t as res_t;"
+                   "db=database(dbpath, VALUE, 1..10, engine='TSDB');"
+                   "pt=db.createPartitionedTable(t,'pt','c1',,`c1);");
 
+    string s = "rows = 20000;t=table(rand(1..100,20000) as c1, rand(`a`b`c`d`e`f`g, 20000) as c2, rand(timestamp(10001..50100), 20000) as c3, rand(100.0000, 20000) as c4, arrayVector(1..20000*3, rand(100.0000, 60000)) as c5);"
+               "loadTable('" + dbpath + "', `" + tab + ").append!(t);"
+               "go;select * from loadTable('" + dbpath + "', `" + tab + ")";
+    pool_demo.run(s, ids[1], 4, 2, 8192);
+
+    AutoFitTableAppender appender("", "res_t", connReconn);
     while (!pool_demo.isFinished(ids[1]))
     {
         Util::sleep(1000);
     };
 
-    TableSP res = pool_demo.getData(ids[1]);
-    EXPECT_EQ(res->rows(), 10000);
-    EXPECT_EQ(res->getForm(), DF_TABLE);
-
-    TableSP ex_tab = connReconn.run("tmp");
-    vector<ConstantSP> args;
-    args.push_back(ex_tab);
-    pool_demo.run("tableInsert{tmp}", args, ids[1], 4, 2, 2000);
-
-    while (!pool_demo.isFinished(ids[1]))
-    {
-        Util::sleep(1000);
-    };
-
-    pool_demo.run("exec * from tmp", ids[2]);
-
-    while (!pool_demo.isFinished(ids[2]))
-    {
-        Util::sleep(1000);
-    };
-
-    TableSP res2 = pool_demo.getData(ids[2]);
-    EXPECT_EQ(res2->rows(), 20000);
-    EXPECT_EQ(res2->getForm(), DF_TABLE);
-
-    connReconn.run("undef(`tmp,SHARED);");
+    BlockReaderSP reader = pool_demo.getData(ids[1]);
+    int rows{0};
+    while (reader->hasNext()) {
+        auto res = reader->read();
+        int upserts = appender.append(res);
+        EXPECT_EQ(upserts, res->rows());
+        EXPECT_EQ(res->getForm(), DF_TABLE);
+        rows += res->rows();
+    }
+    EXPECT_EQ(rows, 20000);
+    EXPECT_TRUE(connReconn.run(R"(
+        ex_t=select * from loadTable(dbpath,tab);
+        all(each(eqObj,ex_t.values(),res_t.values()))
+    )")->getBool());
+    connReconn.run("undef(`res_t,SHARED);dropDatabase(dbpath);go");
     pool_demo.shutDown();
 }
 

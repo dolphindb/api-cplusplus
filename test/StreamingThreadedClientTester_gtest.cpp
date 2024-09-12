@@ -2133,4 +2133,32 @@ namespace STCT
         usedPorts.insert(listenport);
     }
 
+
+    TEST_P(StreamingThreadedClientTester, test_unsubscribe_while_msg_in_queue)
+    {
+        string st = "outTables_" + getRandString(10);
+        string s = "share streamTable(1:0, `ts`val, [TIMESTAMP, INT]) as "+st+";go;";
+        conn.run(s);
+        int msg_total = 0;
+        // Signal notify;
+        // Mutex mutex;
+        int listenport = GetParam();
+        cout << "current listenport is " << listenport << endl;
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
+        auto onehandler = [&](Message msg)
+        {
+            msg_total+=1;
+            cout << "msg_total: " << msg_total << endl;
+            cout << "unsubscribe while msg in queue" << endl;
+            threadedClient.unsubscribe(hostName, port, st, "mutiSchemaOne");
+            // notify.set();
+        };
+        auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0);
+        conn.run("for (i in 0..9999) {tableInsert(`"+st+", now()+i, rand(1000, 1)[0]);};");
+        // notify.wait();
+        EXPECT_EQ(msg_total, 1); // only one message is in handler, because unsubscribe is called before the first message received
+        EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
+        usedPorts.insert(listenport);
+    }
+
 }
