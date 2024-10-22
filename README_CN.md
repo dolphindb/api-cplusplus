@@ -142,7 +142,7 @@ g++ main.cpp -std=c++11 -DLINUX -D_GLIBCXX_USE_CXX11_ABI=1 -DLOGGING_LEVEL_2 -O2
 #### 1.2.3 创建Visual Studio项目
 
 创建windows console project，导入[include](./include)目录下头文件，创建1.1.3节中的main.cpp文件，导入libDolphinDBAPI.lib，并且配置lib目录。注意：
-> 由于VS里默认定义了min/max两个宏，会与头文件中 `min` 和 `max` 函数冲突。为了解决这个问题，在预处理宏定义中需要加入 `__NOMINMAX__` 。
+> 由于VS里默认定义了min/max两个宏，会与头文件中 `min` 和 `max` 函数冲突。为了解决这个问题，在预处理宏定义中需要加入 `NOMINMAX` 。
 > api源代码中用宏定义LINUX、WINDOWS等区分不同平台，因此在预处理宏定义中需要加入 `WINDOWS`。
 #### 1.2.4 编译和运行
 
