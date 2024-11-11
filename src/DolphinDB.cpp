@@ -9,6 +9,8 @@
 #include <fstream>
 #include <istream>
 #include <stack>
+#include <algorithm>
+#include <random>
 #include "Concurrent.h"
 #ifndef WINDOWS
 #include <uuid/uuid.h>
@@ -51,15 +53,6 @@ int min(INDEX a, int b) {
 
 namespace dolphindb {
 
-
-
-
-
-
-
-
-
-
 string Constant::EMPTY("");
 string Constant::NULL_STR("NULL");
 ConstantSP Constant::void_(new Void());
@@ -67,8 +60,6 @@ ConstantSP Constant::null_(new Void(true));
 ConstantSP Constant::true_(new Bool(true));
 ConstantSP Constant::false_(new Bool(false));
 ConstantSP Constant::one_(new Int(1));
-
-
 
 int Constant::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int cellCountToSerialize, int& numElement, int& partial) const {
     throw RuntimeException(Util::getDataFormString(getForm())+"_"+Util::getDataTypeString(getType())+" serialize cell method not supported");
@@ -90,13 +81,7 @@ ConstantSP Constant::getColumnLabel() const {
     return void_;
 }
 
-
-
-
-
-
-
-
+const std::string DBConnection::udpIP_{"224.1.1.1"};
 
 DBConnection::DBConnection(bool enableSSL, bool asyncTask, int keepAliveTime, bool compress, bool python, bool isReverseStreaming) :
 	conn_(new DBConnectionImpl(enableSSL, asyncTask, keepAliveTime, compress, python, isReverseStreaming)), uid_(""), pwd_(""), ha_(false),
@@ -155,6 +140,9 @@ bool DBConnection::connect(const string& hostName, int port, const string& userI
 			if(!foundfirst)
 				nodes_.push_back(firstnode);
 		}
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(nodes_.begin(), nodes_.end(), g);
 		Node connectedNode;
 		TableSP table;
 		while (closed_ == false) {
@@ -356,10 +344,55 @@ void DBConnection::switchDataNode(const string &host, int port) {
         run(initialScript_);
 }
 
+std::string DBConnection::version()
+{
+    auto versionStr = run("version()")->getString();
+    auto versions = Util::split(versionStr, ' ');
+    return std::move(versions[0]);
+}
+
 void DBConnection::login(const string& userId, const string& password, bool enableEncryption) {
     conn_->login(userId, password, enableEncryption);
     uid_ = userId;
     pwd_ = password;
+}
+
+auto DBConnection::getSubscriptionTopic(const SubscribeInfo &info) -> std::pair<std::string, std::vector<std::string>>
+{
+    auto result = run("getSubscriptionTopic", info.tableName, info.actionName);
+    auto topic = result->get(0)->getString();
+    result = result->get(1);
+    auto len = result->size();
+    std::vector<std::string> columns;
+    columns.reserve(len);
+    for (INDEX i = 0; i < len; ++i)
+    {
+        columns.emplace_back(result->getString(i));
+    }
+    return std::make_pair(topic, std::move(columns));
+}
+
+int DBConnection::publishTable(const SubscribeInfo &info, const SubscribeConfig &config, TransportationProtocol protocol)
+{
+    // TODO: support filters
+    bool isUDP = bool(protocol == TransportationProtocol::UDP);
+    std::string hostName = isUDP ? udpIP_ : info.hostName;
+    int port = isUDP ? udpPort_ : info.port;
+    auto ret = run("publishTable", hostName, port, info.tableName, info.actionName, config.offset,
+                   ConstantSP(Util::createConstant(DT_VOID)), config.allowExists, config.resetOffset, isUDP);
+    if (isUDP)
+    {
+        return ret->get(1)->getInt();
+    }
+    return -1;
+}
+
+void DBConnection::stopPublishTable(const SubscribeInfo &info, TransportationProtocol protocol)
+{
+    bool isUDP = bool(protocol == TransportationProtocol::UDP);
+    std::string hostName = isUDP ? udpIP_ : info.hostName;
+    int port = isUDP ? udpPort_ : info.port;
+    auto ret = run("stopPublishTable", hostName, port, info.tableName, info.actionName, false, isUDP);
 }
 
 ConstantSP DBConnection::run(const string& script, int priority, int parallelism, int fetchSize, bool clearMemory) {
@@ -1068,4 +1101,3 @@ void ErrorCodeInfo::set(const ErrorCodeInfo &src) {
 }
 
 }    // namespace dolphindb
-

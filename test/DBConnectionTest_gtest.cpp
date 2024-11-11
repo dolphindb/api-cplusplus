@@ -773,3 +773,16 @@ TEST_F(DBConnectionTest, test_connectionPool_parallel)
     }
 
 }
+
+TEST_F(DBConnectionTest, test_connection_login_encrypt){
+    DBConnectionSP _c = new DBConnection(false, false);
+    _c->connect(hostName, port);
+    #ifdef USE_OPENSSL
+        _c->login("admin", "123456", true);
+        ConstantSP res = _c->run("1+1");
+        EXPECT_EQ(res->getInt(), 2);
+    #else
+        EXPECT_ANY_THROW(_c->login("admin", "123456", true));
+    #endif
+    _c->close();
+}

@@ -132,6 +132,7 @@ public:
 	virtual DATA_TYPE getRawType() const { return DT_INT128;}
 	virtual std::string getString() const { return Guid::getString(uuid_);}
 	static Uuid* parseUuid(const char* str, size_t len);
+	static bool parseUuid(const char* str, size_t len, unsigned char *buf);
 };
 
 class IPAddr : public Int128 {

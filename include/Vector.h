@@ -24,7 +24,7 @@ public:
     virtual bool remove(const ConstantSP& index){return false;}
     virtual bool append(const ConstantSP& value){return append(value, value->size());}
     virtual bool append(const ConstantSP& value, INDEX count){return false;}
-    virtual bool append(const ConstantSP value, INDEX start, INDEX length){return false;}
+    virtual bool append(const ConstantSP& value, INDEX start, INDEX length){return false;}
     virtual bool appendBool(char* buf, int len){return false;}
     virtual bool appendChar(char* buf, int len){return false;}
     virtual bool appendShort(short* buf, int len){return false;}

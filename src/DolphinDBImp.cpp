@@ -2,6 +2,7 @@
 #include "DolphinDB.h"
 #include "Logger.h"
 #include "ConstantMarshall.h"
+#include "internal/Crypto.h"
 
 #define APIMinVersionRequirement 300
 
@@ -156,15 +157,28 @@ void DBConnectionImpl::login(const string& userId, const string& password, bool 
     userId_ = userId;
     pwd_ = password;
     encrypted_ = enableEncryption;
+    if (encrypted_) {
+#ifdef USE_OPENSSL
+        std::vector<ConstantSP> args;
+        std::string publicKey = run("getDynamicPublicKey", args)->getString();
+        if (publicKey.empty()) {
+            throw RuntimeException("Failed to obtain RSA public key from server.");
+        }
+        Crypto ssl(publicKey);
+        userId_ = ssl.RSAEncrypt(userId);
+        pwd_ = ssl.RSAEncrypt(password);
+#else
+        throw RuntimeException("Encrypted login is unavailble without OpenSSL.");
+#endif
+    }
     login();
 }
 
 void DBConnectionImpl::login() {
-    // TODO: handle the case of encryption.
     std::vector<ConstantSP> args;
     args.push_back(new String(userId_));
     args.push_back(new String(pwd_));
-    args.push_back(new Bool(false));
+    args.push_back(new Bool(encrypted_));
     ConstantSP result = run("login", args);
     if (!result->getBool())
         throw IOException("Failed to authenticate the user " + userId_);

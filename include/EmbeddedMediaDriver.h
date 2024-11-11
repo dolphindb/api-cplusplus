@@ -86,13 +86,15 @@ private:
             fprintf(stderr, "ERROR: context init (%d) %s\n", aeron_errcode(), aeron_errmsg());
             return -1;
         }
+        // configs from dolphindb server
+        aeron_driver_context_set_mtu_length(m_context, 4 * 1480);
+        aeron_driver_context_set_term_buffer_length(m_context, 16 * 1024 * 1024);
 
         aeron_driver_context_set_threading_mode(m_context, AERON_THREADING_MODE_SHARED);
+        aeron_driver_context_set_shared_idle_strategy(m_context, "backoff");
         aeron_driver_context_set_dir_delete_on_start(m_context, true);
         aeron_driver_context_set_dir_delete_on_shutdown(m_context, true);
-        aeron_driver_context_set_shared_idle_strategy(m_context, "sleep-ns");
         aeron_driver_context_set_term_buffer_sparse_file(m_context, true);
-        aeron_driver_context_set_term_buffer_length(m_context, 64 * 1024);
         aeron_driver_context_set_dir(m_context,s);
         if (aeron_driver_init(&m_driver, m_context) < 0)
         {

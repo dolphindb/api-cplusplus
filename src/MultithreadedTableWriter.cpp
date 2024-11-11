@@ -398,7 +398,7 @@ void MultithreadedTableWriter::insertThreadWrite(int threadhashkey, std::vector<
         std::vector<ConstantSP>* q = writerThread.writeQueue_.back();
         size_t size = prow->size();
         for(size_t i = 0; i < size; ++i){
-            dynamic_cast<Vector*>(q->at(i).get())->append(prow->at(i));
+            reinterpret_cast<Vector*>(q->at(i).get())->append(prow->at(i));
         }
     }
     writerThread.nonemptySignal.set();

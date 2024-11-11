@@ -814,7 +814,7 @@ public:
 		memcpy(buf,(char*)(data_+indexStart),len * numElement);
 		return len * numElement;
 	}
-	
+
 	int serialize(char* buf, int bufSize, INDEX indexStart, int offset, int cellCountToSerialize, int& numElement, int& partial) const {
 		//assume offset==0 and bufSize>=sizeof(T)
 		if(indexStart >= size_)
@@ -825,7 +825,7 @@ public:
 		memcpy(buf,(char*)(data_+indexStart),len * numElement);
 		return len * numElement;
 	}
-	
+
 	virtual int asof(const ConstantSP& value) const{
 		T target;
 		try{
@@ -1088,7 +1088,7 @@ protected:
 
 
 protected:
-	typedef typename std::unordered_map<T, INDEX>::const_iterator iterator;   
+	typedef typename std::unordered_map<T, INDEX>::const_iterator iterator;
 	T* data_;
 	T nullVal_;
 	int size_;
@@ -1113,7 +1113,7 @@ class FastVoidVector:public AbstractFastVector<char>{
 	virtual ConstantSP get(const ConstantSP& index) const{throw RuntimeException("set not supported.");};
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value){throw RuntimeException("fill not supported.");};
 	virtual bool append(const ConstantSP& value, INDEX appendSize){throw RuntimeException("append not supported.");};
-	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize){throw RuntimeException("append not supported.");};
+	virtual bool append(const ConstantSP& value, INDEX start, INDEX appendSize){throw RuntimeException("append not supported.");};
 	virtual bool add(INDEX start, INDEX length, long long inc) {return false;}
 	virtual bool add(INDEX start, INDEX length, double inc) {return false;}
 	virtual int compare(INDEX index, const ConstantSP& target) const{throw RuntimeException("compare not supported.");};
@@ -1147,7 +1147,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
-	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
+	virtual bool append(const ConstantSP& value, INDEX start, INDEX appendSize);
 	virtual bool add(INDEX start, INDEX length, long long inc) {return false;}
 	virtual bool add(INDEX start, INDEX length, double inc) {return false;}
 	virtual int compare(INDEX index, const ConstantSP& target) const;
@@ -1170,7 +1170,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
-	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
+	virtual bool append(const ConstantSP& value, INDEX start, INDEX appendSize);
 	virtual bool validIndex(INDEX uplimit);
 	virtual bool validIndex(INDEX start, INDEX length, INDEX uplimit);
 	virtual int compare(INDEX index, const ConstantSP& target) const;
@@ -1199,7 +1199,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
-	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
+	virtual bool append(const ConstantSP& value, INDEX start, INDEX appendSize);
 	virtual bool validIndex(INDEX uplimit);
 	virtual bool validIndex(INDEX start, INDEX length, INDEX uplimit);
 	virtual int compare(INDEX index, const ConstantSP& target) const;
@@ -1230,7 +1230,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
-	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
+	virtual bool append(const ConstantSP& value, INDEX start, INDEX appendSize);
 	virtual bool validIndex(INDEX uplimit);
 	virtual bool validIndex(INDEX start, INDEX length, INDEX uplimit);
 	virtual int compare(INDEX index, const ConstantSP& target) const;
@@ -1261,7 +1261,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
-	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
+	virtual bool append(const ConstantSP& value, INDEX start, INDEX appendSize);
 	virtual bool validIndex(INDEX uplimit);
 	virtual bool validIndex(INDEX start, INDEX length, INDEX uplimit);
 	virtual int compare(INDEX index, const ConstantSP& target) const;
@@ -1322,7 +1322,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
-	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
+	virtual bool append(const ConstantSP& value, INDEX start, INDEX appendSize);
 	virtual int compare(INDEX index, const ConstantSP& target) const;
 
 private:
@@ -1396,7 +1396,7 @@ public:
 	virtual ConstantSP get(const ConstantSP& index) const;
 	virtual void fill(INDEX start, INDEX length, const ConstantSP& value);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
-	virtual bool append(const ConstantSP value, INDEX start, INDEX );
+	virtual bool append(const ConstantSP& value, INDEX start, INDEX );
 	virtual int compare(INDEX index, const ConstantSP& target) const;
 
 private:
@@ -1537,7 +1537,7 @@ public:
 	virtual bool isIndexArray() const { return true;}
 	virtual INDEX* getIndexArray() const { return index_->getIndexArray();}
 #endif
-	
+
 	// get the `index`th element each row, corresponding to `arrayVector[index]`
 	virtual ConstantSP 		get(INDEX index) const;
 	virtual ConstantSP 		get(INDEX column, INDEX rowStart,INDEX rowEnd) const;
@@ -1546,10 +1546,10 @@ public:
 	virtual void 	   		clear();
 	virtual void 			reverse();
 	virtual void 			reverse(INDEX start, INDEX length);
-	
+
 	virtual bool   append(const ConstantSP& value, INDEX count);
 	virtual bool   append(const ConstantSP& value);
-	virtual bool   append(const ConstantSP value, INDEX start, INDEX len);
+	virtual bool   append(const ConstantSP& value, INDEX start, INDEX len);
 	virtual bool   append(const ConstantSP& value, const ConstantSP& index);
 	virtual int    compare(INDEX index, const ConstantSP& target) const {throw RuntimeException("Array Vector doesn't support method compare");}
 	virtual void   neg() {throw RuntimeException("Array Vector doesn't support method neg");}
@@ -2493,7 +2493,7 @@ public:
 	virtual ConstantSP getInstance(INDEX size) const;
 	virtual ConstantSP getValue() const;
 	virtual ConstantSP getValue(INDEX capacity) const;
-	virtual bool append(const ConstantSP value, INDEX start, INDEX appendSize);
+	virtual bool append(const ConstantSP& value, INDEX start, INDEX appendSize);
 	virtual bool append(const ConstantSP& value, INDEX appendSize);
 	virtual bool remove(INDEX count);
 	virtual bool remove(const ConstantSP& index);
@@ -2812,6 +2812,7 @@ public:
 	virtual DATA_TYPE getRawType() const {return DT_INT;};
 	virtual int compare(INDEX index, const ConstantSP& target) const {return base_->getSymbol(data_[index]).compare(target->getString());}
 	virtual std::string getString(INDEX index) const override {return base_->getSymbol(data_[index]);}
+	virtual const std::string& getStringRef(INDEX index) const { return base_->getSymbol(data_[index]);}
 	virtual const std::string& getStringRef() const override { return base_->getSymbol(data_[0]); }
 	virtual bool set(INDEX index, const ConstantSP& value);
 	virtual bool set(const ConstantSP& index, const ConstantSP& value);
@@ -2851,13 +2852,18 @@ public:
 	virtual bool append(const ConstantSP& value, INDEX appendSize){
 		checkCapacity(appendSize);
 
-		if(appendSize==1)
-			data_[size_] = base_->findAndInsert(value->getString(0));
+		if(appendSize==1){
+			if(LIKELY(value->getCategory() == LITERAL)){
+				data_[size_] = base_->findAndInsert(value->getStringRef(0));
+			}else{
+				data_[size_] = base_->findAndInsert(value->getString(0));
+			}
+		}
 		else{
 			if(value->getCategory() != LITERAL || value->size() < appendSize)
 				return false;
 			for(int i = 0; i < appendSize; i++){
-				int fillVal = base_->findAndInsert(value->getString(i));
+				int fillVal = base_->findAndInsert(value->getStringRef(i));
 				data_[i + size_]=fillVal;
 			}
 		}
@@ -2966,7 +2972,7 @@ public:
 			mid = (start + end) / 2;
 			if(base_->getSymbol(data_[mid]).compare(target) <= 0)
 				start = mid + 1;
-			else 
+			else
 				end = mid - 1;
 		}
 		return end;
@@ -3277,7 +3283,7 @@ inline bool parseString(const char *str, size_t str_len, T &rawData, int &scale,
                     digitsCount++;
                     if (c != '0') {
                         noneZeroDigitsCount++;
-                    }              
+                    }
                 } else if (c == dec_point) {
                     state = IN_AFTER_DEC;
                 } else if ((c != ' ') && (c != '\t')) {
@@ -3318,7 +3324,7 @@ inline bool parseString(const char *str, size_t str_len, T &rawData, int &scale,
                     digitsCount++;
                     if (noneZeroDigitsCount != 0 || c != '0') {
                         noneZeroDigitsCount++;
-                    }                    
+                    }
                     rawData = 10 * rawData + static_cast<int>(c - '0');
                 } else if (c == dec_point) {
                     state = IN_AFTER_DEC;
@@ -3420,7 +3426,7 @@ inline void valueToDecimalraw(T value, int scale, R* result) {
     if (scale < 0 || scale > decimal_util::MaxPrecision<R>::value) {
         throw RuntimeException("Scale out of bound (valid range: [0, " + std::to_string(decimal_util::MaxPrecision<R>::value) + "], but get: " + std::to_string(scale) + ")");
     }
-    
+
     if(getNullValue<T>() == value){
         *result = std::numeric_limits<R>::min();
     }
@@ -3573,7 +3579,7 @@ public:  /// Interface of Constant
             return static_cast<double>(rawData_) / static_cast<double>(decimal_util::scaleMultiplier<T>(scale_));
         }
     }
-    
+
     void setFloat(float val) override { decimal_util::valueToDecimalraw(val, scale_, &rawData_); }
     void setDouble(double val) override { decimal_util::valueToDecimalraw(val, scale_, &rawData_); }
     void setBool(char val) override { decimal_util::valueToDecimalraw(val, scale_, &rawData_); }
@@ -3581,7 +3587,7 @@ public:  /// Interface of Constant
     void setInt(int val) override { decimal_util::valueToDecimalraw(val, scale_, &rawData_); }
     void setLong(long long val) override { decimal_util::valueToDecimalraw(val, scale_, &rawData_); }
     void setShort(short val) override { decimal_util::valueToDecimalraw(val, scale_, &rawData_); }
-    void setString(const std::string& val) override { decimal_util::toDecimal(val, scale_, rawData_); }    
+    void setString(const std::string& val) override { decimal_util::toDecimal(val, scale_, rawData_); }
     void setBinary(const unsigned char* val, int unitLength) override {
         if (unitLength != sizeof(T)) {
             throw RuntimeException("Invalid unit length");
@@ -3653,7 +3659,7 @@ public:  /// Interface of Constant
             }
         }
         catch(const std::exception& e){
-            std::cerr << "assign decimal fail for " << e.what() << std::endl; 
+            std::cerr << "assign decimal fail for " << e.what() << std::endl;
             return false;
         }
         return true;
@@ -3919,13 +3925,13 @@ public:
     bool append(const ConstantSP& value, INDEX count) override {
         return append(value, 0, count);
     }
-    bool append(const ConstantSP value, INDEX start, INDEX appendSize) override {
+    bool append(const ConstantSP& value, INDEX start, INDEX appendSize) override {
         this->checkCapacity(appendSize);
         // fast path 1: append one element
-        if (appendSize == 1 || value->isScalar()) 
+        if (appendSize == 1 || value->isScalar())
         {
             Decimal<T> tmp = decimal_util::convertFrom<T>(scale_, value->get(start));
-            for (INDEX i = 0; i < appendSize; ++i) 
+            for (INDEX i = 0; i < appendSize; ++i)
             {
                 data_[size_ + i] = tmp.getRawData();
             }
@@ -4133,7 +4139,7 @@ public:
 
         return true;
     }
-    
+
     ConstantSP get(INDEX index) const override {
         if (index >= 0 && index < size_) {
             return ConstantSP(new Decimal<T>(scale_, data_[index]));
@@ -4307,6 +4313,10 @@ public:
     }
 
     bool setBinary(INDEX start, int len, int unitLength, const unsigned char *buf) override {
+		if (unitLength != static_cast<int>(sizeof(T))) {
+			throw RuntimeException("Invalid unit length");
+		}
+		memcpy(data_ + start * unitLength, buf, unitLength * len);
         return true;
     }
 
@@ -4326,7 +4336,5 @@ using FastDecimal128Vector = FastDecimalVector<wide_integer::int128>;
 typedef SmartPointer<FastDecimal32Vector> FastDecimal32VectorSP;
 typedef SmartPointer<FastDecimal64Vector> FastDecimal64VectorSP;
 typedef SmartPointer<FastDecimal128Vector> FastDecimal128VectorSP;
-
 }
 #endif /* CONSTANTIMP_H_ */
-

@@ -33,20 +33,6 @@ string AbstractTable::getTableClassName() const {
 	switch(getTableType()){
 	case BASICTBL:
 		return "BasicTable";
-	// case REALTIMETBL:
-	// 	return "RealtimeTable";
-	// case SNAPTBL:
-	// 	return "SnapshotTable";
-	// case JOINTBL:
-	// 	return "JoinTable";
-	// case FILETBL:
-	// 	return "FileBackedTable";
-	// case SEGTBL:
-	// 	return "SegmentedTable";
-	// case COMPRESSTBL:
-	// 	return "CompressedTable";
-	// case LOGROWTBL:
-	// 	return "LogRowTable";
 	default:
 		return "";
 	}
@@ -56,20 +42,6 @@ string AbstractTable::getTableTypeName() const {
 	switch(getTableType()){
 	case BASICTBL:
 		return "A basic table";
-	// case REALTIMETBL:
-	// 	return "A realtime table";
-	// case SNAPTBL:
-	// 	return "A snapshot table";
-	// case JOINTBL:
-	// 	return "A join table";
-	// case FILETBL:
-	// 	return "A file backed table";
-	// case SEGTBL:
-	// 	return "A segmented table";
-	// case COMPRESSTBL:
-	// 	return "A compressed table";
-	// case LOGROWTBL:
-	// 	return "A log table";
 	default:
 		return "";
 	}

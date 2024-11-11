@@ -40,7 +40,7 @@ ConstantSP StreamDeserializer::TableInfo::newTuple(){
             return res;
         }
     }
-    ConstantSP rowVec=Util::createVector(DT_ANY, cols_.size());
+    ConstantSP rowVec=Util::createVector(DT_ANY, static_cast<INDEX>(cols_.size()));
     for (auto i = 0; i < (int)cols_.size(); i++) {
         auto &colOne = cols_[i];
         auto &scale = scales_[i];

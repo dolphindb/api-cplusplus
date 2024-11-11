@@ -15,9 +15,14 @@
 
 namespace dolphindb {
 
-class EXPORT_DECL IncompatibleTypeException: public std::exception{
+class IncompatibleTypeException: public std::exception{
 public:
-	IncompatibleTypeException(DATA_TYPE expected, DATA_TYPE actual);
+	IncompatibleTypeException(DATA_TYPE expected, DATA_TYPE actual)
+		: expected_(expected), actual_(actual)
+	{
+		errMsg_.append("Incompatible type. Expected: " + getDataTypeName(expected_) + ", Actual: " + getDataTypeName(actual_));
+	}
+
 	virtual ~IncompatibleTypeException() throw(){}
 	virtual const char* what() const throw() { return errMsg_.c_str();}
 	DATA_TYPE expectedType(){return expected_;}
@@ -28,7 +33,7 @@ private:
 	std::string errMsg_;
 };
 
-class EXPORT_DECL SyntaxException: public std::exception{
+class SyntaxException: public std::exception{
 public:
 	SyntaxException(const std::string& errMsg): errMsg_(errMsg){}
 	virtual const char* what() const throw(){
@@ -40,7 +45,7 @@ private:
 	const std::string errMsg_;
 };
 
-class EXPORT_DECL IllegalArgumentException : public std::exception{
+class IllegalArgumentException : public std::exception{
 public:
 	IllegalArgumentException(const std::string& functionName, const std::string& errMsg): functionName_(functionName), errMsg_(errMsg){}
 	virtual const char* what() const throw(){
@@ -54,7 +59,7 @@ private:
 	const std::string errMsg_;
 };
 
-class EXPORT_DECL RuntimeException: public std::exception{
+class RuntimeException: public std::exception{
 public:
 	RuntimeException(const std::string& errMsg):errMsg_(errMsg){}
 	virtual const char* what() const throw(){
@@ -66,7 +71,7 @@ private:
 	const std::string errMsg_;
 };
 
-class EXPORT_DECL OperatorRuntimeException: public std::exception{
+class OperatorRuntimeException: public std::exception{
 public:
 	OperatorRuntimeException(const std::string& optr,const std::string& errMsg): operator_(optr),errMsg_(errMsg){}
 	virtual const char* what() const throw(){
@@ -80,7 +85,7 @@ private:
 	const std::string errMsg_;
 };
 
-class EXPORT_DECL TableRuntimeException: public std::exception{
+class TableRuntimeException: public std::exception{
 public:
 	TableRuntimeException(const std::string& errMsg): errMsg_(errMsg){}
 	virtual const char* what() const throw(){
@@ -92,7 +97,7 @@ private:
 	const std::string errMsg_;
 };
 
-class EXPORT_DECL MemoryException: public std::exception{
+class MemoryException: public std::exception{
 public:
 	MemoryException():errMsg_("Out of memory"){}
 	virtual const char* what() const throw(){
@@ -104,7 +109,7 @@ private:
 	const std::string errMsg_;
 };
 
-class EXPORT_DECL IOException: public std::exception{
+class IOException: public std::exception{
 public:
 	IOException(const std::string& errMsg): errMsg_(errMsg), errCode_(OTHERERR){}
 	IOException(const std::string& errMsg, IO_ERR errCode): errMsg_(errMsg + ". " + getCodeDescription(errCode)), errCode_(errCode){}
@@ -115,7 +120,24 @@ public:
 	virtual ~IOException() throw(){}
 	IO_ERR getErrorCode() const {return errCode_;}
 private:
-	std::string getCodeDescription(IO_ERR errCode) const;
+    std::string getCodeDescription(IO_ERR errCode) const
+    {
+        switch (errCode) {
+        case OK: return "";
+        case DISCONNECTED: return "Socket is disconnected/closed or file is closed.";
+        case NODATA: return "In non-blocking socket mode, there is no data ready for retrieval yet.";
+        case NOSPACE: return "Out of memory, no disk space, or no buffer for sending data in non-blocking socket mode.";
+        case TOO_LARGE_DATA: return "String size exceeds 64K or code size exceeds 1 MB during serialization over network.";
+        case INPROGRESS: return "In non-blocking socket mode, a program is in pending connection mode.";
+        case INVALIDDATA: return "Invalid message format";
+        case END_OF_STREAM: return "Reach the end of a file or a buffer.";
+        case READONLY: return "File is readable but not writable.";
+        case WRITEONLY: return "File is writable but not readable.";
+        case NOTEXIST: return "A file doesn't exist or the socket destination is not reachable.";
+        case OTHERERR: return "Unknown IO error.";
+        default: return "";
+        }
+    }
 
 private:
 	const std::string errMsg_;
@@ -134,7 +156,7 @@ private:
 	const std::string errMsg_;
 };
 
-class EXPORT_DECL NotLeaderException: public std::exception {
+class NotLeaderException: public std::exception {
 public:
 	//Electing a leader. Wait for a while to retry.
 	NotLeaderException() : errMsg_("<NotLeader>"){}
@@ -151,7 +173,7 @@ private:
 	const std::string newLeader_;
 };
 
-class EXPORT_DECL MathException: public std::exception {
+class MathException: public std::exception {
 public:
 	MathException(const std::string& errMsg) : errMsg_(errMsg){}
 	virtual const char* what() const throw(){
@@ -163,7 +185,7 @@ private:
 	const std::string errMsg_;
 };
 
-class EXPORT_DECL TestingException: public std::exception{
+class TestingException: public std::exception{
 public:
 	TestingException(const std::string& caseName,const std::string& subCaseName): name_(caseName),subName_(subCaseName){
 		if(subName_.empty())
@@ -185,7 +207,7 @@ private:
 
 };
 
-class EXPORT_DECL UserException: public std::exception{
+class UserException: public std::exception{
 public:
 	UserException(const std::string exceptionType, const std::string& msg) : exceptionType_(exceptionType), msg_(msg){}
 	virtual const char* what() const throw(){

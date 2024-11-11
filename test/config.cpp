@@ -8,10 +8,10 @@
 
 string hostName = "127.0.0.1";
 string errCode = "0";
-int port = 8902;
+int port = 8848;
 int ctl_port = 8900;
 
-int port300 = 9002;
+int port300 = 8848;
 int ctl_port300 = 9000;
 
 string table = "trades";

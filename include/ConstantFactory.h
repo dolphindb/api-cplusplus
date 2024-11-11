@@ -104,27 +104,22 @@ public:
 	}
 
 	std::string getDataTypeString(DATA_TYPE type) const {
-		if(type >= 0 && type < TYPE_COUNT)
-			return arrTypeStr[type];
-		else if(type >= ARRAY_TYPE_BASE){
-			return getDataTypeString((DATA_TYPE)(type-ARRAY_TYPE_BASE))+"[]";
-		}else{
-			return "UknownType"+std::to_string(type);
-		}
+		return dolphindb::getDataTypeName(type);
 	}
 
 	std::string getDataFormString(DATA_FORM form) const {
 		if(form >= 0 && form < 9)
 			return arrFormStr[form];
 		else
-			return "UknownForm"+std::to_string(form);
+			return "Uknown data form " + std::to_string(form);
 	}
 
 	std::string getTableTypeString(TABLE_TYPE type) const {
-		if(type >= 0 && type < 10)
-			return arrTableTypeStr[type];
-		else
-			return "UknownTable"+std::to_string(type);
+		switch (type) {
+		case BASICTBL: return "BASIC";
+		case COMPRESSTBL: return "COMPRESS";
+		default: return "Uknown table type " + std::to_string(type);
+		}
 	}
 
 	Dictionary* createDictionary(DATA_TYPE keyInternalType, DATA_TYPE keyType, DATA_TYPE valueType){
@@ -770,28 +765,28 @@ private:
 	}
 
 	void init(){
-		arrConstParser[CONSTANT_VOID]=&ConstantFactory::parseVoid;
-		arrConstParser[CONSTANT_BOOL]=&ConstantFactory::parseBool;
-		arrConstParser[CONSTANT_CHAR]=&ConstantFactory::parseChar;
-		arrConstParser[CONSTANT_SHORT]=&ConstantFactory::parseShort;
-		arrConstParser[CONSTANT_INT]=&ConstantFactory::parseInt;
-		arrConstParser[CONSTANT_LONG]=&ConstantFactory::parseLong;
-		arrConstParser[CONSTANT_FLOAT]=&ConstantFactory::parseFloat;
-		arrConstParser[CONSTANT_DOUBLE]=&ConstantFactory::parseDouble;
-		arrConstParser[CONSTANT_DATE]=&ConstantFactory::parseDate;
-		arrConstParser[CONSTANT_MONTH]=&ConstantFactory::parseMonth;
-		arrConstParser[CONSTANT_DATETIME]=&ConstantFactory::parseDateTime;
-		arrConstParser[CONSTANT_DATEHOUR]=&ConstantFactory::parseDateHour;
-		arrConstParser[CONSTANT_TIME]=&ConstantFactory::parseTime;
-		arrConstParser[CONSTANT_NANOTIME]=&ConstantFactory::parseNanoTime;
-		arrConstParser[CONSTANT_TIMESTAMP]=&ConstantFactory::parseTimestamp;
-		arrConstParser[CONSTANT_NANOTIMESTAMP]=&ConstantFactory::parseNanoTimestamp;
-		arrConstParser[CONSTANT_MINUTE]=&ConstantFactory::parseMinute;
-		arrConstParser[CONSTANT_SECOND]=&ConstantFactory::parseSecond;
-		arrConstParser[CONSTANT_STRING]=&ConstantFactory::parseString;
-		arrConstParser[CONSTANT_UUID]=&ConstantFactory::parseUuid;
-		arrConstParser[CONSTANT_IP]=&ConstantFactory::parseIPAddr;
-		arrConstParser[CONSTANT_INT128]=&ConstantFactory::parseInt128;
+		arrConstParser[DT_VOID]=&ConstantFactory::parseVoid;
+		arrConstParser[DT_BOOL]=&ConstantFactory::parseBool;
+		arrConstParser[DT_CHAR]=&ConstantFactory::parseChar;
+		arrConstParser[DT_SHORT]=&ConstantFactory::parseShort;
+		arrConstParser[DT_INT]=&ConstantFactory::parseInt;
+		arrConstParser[DT_LONG]=&ConstantFactory::parseLong;
+		arrConstParser[DT_FLOAT]=&ConstantFactory::parseFloat;
+		arrConstParser[DT_DOUBLE]=&ConstantFactory::parseDouble;
+		arrConstParser[DT_DATE]=&ConstantFactory::parseDate;
+		arrConstParser[DT_MONTH]=&ConstantFactory::parseMonth;
+		arrConstParser[DT_DATETIME]=&ConstantFactory::parseDateTime;
+		arrConstParser[DT_DATEHOUR]=&ConstantFactory::parseDateHour;
+		arrConstParser[DT_TIME]=&ConstantFactory::parseTime;
+		arrConstParser[DT_NANOTIME]=&ConstantFactory::parseNanoTime;
+		arrConstParser[DT_TIMESTAMP]=&ConstantFactory::parseTimestamp;
+		arrConstParser[DT_NANOTIMESTAMP]=&ConstantFactory::parseNanoTimestamp;
+		arrConstParser[DT_MINUTE]=&ConstantFactory::parseMinute;
+		arrConstParser[DT_SECOND]=&ConstantFactory::parseSecond;
+		arrConstParser[DT_STRING]=&ConstantFactory::parseString;
+		arrConstParser[DT_UUID]=&ConstantFactory::parseUuid;
+		arrConstParser[DT_IP]=&ConstantFactory::parseIPAddr;
+		arrConstParser[DT_INT128]=&ConstantFactory::parseInt128;
 		arrConstParser[CONSTANT_DOUBLE_ENUM]=&ConstantFactory::parseDoubleEnum;
 
 		arrConstFactory[DT_VOID]=&ConstantFactory::createVoid;
@@ -985,45 +980,6 @@ private:
 		arrTypeSymbol[DT_DECIMAL64] = ' ';
 		arrTypeSymbol[DT_DECIMAL128] = ' ';
 
-		arrTypeStr[DT_VOID]="VOID";
-		arrTypeStr[DT_BOOL]="BOOL";
-		arrTypeStr[DT_CHAR]="CHAR";
-		arrTypeStr[DT_SHORT]="SHORT";
-		arrTypeStr[DT_INT]="INT";
-		arrTypeStr[DT_LONG]="LONG";
-		arrTypeStr[DT_DATE]="DATE";
-		arrTypeStr[DT_MONTH]="MONTH";
-		arrTypeStr[DT_TIME]="TIME";
-		arrTypeStr[DT_MINUTE]="MINUTE";
-		arrTypeStr[DT_SECOND]="SECOND";
-		arrTypeStr[DT_DATETIME]="DATETIME";
-		arrTypeStr[DT_TIMESTAMP]="TIMESTAMP";
-		arrTypeStr[DT_NANOTIME]="NANOTIME";
-		arrTypeStr[DT_NANOTIMESTAMP]="NANOTIMESTAMP";
-		arrTypeStr[DT_FLOAT]="FLOAT";
-		arrTypeStr[DT_DOUBLE]="DOUBLE";
-		arrTypeStr[DT_SYMBOL]="SYMBOL";
-		arrTypeStr[DT_STRING]="STRING";
-		arrTypeStr[DT_UUID]="UUID";
-		arrTypeStr[DT_FUNCTIONDEF]="FUNCTIONDEF";
-		arrTypeStr[DT_HANDLE]="HANDLE";
-		arrTypeStr[DT_CODE]="CODE";
-		arrTypeStr[DT_DATASOURCE]="DATASOURCE";
-		arrTypeStr[DT_RESOURCE]="RESOURCE";
-		arrTypeStr[DT_ANY]="ANY";
-		arrTypeStr[DT_COMPRESS] = "COMPRESS";
-		arrTypeStr[DT_DICTIONARY]="DICTIONARY";
-		arrTypeStr[DT_DATEHOUR]="DATEHOUR";
-		arrTypeStr[DT_IP]="IPADDR";
-		arrTypeStr[DT_INT128]="INT128";
-		arrTypeStr[DT_BLOB] = "BLOB";
-		arrTypeStr[DT_COMPLEX] = "COMPLEX";
-		arrTypeStr[DT_POINT] = "POINT";
-		arrTypeStr[DT_DURATION] = "DURATION";
-		arrTypeStr[DT_DECIMAL32] = "DECIMAL32";
-		arrTypeStr[DT_DECIMAL64] = "DECIMAL64";
-		arrTypeStr[DT_DECIMAL128] = "DECIMAL128";
-
 		arrFormStr[DF_SCALAR]="SCALAR";
 		arrFormStr[DF_PAIR]="PAIR";
 		arrFormStr[DF_VECTOR]="VECTOR";
@@ -1033,18 +989,8 @@ private:
 		arrFormStr[DF_DICTIONARY]="DICTIONARY";
 		arrFormStr[DF_CHART]="CHART";
 		arrFormStr[DF_CHUNK]="CHUNK";
-
-		arrTableTypeStr[BASICTBL] = "BASIC";
-		arrTableTypeStr[REALTIMETBL] = "REALTIME";
-		arrTableTypeStr[SNAPTBL] = "SNAPSHOT";
-		arrTableTypeStr[FILETBL] = "FILE";
-		arrTableTypeStr[CHUNKTBL] = "CHUNK";
-
-		arrTableTypeStr[JOINTBL] = "JOIN";
-		arrTableTypeStr[SEGTBL] = "SEGMENT";
-		arrTableTypeStr[ALIASTBL] = "ALIAS";
-		arrTableTypeStr[COMPRESSTBL] = "COMPRESS";
-		arrTableTypeStr[LOGROWTBL] = "LOGROW";
+		arrFormStr[DF_SYSOBJ]="SYSOBJ";
+		arrFormStr[DF_TENSOR] = "TENSOR";
 
 		arrPartitionTypeStr[SEQ] = "SEQ";
 		arrPartitionTypeStr[VALUE] = "VALUE";
@@ -1062,6 +1008,8 @@ private:
 		arrCategoryTypeStr[SYSTEM] = "SYSTEM";
 		arrCategoryTypeStr[MIXED] = "MIXED";
 		arrCategoryTypeStr[BINARY] = "BINARY";
+		arrCategoryTypeStr[COMPLEX] = "COMPLEX";
+		arrCategoryTypeStr[ARRAY] = "ARRAY";
 		arrCategoryTypeStr[DENARY] = "DENARY";
 	}
 
@@ -1073,11 +1021,9 @@ private:
 	std::unordered_map<std::string,DATA_TYPE> typeMap_;
 	std::unordered_map<std::string,DATA_FORM> formMap_;
 	char arrTypeSymbol[TYPE_COUNT];
-	std::string arrTypeStr[TYPE_COUNT];
-	std::string arrFormStr[9];
-	std::string arrTableTypeStr[10];
-	std::string arrPartitionTypeStr[6];
-	std::string arrCategoryTypeStr[12];
+	std::string arrFormStr[MAX_DATA_FORM];
+	std::string arrPartitionTypeStr[MAX_PARTITION_TYPE];
+	std::string arrCategoryTypeStr[MAX_CATEGORY];
 };
 
 }

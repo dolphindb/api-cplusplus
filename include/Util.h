@@ -218,13 +218,53 @@ public:
 
 	static void SetOrThrowErrorInfo(ErrorCodeInfo *errorCodeInfo, int errorCode, const std::string &errorInfo);
 	template<typename T>
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, T val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0) {
+		SetOrThrowErrorInfo(&errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "It cannot be converted to " + getDataTypeString(dataType) + " in setValue");
+		return false;
+	}
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::nullptr_t val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, Constant* val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, const ConstantSP& val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, bool val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, char val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, short val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, const char* val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::string val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, const unsigned char* val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, unsigned char val[], ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, char val[], ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, long long val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, long int val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, int val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, float val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, double val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, const void* val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<std::nullptr_t> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<Constant*> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<ConstantSP> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<bool> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<char> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<short> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<const char*> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<std::string> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<const unsigned char*> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<long long> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<long int> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<int> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<float> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<double> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<const void*> val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, long long val, const char *pTypeName, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+
+	template<typename T>
 	static ConstantSP createObject(DATA_TYPE dataType, T val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0) {
 		SetOrThrowErrorInfo(errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "It cannot be converted to " + getDataTypeString(dataType));
 		return NULL;
 	}
 	static ConstantSP createObject(DATA_TYPE dataType, std::nullptr_t val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
 	static ConstantSP createObject(DATA_TYPE dataType, Constant* val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
-	static ConstantSP createObject(DATA_TYPE dataType, ConstantSP val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
+	static ConstantSP createObject(DATA_TYPE dataType, const ConstantSP& val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
 	static ConstantSP createObject(DATA_TYPE dataType, bool val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
 	static ConstantSP createObject(DATA_TYPE dataType, char val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
 	static ConstantSP createObject(DATA_TYPE dataType, short val, ErrorCodeInfo *errorCodeInfo = NULL, int extraParam = 0);
@@ -310,6 +350,21 @@ public:
 	static void enumDecimal128Vector(const VectorSP &pVector, std::function<bool(const wide_integer::int128 *pbuf, INDEX startIndex, int length)> func, INDEX offset = 0) {
 		enumBinaryVector<wide_integer::int128>(pVector, func, offset);
 	}
+
+    static ConstantSP getConstantSP(const std::string &s) { return Util::createString(s); }
+    static ConstantSP getConstantSP(bool v) { return Util::createBool(v); }
+    static ConstantSP getConstantSP(int v) { return Util::createInt(v); }
+    static ConstantSP getConstantSP(int64_t v) { return Util::createLong(v); }
+    static ConstantSP getConstantSP(const ConstantSP &c) { return c; }
+
+    static void getConstantSP(std::vector<ConstantSP> &args) { std::ignore = args; }
+
+    template <typename T, typename... Args>
+    static void getConstantSP(std::vector<ConstantSP> &args, T &&first, Args &&... other)
+    {
+        args.push_back(getConstantSP(first));
+        getConstantSP(args, std::forward<Args>(other)...);
+    }
 
 private:
 	template <class T>

@@ -6,6 +6,7 @@
 #include "Util.h"
 #include "Types.h"
 #include "Exceptions.h"
+#include "ScalarImp.h"
 #include <unordered_map>
 #include <string>
 #include <vector>
@@ -58,7 +59,7 @@ public:
 
     template<typename... TArgs>
     bool insert(ErrorCodeInfo &errorInfo, TArgs... args) {
-        RWLockGuard<RWLock> guard(&insertRWLock_, false);
+        RWLockGuard<RWLock> guard(&insertRWLock_, true);
         if (hasError_.load()) {
             throw RuntimeException("Thread is exiting for " + errorInfo_.errorInfo);
         }
@@ -71,19 +72,28 @@ public:
         }
         {
             errorInfo.clearError();
-            int colIndex1 = 0, colIndex2 = 0;
-            ConstantSP result[] = { Util::createObject(getColDataType(colIndex1++), args, &errorInfo, colExtras_[colIndex2++])... };
+            int colIndex1 = 0, colIndex2 = 0, colIndex3 = 0;
+            if(oneRowData_.empty()){
+                int size = colTypes_.size();
+                for(int i = 0; i < size; ++i){
+                    if(colTypes_[i] >= ARRAY_TYPE_BASE){
+                        oneRowData_.push_back(Util::createVector(colTypes_[i], 0, 0, true, colExtras_[i]));
+                    }else{
+                        oneRowData_.push_back(Util::createConstant(colTypes_[i], colExtras_[i]));
+                    }
+                }
+            }
+            bool results[] = {Util::setValue(oneRowData_[colIndex1++], getColDataType(colIndex2++), args, errorInfo, colExtras_[colIndex3++])...};
             if (errorInfo.hasError()){
                 for(int i = static_cast<int>(colTypes_.size() - 1); i >= 0; --i){
-                    if(result[i].isNull()){
+                    if(results[i] == false){
                         errorInfo.errorInfo.append(" for col ").append(std::to_string(i + 1));
                         return false;
                     }
                 }
                 return false;
             }
-            std::vector<ConstantSP> oneRow(std::begin(result), std::end(result));
-            std::vector<ConstantSP>* pRow = &oneRow;
+            std::vector<ConstantSP>* pRow = &oneRowData_;
             return insert(&pRow, 1, errorInfo);
         }
     }
@@ -92,7 +102,7 @@ public:
     void getStatus(Status &status);
     void getUnwrittenData(std::vector<std::vector<ConstantSP>*> &unwrittenData);
 	bool insertUnwrittenData(std::vector<std::vector<ConstantSP>*> &records, ErrorCodeInfo &errorInfo) { return insert(records.data(), static_cast<int>(records.size()), errorInfo, true); }
-    
+
 	//bool isExit(){ return hasError_; }
     //const DATA_TYPE* getColType(){ return colTypes_.data(); }
     //int getColSize(){ return colTypes_.size(); }
@@ -112,7 +122,7 @@ private:
     struct WriterThread {
 		WriterThread() : nonemptySignal(false,true){}
 		SmartPointer<DBConnection> conn;
-        
+
         std::list<std::vector<ConstantSP>*> writeQueue_;   //每个元素都是一个子表，按列排好，最大行数为perVectorSize_
         std::vector<std::vector<ConstantSP>*> failedQueue_;
         ThreadSP writeThread;
@@ -137,7 +147,7 @@ private:
         MultithreadedTableWriter &tableWriter_;
         WriterThread &writeThread_;
     };
-    
+
 private:
     friend class SendExecutor;
 	friend class InsertExecutor;
@@ -174,6 +184,7 @@ private:
     RWLock insertRWLock_;
 
     bool enableStreamTableTimestamp_;
+    std::vector<ConstantSP> oneRowData_;
 public:
     PytoDdbRowPool * getPytoDdb(){ return pytoDdb_;}
 };

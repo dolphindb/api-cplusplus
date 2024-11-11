@@ -579,6 +579,14 @@ Uuid* Uuid::parseUuid(const char* str, size_t len){
 	return new Uuid(str, len);
 }
 
+bool Uuid::parseUuid(const char* str, size_t len, unsigned char *buf){
+	if(len == 0)
+		memset(buf, 0, 16);
+	else if(len != 36 || !Util::fromGuid(str, buf))
+		return false;
+	return true;
+}
+
 IPAddr::IPAddr(){
 }
 

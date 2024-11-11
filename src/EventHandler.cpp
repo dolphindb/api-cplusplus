@@ -145,7 +145,7 @@ bool EventHandler::checkSchema(const std::vector<EventSchema>& eventSchemas, con
                 errMsg = "Event " + schema.eventType_ + " doesn't contain eventTimeKey " + expandTimeKeys[index];
                 return false;
             }
-            schemaEx->timeIndex_ = std::distance(schema.fieldNames_.begin(), iter);
+            schemaEx->timeIndex_ = static_cast<int>(std::distance(schema.fieldNames_.begin(), iter));
         }
 
         for(const auto& commonKey : commonKeys){
@@ -154,15 +154,15 @@ bool EventHandler::checkSchema(const std::vector<EventSchema>& eventSchemas, con
                 errMsg = "Event " + schema.eventType_ + " doesn't contain commonField " + commonKey;
                 return false;
             }
-            schemaEx->commonKeyIndex_.push_back(std::distance(schema.fieldNames_.begin(), iter));
+            schemaEx->commonKeyIndex_.push_back(static_cast<int>(std::distance(schema.fieldNames_.begin(), iter)));
         }
 
         std::vector<AttributeSerializerSP> serls;
-        unsigned length = schema.fieldNames_.size();
-        for(unsigned j = 0; j < length; ++j){
+        size_t length = schema.fieldNames_.size();
+        for(size_t j = 0; j < length; ++j){
             DATA_TYPE type = schema.fieldTypes_[j];
             DATA_FORM form = schema.fieldForms_[j];
-            if(form < 0 || form >= DATA_FORM::MAX_DATA_FORMS){
+            if(form < 0 || form >= DATA_FORM::MAX_DATA_FORM){
                 errMsg = "Invalid data form for the field " + schema.fieldNames_[j] + " of event " + schema.eventType_;
                 return false;
             }
@@ -222,7 +222,7 @@ EventHandler::EventHandler(const std::vector<EventSchema>& eventSchemas, const s
         if(event.eventType_.empty()){
             throw IllegalArgumentException(funcName, "eventType must not be empty.");
         }
-        unsigned length = event.fieldNames_.size();
+        size_t length = event.fieldNames_.size();
         if(event.fieldExtraParams_.empty()){
             event.fieldExtraParams_.resize(length, 0);
         }
@@ -233,7 +233,7 @@ EventHandler::EventHandler(const std::vector<EventSchema>& eventSchemas, const s
             throw IllegalArgumentException(funcName, "The number of eventKey, eventTypes, eventForms and eventExtraParams must have the same length.");
         }
     }
-    unsigned eventNum = eventSchemas.size();
+    size_t eventNum = eventSchemas.size();
 
     //check eventTimeKeys
     std::vector<std::string> expandTimeKeys;
@@ -256,7 +256,7 @@ EventHandler::EventHandler(const std::vector<EventSchema>& eventSchemas, const s
     if(!checkSchema(expandEventSchemas, expandTimeKeys, commonKeys, errMsg)){
         throw IllegalArgumentException(funcName, errMsg);
     }
-    commonKeySize_ = commonKeys.size();
+    commonKeySize_ = static_cast<int>(commonKeys.size());
 }
 
 bool EventHandler::deserializeEvent(ConstantSP obj, std::vector<std::string>& eventTypes, std::vector<std::vector<ConstantSP>>& attributes, ErrorCodeInfo& errorInfo){
@@ -277,9 +277,9 @@ bool EventHandler::deserializeEvent(ConstantSP obj, std::vector<std::string>& ev
         DataInputStreamSP input = new DataInputStream(blob.data(), blob.size(), false);
 
         EventSchema& schema = iter->second.eventSchema_->schema_;
-        unsigned attrCount = schema.fieldTypes_.size();
+        size_t attrCount = schema.fieldTypes_.size();
         std::vector<ConstantSP> datas(attrCount);
-        for(unsigned i = 0; i < attrCount; ++i){
+        for(size_t i = 0; i < attrCount; ++i){
             DATA_FORM form = schema.fieldForms_[i];
             DATA_TYPE type = schema.fieldTypes_[i];
             int extraParam = schema.fieldExtraParams_[i];

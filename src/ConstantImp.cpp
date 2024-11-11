@@ -44,7 +44,7 @@ IO_ERR StringVector::deserialize(DataInputStream* in, INDEX indexStart, INDEX ta
         value.append(buf.get(), len);
         return ret;
     };
-    
+
 	//read string
 	numElement = 0;
 	INDEX firstTarget = ((std::min))(size() - indexStart, targetNumElement);
@@ -1021,7 +1021,7 @@ void FastBoolVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 		containNull_=true;
 }
 
-bool FastBoolVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
+bool FastBoolVector::append(const ConstantSP& value, INDEX start, INDEX appendSize) {
 	checkCapacity(appendSize);
 
 	if(appendSize==1)
@@ -1102,7 +1102,7 @@ void FastCharVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 		containNull_=true;
 }
 
-bool FastCharVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
+bool FastCharVector::append(const ConstantSP& value, INDEX start, INDEX appendSize) {
 	checkCapacity(appendSize);
 
 	if(appendSize==1)
@@ -1211,7 +1211,7 @@ void FastShortVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 		containNull_=true;
 }
 
-bool FastShortVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
+bool FastShortVector::append(const ConstantSP& value, INDEX start, INDEX appendSize) {
 	checkCapacity(appendSize);
 
 	if(appendSize==1)
@@ -1306,7 +1306,7 @@ void  FastIntVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 		containNull_=true;
 }
 
-bool  FastIntVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
+bool  FastIntVector::append(const ConstantSP& value, INDEX start, INDEX appendSize) {
 	checkCapacity(appendSize);
 
 	if(appendSize == 1)
@@ -1401,7 +1401,7 @@ void FastLongVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 		containNull_=true;
 }
 
-bool FastLongVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
+bool FastLongVector::append(const ConstantSP& value, INDEX start, INDEX appendSize) {
 	checkCapacity(appendSize);
 
 	if(appendSize==1)
@@ -1501,7 +1501,7 @@ void FastFloatVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 		containNull_=true;
 }
 
-bool FastFloatVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
+bool FastFloatVector::append(const ConstantSP& value, INDEX start, INDEX appendSize) {
 	checkCapacity(appendSize);
 
 	if(appendSize==1)
@@ -1587,7 +1587,7 @@ void FastDoubleVector::fill(INDEX start, INDEX length, const ConstantSP& value){
 		containNull_=true;
 }
 
-bool FastDoubleVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
+bool FastDoubleVector::append(const ConstantSP& value, INDEX start, INDEX appendSize) {
 	checkCapacity(appendSize);
 	if(appendSize==1)
 		data_[size_] = value->getDouble(0);
@@ -2081,7 +2081,7 @@ ConstantSP FastTimestampVector::castTemporal(DATA_TYPE expectType){
 		ratio = -ratio;
 		for(int i = 0; i < size_; i++){
 			int tail = (data_[i] < 0) && (data_[i] % ratio);
-			data_[i] == LLONG_MIN ? pbuf[i] = INT_MIN : pbuf[i] = static_cast<int>(data_[i] / ratio - tail);		
+			data_[i] == LLONG_MIN ? pbuf[i] = INT_MIN : pbuf[i] = static_cast<int>(data_[i] / ratio - tail);
 		}
 	}
 	else if(expectType == DT_MONTH){
@@ -2343,7 +2343,7 @@ ConstantSP FastArrayVector::getInstance(INDEX sz) const {
 	INDEX *pindex = index_->getIndexArray();
 	INDEX *indexArray = new INDEX[sz];
 	memcpy(indexArray, pindex, sz * sizeof(INDEX));
-	VectorSP index = Util::createVector(DT_INT, sz, sz, true, 0, indexArray); 
+	VectorSP index = Util::createVector(DT_INT, sz, sz, true, 0, indexArray);
 
 	INDEX valueSize = 0;
 	if(sz>0)
@@ -2628,7 +2628,7 @@ void FastArrayVector::fill(INDEX start, INDEX length, const ConstantSP& value) {
 IO_ERR FastArrayVector::deserializeFixedLength(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement) {
 	IO_ERR ret = OK;
 	numElement = 0;
-	
+
 	while(targetNumElement > 0){
 		/*
 		 * Read the row count, bytes of count and reserved byte
@@ -2695,7 +2695,7 @@ IO_ERR FastArrayVector::deserializeFixedLength(DataInputStream* in, INDEX indexS
 			// cell count of this row
 			int valueCellCount = pindex[indexStart + rowCount_ - rowsRead_ - 1] - prevStart;
 			int tmpNumElement;
-			// `value_` need expand 
+			// `value_` need expand
 			if(valueSize_ < prevStart + valueCellCount){
 				// change the size of value_
 				value_->resize(prevStart + valueCellCount);
@@ -2778,7 +2778,7 @@ std::string FastArrayVector::getString() const {
 	if (size_ > len)
 		str.append("...");
 	str.append("]");
-	
+
 	return str;
 }
 
@@ -2896,7 +2896,7 @@ bool FastArrayVector::append(const ConstantSP& value, INDEX counts) {
 	return append(value, 0, counts);
 }
 
-bool FastArrayVector::append(const ConstantSP value, INDEX start, INDEX len) {
+bool FastArrayVector::append(const ConstantSP& value, INDEX start, INDEX len) {
 	if(value->isTuple()){
 		if(start + len > value->size()){
 			return false;
@@ -4763,7 +4763,7 @@ void FastFixedLengthVector::fill(INDEX start, INDEX length, const ConstantSP& va
 	}
 }
 
-bool FastFixedLengthVector::append(const ConstantSP value, INDEX start, INDEX appendSize) {
+bool FastFixedLengthVector::append(const ConstantSP& value, INDEX start, INDEX appendSize) {
 	checkCapacity(appendSize);
 	if (!value->getBinary(start, appendSize, fixedLength_, data_ + size_ * fixedLength_))
 		return false;

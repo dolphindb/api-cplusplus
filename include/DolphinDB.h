@@ -29,12 +29,14 @@
 #include "Constant.h"
 #include "Dictionary.h"
 #include "Table.h"
+// MSVC warning C4150: destructor of Domain is required during instantiation of SmartPointer<Domain>
+#include "Domain.h"
+#include "Util.h"
 
 namespace dolphindb {
 
 class DBConnectionImpl;
 class BlockReader;
-class Domain; 
 class DBConnectionPoolImpl;
 class PartitionedTableAppender;
 class DBConnection;
@@ -46,8 +48,46 @@ typedef SmartPointer<DBConnection> DBConnectionSP;
 typedef SmartPointer<DBConnectionPool> DBConnectionPoolSP;
 typedef SmartPointer<PartitionedTableAppender> PartitionedTableAppenderSP;
 
+enum class TransportationProtocol {
+    TCP, UDP,
+};
+
+// Parameters of subscribe
+
+struct SubscribeInfo {
+    std::string hostName;
+    int port;
+    std::string tableName;
+    std::string actionName;
+    bool operator<(const SubscribeInfo &info) const
+    {
+        if (hostName != info.hostName) {
+            return hostName < info.hostName;
+        } else if (port != info.port) {
+            return port < info.port;
+        } else if (tableName != info.tableName) {
+            return tableName < info.tableName;
+        }
+        return actionName < info.actionName;
+    }
+};
+
+struct SubscribeConfig {
+    int64_t offset;
+    bool msgAsTable;
+    bool allowExists;
+    bool resetOffset;
+};
+
 class EXPORT_DECL DBConnection {
 public:
+    DBConnection(std::string host, int port)
+        :DBConnection()
+    {
+        if (!connect(host, port)) {
+            throw RuntimeException("Failed to connect to server: " + host + ":" + std::to_string(port));
+        }
+    }
 	DBConnection(bool enableSSL = false, bool asyncTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false, bool isReverseStreaming = false);
 	virtual ~DBConnection();
 	DBConnection(DBConnection&& oth);
@@ -61,6 +101,8 @@ public:
 	bool connect(const std::string& hostName, int port, const std::string& userId = "", const std::string& password = "", const std::string& initialScript = "",
 		bool highAvailability = false, const std::vector<std::string>& highAvailabilitySites = std::vector<std::string>(), int keepAliveTime=7200, bool reconnect = false);
 
+	std::string version();
+
 	/**
 	 * Log onto the DolphinDB server using the given userId and password. If the parameter enableEncryption
 	 * is true, the client obtains a public key from the server and then encrypts the userId and password
@@ -68,6 +110,36 @@ public:
 	 * in plain text.
 	 */
 	void login(const std::string& userId, const std::string& password, bool enableEncryption);
+
+    /*
+     * Internal function for stream subscription.
+     * Server function prototype: getSubscriptionTopic(tableName, actionName)
+     * Server return value: (topic, columns)
+     */
+    std::pair<std::string, std::vector<std::string>> getSubscriptionTopic(const SubscribeInfo &info);
+
+    /*
+     * Internal function for stream subscription.
+     * Server function prototype: publishTable(host, port, tableName, [actionName], [offset], [filter], [allowExists], [resetOffset], [udpMulticast])
+     * Server return value: columnNames for TCP or (columnNames, port) for UDP
+     */
+    int publishTable(const SubscribeInfo &info, const SubscribeConfig &config, TransportationProtocol protocol);
+
+    /*
+     * Internal function for stream unsubscription.
+     * Server function prototype: stopPublishTable(host, port, tableName, actionName, false, [udpMulticast])
+     * the 5th arg is an internal parameter
+     */
+    void stopPublishTable(const SubscribeInfo &info, TransportationProtocol protocol);
+
+    /*
+     * Internal function for stream multicast.
+     * Server function prototype: triggerMulticastOnceInternal(tableName, topic, offset)
+     */
+    void restartMulticast(const SubscribeInfo &info, const std::string &topic, const SubscribeConfig &config)
+    {
+        auto ret = run("triggerMulticastOnceInternal", info.tableName, topic, config.offset);
+    }
 
 	/**
 	 * Run the script on the DolphinDB server and return the result to the client.If nothing returns,
@@ -82,6 +154,14 @@ public:
 	 * returns a void object. If error is raised on the server, the function throws an exception.
 	 */
 	ConstantSP run(const std::string& funcName, std::vector<ConstantSP>& args, int priority=4, int parallelism=64, int fetchSize=0, bool clearMemory = false);
+
+    template <typename... ArgsT>
+    ConstantSP run(const std::string &func, ArgsT &&... args)
+    {
+        std::vector<ConstantSP> argVec;
+        Util::getConstantSP(argVec, std::forward<ArgsT>(args)...);
+        return run(func, argVec);
+    }
 
 	/**
 	 * upload a local object to the DolphinDB server and assign the given name in the session.
@@ -162,6 +242,8 @@ private:
 	static const int maxRerunCnt_ = 30;
 	long   runSeqNo_;
 	Mutex	mutex_;
+    static const std::string udpIP_;
+    static constexpr int udpPort_{1234};
 };
 
 class EXPORT_DECL BlockReader : public Constant{
