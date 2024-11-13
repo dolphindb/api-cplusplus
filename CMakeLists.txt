@@ -1,60 +1,91 @@
-cmake_minimum_required(VERSION 3.6)
-set(CMAKE_CXX_STANDARD 11)
+cmake_minimum_required(VERSION 3.13)
+
 project(DolphinDBAPI)
 
-set(LINK_LIBS)
-if(USE_OPENSSL)
-    add_definitions("-DUSE_OPENSSL=1")
-    if(OPENSSL_PATH)
-        set(ENV{OPENSSL_ROOT_DIR} ${OPENSSL_PATH})
-    endif()
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+option(USE_OPENSSL "Use OpenSSL for encrypted communication" ON)
+option(USE_AERON "Use Aeron for UDP connection" ON)
+option(USE_CXX11_ABI "Gcc Use C++11 ABI" ON)
+
+add_library(${CMAKE_PROJECT_NAME} SHARED)
+
+add_subdirectory(src)
+
+if (USE_OPENSSL)
     find_package(OpenSSL REQUIRED)
-    list(APPEND LINK_LIBS ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
-    include_directories(${OPENSSL_INCLUDE_DIR})
-    message("openssl include dir    : ${OPENSSL_INCLUDE_DIR}")
-    message("openssl ssl lib dir    : ${OPENSSL_SSL_LIBRARY}")
-    message("openssl crypto lib dir : ${OPENSSL_CRYPTO_LIBRARY}")
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE USE_OPENSSL)
 endif()
 
-if(UNIX)
-    add_definitions(-fPIC -DNDEBUG -DLINUX -O3 -Wall -fmessage-length=0 -std=gnu++11 -msse -msse2 -msse3 -funroll-loops)
-    if(ABI EQUAL 0)
-        message("set _GLIBCXX_USE_CXX11_ABI to 0")
-        add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
-    elseif(ABI EQUAL 1)
-        message("set _GLIBCXX_USE_CXX11_ABI to 1")
-        add_definitions("-D_GLIBCXX_USE_CXX11_ABI=1")
+if (USE_AERON)
+    if (NOT DEFINED AERON_INSTALL_DIR)
+        set(AERON_INSTALL_DIR "/usr/local")
     endif()
-    if(UUID_PATH)
-        include_directories(${UUID_PATH}/include)
-        link_directories(${UUID_PATH}/lib)
-    endif()
-    list(APPEND LINK_LIBS pthread uuid dl)
-elseif(WIN32)
-    if(MSVC)
-        message("MSVC Compiling")
-        add_definitions("-DWINDOWS -DWIN32_LEAN_AND_MEAN -D_DDBAPIDLL -DNOMINMAX")
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MDd")
-        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd")
-    elseif(MINGW)
-        message("MINGW Compiling")
-        add_definitions(-fPIC -DNDEBUG -O3 -Wall -fmessage-length=0 -std=gnu++11 -msse -msse2 -msse3 -funroll-loops)
-        add_definitions("-DWINDOWS -D_WIN32_WINNT=0x0600")
-        if(ABI EQUAL 0)
-            message("set _GLIBCXX_USE_CXX11_ABI to 0")
-            add_definitions("-D_GLIBCXX_USE_CXX11_ABI=0")
-        elseif(ABI EQUAL 1)
-            message("set _GLIBCXX_USE_CXX11_ABI to 1")
-            add_definitions("-D_GLIBCXX_USE_CXX11_ABI=1")
-        endif()
-    endif()
-    list(APPEND LINK_LIBS ws2_32)
+    set(AERON_INCLUDE_DIR
+        "${AERON_INSTALL_DIR}/include/wrapper"
+        "${AERON_INSTALL_DIR}/include/aeron"
+        "${AERON_INSTALL_DIR}/include"
+    )
+    target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE ${AERON_INSTALL_DIR}/lib)
+    set(AERON_LIBRARY
+        aeron
+        aeron_client_shared
+        aeron_driver
+    )
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE USE_AERON)
 endif()
 
-AUX_SOURCE_DIRECTORY(src DIR_SRCS)
-include_directories(include)
-ADD_LIBRARY(DolphinDBAPI SHARED ${DIR_SRCS})
-target_link_libraries(
-    DolphinDBAPI
-    ${LINK_LIBS}
+if (NOT USE_CXX11_ABI)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE _GLIBCXX_USE_CXX11_ABI=0)
+endif()
+
+target_include_directories(${CMAKE_PROJECT_NAME}
+    PRIVATE ${OPENSSL_INCLUDE_DIR}
+    PRIVATE BEFORE ${AERON_INCLUDE_DIR} # make sure we include C warpper before deprecated C++ API
 )
+target_link_libraries(${CMAKE_PROJECT_NAME}
+    PRIVATE ${OPENSSL_SSL_LIBRARY}
+    PRIVATE ${OPENSSL_CRYPTO_LIBRARY}
+    PRIVATE ${AERON_LIBRARY}
+)
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    target_compile_definitions(${CMAKE_PROJECT_NAME}
+        PRIVATE WINDOWS NOMINMAX _DDBAPIDLL
+    )
+    # C4251: Class member of an exported class is not marked dllexport.
+    # This is triggered by std::string but we cannot modify STL.
+    # C4100: Parameter is unused. We should fix this later.
+    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE /W3 /WX /MP /wd4251 /wd4100)
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32)
+else ()
+    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wall -Werror)
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pthread rt uuid)
+endif()
+
+if (USE_CXX11_ABI AND EXISTS "${PROJECT_SOURCE_DIR}/thirdparty/googletest/CMakeLists.txt")
+    add_executable(${CMAKE_PROJECT_NAME}_test)
+    add_subdirectory(test)
+
+    if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+        target_compile_options(${CMAKE_PROJECT_NAME}_test PRIVATE /W0 /utf-8 /MP)
+        target_compile_definitions(${CMAKE_PROJECT_NAME}_test PRIVATE WINDOWS NOMINMAX)
+    else()
+        target_compile_options(${CMAKE_PROJECT_NAME}_test PRIVATE -w)
+    endif()
+
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    add_subdirectory("${PROJECT_SOURCE_DIR}/thirdparty/googletest")
+
+    enable_testing()
+
+    target_link_libraries(${CMAKE_PROJECT_NAME}_test
+        ${CMAKE_PROJECT_NAME}
+        gtest_main
+        gmock_main
+    )
+else()
+    message("skipping tests.")
+endif()
