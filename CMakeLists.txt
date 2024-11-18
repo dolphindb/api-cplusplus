@@ -51,18 +51,29 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     PRIVATE ${AERON_LIBRARY}
 )
 
-if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+if (WIN32)
     target_compile_definitions(${CMAKE_PROJECT_NAME}
         PRIVATE WINDOWS NOMINMAX _DDBAPIDLL
     )
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32)
+    if (MINGW)
+        target_compile_definitions(${CMAKE_PROJECT_NAME}
+            PRIVATE _WIN32_WINNT=0x0600
+        )
+    endif()
+else()
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pthread rt uuid)
+endif()
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     # C4251: Class member of an exported class is not marked dllexport.
     # This is triggered by std::string but we cannot modify STL.
     # C4100: Parameter is unused. We should fix this later.
     target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE /W3 /WX /MP /wd4251 /wd4100)
-    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32)
-else ()
-    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wall -Werror)
-    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pthread rt uuid)
+else()
+    # overloaded-virtual: Derived class hides base class virtual functions
+    # This is triggered by derived classes of Constant and we will fix this later
+    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wall -Werror -Wno-overloaded-virtual)
 endif()
 
 if (USE_CXX11_ABI AND EXISTS "${PROJECT_SOURCE_DIR}/thirdparty/googletest/CMakeLists.txt")

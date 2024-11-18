@@ -46,7 +46,7 @@ protected:
                                      int64_t offset, bool resubscribe, const VectorSP &filter,
                                      bool msgAsTable, bool allowExists, int batchSize,
 									 std::string userName, std::string password,
-									 const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, bool isEvent, int resubTimeout, bool subOnce, bool convertMsgRowData);
+									 const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, bool isEvent, int resubscribeInterval, bool subOnce, bool convertMsgRowData, int resubscribeTimeout);
     void unsubscribeInternal(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME);
 
 protected:
@@ -58,7 +58,7 @@ class EXPORT_DECL EventClient : public StreamingClient{
 public:
     EventClient(const std::vector<EventSchema>& eventSchema, const std::vector<std::string>& eventTimeFields, const std::vector<std::string>& commonFields);
     ThreadSP subscribe(const std::string& host, int port, const EventMessageHandler &handler, const std::string& tableName, const std::string& actionName = DEFAULT_ACTION_NAME, int64_t offset = -1,
-        bool resub = true, const std::string& userName="", const std::string& password="");
+        bool resub = true, const std::string& userName="", const std::string& password="", int resubscribeTimeout=0);
     void unsubscribe(const std::string& host, int port, const std::string& tableName, const std::string& actionName = DEFAULT_ACTION_NAME);
 
 private:
@@ -76,13 +76,13 @@ public:
                        std::string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true,
                        const VectorSP &filter = nullptr, bool msgAsTable = false, bool allowExists = false,
 						std::string userName="", std::string password="",
-					   const StreamDeserializerSP &blobDeserializer = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(),int resubTimeout = 100, bool subOnce = false);
+					   const StreamDeserializerSP &blobDeserializer = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(),int resubscribeInterval = 100, bool subOnce = false, int resubscribeTimeout = 0);
     ThreadSP subscribe(std::string host, int port, const MessageBatchHandler &handler, std::string tableName,
                        std::string actionName = DEFAULT_ACTION_NAME, int64_t offset = -1, bool resub = true,
                        const VectorSP &filter = nullptr, bool allowExists = false, int batchSize = 1,
 						double throttle = 1,bool msgAsTable = false,
 						std::string userName = "", std::string password = "",
-						const StreamDeserializerSP &blobDeserializer = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(),int resubTimeout = 100,bool subOnce = false);
+						const StreamDeserializerSP &blobDeserializer = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(),int resubscribeInterval = 100,bool subOnce = false, int resubscribeTimeout = 0);
 	size_t getQueueDepth(const ThreadSP &thread);
     void unsubscribe(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME);
 };
@@ -97,7 +97,7 @@ public:
                                std::string actionName, int64_t offset = -1, bool resub = true,
                                const VectorSP &filter = nullptr, bool msgAsTable = false, bool allowExists = false,
 								std::string userName = "", std::string password = "",
-							   const StreamDeserializerSP &blobDeserializer = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(), int resubTimeout = 100, bool subOnce = false);
+							   const StreamDeserializerSP &blobDeserializer = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(), int resubscribeInterval = 100, bool subOnce = false, int resubscribeTimeout = 0);
     void unsubscribe(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME);
 	size_t getQueueDepth(const ThreadSP &thread);
 
@@ -115,7 +115,7 @@ public:
                              int64_t offset = -1, bool resub = true, const VectorSP &filter = nullptr,
                              bool msgAsTable = false, bool allowExists = false,
 							std::string userName="", std::string password="",
-							 const StreamDeserializerSP &blobDeserializer = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(), int resubTimeout = 100, bool subOnce = false);
+							 const StreamDeserializerSP &blobDeserializer = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(), int resubscribeInterval = 100, bool subOnce = false, int resubscribeTimeout = 0);
     void unsubscribe(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME);
 };
 

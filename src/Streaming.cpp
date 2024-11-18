@@ -328,13 +328,17 @@ class StreamingClientImpl {
 			  streamDeserializer_(nullptr),
               currentSiteIndex_(-1),
               isEvent_(false),
-              resubTimeout_(100),
+              resubscribeInterval_(100),
               subOnce_(false),
               lastSiteIndex_(-1),
-              batchSize_(1) {}
+              batchSize_(1),
+              resubscribeTimeout_(0)
+        {
+            subscribeTime_ = std::chrono::steady_clock::now();
+        }
         explicit SubscribeInfo(const string& id, const string &host, int port, const string &tableName, const string &actionName, long long offset, bool resub,
                                const VectorSP &filter, bool msgAsTable, bool allowExists, int batchSize,
-								const string &userName, const string &password, const StreamDeserializerSP &blobDeserializer, bool isEvent, int resubTimeout, bool subOnce, bool convertMsgRowData)
+								const string &userName, const string &password, const StreamDeserializerSP &blobDeserializer, bool isEvent, int resubscribeInterval, bool subOnce, bool convertMsgRowData, int resubscribeTimeout)
             : ID_(move(id)),
               host_(move(host)),
               port_(port),
@@ -353,14 +357,16 @@ class StreamingClientImpl {
 			  streamDeserializer_(blobDeserializer),
 			  currentSiteIndex_(-1),
 			  isEvent_(isEvent),
-			  resubTimeout_(resubTimeout),
+			  resubscribeInterval_(resubscribeInterval),
 			  subOnce_(subOnce),
 			  lastSiteIndex_(-1),
 
               batchSize_(batchSize),
               convertMsgRowData_(convertMsgRowData),
-              stopped_(std::make_shared<std::atomic<bool>>(false))
+              stopped_(std::make_shared<std::atomic<bool>>(false)),
+              resubscribeTimeout_(resubscribeTimeout)
         {
+            subscribeTime_ = std::chrono::steady_clock::now();
 		}
 
         string ID_;
@@ -383,12 +389,14 @@ class StreamingClientImpl {
         vector<pair<string, int>> availableSites_;
         int currentSiteIndex_;
         bool isEvent_;
-        int resubTimeout_;
+        int resubscribeInterval_;
         bool subOnce_;
         int lastSiteIndex_;
         int batchSize_;
         bool convertMsgRowData_;
         std::shared_ptr<std::atomic<bool>> stopped_;
+        int resubscribeTimeout_;
+        std::chrono::steady_clock::time_point subscribeTime_;
 
 		void exit() {
 			if (!socket_.isNull()) {
@@ -517,7 +525,7 @@ public:
                                      bool resubscribe = true, const VectorSP &filter = nullptr, bool msgAsTable = false,
                                      bool allowExists = false, int batchSize  = 1,
 									const string &userName="", const string &password="",
-									const StreamDeserializerSP &sdsp = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(), bool isEvent = false, int resubTimeout = 100, bool subOnce = false, bool convertMsgRowData = false);
+									const StreamDeserializerSP &sdsp = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(), bool isEvent = false, int resubscribeInterval = 100, bool subOnce = false, bool convertMsgRowData = false, int resubscribeTimeout = 0);
     string subscribeInternal(DBConnection &conn, SubscribeInfo &info);
     void insertMeta(SubscribeInfo &info, const string &topic);
     bool delMeta(const string &topic, bool exitFlag);
@@ -1024,6 +1032,7 @@ void StreamingClientImpl::reconnect() {
         }
 
         topicReconn_.op([&](unordered_map<string, pair<long long, long long>> &mp) {
+            std::vector<std::string> failedResubs;
             for (auto &p : mp) {
                 SubscribeInfo info;
                 if (!topicSubInfos_.find(p.first, info)) continue;
@@ -1034,8 +1043,13 @@ void StreamingClientImpl::reconnect() {
                 string newTopic = topic;
                 bool isReconnected = false;
 
-                // reconn every info.resubTimeout ms
-                if (Util::getEpochTime() - p.second.first <= info.resubTimeout_) continue;
+                // reconn every info.resubscribeInterval ms
+                if (Util::getEpochTime() - p.second.first <= info.resubscribeInterval_) continue;
+                if (info.resubscribeTimeout_ > 0 && (std::chrono::steady_clock::now() - info.subscribeTime_) > std::chrono::milliseconds(info.resubscribeTimeout_)) {
+                    cerr << "[" << Timestamp(Util::getEpochTime()).getString() << "]" << ": resubscribe reached resubscribeTimeout" << std::endl;
+                    failedResubs.push_back(p.first);
+                    continue;
+                }
 
                 if(info.availableSites_.empty()){
                     for (int i = 0; i < 3; ++i) {
@@ -1147,6 +1161,9 @@ void StreamingClientImpl::reconnect() {
                 }
                 p.second.first = Util::getEpochTime();
             }
+            for (auto &topic : failedResubs) {
+                mp.erase(topic);
+            }
         });
         if (isExit()) {
             return;
@@ -1161,6 +1178,11 @@ void StreamingClientImpl::reconnect() {
                 string _host;
                 int _port = 0;
                 initResub_.pop();
+                auto now = std::chrono::steady_clock::now();
+                if (info.resubscribeTimeout_ > 0 && (now - info.subscribeTime_) > std::chrono::milliseconds(info.resubscribeTimeout_)) {
+                    cerr << "[" << Timestamp(Util::getEpochTime()).getString() << "]" << ": resubscribe reached resubscribeTimeout" << std::endl;
+                    continue;
+                }
                 try {
                     if(!info.availableSites_.empty()){
                         info.currentSiteIndex_ = (info.currentSiteIndex_ + 1) % info.availableSites_.size();
@@ -1233,6 +1255,7 @@ void StreamingClientImpl::parseMessage(DataInputStreamSP in, ActivePublisherSP p
             set<string> ts;
             if (liveSubsOnSite_.find(site, ts)) {
                 for (auto &t : ts) {
+                    topicSubInfos_.op([&t](unordered_map<string, SubscribeInfo> &mp) { mp[t].subscribeTime_ = std::chrono::steady_clock::now(); });
                     topicReconn_.insert(t, {Util::getEpochTime(), 0});
                 }
             }
@@ -1461,7 +1484,7 @@ SubscribeQueue StreamingClientImpl::subscribeInternal(const string &host, int po
                                                       const string &actionName, int64_t offset, bool resubscribe,
                                                       const VectorSP &filter, bool msgAsTable, bool allowExists, int batchSize,
 													  const string &userName, const string &password,
-													  const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, bool isEvent, int resubTimeout, bool subOnce, bool convertMsgRowData) {
+													  const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, bool isEvent, int resubscribeInterval, bool subOnce, bool convertMsgRowData, int resubscribeTimeout) {
 
 	if (msgAsTable && !blobDeserializer.isNull()) {
 		throw RuntimeException("msgAsTable must be false when StreamDeserializer is set.");
@@ -1480,7 +1503,7 @@ SubscribeQueue StreamingClientImpl::subscribeInternal(const string &host, int po
     while (isExit()==false) {
         ++attempt;
         SubscribeInfo info(_id, _host, _port, tableName, actionName, offset, resubscribe, filter, msgAsTable, allowExists,
-			batchSize, userName,password,blobDeserializer, isEvent, resubTimeout, subOnce, convertMsgRowData);
+			batchSize, userName,password,blobDeserializer, isEvent, resubscribeInterval, subOnce, convertMsgRowData, resubscribeTimeout);
         if(!backupSites.empty()){
             info.availableSites_.push_back({host, port});
             info.currentSiteIndex_ = 0;
@@ -1498,6 +1521,7 @@ SubscribeQueue StreamingClientImpl::subscribeInternal(const string &host, int po
 			insertMeta(info, topic);
             return SubscribeQueue(info.queue_, info.stopped_);
         } catch (std::exception &e) {
+            cerr << e.what() << endl;
             if(!backupSites.empty()){
                 LockGuard<Mutex> _(&mtx_);
                 initResub_.push(info);
@@ -1605,11 +1629,11 @@ SubscribeQueue StreamingClient::subscribeInternal(string host, int port, string 
                                                   int64_t offset, bool resubscribe, const dolphindb::VectorSP &filter,
                                                   bool msgAsTable, bool allowExists, int batchSize,
 												  string userName, string password,
-												  const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, bool isEvent, int resubTimeout, bool subOnce, bool convertMsgRowData) {
+												  const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, bool isEvent, int resubscribeInterval, bool subOnce, bool convertMsgRowData, int resubscribeTimeout) {
     return impl_->subscribeInternal(host, port, tableName, actionName, offset, resubscribe, filter, msgAsTable,
                                     allowExists, batchSize,
 									userName,password,
-									blobDeserializer, backupSites, isEvent, resubTimeout, subOnce, convertMsgRowData);
+									blobDeserializer, backupSites, isEvent, resubscribeInterval, subOnce, convertMsgRowData, resubscribeTimeout);
 }
 
 void StreamingClient::unsubscribeInternal(string host, int port, string tableName, string actionName) {
@@ -1627,10 +1651,10 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageBatchHand
                                    string actionName, int64_t offset, bool resub, const VectorSP &filter,
                                    bool allowExists, int batchSize, double throttle, bool msgAsTable,
 									string userName, string password,
-								   const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubTimeout, bool subOnce) {
+								   const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubscribeInterval, bool subOnce, int resubscribeTimeout) {
     auto subscribeQueue = subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset,
                               resub, filter, msgAsTable, allowExists, batchSize, userName, password, blobDeserializer,
-                              backupSites, false, resubTimeout, subOnce, false);
+                              backupSites, false, resubscribeInterval, subOnce, false, resubscribeTimeout);
     if (subscribeQueue.queue_.isNull()) {
         cerr << "Subscription already made, handler loop not created." << endl;
         ThreadSP t = new Thread(new Executor([]() {}));
@@ -1977,7 +2001,7 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageHandler &
                                    string actionName, int64_t offset, bool resub, const VectorSP &filter,
                                    bool msgAsTable, bool allowExists,
 									string userName, string password,
-									const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubTimeout, bool subOnce) {
+									const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubscribeInterval, bool subOnce, int resubscribeTimeout) {
 #ifdef USE_AERON
     if (udpImpl_ != nullptr) {
         auto conn = std::make_shared<DBConnection>(host, port);
@@ -1996,7 +2020,7 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageHandler &
     }
 #endif
     auto subscribeQueue = subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset,
-                                             resub, filter, msgAsTable, false,1, userName, password, blobDeserializer, backupSites, false, resubTimeout, subOnce, true);
+                                             resub, filter, msgAsTable, false,1, userName, password, blobDeserializer, backupSites, false, resubscribeInterval, subOnce, true, resubscribeTimeout);
     if (subscribeQueue.queue_.isNull()) {
         cerr << "Subscription already made, handler loop not created." << endl;
         ThreadSP t = new Thread(new Executor([]() {}));
@@ -2025,9 +2049,9 @@ PollingClient::PollingClient(int listeningPort) : StreamingClient(listeningPort)
 MessageQueueSP PollingClient::subscribe(string host, int port, string tableName, string actionName, int64_t offset,
                                         bool resub, const VectorSP &filter, bool msgAsTable, bool allowExists,
 										string userName, string password,
-										const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubTimeout, bool subOnce) {
+										const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubscribeInterval, bool subOnce, int resubscribeTimeout) {
     return subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset, resub, filter,
-                             msgAsTable, allowExists,1, userName, password, blobDeserializer, backupSites, false, resubTimeout, subOnce, false).queue_;
+                             msgAsTable, allowExists,1, userName, password, blobDeserializer, backupSites, false, resubscribeInterval, subOnce, false, resubscribeTimeout).queue_;
 }
 
 void PollingClient::unsubscribe(string host, int port, string tableName, string actionName) {
@@ -2050,9 +2074,9 @@ vector<ThreadSP> ThreadPooledClient::subscribe(string host, int port, const Mess
                                                string actionName, int64_t offset, bool resub, const VectorSP &filter,
                                                bool msgAsTable, bool allowExists,
 												string userName, string password,
-												const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubTimeout, bool subOnce) {
+												const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, int resubscribeInterval, bool subOnce, int resubscribeTimeout) {
     auto queue = subscribeInternal(std::move(host), port, std::move(tableName), std::move(actionName), offset, resub,
-                                   filter, msgAsTable, allowExists,1, userName,password, blobDeserializer, backupSites, false, resubTimeout, subOnce, true);
+                                   filter, msgAsTable, allowExists,1, userName,password, blobDeserializer, backupSites, false, resubscribeInterval, subOnce, true, resubscribeTimeout);
     vector<ThreadSP> ret;
     for (int i = 0; i < threadCount_ && isExit() == false; ++i) {
 		ThreadSP t = newHandleThread(handler, queue, msgAsTable, blobDeserializer.isNull() == false, impl_);
@@ -2068,7 +2092,7 @@ EventClient::EventClient(const std::vector<EventSchema>& eventSchemas, const std
 
 }
 
-ThreadSP EventClient::subscribe(const string& host, int port, const EventMessageHandler &handler, const string& tableName, const string& actionName, int64_t offset, bool resub, const string& userName, const string& password){
+ThreadSP EventClient::subscribe(const string& host, int port, const EventMessageHandler &handler, const string& tableName, const string& actionName, int64_t offset, bool resub, const string& userName, const string& password, int resubscribeTimeout){
     if(tableName.empty()){
         throw RuntimeException("tableName must not be empty.");
     }
@@ -2085,7 +2109,7 @@ ThreadSP EventClient::subscribe(const string& host, int port, const EventMessage
     }
     tempConn.close();
 
-    SubscribeQueue subscribeQueue = subscribeInternal(host, port, tableName, actionName, offset, resub, nullptr, false, false, 1, userName, password, nullptr, std::vector<std::string>(), true, 100, false, false);
+    SubscribeQueue subscribeQueue = subscribeInternal(host, port, tableName, actionName, offset, resub, nullptr, false, false, 1, userName, password, nullptr, std::vector<std::string>(), true, 100, false, false, resubscribeTimeout);
     if (subscribeQueue.queue_.isNull()) {
         cerr << "Subscription already made, handler loop not created." << endl;
         return nullptr;
