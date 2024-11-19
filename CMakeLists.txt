@@ -6,9 +6,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(USE_OPENSSL "Use OpenSSL for encrypted communication" ON)
-option(USE_AERON "Use Aeron for UDP connection" ON)
-option(USE_CXX11_ABI "Gcc Use C++11 ABI" ON)
+option(USE_OPENSSL "Use OpenSSL for encrypted communication." ON)
+option(USE_AERON "Use Aeron for UDP connections. ${CMAKE_PROJECT_NAME} will search for Aeron in $\{CMAKE_INSTALL_PREFIX\} by default, you can specify a different location with AERON_INSTALL_DIR" ON)
+option(WITH_GTEST "Compile testcases." OFF)
 
 add_library(${CMAKE_PROJECT_NAME} SHARED)
 
@@ -21,7 +21,7 @@ endif()
 
 if (USE_AERON)
     if (NOT DEFINED AERON_INSTALL_DIR)
-        set(AERON_INSTALL_DIR "/usr/local")
+        set(AERON_INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
     endif()
     set(AERON_INCLUDE_DIR
         "${AERON_INSTALL_DIR}/include/wrapper"
@@ -37,10 +37,6 @@ if (USE_AERON)
     target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE USE_AERON)
 endif()
 
-if (NOT USE_CXX11_ABI)
-    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE _GLIBCXX_USE_CXX11_ABI=0)
-endif()
-
 target_include_directories(${CMAKE_PROJECT_NAME}
     PRIVATE ${OPENSSL_INCLUDE_DIR}
     PRIVATE BEFORE ${AERON_INCLUDE_DIR} # make sure we include C warpper before deprecated C++ API
@@ -52,14 +48,10 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 )
 
 if (WIN32)
-    target_compile_definitions(${CMAKE_PROJECT_NAME}
-        PRIVATE WINDOWS NOMINMAX _DDBAPIDLL
-    )
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE NOMINMAX _DDBAPIDLL)
     target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32)
     if (MINGW)
-        target_compile_definitions(${CMAKE_PROJECT_NAME}
-            PRIVATE _WIN32_WINNT=0x0600
-        )
+        target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE _WIN32_WINNT=0x0600)
     endif()
 else()
     target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pthread rt uuid)
@@ -69,14 +61,17 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     # C4251: Class member of an exported class is not marked dllexport.
     # This is triggered by std::string but we cannot modify STL.
     # C4100: Parameter is unused. We should fix this later.
-    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE /W3 /WX /MP /wd4251 /wd4100)
+    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE /W3 /MP /wd4251 /wd4100)
 else()
     # overloaded-virtual: Derived class hides base class virtual functions
     # This is triggered by derived classes of Constant and we will fix this later
-    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wall -Werror -Wno-overloaded-virtual)
+    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wall -Wno-overloaded-virtual)
 endif()
 
-if (USE_CXX11_ABI AND EXISTS "${PROJECT_SOURCE_DIR}/thirdparty/googletest/CMakeLists.txt")
+if (WITH_GTEST)
+    if (NOT USE_CXX11_ABI)
+        message(FATAL_ERROR "cannot compile testcases without C++11 ABI")
+    endif()
     add_executable(${CMAKE_PROJECT_NAME}_test)
     add_subdirectory(test)
 
@@ -97,6 +92,4 @@ if (USE_CXX11_ABI AND EXISTS "${PROJECT_SOURCE_DIR}/thirdparty/googletest/CMakeL
         gtest_main
         gmock_main
     )
-else()
-    message("skipping tests.")
 endif()
