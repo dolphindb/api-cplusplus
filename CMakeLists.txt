@@ -39,7 +39,7 @@ endif()
 
 target_include_directories(${CMAKE_PROJECT_NAME}
     PRIVATE ${OPENSSL_INCLUDE_DIR}
-    PRIVATE BEFORE ${AERON_INCLUDE_DIR} # make sure we include C warpper before deprecated C++ API
+    PRIVATE ${AERON_INCLUDE_DIR}
 )
 target_link_libraries(${CMAKE_PROJECT_NAME}
     PRIVATE ${OPENSSL_SSL_LIBRARY}
@@ -61,7 +61,8 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     # C4251: Class member of an exported class is not marked dllexport.
     # This is triggered by std::string but we cannot modify STL.
     # C4100: Parameter is unused. We should fix this later.
-    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE /W3 /MP /wd4251 /wd4100)
+    # C4996: The code uses a deprecated API. We should fix this later.
+    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE /W3 /MP /wd4251 /wd4100 /wd4996)
 else()
     # overloaded-virtual: Derived class hides base class virtual functions
     # This is triggered by derived classes of Constant and we will fix this later
