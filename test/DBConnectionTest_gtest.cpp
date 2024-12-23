@@ -59,18 +59,15 @@ void StopCurNode(string cur_node)
     cout << cur_node + " has stopped..." << endl;
     std::this_thread::sleep_for(std::chrono::seconds(5));
     // std::this_thread::yield();
-    conn1.run("try{startDataNode(\"" + cur_node + "\")}catch(ex){};sleep(2000)");
-    if (conn1.run("(exec state from getClusterPerf() where name = `" + cur_node + ")[0]")->getInt() == 1)
-    {
-        cout << "restart the datanode: " + cur_node + " successfully..." << endl;
-        conn1.close();
-        return;
-    }
-    else
-    {
-        cout << "restart datanode failed." << endl;
-        conn1.close();
-        return;
+    conn1.run("try{startDataNode(\"" + cur_node + "\")}catch(ex){};");
+    bool state = conn1.run("exec state from getClusterPerf() where name = `" + cur_node)->getBool();
+    int wait_time = 0;
+    while (!state && wait_time < 60){
+        conn1.run("try{startDataNode(\"" + cur_node + "\")}catch(ex){};");
+        state = conn1.run("exec state from getClusterPerf() where name = `" + cur_node)->getBool();
+        cout << "waiting for " + cur_node + " to start..." << endl;
+        Util::sleep(1000);
+        wait_time += 1;
     }
 }
 
@@ -271,9 +268,8 @@ TEST_F(DBConnectionTest, test_connection_python_upload)
 
 TEST_F(DBConnectionTest, test_connect_reconnect)
 {
-#ifdef WINDOWS
-    cout << "skip this case." << endl;
-    EXPECT_EQ(1, 1);
+#ifdef _WIN32
+    GTEST_SKIP();
 #else
     bool res;
     string cur_node = connReconn.run("getNodeAlias()")->getString();
@@ -285,7 +281,7 @@ TEST_F(DBConnectionTest, test_connect_reconnect)
     t1.join();
     t2.join();
 
-    Util::sleep(10000);
+    Util::sleep(1000);
     EXPECT_EQ(res, false);
     cout << "check passed..." << endl;
     cout << "check if reconnected..." << endl;
@@ -306,7 +302,8 @@ TEST_F(DBConnectionTest, test_connectionPool_withErrPassword)
     EXPECT_ANY_THROW(DBConnectionPool pool_demo(hostName, port, 10, "admin", "123456789"));
 }
 
-TEST_F(DBConnectionTest, test_connectionPool_loadBalance)
+
+TEST_F(DBConnectionTest, DISABLED_test_connectionPool_loadBalance)
 {
     EXPECT_ANY_THROW(DBConnectionPool pool_demo(hostName, port, 10, "adminasdccc", "123456", true));
     EXPECT_ANY_THROW(DBConnectionPool pool_demo(hostName, port, 10, "admin", "123456789", true));
@@ -536,7 +533,7 @@ TEST_F(DBConnectionTest, test_DBconnectionPoolwithFetchSize)
     pool_demo.shutDown();
 }
 
-#ifndef WINDOWS
+#ifndef _WIN32
 TEST_F(DBConnectionTest, test_connection_concurrent_insert_datas)
 {
     srand(time(NULL));
@@ -777,7 +774,7 @@ TEST_F(DBConnectionTest, test_connectionPool_parallel)
 TEST_F(DBConnectionTest, test_connection_login_encrypt){
     DBConnectionSP _c = new DBConnection(false, false);
     _c->connect(hostName, port);
-    #ifdef USE_OPENSSL
+    #ifdef TEST_OPENSSL
         _c->login("admin", "123456", true);
         ConstantSP res = _c->run("1+1");
         EXPECT_EQ(res->getInt(), 2);

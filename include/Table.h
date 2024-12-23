@@ -1,5 +1,10 @@
 #pragma once
 
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4100 )
+#endif
+
 #include "Constant.h"
 #include "SmartPointer.h"
 
@@ -59,3 +64,7 @@ public:
 };
 typedef SmartPointer<Table> TableSP;
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

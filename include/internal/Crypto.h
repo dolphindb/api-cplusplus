@@ -16,12 +16,14 @@ public:
     std::string RSAEncrypt(const std::string &text) const;
 
 private:
+    void freeCrypto();
     void printOpenSSLError() const;
     std::string Base64Encode(const std::vector<unsigned char> &text) const;
 
 private:
-    RSA *rsa_;
-    BIO *keyBio_;
+    BIO *keyBio_{nullptr};
+    EVP_PKEY *rsa_{nullptr};
+    EVP_PKEY_CTX *ctx_{nullptr};
 };
 
 #endif

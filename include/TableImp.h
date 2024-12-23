@@ -8,6 +8,11 @@
 #ifndef TABLE_H_
 #define TABLE_H_
 
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4100 )
+#endif
+
 #include <atomic>
 
 #include "Table.h"
@@ -85,7 +90,7 @@ public:
 	virtual bool isBasicTable() const {return true;}
 	virtual ConstantSP getColumn(INDEX index) const;
 	virtual ConstantSP get(INDEX col, INDEX row) const {return cols_[col]->get(row);}
-	virtual DATA_TYPE getColumnType(const int index) const { return cols_[index]->getType();}
+	virtual DATA_TYPE getColumnType(int index) const { return cols_[index]->getType();}
 	virtual void setColumnName(int index, const std::string& name);
 	virtual INDEX size() const {return size_;}
 	virtual bool sizeable() const {return isReadOnly()==false;}
@@ -126,5 +131,9 @@ private:
 typedef SmartPointer<BasicTable> BasicTableSP;
 
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif
 
 #endif /* TABLE_H_ */

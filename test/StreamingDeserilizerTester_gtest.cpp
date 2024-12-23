@@ -8,20 +8,26 @@ public:
     {
         // DBConnection conn;
         conn.initialize();
+        conn300->initialize();
+        bool ret300 = conn300->connect(hostName, port300, "admin", "123456");
         bool ret = conn.connect(hostName, port, "admin", "123456");
         if (!ret)
         {
-            cout << "Failed to connect to the server" << endl;
+            GTEST_FAIL() << "Failed to connect to the server " << hostName << ":" << port << endl;
         }
-        else
+        if (!ret300)
         {
-            cout << "connect to " + hostName + ":" + std::to_string(port) << endl;
+            GTEST_FAIL() << "Failed to connect to the server " << hostName << ":" << port300 << endl;
         }
+        cout << "connect to " + hostName + ":" + std::to_string(port) << endl;
+        cout << "connect to " + hostName + ":" + std::to_string(port300) << endl;
+        scfg.protocol = TransportationProtocol::UDP;
     }
     static void TearDownTestCase()
     {
         usedPorts.clear();
         conn.close();
+        conn300->close();
     }
 
     // Case
@@ -30,22 +36,28 @@ public:
         cout << "check connect...";
         try
         {
-            ConstantSP res = conn.run("1+1");
+            ConstantSP res300 = conn300->run("1+1");
         }
         catch (const std::exception &e)
         {
-            conn.connect(hostName, port, "admin", "123456");
+            bool res = conn300->connect(hostName, port, "admin", "123456");
+            if (!res) GTEST_FAIL() << "Failed to connect to the server " << hostName << ":" << port300 << endl;
         }
 
         cout << "ok" << endl;
         CLEAR_ENV(conn);
+        CLEAR_ENV2(conn300);
     }
     virtual void TearDown()
     {
         CLEAR_ENV(conn);
+        CLEAR_ENV2(conn300);
     }
+public:
+    static StreamingClientConfig scfg;
 };
 
+StreamingClientConfig StreamingDeserilizerTester::scfg;
 class StreamingDeserilizerTester_basic : public StreamingDeserilizerTester, public ::testing::WithParamInterface<int>
 {
 };
@@ -258,7 +270,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try
@@ -304,7 +316,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
         EXPECT_TRUE(conn.run("re = select * from res2_SDT order by datetimev;\
                             ex = select * from ex2_SDT order by datetimev;\
-                            all(each(eqObj, re.values(), ex.values()))")->getBool());                   
+                            all(each(eqObj, re.values(), ex.values()))")->getBool());
         EXPECT_EQ(msg1_total, 1000);
         EXPECT_EQ(msg2_total, 1000);
     }
@@ -332,7 +344,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
         for (auto &msg : msgs)
         {
             const string &symbol = msg.getSymbol();
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -378,13 +390,142 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
         EXPECT_TRUE(conn.run("re = select * from res2_SDT order by datetimev;\
                             ex = select * from ex2_SDT order by datetimev;\
-                            all(each(eqObj, re.values(), ex.values()))")->getBool());         
+                            all(each(eqObj, re.values(), ex.values()))")->getBool());
         EXPECT_EQ(msg1_total, 1000);
         EXPECT_EQ(msg2_total, 1000);
     }
 
     usedPorts.insert(listenport);
 }
+
+TEST_F(StreamingDeserilizerTester_basic, test_UDPThreadclient_onehandler_subscribeWithstreamDeserilizer)
+{
+    #ifdef _WIN32
+        GTEST_SKIP() << "not support udp on Windows yet.";
+    #endif
+    int msg1_total = 0, msg2_total = 0;
+
+    Signal notify;
+    Mutex mutex;
+    const string st = "test_SD_" + getRandString(10);
+    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+
+    AutoFitTableAppender appender1("", "res1_SDT", *conn300);
+    AutoFitTableAppender appender2("", "res2_SDT", *conn300);
+
+    auto onehandler = [&](Message msg)
+    {
+        const string &symbol = msg.getSymbol();
+        LockGuard<Mutex> lock(&mutex);
+        bool succeeded = false;
+        TableSP tmp = AnyVectorToTable(msg);
+        while(!succeeded){
+            try
+            {
+                if (symbol == "msg1")
+                {
+                    appender1.append(tmp);
+                    msg1_total += 1;
+                }
+                else if (symbol == "msg2")
+                {
+                    appender2.append(tmp);
+                    msg2_total += 1;
+                }
+                succeeded = true;
+            }
+            catch(const std::exception& e)
+            {
+                Util::sleep(100);
+            }
+        }
+
+        if (msg.getOffset() == 1999)
+        {
+            notify.set();
+        }
+    };
+
+    ThreadedClient threadedClient = ThreadedClient(scfg);
+    auto thread1 = threadedClient.subscribe(hostName, port300, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp);
+    thread1->setAffinity(0);
+    notify.wait();
+
+    threadedClient.unsubscribe(hostName, port300, st, "test_SD");
+    EXPECT_TRUE(conn300->run("re = select * from res1_SDT order by datetimev;\
+                        ex = select * from ex1_SDT order by datetimev;\
+                        all(each(eqObj, re.values(), ex.values()))")->getBool());
+    EXPECT_TRUE(conn300->run("re = select * from res2_SDT order by datetimev;\
+                        ex = select * from ex2_SDT order by datetimev;\
+                        all(each(eqObj, re.values(), ex.values()))")->getBool());
+    EXPECT_EQ(msg1_total, 1000);
+    EXPECT_EQ(msg2_total, 1000);
+}
+
+
+TEST_F(StreamingDeserilizerTester_basic, test_UDPThreadclient_batchhandler_subscribeWithstreamDeserilizer)
+{
+    GTEST_SKIP() << "not support batch handler on UDP yet.";
+    int msg1_total = 0, msg2_total = 0;
+    Signal notify;
+    Mutex mutex;
+    const string st = "test_SD_" + getRandString(10);
+    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+
+    AutoFitTableAppender appender1("", "res1_SDT", *conn300);
+    AutoFitTableAppender appender2("", "res2_SDT", *conn300);
+
+    auto batchhandler = [&](vector<Message> msgs)
+    {
+        LockGuard<Mutex> lock(&mutex);
+        for (auto &msg : msgs)
+        {
+            const string &symbol = msg.getSymbol();
+            bool succeeded = false;
+            TableSP tmp = AnyVectorToTable(msg);
+            while(!succeeded){
+                try
+                {
+                    if (symbol == "msg1")
+                    {
+                        appender1.append(tmp);
+                        msg1_total += 1;
+                    }
+                    else if (symbol == "msg2")
+                    {
+                        appender2.append(tmp);
+                        msg2_total += 1;
+                    }
+                    succeeded = true;
+                }
+                catch(const std::exception& e)
+                {
+                    Util::sleep(100);
+                }
+            }
+            if (msg.getOffset() == 1999)
+            {
+                notify.set();
+            }
+        }
+    };
+
+    ThreadedClient threadedClient = ThreadedClient(scfg);
+    auto thread2 = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, true, 1, 1.0, false, "admin", "123456", sdsp);
+    thread2->setAffinity(0);
+    notify.wait();
+    threadedClient.unsubscribe(hostName, port300, st, "mutiSchemaBatch");
+    EXPECT_TRUE(conn300->run("re = select * from res1_SDT order by datetimev;\
+                        ex = select * from ex1_SDT order by datetimev;\
+                        all(each(eqObj, re.values(), ex.values()))")->getBool());
+    EXPECT_TRUE(conn300->run("re = select * from res2_SDT order by datetimev;\
+                        ex = select * from ex2_SDT order by datetimev;\
+                        all(each(eqObj, re.values(), ex.values()))")->getBool());
+    EXPECT_EQ(msg1_total, 1000);
+    EXPECT_EQ(msg2_total, 1000);
+
+}
+
 
 TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamDeserilizer)
 {
@@ -420,7 +561,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
             if(msg.isNull()) {break;}
             else{
                 const string &symbol = msg.getSymbol();
-                bool succeeded = false; 
+                bool succeeded = false;
                 TableSP tmp = AnyVectorToTable(msg);
                 while(!succeeded){
                     try
@@ -448,7 +589,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
                 }
             }
         } });
-        
+
         notify.wait();
         client.unsubscribe(hostName, port, st, "actionTest");
         th1.join();
@@ -481,7 +622,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_1_s
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try
@@ -555,7 +696,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_2_s
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try
@@ -628,6 +769,26 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_with_msgAsTable_True)
     usedPorts.insert(listenport);
 }
 
+
+TEST_F(StreamingDeserilizerTester_basic, test_UDPThreadclient_with_msgAsTable_True)
+{
+    #ifdef _WIN32
+        GTEST_SKIP() << "not support udp on Windows yet.";
+    #endif
+    const string st = "test_SD_" + getRandString(10);
+    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+
+    auto onehandler = [&](Message msg)
+    {
+        const string &symbol = msg.getSymbol();
+        // cout << symbol << endl;
+    };
+
+    ThreadedClient threadedClient = ThreadedClient(scfg);
+    EXPECT_ANY_THROW(auto thread1 = threadedClient.subscribe(hostName, port300, onehandler, st, "test_SD", 0, true, nullptr, true, false, "admin", "123456", sdsp));
+}
+
+
 TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_with_msgAsTable_True)
 {
     int listenport = GetParam();
@@ -686,7 +847,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try
@@ -741,6 +902,73 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
     usedPorts.insert(listenport);
 }
 
+TEST_F(StreamingDeserilizerTester_basic, test_UDPThreadclient_onehandler_subscribeWithstreamDeserilizer_2)
+{
+    #ifdef _WIN32
+        GTEST_SKIP() << "not support udp on Windows yet.";
+    #endif
+    int msg1_total = 0, msg2_total = 0;
+    Signal notify;
+    Mutex mutex;
+    const string st = "test_SD_" + getRandString(10);
+    StreamDeserializerSP sdsp = createStreamDeserializer_2(st);
+
+
+    AutoFitTableAppender appender1("", "res1_SDT", *conn300);
+    AutoFitTableAppender appender2("", "res2_SDT", *conn300);
+
+    auto onehandler = [&](Message msg)
+    {
+        const string &symbol = msg.getSymbol();
+        LockGuard<Mutex> lock(&mutex);
+        bool succeeded = false;
+        TableSP tmp = AnyVectorToTable(msg);
+        while(!succeeded){
+            try
+            {
+                if (symbol == "msg1")
+                {
+                    appender1.append(tmp);
+                    msg1_total += 1;
+                }
+                else if (symbol == "msg2")
+                {
+                    appender2.append(tmp);
+                    msg2_total += 1;
+                }
+                succeeded = true;
+            }
+            catch(const std::exception& e)
+            {
+                Util::sleep(100);
+            }
+        }
+
+        if (msg.getOffset() == 1999)
+        {
+            notify.set();
+        }
+    };
+
+
+    ThreadedClient threadedClient = ThreadedClient(scfg);
+    auto thread1 = threadedClient.subscribe(hostName, port300, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp);
+    thread1->setAffinity(0);
+    notify.wait();
+
+    threadedClient.unsubscribe(hostName, port300, st, "test_SD");
+    EXPECT_TRUE(conn300->run("re = select * from res1_SDT order by datetimev;\
+                        ex = select * from ex1_SDT order by datetimev;\
+                        all(each(eqObj, re.values(), ex.values()))")->getBool());
+    EXPECT_TRUE(conn300->run("re = select * from res2_SDT order by datetimev;\
+                        ex = select * from ex2_SDT order by datetimev;\
+                        all(each(eqObj, re.values(), ex.values()))")->getBool());
+    EXPECT_EQ(msg1_total, 1000);
+    EXPECT_EQ(msg2_total, 1000);
+}
+
+
+
 TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscribeWithstreamDeserilizer_2)
 {
     int msg1_total = 0, msg2_total = 0;
@@ -761,7 +989,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
         for (auto &msg : msgs)
         {
             const string &symbol = msg.getSymbol();
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -849,7 +1077,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
             if(msg.isNull()) {break;}
             else{
                 const string &symbol = msg.getSymbol();
-                bool succeeded = false; 
+                bool succeeded = false;
                 TableSP tmp = AnyVectorToTable(msg);
                 while(!succeeded){
                     try
@@ -909,7 +1137,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_1_s
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try
@@ -983,7 +1211,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_2_s
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try
@@ -1114,7 +1342,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try
@@ -1168,6 +1396,71 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
     usedPorts.insert(listenport);
 }
 
+TEST_F(StreamingDeserilizerTester_basic, test_UDPThreadclient_onehandler_subscribeWithstreamDeserilizer_3)
+{
+    #ifdef _WIN32
+        GTEST_SKIP() << "not support udp on Windows yet.";
+    #endif
+    int msg1_total = 0, msg2_total = 0;
+    Signal notify;
+    Mutex mutex;
+    const string st = "test_SD_" + getRandString(10);
+    StreamDeserializerSP sdsp = createStreamDeserializer_3(st);
+
+    AutoFitTableAppender appender1("", "res1_SDT", *conn300);
+    AutoFitTableAppender appender2("", "res2_SDT", *conn300);
+
+    auto onehandler = [&](Message msg)
+    {
+        const string &symbol = msg.getSymbol();
+        LockGuard<Mutex> lock(&mutex);
+        bool succeeded = false;
+        TableSP tmp = AnyVectorToTable(msg);
+        while(!succeeded){
+            try
+            {
+                if (symbol == "msg1")
+                {
+                    appender1.append(tmp);
+                    msg1_total += 1;
+                }
+                else if (symbol == "msg2")
+                {
+                    appender2.append(tmp);
+                    msg2_total += 1;
+                }
+                succeeded = true;
+            }
+            catch(const std::exception& e)
+            {
+                Util::sleep(100);
+            }
+        }
+
+        if (msg.getOffset() == 1999)
+        {
+            notify.set();
+        }
+    };
+
+    ThreadedClient threadedClient = ThreadedClient(scfg);
+    auto thread1 = threadedClient.subscribe(hostName, port300, onehandler, st, "test_SD", 0, true, nullptr, false, false, "admin", "123456", sdsp);
+    thread1->setAffinity(0);
+    notify.wait();
+
+    threadedClient.unsubscribe(hostName, port300, st, "test_SD");
+    EXPECT_TRUE(conn300->run("re = select * from res1_SDT order by datetimev;\
+                        ex = select * from ex1_SDT order by datetimev;\
+                        all(each(eqObj, re.values(), ex.values()))")->getBool());
+    EXPECT_TRUE(conn300->run("re = select * from res2_SDT order by datetimev;\
+                        ex = select * from ex2_SDT order by datetimev;\
+                        all(each(eqObj, re.values(), ex.values()))")->getBool());
+    EXPECT_EQ(msg1_total, 1000);
+    EXPECT_EQ(msg2_total, 1000);
+}
+
+
+
 TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscribeWithstreamDeserilizer_3)
 {
     int msg1_total = 0, msg2_total = 0;
@@ -1188,7 +1481,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
         for (auto &msg : msgs)
         {
             const string &symbol = msg.getSymbol();
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -1276,7 +1569,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
             if(msg.isNull()) {break;}
             else{
                 const string &symbol = msg.getSymbol();
-                bool succeeded = false; 
+                bool succeeded = false;
                 TableSP tmp = AnyVectorToTable(msg);
                 while(!succeeded){
                     try
@@ -1336,7 +1629,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_1_s
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try
@@ -1409,7 +1702,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_3_s
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try
@@ -1579,7 +1872,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadclient_onehandler_subscri
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try
@@ -1633,6 +1926,75 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadclient_onehandler_subscri
     usedPorts.insert(listenport);
 }
 
+TEST_P(StreamingDeserilizerTester_allTypes, test_UDPThreadclient_onehandler_subscribeWithstreamDeserilizer_allTypes)
+{
+    #ifdef _WIN32
+        GTEST_SKIP() << "not support udp on Windows yet.";
+    #endif
+    int msg1_total = 0, msg2_total = 0;
+    DATA_TYPE ttp = std::get<1>(GetParam()).first;
+    string scr = std::get<1>(GetParam()).second;
+
+    Signal notify;
+    Mutex mutex;
+    const string st = "test_SD_" + getRandString(10);
+    StreamDeserializerSP sdsp = createStreamDeserializer_withallTypes(st, ttp, scr);
+
+    AutoFitTableAppender appender1("", "res1_SDT", *conn300);
+    AutoFitTableAppender appender2("", "res2_SDT", *conn300);
+
+    auto onehandler = [&](Message msg)
+    {
+        const string &symbol = msg.getSymbol();
+        LockGuard<Mutex> lock(&mutex);
+        bool succeeded = false;
+        TableSP tmp = AnyVectorToTable(msg);
+        while(!succeeded){
+            try
+            {
+                if (symbol == "msg1")
+                {
+                    appender1.append(tmp);
+                    msg1_total += 1;
+                }
+                else if (symbol == "msg2")
+                {
+                    appender2.append(tmp);
+                    msg2_total += 1;
+                }
+                succeeded = true;
+            }
+            catch(const std::exception& e)
+            {
+                Util::sleep(100);
+            }
+        }
+
+        if (msg.getOffset() == 1999)
+        {
+            notify.set();
+        }
+    };
+
+    ThreadedClient threadedClient = ThreadedClient(scfg);
+    auto thread1 = threadedClient.subscribe(hostName, port300, onehandler, st, "test_SD", 0, false, nullptr, false, false, "admin", "123456", sdsp);
+    thread1->setAffinity(0);
+    notify.wait();
+
+    threadedClient.unsubscribe(hostName, port300, st, "test_SD");
+    EXPECT_TRUE(conn300->run("re = select * from res1_SDT order by datetimev;\
+                        ex = select * from ex1_SDT order by datetimev;\
+                        all(each(eqObj, re.values(), ex.values()))")->getBool());
+    EXPECT_TRUE(conn300->run("re = select * from res2_SDT order by datetimev;\
+                        ex = select * from ex2_SDT order by datetimev;\
+                        all(each(eqObj, re.values(), ex.values()))")->getBool());
+    EXPECT_EQ(msg1_total, 1000);
+    EXPECT_EQ(msg2_total, 1000);
+
+}
+
+
+
 TEST_P(StreamingDeserilizerTester_allTypes, test_Threadclient_batchhandler_subscribeWithstreamDeserilizer_allTypes)
 {
     int msg1_total = 0, msg2_total = 0;
@@ -1655,7 +2017,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadclient_batchhandler_subsc
         for (auto &msg : msgs)
         {
             const string &symbol = msg.getSymbol();
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -1744,7 +2106,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Pollingclient_subscribeWithstre
             if(msg.isNull()) {break;}
             else{
                 const string &symbol = msg.getSymbol();
-                bool succeeded = false; 
+                bool succeeded = false;
                 TableSP tmp = AnyVectorToTable(msg);
                 while(!succeeded){
                     try
@@ -1806,7 +2168,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadpooledclient_subscribeWit
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try
@@ -1915,7 +2277,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadclient_onehandler_subs
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try
@@ -1969,6 +2331,74 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadclient_onehandler_subs
     usedPorts.insert(listenport);
 }
 
+
+TEST_P(StreamingDeserilizerTester_arrayVector, test_UDPThreadclient_onehandler_subscribeWithstreamDeserilizer_arrayVector)
+{
+    #ifdef _WIN32
+        GTEST_SKIP() << "not support udp on Windows yet.";
+    #endif
+    int msg1_total = 0, msg2_total = 0;
+    DATA_TYPE ttp = std::get<1>(GetParam()).first;
+    string scr = std::get<1>(GetParam()).second;
+
+    Signal notify;
+    Mutex mutex;
+    const string st = "test_SD_" + getRandString(10);
+    StreamDeserializerSP sdsp = createStreamDeserializer_witharrayVector(st, ttp, scr);
+
+    AutoFitTableAppender appender1("", "res1_SDT", *conn300);
+    AutoFitTableAppender appender2("", "res2_SDT", *conn300);
+
+    auto onehandler = [&](Message msg)
+    {
+        const string &symbol = msg.getSymbol();
+        LockGuard<Mutex> lock(&mutex);
+        bool succeeded = false;
+        TableSP tmp = AnyVectorToTable(msg);
+        while(!succeeded){
+            try
+            {
+                if (symbol == "msg1")
+                {
+                    appender1.append(tmp);
+                    msg1_total += 1;
+                }
+                else if (symbol == "msg2")
+                {
+                    appender2.append(tmp);
+                    msg2_total += 1;
+                }
+                succeeded = true;
+            }
+            catch(const std::exception& e)
+            {
+                Util::sleep(100);
+            }
+        }
+
+        if (msg.getOffset() == 1999)
+        {
+            notify.set();
+        }
+    };
+
+    ThreadedClient threadedClient = ThreadedClient(scfg);
+    auto thread1 = threadedClient.subscribe(hostName, port300, onehandler, st, "test_SD", 0, false, nullptr, false, false, "admin", "123456", sdsp);
+    thread1->setAffinity(0);
+    notify.wait();
+
+    threadedClient.unsubscribe(hostName, port300, st, "test_SD");
+    EXPECT_TRUE(conn300->run("re = select * from res1_SDT order by datetimev;\
+                        ex = select * from ex1_SDT order by datetimev;\
+                        all(each(eqObj, re.values(), ex.values()))")->getBool());
+    EXPECT_TRUE(conn300->run("re = select * from res2_SDT order by datetimev;\
+                        ex = select * from ex2_SDT order by datetimev;\
+                        all(each(eqObj, re.values(), ex.values()))")->getBool());
+    EXPECT_EQ(msg1_total, 1000);
+    EXPECT_EQ(msg2_total, 1000);
+}
+
+
 TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadclient_batchhandler_subscribeWithstreamDeserilizer_arrayVector)
 {
     int msg1_total = 0, msg2_total = 0;
@@ -1991,7 +2421,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadclient_batchhandler_su
         for (auto &msg : msgs)
         {
             const string &symbol = msg.getSymbol();
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -2080,7 +2510,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Pollingclient_subscribeWiths
             if(msg.isNull()) {break;}
             else{
                 const string &symbol = msg.getSymbol();
-                bool succeeded = false; 
+                bool succeeded = false;
                 TableSP tmp = AnyVectorToTable(msg);
                 while(!succeeded){
                     try
@@ -2142,7 +2572,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadpooledclient_subscribe
     {
         const string &symbol = msg.getSymbol();
         LockGuard<Mutex> lock(&mutex);
-        bool succeeded = false; 
+        bool succeeded = false;
         TableSP tmp = AnyVectorToTable(msg);
         while(!succeeded){
             try

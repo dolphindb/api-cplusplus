@@ -269,7 +269,7 @@ TEST_F(ScalarTest,testScalar){
     EXPECT_EQ(conn.run("a=NULL;a")->getString(),"");
     EXPECT_ANY_THROW(dateval->getInt128());
 
-    #ifndef WINDOWS
+    #ifndef _WIN32
     Time t1(86400000);
     Time t2(100001);
     Time t3(-1);
@@ -1628,7 +1628,7 @@ TEST_F(ScalarTest,testScalarFunction){
     uuidval2->nullFill(uuidval);
     EXPECT_EQ(uuidval2->getString(), uuidval->getValue()->getString());
 
-    #ifndef WINDOWS
+    #ifndef _WIN32
     Uuid uuidval3 = Uuid(false);
     Uuid uuidval4 = Uuid(true);
     Uuid uuidval5 = Uuid(uuid);
@@ -1659,7 +1659,7 @@ TEST_F(ScalarTest,testScalarFunction){
     ipval2->nullFill(ipval);
     EXPECT_EQ(ipval2->getString(), ipval->getValue()->getString());
 
-    #ifndef WINDOWS
+    #ifndef _WIN32
     const char* ip_1 = "";
     const char* ip_2 = "1.1.1";
     EXPECT_EQ(IPAddr(ip_1, 0).getString(), "0.0.0.0");

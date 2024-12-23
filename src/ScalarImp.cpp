@@ -18,32 +18,14 @@
 #include "ConstantImp.h"
 namespace dolphindb {
 
-static TemporalFormat* monthFormat_;
-static TemporalFormat* dateFormat_;
-static TemporalFormat* minuteFormat_;
-static TemporalFormat* secondFormat_;
-static TemporalFormat* timeFormat_;
-static TemporalFormat* timestampFormat_;
-static TemporalFormat* nanotimeFormat_;
-static TemporalFormat* nanotimestampFormat_;
-static TemporalFormat* datetimeFormat_;
-static TemporalFormat* datehourFormat_;
-static NumberFormat* floatingNormFormat_;
-static NumberFormat* floatingSciFormat_;
-
-void initFormatters(){
-	monthFormat_ = new TemporalFormat("yyyy.MM\\M");
-	dateFormat_ = new TemporalFormat("yyyy.MM.dd");
-	minuteFormat_ = new TemporalFormat("HH:mm\\m");
-	secondFormat_ = new TemporalFormat("HH:mm:ss");
-	timeFormat_ = new TemporalFormat("HH:mm:ss.SSS");
-	timestampFormat_ = new TemporalFormat("yyyy.MM.ddTHH:mm:ss.SSS");
-	nanotimeFormat_ = new TemporalFormat("HH:mm:ss.nnnnnnnnn");
-	nanotimestampFormat_ = new TemporalFormat("yyyy.MM.ddTHH:mm:ss.nnnnnnnnn");
-	datetimeFormat_ = new TemporalFormat("yyyy.MM.ddTHH:mm:ss");
-	datehourFormat_ = new TemporalFormat("yyyy.MM.ddTHH");
-	floatingNormFormat_  = new NumberFormat("0.######");
-	floatingSciFormat_ = new NumberFormat("0.0#####E0");
+std::string DoubleToString(double val){
+    double absVal = std::abs(val);
+    if((absVal>0 && absVal<=0.000001) || absVal>=1000000.0) {
+        static NumberFormat floatingSciFormat("0.0#####E0");
+        return floatingSciFormat.format(val);
+    }
+    static NumberFormat floatingNormFormat("0.######");
+    return floatingNormFormat.format(val);
 }
 
 inline int countTemporalUnit(int days, int multiplier, int remainder){
@@ -353,7 +335,7 @@ Char* Char::parseChar(const string& str){
 		int val = atoi(str.c_str());
 		if(val>127 || val < -128)
 			return NULL;
-		p=new Char(atoi(str.c_str()));
+		p=new Char(static_cast<char>(atoi(str.c_str())));
 	}
 	return p;
 }
@@ -376,7 +358,7 @@ Short* Short::parseShort(const string& str){
 		int val = atoi(str.c_str());
 		if(val>65535 || val < -65536)
 			return NULL;
-		p=new Short(atoi(str.c_str()));
+		p=new Short(static_cast<short>(atoi(str.c_str())));
 	}
 	return p;
 }
@@ -697,7 +679,7 @@ bool IPAddr::parseIP4(const char* str, size_t len, unsigned char* buf){
 		if(i==len || str[i] == '.'){
 			if(curByte < 0 || curByte > 255 || byteIndex > 3)
 				return false;
-			buf[Util::LITTLE_ENDIAN_ORDER ? 3 - byteIndex++ : 12 + byteIndex++ ] = curByte;
+			buf[Util::LITTLE_ENDIAN_ORDER ? 3 - byteIndex++ : 12 + byteIndex++ ] = static_cast<unsigned char>(curByte);
 			curByte = 0;
 			continue;
 		}
@@ -738,11 +720,11 @@ bool IPAddr::parseIP6(const char* str, size_t len, unsigned char* buf){
 				if(curByte < 0 || curByte > 65535 || byteIndex > 15)
 					return false;
 				if(Util::LITTLE_ENDIAN_ORDER){
-					buf[15 - byteIndex++] = curByte>>8;
+					buf[15 - byteIndex++] = static_cast<unsigned char>(curByte>>8);
 					buf[15 - byteIndex++] = curByte & 255;
 				}
 				else{
-					buf[byteIndex++] = curByte>>8;
+					buf[byteIndex++] = static_cast<unsigned char>(curByte>>8);
 					buf[byteIndex++] = curByte & 255;
 				}
 				curByte = 0;
@@ -816,19 +798,13 @@ const long long* Float::getLongConst(INDEX start, int len, long long* buf) const
 }
 
 string Float::toString(float val){
-	if(val == FLT_NMIN)
-		return "";
-	else if(std::isnan(val))
-		return "NaN";
-	else if(std::isinf(val))
-		return "inf";
-
-	float absVal = std::abs(val);
-	if((absVal>0 && absVal<=0.000001) || absVal>=1000000.0){
-		return floatingSciFormat_->format(val);
-	}
-	else
-		return floatingNormFormat_->format(val);
+    if(val == FLT_NMIN)
+        return "";
+    if(std::isnan(val))
+        return "NaN";
+    if(std::isinf(val))
+        return "inf";
+    return DoubleToString(val);
 }
 
 Float* Float::parseFloat(const string& str){
@@ -906,19 +882,13 @@ const long long* Double::getLongConst(INDEX start, int len, long long* buf) cons
 }
 
 string Double::toString(double val){
-	if(val == DBL_NMIN)
-		return "";
-	else if(std::isnan(val))
-		return "NaN";
-	else if(std::isinf(val))
-		return "inf";
-
-	double absVal = std::abs(val);
-	if((absVal>0 && absVal<=0.000001) || absVal>=1000000.0){
-		return floatingSciFormat_->format(val);
-	}
-	else
-		return floatingNormFormat_->format(val);
+    if(val == DBL_NMIN)
+        return "";
+    if(std::isnan(val))
+        return "NaN";
+    if(std::isinf(val))
+        return "inf";
+    return DoubleToString(val);
 }
 
 Double* Double::parseDouble(const string& str){
@@ -972,10 +942,10 @@ Date* Date::parseDate(const string& date){
 }
 
 string Date::toString(int val){
-	if(val == INT_MIN)
-		return "";
-	else
-		return dateFormat_->format(val, DT_DATE);
+    if(val == INT_MIN)
+        return "";
+    static TemporalFormat dateFormat("yyyy.MM.dd");
+    return dateFormat.format(val, DT_DATE);
 }
 
 DateTime::DateTime(int year, int month, int day, int hour, int minute,int second):
@@ -983,24 +953,24 @@ DateTime::DateTime(int year, int month, int day, int hour, int minute,int second
 }
 
 string DateTime::toString(int val){
-	if(val == INT_MIN)
-		return "";
-	else
-		return datetimeFormat_->format(val, DT_DATETIME);
+    if(val == INT_MIN)
+        return "";
+    static TemporalFormat datetimeFormat("yyyy.MM.ddTHH:mm:ss");
+    return datetimeFormat.format(val, DT_DATETIME);
 }
 
 string Month::toString(int val){
-	if(val == INT_MIN)
-		return "";
-	else
-		return monthFormat_->format(val, DT_MONTH);
+    if(val == INT_MIN)
+        return "";
+    static TemporalFormat monthFormat("yyyy.MM\\M");
+    return monthFormat.format(val, DT_MONTH);
 }
 
 string Time::toString(int val){
-	if(val < 0 || val >= 86400000)
-		return "";
-	else
-		return timeFormat_->format(val, DT_TIME);
+    if(val < 0 || val >= 86400000)
+        return "";
+    static TemporalFormat timeFormat("HH:mm:ss.SSS");
+    return timeFormat.format(val, DT_TIME);
 }
 
 void Time::validate(){
@@ -1011,8 +981,8 @@ void Time::validate(){
 string Minute::toString(int val){
 	if(val < 0 || val >= 1440)
 		return "";
-	else
-		return minuteFormat_->format(val, DT_MINUTE);
+    static TemporalFormat minuteFormat("HH:mm\\m");
+	return minuteFormat.format(val, DT_MINUTE);
 }
 
 void Minute::validate(){
@@ -1023,8 +993,8 @@ void Minute::validate(){
 string Second::toString(int val){
 	if(val < 0 || val >= 86400 )
 		return "";
-	else
-		return secondFormat_->format(val, DT_SECOND);
+    static TemporalFormat secondFormat("HH:mm:ss");
+	return secondFormat.format(val, DT_SECOND);
 }
 
 void Second::validate(){
@@ -1039,8 +1009,8 @@ Timestamp::Timestamp(int year, int month, int day,int hour, int minute, int seco
 string Timestamp::toString(long long val){
 	if(val == LLONG_MIN)
 		return "";
-	else
-		return timestampFormat_->format(val, DT_TIMESTAMP);
+    static TemporalFormat timestampFormat("yyyy.MM.ddTHH:mm:ss.SSS");
+	return timestampFormat.format(val, DT_TIMESTAMP);
 }
 
 NanoTimestamp::NanoTimestamp(int year, int month, int day,int hour, int minute, int second, int nanoSecond):
@@ -1050,15 +1020,15 @@ NanoTimestamp::NanoTimestamp(int year, int month, int day,int hour, int minute, 
 string NanoTimestamp::toString(long long val){
 	if(val == LLONG_MIN)
 		return "";
-	else
-		return nanotimestampFormat_->format(val, DT_NANOTIMESTAMP);
+    static TemporalFormat nanotimestampFormat("yyyy.MM.ddTHH:mm:ss.nnnnnnnnn");
+	return nanotimestampFormat.format(val, DT_NANOTIMESTAMP);
 }
 
 string NanoTime::toString(long long val){
-	if(val < 0 || val >= 86400000000000ll)
-		return "";
-	else
-		return nanotimeFormat_->format(val, DT_NANOTIME);
+    if(val < 0 || val >= 86400000000000ll)
+        return "";
+    static TemporalFormat nanotimeFormat("HH:mm:ss.nnnnnnnnn");
+    return nanotimeFormat.format(val, DT_NANOTIME);
 }
 
 void NanoTime::validate(){
@@ -1331,8 +1301,8 @@ DateHour::DateHour(int year, int month, int day, int hour):
 string DateHour::toString(int val){
     if(val == INT_MIN)
         return "";
-    else
-        return datehourFormat_->format(val, DT_DATEHOUR);
+    static TemporalFormat datehourFormat("yyyy.MM.ddTHH");
+    return datehourFormat.format(val, DT_DATEHOUR);
 }
 
 DateHour* DateHour::parseDateHour(const string& str){

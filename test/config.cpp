@@ -1,5 +1,5 @@
 #include "config.h"
-#ifdef WINDOWS
+#ifdef _WIN32
     #include <windows.h>
     #define GET_PID GetCurrentProcessId
 #else
@@ -8,10 +8,10 @@
 
 string hostName = "127.0.0.1";
 string errCode = "0";
-int port = 8848;
+int port = 8902;
 int ctl_port = 8900;
 
-int port300 = 8848;
+int port300 = 9002;
 int ctl_port300 = 9000;
 
 string table = "trades";

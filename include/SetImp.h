@@ -13,6 +13,11 @@
 #include "Set.h"
 #include "Util.h"
 
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4100 )
+#endif
+
 namespace dolphindb {
 
 template<class T>
@@ -210,3 +215,7 @@ public:
 
 }
 #endif /* SETIMP_H_ */
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

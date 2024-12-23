@@ -645,7 +645,7 @@ TEST_F(FunctionTest,test_Util_functions){
     EXPECT_FALSE(Util::strWildCmp("dolphindb","DolphinDB"));
     EXPECT_TRUE(Util::strWildCmp("DolphinDB","DolphinDB"));
 
-    #ifdef WINDOWS
+    #ifdef _WIN32
     EXPECT_TRUE(Util::isWindows());
     #else
     EXPECT_FALSE(Util::isWindows());
@@ -1073,7 +1073,7 @@ TEST_F(FunctionTest,test_Util_functions){
     EXPECT_TRUE(conn.run("eqObj(int128val,int128('e1671797c52e15f763380b45e841ec32'))")->getBool());
     cout<<"--------------All cases passed----------------"<<endl;
 }
-#ifndef WINDOWS
+#ifndef _WIN32
 TEST_F(FunctionTest,test_FastVector_get){
     // todo: when will the variable `index` not IndexArray
     auto base = new SymbolBase(0);
@@ -1293,40 +1293,6 @@ TEST_F(FunctionTest, DBConnection_upload){
     EXPECT_ANY_THROW(dc.run("1+1"));
     dc = std::move(dc);
     dd = std::move(dc);
-}
-
-
-TEST_F(FunctionTest, DLogger){
-    {
-        RecordTime t("name");
-        Util::sleep(200);
-    }
-    char workDir[256]{};
-    const char* path = getcwd(workDir, sizeof(workDir));
-    printf("%s\n", path);
-    std::string file = std::string(workDir).append("/tempFile123");
-    DLogger::SetLogFilePath(file);
-    auto level = DLogger::GetMinLevel();
-    DLogger::Info("123", "345");
-    DLogger::SetLogFilePath("");
-    DLogger::SetMinLevel(DLogger::Level::LevelWarn);
-    DLogger::Info("123", "345");
-    DLogger::Error("123", "345");
-    remove(file.c_str());
-
-    {
-        RecordTime t("name");
-        Util::sleep(100);
-    }
-    {
-        RecordTime t("name2");
-        Util::sleep(100);
-    }
-    {
-        RecordTime t("name2");
-        Util::sleep(200);
-    }
-    RecordTime::printAllTime();
 }
 
 

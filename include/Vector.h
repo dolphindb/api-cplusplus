@@ -1,5 +1,10 @@
 #pragma once
 
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4100 )
+#endif
+
 #include "Constant.h"
 #include "SmartPointer.h"
 
@@ -17,8 +22,8 @@ public:
     virtual INDEX getCapacity() const = 0;
     virtual	INDEX reserve(INDEX capacity) {throw RuntimeException("Vector::reserve method not supported");}
     virtual	void resize(INDEX sz) {throw RuntimeException("Vector::resize method not supported");}
-    virtual INDEX getValueSize() const {throw RuntimeException("Vector::getValueSize method not supported"); return 0;}
-    virtual short getUnitLength() const = 0;
+    virtual INDEX getValueSize() const {throw RuntimeException("Vector::getValueSize method not supported");}
+    virtual size_t getUnitLength() const = 0;
     virtual void clear()=0;
     virtual bool remove(INDEX count){return false;}
     virtual bool remove(const ConstantSP& index){return false;}
@@ -39,7 +44,7 @@ public:
     virtual std::string getScript() const;
     virtual std::string getString(INDEX index) const = 0;
     virtual VECTOR_TYPE getVectorType() const{return VECTOR_TYPE::ARRAY;}
-    virtual bool isSorted(bool asc, bool strict = false) const {throw RuntimeException("Vector::isSorted method not supported"); return false;}
+    virtual bool isSorted(bool asc, bool strict = false) const {throw RuntimeException("Vector::isSorted method not supported");}
     virtual ConstantSP getInstance() const {return getInstance(size());}
     virtual ConstantSP getInstance(INDEX size) const = 0;
     virtual ConstantSP getValue(INDEX capacity) const {throw RuntimeException("Vector::getValue method not supported");}
@@ -74,3 +79,7 @@ private:
 };
 typedef SmartPointer<Vector> VectorSP;
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

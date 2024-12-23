@@ -1,6 +1,6 @@
 #include "Compress.h"
 #include "Util.h"
-#include "LZ4.h"
+#include "lz4.h"
 #include "DolphinDB.h"
 
 const int MAX_DECOMPRESSED_SIZE = 1 << 16;

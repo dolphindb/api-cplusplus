@@ -339,11 +339,11 @@ class StreamingClientImpl {
         explicit SubscribeInfo(const string& id, const string &host, int port, const string &tableName, const string &actionName, long long offset, bool resub,
                                const VectorSP &filter, bool msgAsTable, bool allowExists, int batchSize,
 								const string &userName, const string &password, const StreamDeserializerSP &blobDeserializer, bool isEvent, int resubscribeInterval, bool subOnce, bool convertMsgRowData, int resubscribeTimeout)
-            : ID_(move(id)),
-              host_(move(host)),
+            : ID_(std::move(id)),
+              host_(std::move(host)),
               port_(port),
-              tableName_(move(tableName)),
-              actionName_(move(actionName)),
+              tableName_(std::move(tableName)),
+              actionName_(std::move(actionName)),
               offset_(offset),
               resub_(resub),
               filter_(filter),
@@ -352,8 +352,8 @@ class StreamingClientImpl {
               attributes_(),
               haSites_(0),
               queue_(new MessageQueue(std::max(DEFAULT_QUEUE_CAPACITY, batchSize), batchSize)),
-			  userName_(move(userName)),
-			  password_(move(password)),
+			  userName_(std::move(userName)),
+			  password_(std::move(password)),
 			  streamDeserializer_(blobDeserializer),
 			  currentSiteIndex_(-1),
 			  isEvent_(isEvent),
@@ -666,25 +666,22 @@ private:
         }
     }
 
-    bool getNewLeader(const string& s, string &host, int &port) {
-        string msg{s};
-		size_t index = msg.find("<NotLeader>");
-		if (index != string::npos) {
-			index = msg.find(">");
-			string ipport = msg.substr(index + 1);
+    bool getNewLeader(const string& s, string &host, int &port)
+    {
+        size_t index = s.find("<NotLeader>");
+        if (index == string::npos) {
+            return false;
+        }
+        index = s.find(">");
+        string ipport = s.substr(index + 1);
 
-			auto v = Util::split(ipport, ':');
-			if (v.size() < 2) {
-				return false;
-			}
-			host = v[0];
-			port = std::stoi(v[1]);
-			if (port <= 0 || port > 65535) {
-				return false;
-			}
-			return true;
-		}
-		return false;
+        auto v = Util::split(ipport, ':');
+        if (v.size() < 2) {
+            return false;
+        }
+        host = v[0];
+        port = std::stoi(v[1]);
+        return (port > 0 && port <= 65535);
     }
 
 private:
@@ -724,6 +721,7 @@ struct SubscribeClient {
     std::atomic<bool> exit{false};
     int64_t offset{-1};
     MessageHandler handler;
+    StreamDeserializerSP deserializer;
 #ifdef USE_AERON
     std::shared_ptr<aeron::Aeron> aeron;
     std::shared_ptr<aeron::Subscription> subscription;
@@ -738,7 +736,7 @@ public:
         : config_(config) {}
     ~UDPStreamingImpl();
     void subscribe(const SubscribeInfo &info, const SubscribeConfig &config,
-        const std::shared_ptr<DBConnection> &conn, const MessageHandler &handler);
+        const std::shared_ptr<DBConnection> &conn, const MessageHandler &handlerconst, const StreamDeserializerSP &blobDeserializer);
     void unsubscribe(const SubscribeInfo &info);
 private:
     bool parseMessage(DataInputStreamSP data, SubscribeClient &client);
@@ -753,8 +751,11 @@ private:
 };
 
 void UDPStreamingImpl::subscribe(const SubscribeInfo &info, const SubscribeConfig &config,
-    const std::shared_ptr<DBConnection> &conn, const MessageHandler &handler)
+    const std::shared_ptr<DBConnection> &conn, const MessageHandler &handler, const StreamDeserializerSP &blobDeserializer)
 {
+    if (config.msgAsTable && !blobDeserializer.isNull()) {
+        throw RuntimeException("msgAsTable must be false when StreamDeserializer is set.");
+    }
     {
         std::unique_lock<std::mutex> clientsLock{clientsMutex_};
         cleanup();
@@ -774,6 +775,7 @@ void UDPStreamingImpl::subscribe(const SubscribeInfo &info, const SubscribeConfi
     client.columnNames = std::move(getInfo.second);
     client.port = conn->publishTable(info, config, config_.protocol);
     client.msgQueue = std::make_shared<MessageQueue>(1024);
+    client.deserializer = blobDeserializer;
     client.aeron = AeronStart();
     std::string channel = "aeron:udp?endpoint=224.1.1.1:";
     channel += std::to_string(client.port);
@@ -810,16 +812,33 @@ void UDPStreamingImpl::subscribe(const SubscribeInfo &info, const SubscribeConfi
                 client.handler(Message(convertTupleToTable(client.columnNames, msg), msg.getOffset()));
                 continue;
             }
-            auto colSize = msg->size();
-            auto rowSize = msg->get(0)->size();
             auto offset = msg.getOffset();
-            for (INDEX i = 0; i < rowSize && !client.exit; ++i) {
-                VectorSP row = Util::createVector(DT_ANY, colSize, colSize);
-                for (INDEX j = 0; j < colSize; ++j) {
-                    row->set(j, msg->get(j)->get(i));
+            auto &des = client.deserializer;
+            if (!des.isNull()) {
+                vector<VectorSP> rows;
+                vector<std::string> symbols;
+                ErrorCodeInfo errorInfo;
+                if (!des->parseBlob(msg, rows, symbols, errorInfo)) {
+                    cerr << "[ERROR] parse BLOB field failed: " << errorInfo.errorInfo << ", stopping this parse thread." << endl;
+                    break;
                 }
-                Message rowMsg(row, offset++);
-                client.handler(rowMsg);
+                auto symbolIt = symbols.begin();
+                for (auto &row : rows) {
+                    Message m(row, *symbolIt++, des, offset++);
+                    client.handler(m);
+                }
+                rows.clear();
+            } else {
+                auto colSize = msg->size();
+                auto rowSize = msg->get(0)->size();
+                for (INDEX i = 0; i < rowSize && !client.exit; ++i) {
+                    VectorSP row = Util::createVector(DT_ANY, colSize, colSize);
+                    for (INDEX j = 0; j < colSize; ++j) {
+                        row->set(j, msg->get(j)->get(i));
+                    }
+                    Message rowMsg(row, offset++);
+                    client.handler(rowMsg);
+                }
             }
         }
     });
@@ -1005,11 +1024,10 @@ void StreamingClientImpl::checkServerVersion(std::string host, int port, const s
         }
     }
 
-    auto versionStr = conn.run("version()")->getString();
-    auto _ = Util::split(Util::split(versionStr, ' ')[0], '.');
-    auto v0 = std::stoi(_[0]);
-    auto v1 = std::stoi(_[1]);
-    auto v2 = std::stoi(_[2]);
+    auto versionStr = Util::split(conn.version(), '.');
+    auto v0 = std::stoi(versionStr[0]);
+    auto v1 = std::stoi(versionStr[1]);
+    auto v2 = std::stoi(versionStr[2]);
 
     if (v0 == 3 || (v0 == 2 && v1 == 0 && v2 >= 9) || (v0 == 2 && v1 == 10)) {
         //server only support reverse connection
@@ -1194,16 +1212,13 @@ void StreamingClientImpl::reconnect() {
                     auto topic = subscribeInternal(conn, info);
                     insertMeta(info, topic);
                 } catch (std::exception &e) {
-                    if (!info.availableSites_.empty()){
-                        cerr << "failed to resub with exception: " << e.what() << endl;
-                    }
-                    else if (getNewLeader(e.what(), _host, _port)) {
+                    if (getNewLeader(e.what(), _host, _port)) {
                         cerr << "when handle initResub_, Got NotLeaderException, switch to leader node [" << _host << ":" << _port << "] for subscription"  << endl;
                         HAStreamTableInfo haInfo{info.host_, info.port_, info.tableName_, info.actionName_, _host, _port};
                         haStreamTableInfo_.push_back(haInfo);
                         info.host_ = _host;
                         info.port_ = _port;
-                    }else {
+                    } else {
                         cerr << "failed to resub with exception: " << e.what() << endl;
                     }
                     v.emplace_back(info);
@@ -1960,8 +1975,8 @@ void handleConvertRowData(Message& msg, const MessageHandler& handler,  Constant
                 }
             }
         }
-        Message msg(callBackArgs, offsetEnd + row);
-        handler(msg);
+        Message convertedMsg(callBackArgs, offsetEnd + row);
+        handler(convertedMsg);
     }
 }
 
@@ -2015,7 +2030,7 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageHandler &
         if (!userName.empty()) {
             conn->login(userName, password, false);
         }
-        udpImpl_->subscribe(info, config, conn, handler);
+        udpImpl_->subscribe(info, config, conn, handler, blobDeserializer);
         return nullptr;
     }
 #endif
@@ -2086,8 +2101,8 @@ vector<ThreadSP> ThreadPooledClient::subscribe(string host, int port, const Mess
     return ret;
 }
 
-EventClient::EventClient(const std::vector<EventSchema>& eventSchemas, const std::vector<std::string>& eventTimeKeys, const std::vector<std::string>& commonKeys)
-    : StreamingClient(0), eventHandler_(eventSchemas, eventTimeKeys, commonKeys)
+EventClient::EventClient(const std::vector<EventSchema>& eventSchemas, const std::vector<std::string>& eventTimeFields, const std::vector<std::string>& commonFields)
+    : StreamingClient(0), eventHandler_(eventSchemas, eventTimeFields, commonFields)
 {
 
 }

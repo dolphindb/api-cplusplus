@@ -1,7 +1,7 @@
 #ifdef LINUX
 #include "config.h"
 
-class IPCinMemoryTableTest : public testing::Test
+class StreamingIPCinMemoryTableTest : public testing::Test
 {
 protected:
     // Suite
@@ -82,7 +82,7 @@ void insertRow(TableSP table)
     return;
 }
 
-TEST_F(IPCinMemoryTableTest, test_basic)
+TEST_F(StreamingIPCinMemoryTableTest, test_basic)
 {
     thread th1 = thread(insertTask, 10000, 0);
     string tableName = "pubTable";
@@ -108,7 +108,7 @@ TEST_F(IPCinMemoryTableTest, test_basic)
     }
 }
 
-TEST_F(IPCinMemoryTableTest, test_subscribe_tableNameNullstr)
+TEST_F(StreamingIPCinMemoryTableTest, test_subscribe_tableNameNullstr)
 {
     string tableName = "pubTable";
     IPCInMemoryStreamClient IPCMclient;
@@ -121,7 +121,7 @@ TEST_F(IPCinMemoryTableTest, test_subscribe_tableNameNullstr)
     EXPECT_ANY_THROW(ThreadSP thread0 = IPCMclient.subscribe("", nullptr, outputTable, false));
 }
 
-TEST_F(IPCinMemoryTableTest, test_subscribe_tableNameNotExist)
+TEST_F(StreamingIPCinMemoryTableTest, test_subscribe_tableNameNotExist)
 {
     string tableName = "pubTable";
     IPCInMemoryStreamClient IPCMclient;
@@ -134,7 +134,7 @@ TEST_F(IPCinMemoryTableTest, test_subscribe_tableNameNotExist)
     EXPECT_ANY_THROW(ThreadSP thread0 = IPCMclient.subscribe("errTableName", nullptr, outputTable, false));
 }
 
-TEST_F(IPCinMemoryTableTest, test_subscribe_handlerNull)
+TEST_F(StreamingIPCinMemoryTableTest, test_subscribe_handlerNull)
 {
     thread th1 = thread(insertTask, 10000, 0);
     string tableName = "pubTable";
@@ -160,7 +160,7 @@ TEST_F(IPCinMemoryTableTest, test_subscribe_handlerNull)
     }
 }
 
-TEST_F(IPCinMemoryTableTest, test_subscribe_outputTableNull)
+TEST_F(StreamingIPCinMemoryTableTest, test_subscribe_outputTableNull)
 {
     thread th1 = thread(insertTask, 10000, 0);
     string tableName = "pubTable";
@@ -185,7 +185,7 @@ TEST_F(IPCinMemoryTableTest, test_subscribe_outputTableNull)
     EXPECT_TRUE(conn.run("all(each(eqObj, t1.values(), pubTable.values()))")->getBool());
 }
 
-TEST_F(IPCinMemoryTableTest, test_subscribe_outputTableErrorColType)
+TEST_F(StreamingIPCinMemoryTableTest, test_subscribe_outputTableErrorColType)
 {
     string tableName = "pubTable";
     IPCInMemoryStreamClient IPCMclient;
@@ -198,7 +198,7 @@ TEST_F(IPCinMemoryTableTest, test_subscribe_outputTableErrorColType)
     EXPECT_ANY_THROW(ThreadSP thread0 = IPCMclient.subscribe(tableName, nullptr, outputTable, false));
 }
 
-TEST_F(IPCinMemoryTableTest, test_subscribe_outputTableErrorColNum)
+TEST_F(StreamingIPCinMemoryTableTest, test_subscribe_outputTableErrorColNum)
 {
     string tableName = "pubTable";
     IPCInMemoryStreamClient IPCMclient;
@@ -211,7 +211,7 @@ TEST_F(IPCinMemoryTableTest, test_subscribe_outputTableErrorColNum)
     EXPECT_ANY_THROW(ThreadSP thread0 = IPCMclient.subscribe(tableName, nullptr, outputTable, false));
 }
 
-TEST_F(IPCinMemoryTableTest, test_subscribe_overwriteTrue)
+TEST_F(StreamingIPCinMemoryTableTest, test_subscribe_overwriteTrue)
 {
     thread th1 = thread(insertTask, 10000, 0);
     string tableName = "pubTable";
@@ -232,7 +232,7 @@ TEST_F(IPCinMemoryTableTest, test_subscribe_overwriteTrue)
     EXPECT_EQ(conn.run("outputTable.size()")->getInt(), 0);
 }
 
-TEST_F(IPCinMemoryTableTest, test_unsubscribe_tableNameNullstr)
+TEST_F(StreamingIPCinMemoryTableTest, test_unsubscribe_tableNameNullstr)
 {
     thread th1 = thread(insertTask, 10000, 0);
     string tableName = "pubTable";
@@ -252,7 +252,7 @@ TEST_F(IPCinMemoryTableTest, test_unsubscribe_tableNameNullstr)
     IPCMclient.unsubscribe(tableName);
 }
 
-TEST_F(IPCinMemoryTableTest, test_unsubscribe_tableNameNotExist)
+TEST_F(StreamingIPCinMemoryTableTest, test_unsubscribe_tableNameNotExist)
 {
     thread th1 = thread(insertTask, 10000, 0);
     string tableName = "pubTable";
@@ -272,7 +272,7 @@ TEST_F(IPCinMemoryTableTest, test_unsubscribe_tableNameNotExist)
     IPCMclient.unsubscribe(tableName);
 }
 
-TEST_F(IPCinMemoryTableTest, test_subscribe_twice)
+TEST_F(StreamingIPCinMemoryTableTest, test_subscribe_twice)
 {
     thread th1 = thread(insertTask, 10000, 0);
     string tableName = "pubTable";
@@ -292,7 +292,7 @@ TEST_F(IPCinMemoryTableTest, test_subscribe_twice)
     IPCMclient.unsubscribe(tableName);
 }
 
-TEST_F(IPCinMemoryTableTest, test_unsubscribe_twice)
+TEST_F(StreamingIPCinMemoryTableTest, test_unsubscribe_twice)
 {
     thread th1 = thread(insertTask, 10000, 0);
     string tableName = "pubTable";
@@ -312,7 +312,7 @@ TEST_F(IPCinMemoryTableTest, test_unsubscribe_twice)
     IPCMclient.unsubscribe(tableName);
 }
 
-TEST_F(IPCinMemoryTableTest, test_subscribe_hugetable)
+TEST_F(StreamingIPCinMemoryTableTest, test_subscribe_hugetable)
 {
     thread th1 = thread(insertTask, 1000000, 0);
     string tableName = "pubTable";
@@ -345,7 +345,7 @@ TEST_F(IPCinMemoryTableTest, test_subscribe_hugetable)
 }
 
 // https://dolphindb1.atlassian.net/browse/AC-216
-TEST_F(IPCinMemoryTableTest, test_subscribeUnsubscribe_with_gt1048576rows)
+TEST_F(StreamingIPCinMemoryTableTest, test_subscribeUnsubscribe_with_gt1048576rows)
 {
     string tableName = "pubSharedSnapshotTb";
 
@@ -415,7 +415,7 @@ TEST_F(IPCinMemoryTableTest, test_subscribeUnsubscribe_with_gt1048576rows)
     th2.join();
 }
 // https://dolphindb1.atlassian.net/browse/AC-216
-TEST_F(IPCinMemoryTableTest, test_subscribeUnsubscribe_overwriteTrue_with_gt1048576rows)
+TEST_F(StreamingIPCinMemoryTableTest, test_subscribeUnsubscribe_overwriteTrue_with_gt1048576rows)
 {
     string tableName = "pubSharedSnapshotTb";
 

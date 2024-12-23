@@ -72,7 +72,7 @@ namespace STPCT
         int scale64 = rand() % 18;
         int scale128 = rand() % 38;
         printf("#[PARAM] scale32: %d, scale64: %d, scale128: %d\n", scale32, scale64, scale128);
-        string replayScript = 
+        string replayScript =
             "colName =  `ind`cbool`cchar`cshort`cint`clong`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cfloat`cdouble`csymbol`cstring`cblob`cipaddr`cuuid`cint128`cdecimal32`cdecimal64`cdecimal128;"
             "colType = [INT, BOOL, CHAR, SHORT, INT,LONG, DATE, MONTH, TIME, MINUTE, SECOND, DATETIME, TIMESTAMP, NANOTIME, NANOTIMESTAMP, FLOAT, DOUBLE, SYMBOL, STRING, BLOB, IPADDR, UUID, INT128, DECIMAL32(" +
             to_string(scale32) + "), DECIMAL64(" + to_string(scale64) + "), DECIMAL128(" + to_string(scale128) + ")];"
@@ -95,7 +95,7 @@ namespace STPCT
 
     static void createSharedTableAndReplay_withArrayVector(const string &st)
     {
-        string replayScript = 
+        string replayScript =
             "colName = `ts`cbool`cchar`cshort`cint`clong`cdate`cmonth`ctime`cminute`csecond`cdatetime`ctimestamp`cnanotime`cnanotimestamp`cdatehour`cfloat`cdouble`cipaddr`cuuid`cint128`cdecimal32`cdecimal64`cdecimal128;"
             "colType = [TIMESTAMP, BOOL[], CHAR[], SHORT[], INT[],LONG[], DATE[], MONTH[], TIME[], MINUTE[], SECOND[], DATETIME[], TIMESTAMP[], NANOTIME[], NANOTIMESTAMP[], DATEHOUR[], FLOAT[], DOUBLE[], IPADDR[], UUID[], INT128[],DECIMAL32(6)[],DECIMAL64(16)[],DECIMAL128(26)[]];"
             "st1 = streamTable(1:0,colName, colType);"
@@ -148,7 +148,7 @@ namespace STPCT
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -187,6 +187,7 @@ namespace STPCT
             EXPECT_TRUE(conn.run("re = select * from res_STPCT order by datetimev;\
                                 ex = select * from ex_STPCT order by datetimev;\
                                 all(each(eqObj, re.values(), ex.values()))")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total, 1000);
@@ -212,7 +213,7 @@ namespace STPCT
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -251,6 +252,7 @@ namespace STPCT
             EXPECT_TRUE(conn.run("re = select * from res_STPCT order by datetimev;\
                                 ex = select * from ex_STPCT order by datetimev;\
                                 all(each(eqObj, re.values(), ex.values()))")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total, 1000);
@@ -276,7 +278,7 @@ namespace STPCT
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -315,6 +317,7 @@ namespace STPCT
             EXPECT_TRUE(conn.run("re = select * from res_STPCT order by datetimev;\
                                 ex = select * from ex_STPCT order by datetimev;\
                                 all(each(eqObj, re.values(), ex.values()))")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total, 1000);
@@ -340,7 +343,7 @@ namespace STPCT
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -379,6 +382,7 @@ namespace STPCT
             EXPECT_TRUE(conn.run("re = select * from res_STPCT order by datetimev;\
                                 ex = select * from ex_STPCT order by datetimev;\
                                 all(each(eqObj, re.values(), ex.values()))")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total, 1000);
@@ -404,7 +408,7 @@ namespace STPCT
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -443,6 +447,7 @@ namespace STPCT
             EXPECT_TRUE(conn.run("re = select * from res_STPCT order by datetimev;\
                                 ex = select * from ex_STPCT order by datetimev;\
                                 all(each(eqObj, re.values(), ex.values()))")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total, 1000);
@@ -468,7 +473,7 @@ namespace STPCT
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -507,6 +512,7 @@ namespace STPCT
             EXPECT_TRUE(conn.run("re = select * from res_STPCT order by datetimev;\
                                 ex = select * from ex_STPCT order by datetimev;\
                                 all(each(eqObj, re.values(), ex.values()))")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total, 1000);
@@ -696,7 +702,7 @@ namespace STPCT
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -735,6 +741,7 @@ namespace STPCT
             client.unsubscribe(hostName, port, st, "actionTest");
 
             EXPECT_TRUE(conn.run("re = exec sym from res_STPCT; all(re == `b)")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total > 0, true);
@@ -761,7 +768,7 @@ namespace STPCT
         {
             ASSERT_EQ(msg->getForm(), DF_TABLE);
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             while(!succeeded){
                 try
                 {
@@ -800,6 +807,7 @@ namespace STPCT
             EXPECT_TRUE(conn.run("re = select * from res_STPCT order by datetimev;\
                                 ex = select * from ex_STPCT order by datetimev;\
                                 all(each(eqObj, re.values(), ex.values()))")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total, 1000);
@@ -938,7 +946,7 @@ namespace STPCT
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -980,6 +988,7 @@ namespace STPCT
             EXPECT_TRUE(conn.run("re = select * from res_STPCT order by datetimev;\
                                 ex = select * from ex_STPCT order by datetimev;\
                                 all(each(eqObj, re.values(), ex.values()))")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total, 1000);
@@ -1006,7 +1015,7 @@ namespace STPCT
         {
             msg_total+=1;
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -1046,6 +1055,7 @@ namespace STPCT
             EXPECT_TRUE(conn.run("re = select * from res_STPCT order by ind;\
                                 ex = select * from ex_STPCT order by ind;\
                                 all(each(eqObj, re.values(), ex.values()))")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total, 1000);
@@ -1071,7 +1081,7 @@ namespace STPCT
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -1112,6 +1122,7 @@ namespace STPCT
             EXPECT_TRUE(conn.run("re = select * from res_STPCT order by ts;\
                                 ex = select * from ex_STPCT order by ts;\
                                 all(each(eqObj, re.values(), ex.values()))")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total, 1000);
@@ -1137,7 +1148,7 @@ namespace STPCT
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            // bool succeeded = false; 
+            // bool succeeded = false;
             // TableSP tmp = AnyVectorToTable(msg);
             // while(!succeeded){
             //     try
@@ -1199,7 +1210,7 @@ namespace STPCT
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             while(!succeeded){
                 try
                 {
@@ -1239,6 +1250,7 @@ namespace STPCT
             EXPECT_TRUE(conn.run("re = select * from res_STPCT order by datetimev;\
                                 ex = select * from ex_STPCT order by datetimev;\
                                 all(each(eqObj, re.values(), ex.values()))")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total, 1000000);
@@ -1358,7 +1370,7 @@ namespace STPCT
                 };
         };
         void createST(DBConnection& conn, const string& name, const string& dtStr){
-            string s = 
+            string s =
                 "colName = `ts`testCol;"
                 "colType = [TIMESTAMP, "+dtStr+"];"
                 "share streamTable(1:0, colName, colType) as "+name+";"
@@ -1366,7 +1378,7 @@ namespace STPCT
             conn.run(s);
         };
         void insertData(DBConnection& conn, const string& name, const string& colScript){
-            string s = 
+            string s =
                 "row_num = 1000;"
                 "col0 = now()..(now()+row_num-1);"
                 "col1 = "+colScript+";"
@@ -1391,7 +1403,7 @@ namespace STPCT
             typeString = typeString.substr(0, 9) + "(15)";
         else if (typeString.compare(0, 10, "DECIMAL128") == 0)
             typeString = typeString.substr(0, 10) + "(25)";
-        
+
         if (ttp > ARRAY_TYPE_BASE && typeString.compare(0, 7, "DECIMAL") == 0){
             typeString = typeString + "[]";
         }
@@ -1410,7 +1422,7 @@ namespace STPCT
         {
             LockGuard<Mutex> lock(&mutex);
             msg_total += 1;
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -1454,6 +1466,7 @@ namespace STPCT
             EXPECT_TRUE(conn.run("re = select * from res_STPCT order by ts;\
                                 ex = select * from "+st+" order by ts;\
                                 all(each(eqObj, re.values(), ex.values()))")->getBool());
+            Util::sleep(1000);
             EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
 
             EXPECT_EQ(msg_total, 1000);
@@ -1465,4 +1478,38 @@ namespace STPCT
         }
         usedPorts.insert(listenport);
     }
+
+
+    TEST_P(StreamingThreadPooledClientTester, test_resub_true_with_resubscribeTimeout)
+    {
+        string st = "outTables_" + getRandString(10);
+        STPCT::createSharedTableAndReplay(st, 1000);
+
+        int listenport = GetParam();
+        cout << "current listenport is " << listenport << endl;
+        ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 2) : ThreadPooledClient(listenport, 2);
+        if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
+        {
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, false));
+        }
+        else
+        {
+            unsigned int resubscribeTimeout = 500;
+            ThreadPooledClient client1 = listenport == -1? ThreadPooledClient(0, 2) : ThreadPooledClient(listenport, 2);
+            client.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true);
+            auto ths = client1.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "", "", nullptr, {}, 100, false, resubscribeTimeout);
+
+            Util::sleep(resubscribeTimeout+1000);
+            client.unsubscribe(hostName, port, st, DEFAULT_ACTION_NAME);
+            client1.exit();
+            Util::sleep(1000);
+            for (auto t : ths){
+                EXPECT_TRUE(t->isComplete());
+            }
+            EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
+
+        }
+        usedPorts.insert(listenport);
+    }
+
 }

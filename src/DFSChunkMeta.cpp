@@ -5,7 +5,7 @@
 namespace dolphindb {
 
 DFSChunkMeta::DFSChunkMeta(const std::string& path, const Guid& id, int version, int sz, CHUNK_TYPE chunkType, const std::vector<std::string>& sites, long long cid)
-    : Constant(2051), type_(chunkType), replicaCount_(static_cast<char>(sites.size())), version_(version), size_(sz), sites_(0), path_(path), cid_(cid), id_(id) {
+    : Constant(2051), type_(static_cast<char>(chunkType)), replicaCount_(static_cast<char>(sites.size())), version_(version), size_(sz), sites_(0), path_(path), cid_(cid), id_(id) {
     if (replicaCount_ == 0)
         return;
     sites_ = new std::string[replicaCount_];
@@ -14,7 +14,7 @@ DFSChunkMeta::DFSChunkMeta(const std::string& path, const Guid& id, int version,
 }
 
 DFSChunkMeta::DFSChunkMeta(const std::string& path, const Guid& id, int version, int sz, CHUNK_TYPE chunkType, const std::string* sites, int siteCount, long long cid)
-    : Constant(2051), type_(chunkType), replicaCount_(siteCount), version_(version), size_(sz), sites_(0), path_(path), cid_(cid), id_(id) {
+    : Constant(2051), type_(static_cast<char>(chunkType)), replicaCount_(static_cast<char>(siteCount)), version_(version), size_(sz), sites_(0), path_(path), cid_(cid), id_(id) {
     if (replicaCount_ == 0)
         return;
     sites_ = new std::string[replicaCount_];
@@ -39,7 +39,7 @@ DFSChunkMeta::DFSChunkMeta(const DataInputStreamSP& in) : Constant(2051), sites_
         sites_ = new std::string[replicaCount_];
     for (int i = 0; i < replicaCount_; ++i) {
         std::string site;
-        if ((ret = in->readString(site)) != OK)
+        if (in->readString(site) != OK)
             throw RuntimeException("Failed to deserialize DFSChunkMeta object.");
         sites_[i] = site;
     }

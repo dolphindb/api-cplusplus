@@ -45,7 +45,7 @@ protected:
     }
 };
 
-#ifndef WINDOWS
+#ifndef _WIN32
 TEST_F(ArrayVectorTest, testArrayVector_append)
 {
     VectorSP vec = Util::createArrayVector(DT_BOOL_ARRAY, 0, 1);

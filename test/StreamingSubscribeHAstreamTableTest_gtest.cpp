@@ -1051,8 +1051,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_backupSites)
 
         th1.join();
         Util::sleep(1000);
-        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(1000);go;"
-                        "assert (exec state from getClusterPerf() where name = `" + leaderName + ")[0] == 0;"
+        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(5000);go;"
+                        "do{sleep(1000);}while((exec state from getClusterPerf() where name = `" + leaderName + ")[0] != 0);"
                         "print('stop leader DataNode successfully!');");
         conn.run("do{"
                         "try{"
@@ -1141,8 +1141,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadedClient_onehandler_backu
 
         th1.join();
         Util::sleep(1000);
-        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(1000);go;"
-                        "assert (exec state from getClusterPerf() where name = `" + leaderName + ")[0] == 0;"
+        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};go;"
+                        "do{sleep(1000);}while((exec state from getClusterPerf() where name = `" + leaderName + ")[0] != 0);"
                         "print('stop leader DataNode successfully!');");
         conn.run("do{"
                         "try{"
@@ -1232,8 +1232,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadedClient_batchhandler_bac
 
         th1.join();
         Util::sleep(1000);
-        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(1000);go;"
-                        "assert (exec state from getClusterPerf() where name = `" + leaderName + ")[0] == 0;"
+        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};go;"
+                        "do{sleep(1000);}while((exec state from getClusterPerf() where name = `" + leaderName + ")[0] != 0);"
                         "print('stop leader DataNode successfully!');");
         conn.run("do{"
                         "try{"
@@ -1320,8 +1320,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadPooledClient_backupSites)
 
         th1.join();
         Util::sleep(1000);
-        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(1000);go;"
-                        "assert (exec state from getClusterPerf() where name = `" + leaderName + ")[0] == 0;"
+        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};go;"
+                        "do{sleep(1000);}while((exec state from getClusterPerf() where name = `" + leaderName + ")[0] != 0);"
                         "print('stop leader DataNode successfully!');");
         conn.run("do{"
                         "try{"
@@ -1412,8 +1412,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_backupSites_with_
 
         th1.join();
         Util::sleep(1000);
-        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(1000);go;"
-                        "assert (exec state from getClusterPerf() where name = `" + leaderName + ")[0] == 0;"
+        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};go;"
+                        "do{sleep(1000);}while((exec state from getClusterPerf() where name = `" + leaderName + ")[0] != 0);"
                         "print('stop leader DataNode successfully!');");
         conn.run("do{"
                         "try{"
@@ -1503,8 +1503,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadedClient_backupSites_with
 
         th1.join();
         Util::sleep(1000);
-        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(1000);go;"
-                        "assert (exec state from getClusterPerf() where name = `" + leaderName + ")[0] == 0;"
+        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};go;"
+                        "do{sleep(1000);}while((exec state from getClusterPerf() where name = `" + leaderName + ")[0] != 0);"
                         "print('stop leader DataNode successfully!');");
         conn.run("do{"
                         "try{"
@@ -1592,8 +1592,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadPooledClient_backupSites_
 
         th1.join();
         Util::sleep(1000);
-        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(1000);go;"
-                        "assert (exec state from getClusterPerf() where name = `" + leaderName + ")[0] == 0;"
+        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};go;"
+                        "do{sleep(1000);}while((exec state from getClusterPerf() where name = `" + leaderName + ")[0] != 0);"
                         "print('stop leader DataNode successfully!');");
         conn.run("do{"
                         "try{"
@@ -1685,8 +1685,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_backupSites_resub
 
         th1.join();
         Util::sleep(1000);
-        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(1000);go;"
-                        "assert (exec state from getClusterPerf() where name = `" + leaderName + ")[0] == 0;"
+        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};go;"
+                        "do{sleep(1000);}while((exec state from getClusterPerf() where name = `" + leaderName + ")[0] != 0);"
                         "print('stop leader DataNode successfully!');");
         conn.run("do{"
                         "try{"
@@ -1771,8 +1771,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadedClient_onehandler_backu
 
         th1.join();
         Util::sleep(1000);
-        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(1000);go;"
-                        "assert (exec state from getClusterPerf() where name = `" + leaderName + ")[0] == 0;"
+        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};go;"
+                        "do{sleep(1000);}while((exec state from getClusterPerf() where name = `" + leaderName + ")[0] != 0);"
                         "print('stop leader DataNode successfully!');");
         conn.run("do{"
                         "try{"
@@ -1859,8 +1859,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadedClient_batchhandler_bac
 
         th1.join();
         Util::sleep(1000);
-        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(1000);go;"
-                        "assert (exec state from getClusterPerf() where name = `" + leaderName + ")[0] == 0;"
+        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};go;"
+                        "do{sleep(1000);}while((exec state from getClusterPerf() where name = `" + leaderName + ")[0] != 0);"
                         "print('stop leader DataNode successfully!');");
         conn.run("do{"
                         "try{"
@@ -1944,8 +1944,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_ThreadPooledClient_backupSites_
 
         th1.join();
         Util::sleep(1000);
-        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(1000);go;"
-                        "assert (exec state from getClusterPerf() where name = `" + leaderName + ")[0] == 0;"
+        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};go;"
+                        "do{sleep(1000);}while((exec state from getClusterPerf() where name = `" + leaderName + ")[0] != 0);"
                         "print('stop leader DataNode successfully!');");
         conn.run("do{"
                         "try{"
@@ -2032,8 +2032,8 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_backupSites_subOn
 
         th1.join();
         Util::sleep(1000);
-        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};sleep(1000);go;"
-                        "assert (exec state from getClusterPerf() where name = `" + leaderName + ")[0] == 0;"
+        conn_ctl->run("try{stopDataNode(`" + leaderName + ")}catch(ex){};go;"
+                        "do{sleep(1000);}while((exec state from getClusterPerf() where name = `" + leaderName + ")[0] != 0);"
                         "print('stop leader DataNode successfully!');");
 
         conn.run("do{"

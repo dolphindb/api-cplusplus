@@ -176,25 +176,17 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
     }
     if (mode == M_Append) {
         if (dbName_.empty()) {//memory table
-            scriptTableInsert_ = std::move(std::string("tableInsert{") + tableName_ + "}");
-        }
-        else if (isPartionedTable_) {//partitioned table
-            scriptTableInsert_ = std::move(std::string("tableInsert{loadTable(\"") + dbName_ + "\",\"" + tableName_ + "\")}");
-        }
-        else {//single partitioned table
-            scriptTableInsert_ = std::move(std::string("tableInsert{loadTable(\"") + dbName_ + "\",\"" + tableName_ + "\")}");
+            scriptTableInsert_ = std::string("tableInsert{") + tableName_ + "}";
+        } else {
+            scriptTableInsert_ = std::string("tableInsert{loadTable(\"") + dbName_ + "\",\"" + tableName_ + "\")}";
         }
     }
     else if (mode == M_Upsert) {
         //upsert!(obj, newData, [ignoreNull=false], [keyColNames], [sortColumns])
         if (dbName_.empty()) {//memory table
-            scriptTableInsert_ = std::move(std::string("upsert!{") + tableName_);
-        }
-        else if (isPartionedTable_) {//partitioned table
-            scriptTableInsert_ = std::move(std::string("upsert!{loadTable(\"") + dbName_ + "\",\"" + tableName_ + "\")");
-        }
-        else {//single partitioned table
-            scriptTableInsert_ = std::move(std::string("upsert!{loadTable(\"") + dbName_ + "\",\"" + tableName_ + "\")");
+            scriptTableInsert_ = std::string("upsert!{") + tableName_;
+        } else {
+            scriptTableInsert_ = std::string("upsert!{loadTable(\"") + dbName_ + "\",\"" + tableName_ + "\")";
         }
         //ignore newData
         scriptTableInsert_ += ",";

@@ -14,7 +14,7 @@ DBConnectionPoolImpl::DBConnectionPoolImpl(const std::string& hostName, int port
             bool ret = conn->connect(hostName, port, userId, password, "", highAvailability, {},7200, reConnect);
             if(!ret)
                 throw IOException("Failed to connect to " + hostName + ":" + std::to_string(port));
-            workers_.push_back(new Thread(new AsynWorker(*this,latch_, conn, queue_, taskStatus_, hostName, port, userId, password)));
+            workers_.push_back(new Thread(new AsynWorker(*this,latch_, conn, queue_, taskStatus_, hostName, userId, password)));
             workers_.back()->start();
         }
     }
@@ -42,7 +42,7 @@ DBConnectionPoolImpl::DBConnectionPoolImpl(const std::string& hostName, int port
             ret = conn->connect(curhost, curport, userId, password, "", highAvailability, {}, 7200, reConnect);
             if(!ret)
                 throw IOException("Failed to connect to " + curhost + ":" + std::to_string(curport));
-            workers_.push_back(new Thread(new AsynWorker(*this,latch_, conn, queue_, taskStatus_, curhost, curport, userId, password)));
+            workers_.push_back(new Thread(new AsynWorker(*this,latch_, conn, queue_, taskStatus_, curhost, userId, password)));
             workers_.back()->start();
         }
     }

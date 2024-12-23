@@ -17,7 +17,7 @@
 namespace dolphindb {
 
 short ConstantMarshallImp::encodeFlag(const ConstantSP& target, bool compress){
-	short flag = target->getForm() << 8;
+	int flag = target->getForm() << 8;
 	if (compress == false) {
 		if (target->isTable()) {
 			flag += ((Table*)target.get())->getTableType();
@@ -30,7 +30,7 @@ short ConstantMarshallImp::encodeFlag(const ConstantSP& target, bool compress){
 		else
 			flag += DT_COMPRESS;
 	}
-	return flag;
+	return static_cast<short>(flag);
 }
 
 IO_ERR ConstantMarshallImp::flush(){
@@ -200,7 +200,6 @@ bool VectorMarshall::start(const char* requestHeader, size_t headerSize, const C
 	}
 	//flag
 	out_.start(buf_, offset);
-	offset = 0;
 
 	int unitLen = Util::getDataTypeSize(target->getType());
 	CompressionFactory::Header header;
@@ -211,10 +210,10 @@ bool VectorMarshall::start(const char* requestHeader, size_t headerSize, const C
 	else
 		header.flag = 0;
 	header.charCode = -1;
-	header.compressedType = type;
+	header.compressedType = static_cast<char>(type);
 	header.dataType = (char)target->getType();
-	header.unitLength = unitLen;
-	header.reserved = target->getExtraParamForType();
+	header.unitLength = static_cast<char>(unitLen);
+	header.reserved = static_cast<short>(target->getExtraParamForType());
 	header.extra = target->getExtraParamForType();
 	header.elementCount = target->rows();
 	header.checkSum = -1;
@@ -671,7 +670,7 @@ bool VectorUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 	DataInputStreamSP input = in_;
 	DataOutputStreamSP decompressOutput = new DataOutputStream(queue);
 	ThreadSP decodeThread;
-	CompressionFactory::Header compressHeader;
+	CompressionFactory::Header compressHeader{};
 	int valueSize = -1;
 	if (type == DT_COMPRESS) {
 		input->read((char*)&compressHeader, sizeof(compressHeader));
@@ -700,7 +699,7 @@ bool VectorUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 	}
 	DATA_TYPE actualType = type;
 	SymbolBaseSP sym;
-	if(actualType == 128 + DT_SYMBOL){
+	if(static_cast<int>(actualType) == 128 + static_cast<int>(DT_SYMBOL)) {
 		if(symbaseUnmarshall_.isNull())
 			resetSymbolBaseUnmarshall(input, true);
 		if(!symbaseUnmarshall_->start(blocking, ret))
@@ -725,7 +724,7 @@ bool VectorUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
 	if(form == DF_PAIR)
 		obj_ = Util::createPair(actualType, scale_);
 	else if(form == DF_VECTOR){
-		if (actualType == 128 + DT_SYMBOL)
+		if(static_cast<int>(actualType) == 128 + static_cast<int>(DT_SYMBOL))
 			obj_ = Util::createSymbolVector(sym, rows_);
 		else if (actualType <= 64)
 			obj_ = Util::createVector(actualType, rows_, rows_, true, scale_);

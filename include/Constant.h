@@ -1,5 +1,8 @@
 #pragma once
-
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4100 )
+#endif
 #include <string>
 #include "SmartPointer.h"
 #include "Types.h"
@@ -54,7 +57,7 @@ public:
     inline bool transferAsString() const {return flag_ & 64;}
     inline void transferAsString(bool val){ if(val) flag_ |= 64; else flag_ &= ~64;}
     inline DATA_FORM getForm() const {return DATA_FORM(flag_ >> 8);}
-    inline void setForm(DATA_FORM df){ flag_ = (flag_ & 127) + (df << 8);}
+    inline void setForm(DATA_FORM df){ flag_ = (flag_ & static_cast<unsigned short>(127)) + static_cast<unsigned short>(df << 8);}
     inline bool isScalar() const { return getForm()==DF_SCALAR;}
     inline bool isArray() const { return getForm()==DF_VECTOR;}
     inline bool isPair() const { return getForm()==DF_PAIR;}
@@ -250,9 +253,21 @@ public:
     virtual int getSegmentSizeInBit() const { return 0;}
     virtual bool containNotMarshallableObject() const {return false;}
     virtual ConstantSP castTemporal(DATA_TYPE expectType) { throw IncompatibleTypeException(getType(), expectType); }
+protected:
+    void checkSize(const INDEX start, const INDEX length) const
+    {
+        auto mySize = size();
+        if (start < 0 || length < 0 || start >= mySize || length > (mySize - start)) {
+			throw RuntimeException("Invalid index");
+        }
+    }
 private:
     unsigned short flag_;
 
 };
 
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

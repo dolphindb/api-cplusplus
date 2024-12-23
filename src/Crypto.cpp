@@ -12,26 +12,40 @@ namespace dolphindb {
 
 Crypto::Crypto(const std::string &publicKey)
 {
-    keyBio_ = BIO_new_mem_buf(publicKey.data(), publicKey.size() + 1);
-    rsa_ = PEM_read_bio_RSA_PUBKEY(keyBio_, nullptr, nullptr, nullptr);
-    if (rsa_ == nullptr) {
-        BIO_free(keyBio_);
+    bool initSuccess{false};
+    keyBio_ = BIO_new_mem_buf(publicKey.data(), static_cast<int>(publicKey.size()) + 1);
+    rsa_ = PEM_read_bio_PUBKEY(keyBio_, nullptr, nullptr, nullptr);
+    if (rsa_ != nullptr) {
+        ctx_ = EVP_PKEY_CTX_new(rsa_, nullptr);
+    }
+    if (ctx_ != nullptr) {
+        initSuccess = (EVP_PKEY_encrypt_init(ctx_) == 1);
+    }
+    if (!initSuccess) {
+        freeCrypto();
         throw RuntimeException("Invalid RSA public key.");
     }
 }
 
+void Crypto::freeCrypto()
+{
+    // All OpenSSL *_free API does nothing if the argument is null.
+    EVP_PKEY_CTX_free(ctx_);
+    EVP_PKEY_free(rsa_);
+    BIO_free(keyBio_);
+}
+
 Crypto::~Crypto()
 {
-    RSA_free(rsa_);
-    BIO_free(keyBio_);
+    freeCrypto();
 }
 
 auto Crypto::RSAEncrypt(const std::string &text) const -> std::string
 {
-    int rsa_size = RSA_size(rsa_);
+    int rsa_size = EVP_PKEY_size(rsa_);
     std::vector<unsigned char> encrypted(rsa_size);
-    int ret = RSA_public_encrypt(text.size(), (unsigned char*)text.c_str(), encrypted.data(), rsa_, RSA_PKCS1_PADDING);
-    if (ret == -1) {
+    size_t encrypted_len;
+    if (EVP_PKEY_encrypt(ctx_, encrypted.data(), &encrypted_len, (const unsigned char*)text.c_str(), text.size()) != 1) {
         printOpenSSLError();
         throw RuntimeException("Failed to encrypt userId or password.");
     }
@@ -53,7 +67,7 @@ std::string Crypto::Base64Encode(const std::vector<unsigned char> &text) const
     BIO* b64 = BIO_new(BIO_f_base64());
     BIO* bio = BIO_new(BIO_s_mem());
     bio = BIO_push(b64, bio);
-    BIO_write(bio, text.data(), text.size());
+    BIO_write(bio, text.data(), static_cast<int>(text.size()));
     std::ignore = BIO_flush(bio);
     BUF_MEM* bufferPtr;
     BIO_get_mem_ptr(bio, &bufferPtr);

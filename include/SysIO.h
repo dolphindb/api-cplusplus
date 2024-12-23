@@ -8,6 +8,11 @@
 #ifndef SYSIO_H_
 #define SYSIO_H_
 
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4100 )
+#endif
+
 #include <iostream>
 #include <string>
 #include "SmartPointer.h"
@@ -38,13 +43,11 @@ namespace dolphindb {
 
 class Constant;
 class Socket;
-class UdpSocket;
 class DataInputStream;
 class DataOutputStream;
 class DataStream;
 class DataBlock;
 typedef SmartPointer<Socket> SocketSP;
-typedef SmartPointer<UdpSocket> UdpSocketSP;
 typedef SmartPointer<DataInputStream> DataInputStreamSP;
 typedef SmartPointer<DataOutputStream> DataOutputStreamSP;
 typedef SmartPointer<DataStream> DataStreamSP;
@@ -101,28 +104,6 @@ private:
 	SSL* ssl_;
 #endif
 	int keepAliveTime_;
-};
-
-class EXPORT_DECL UdpSocket{
-public:
-	UdpSocket(int port);
-	UdpSocket(const std::string& remoteHost, int remotePort);
-	~UdpSocket();
-	int getPort() const {return port_;}
-	IO_ERR send(const char* buffer, size_t length);
-	IO_ERR recv(char* buffer, size_t length, size_t& actualLength);
-	void setRemotePort(int remotePort){ remotePort_ = remotePort;}
-	IO_ERR bind();
-
-private:
-	int getErrorCode();
-
-private:
-	int port_;
-	std::string remoteHost_;
-	int remotePort_;
-	SOCKET handle_;
-	struct sockaddr_in addrRemote_;
 };
 
 class DataBlock{
@@ -369,8 +350,8 @@ private:
 
 class EXPORT_DECL DataStream : public DataInputStream{
 public:
-	DataStream(const char* data, int size) : DataInputStream(data, size), flag_(1), outBuf_(0), outSize_(0){}
-	DataStream(const SocketSP& socket) : DataInputStream(socket), flag_(3), outBuf_(new char[2048]), outSize_(2048){}
+	DataStream(const char* data, int size) : DataInputStream(data, size), flag_(1), outBuf_(0) {}
+	DataStream(const SocketSP& socket) : DataInputStream(socket), flag_(3), outBuf_(new char[2048]) {}
 	DataStream(FILE* file, bool readable, bool writable);
 	virtual ~DataStream();
 	bool isReadable() const;
@@ -386,7 +367,6 @@ public:
 private:
 	char flag_; // bit0: readable bit1: writable
 	char* outBuf_;
-	size_t outSize_;
 };
 
 struct EXPORT_DECL FileAttributes{
@@ -398,4 +378,9 @@ struct EXPORT_DECL FileAttributes{
 };
 
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif
+
 #endif

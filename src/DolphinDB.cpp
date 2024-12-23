@@ -90,17 +90,17 @@ DBConnection::DBConnection(bool enableSSL, bool asyncTask, int keepAliveTime, bo
 }
 
 DBConnection::DBConnection(DBConnection&& oth) :
-		conn_(move(oth.conn_)), uid_(move(oth.uid_)), pwd_(move(oth.pwd_)),
-		initialScript_(move(oth.initialScript_)), ha_(oth.ha_), enableSSL_(oth.enableSSL_),
+		conn_(std::move(oth.conn_)), uid_(std::move(oth.uid_)), pwd_(std::move(oth.pwd_)),
+		initialScript_(std::move(oth.initialScript_)), ha_(oth.ha_), enableSSL_(oth.enableSSL_),
 		asynTask_(oth.asynTask_),compress_(oth.compress_),nodes_(oth.nodes_),lastConnNodeIndex_(0),
 		reconnect_(oth.reconnect_), closed_(oth.closed_), runSeqNo_(oth.runSeqNo_){}
 
 DBConnection& DBConnection::operator=(DBConnection&& oth) {
     if (this == &oth) { return *this; }
-    conn_ = move(oth.conn_);
-    uid_ = move(oth.uid_);
-    pwd_ = move(oth.pwd_);
-    initialScript_ = move(oth.initialScript_);
+    conn_ = std::move(oth.conn_);
+    uid_ = std::move(oth.uid_);
+    pwd_ = std::move(oth.pwd_);
+    initialScript_ = std::move(oth.initialScript_);
     ha_ = oth.ha_;
     nodes_ = oth.nodes_;
     oth.nodes_.clear();
@@ -157,22 +157,14 @@ bool DBConnection::connect(const string& hostName, int port, const string& userI
 			}
 			try {
 				table = conn_->run("rpc(getControllerAlias(), getClusterPerf)");
-                break;
+				break;
 			}
 			catch (std::exception& e) {
 				std::cerr << "ERROR getting other data nodes, exception: " << e.what() << std::endl;
 				string host;
 				int portNumber = 0;
-				if (connected()) {
-					ExceptionType type = parseException(e.what(), host, portNumber);
-					if (type == ET_IGNORE)
-						continue;
-					else if (type == ET_NEWLEADER || type == ET_NODENOTAVAIL) {
-						switchDataNode(host, portNumber);
-					}
-				}
-				else {
-                    parseException(e.what(), host, portNumber);
+				ExceptionType type = parseException(e.what(), host, portNumber);
+				if (type != ET_UNKNOWN || !connected()) {
 					switchDataNode(host, portNumber);
 				}
 			}
@@ -263,33 +255,19 @@ bool DBConnection::connected() {
 }
 
 bool DBConnection::connectNode(string hostName, int port, int keepAliveTime) {
-	//int attempt = 0;
-	while (closed_ == false) {
-		try {
-			return conn_->connect(hostName, port, uid_, pwd_, enableSSL_, asynTask_, keepAliveTime, compress_,python_);
-		}
-		catch (IOException& e) {
-			if (connected()) {
-				ExceptionType type = parseException(e.what(), hostName, port);
-				if (type != ET_NEWLEADER) {
-					if (type == ET_IGNORE)
-						return true;
-					else if (type == ET_NODENOTAVAIL)
-						return false;
-					else { //UNKNOW
-						std::cerr << "Connect " << hostName << ":" << port << " failed, exception message: " << e.what() << std::endl;
-						return false;
-						//throw;
-					}
-				}
-			}
-			else {
-				return false;
-			}
-		}
-		Util::sleep(100);
-	}
-	return false;
+    //int attempt = 0;
+    while (closed_ == false) {
+        try {
+            return conn_->connect(hostName, port, uid_, pwd_, enableSSL_, asynTask_, keepAliveTime, compress_,python_);
+        } catch (IOException& e) {
+            ExceptionType type = parseException(e.what(), hostName, port);
+            if (!connected() || type != ET_NEWLEADER) {
+                return false;
+            }
+            Util::sleep(100);
+        }
+    }
+    return false;
 }
 
 DBConnection::ExceptionType DBConnection::parseException(const string &msg, string &host, int &port) {
@@ -302,7 +280,7 @@ DBConnection::ExceptionType DBConnection::parseException(const string &msg, stri
 		return ET_NEWLEADER;
 	}
 	else {
-		static string ignoreMsgs[] = { "<ChunkInTransaction>","<DataNodeNotAvail>","<DataNodeNotReady>","DFS is not enabled" };
+		static string ignoreMsgs[] = { "<ChunkInTransaction>","<DataNodeNotAvail>","<DataNodeNotReady>","<ControllerNotReady>","DFS is not enabled" };
 		static int ignoreMsgSize = sizeof(ignoreMsgs) / sizeof(string);
 		for (int i = 0; i < ignoreMsgSize; i++) {
 			index = msg.find(ignoreMsgs[i]);
@@ -314,7 +292,7 @@ DBConnection::ExceptionType DBConnection::parseException(const string &msg, stri
 				return ET_NODENOTAVAIL;
 			}
 		}
-		return ET_UNKNOW;
+		return ET_UNKNOWN;
 	}
 }
 
@@ -397,94 +375,70 @@ void DBConnection::stopPublishTable(const SubscribeInfo &info, TransportationPro
 
 ConstantSP DBConnection::run(const string& script, int priority, int parallelism, int fetchSize, bool clearMemory) {
     LockGuard<Mutex> LockGuard(&mutex_);
-    if (nodes_.empty()==false) {
-        long seqNo = nextSeqNo();
-		while(closed_ == false){
-			try {
-				return conn_->run(script, priority, parallelism, fetchSize, clearMemory, seqNo);
-			}
-			catch (IOException& e) {
-                if(seqNo > 0)
-                    seqNo = -seqNo;
-				string host;
-				int port = 0;
-				if (connected()) {
-					ExceptionType type = parseException(e.what(), host, port);
-					if (type == ET_IGNORE)
-						return new Void();
-					else if (type == ET_UNKNOW)
-						throw;
-				}
-				else {
-					parseException(e.what(), host, port);
-				}
-				switchDataNode(host, port);
-			}
-		}
-    } else {
+    if (nodes_.empty()) {
         return conn_->run(script, priority, parallelism, fetchSize, clearMemory, 0);
+    }
+    long seqNo = nextSeqNo();
+    while(closed_ == false){
+        try {
+            return conn_->run(script, priority, parallelism, fetchSize, clearMemory, seqNo);
+        } catch (IOException& e) {
+            if(seqNo > 0)
+                seqNo = -seqNo;
+            string host;
+            int port = 0;
+            ExceptionType type = parseException(e.what(), host, port);
+            if (type == ET_UNKNOWN && connected()) {
+                 throw;
+            }
+            switchDataNode(host, port);
+        }
     }
     return NULL;
 }
 
 ConstantSP DBConnection::run(const string& funcName, vector<dolphindb::ConstantSP>& args, int priority, int parallelism, int fetchSize, bool clearMemory) {
     LockGuard<Mutex> LockGuard(&mutex_);
-    if (nodes_.empty() == false) {
-        long seqNo = nextSeqNo();
-        while (closed_ == false) {
-			try {
-				return conn_->run(funcName, args, priority, parallelism, fetchSize, clearMemory, seqNo);
-			}
-			catch (IOException& e) {
-                if(seqNo > 0)
-                    seqNo = -seqNo;
-				string host;
-				int port = 0;
-				if (connected()) {
-					ExceptionType type = parseException(e.what(), host, port);
-					if (type == ET_IGNORE)
-						return new Void();
-					else if (type == ET_UNKNOW)
-						throw;
-				}
-				else {
-					parseException(e.what(), host, port);
-				}
-				switchDataNode(host, port);
-			}
-		}
-    } else {
+    if (nodes_.empty()) {
         return conn_->run(funcName, args, priority, parallelism, fetchSize, clearMemory, 0);
+    }
+    long seqNo = nextSeqNo();
+    while (closed_ == false) {
+        try {
+            return conn_->run(funcName, args, priority, parallelism, fetchSize, clearMemory, seqNo);
+        } catch (IOException& e) {
+            if(seqNo > 0) {
+                seqNo = -seqNo;
+            }
+            std::string host;
+            int port = 0;
+            ExceptionType type = parseException(e.what(), host, port);
+            if (type == ET_UNKNOWN && connected()) {
+                throw;
+            }
+        }
     }
     return NULL;
 }
 
 ConstantSP DBConnection::upload(const string& name, const ConstantSP& obj) {
     LockGuard<Mutex> LockGuard(&mutex_);
-    if (nodes_.empty() == false) {
-		while (closed_ == false) {
-			try {
-				return conn_->upload(name, obj);
-			}
-			catch (IOException& e) {
-				string host;
-				int port = 0;
-				if (connected()) {
-					ExceptionType type = parseException(e.what(), host, port);
-					if (type == ET_IGNORE)
-						return Constant::void_;
-					else if (type == ET_UNKNOW)
-						throw;
-				}
-				else {
-					parseException(e.what(), host, port);
-				}
-				switchDataNode(host, port);
-			}
-		}
-    } else {
+    if (nodes_.empty()) {
         return conn_->upload(name, obj);
     }
+	while (!closed_) {
+		try {
+			return conn_->upload(name, obj);
+		} catch (IOException& e) {
+			string host;
+			int port = 0;
+			ExceptionType type = parseException(e.what(), host, port);
+            if (type == ET_UNKNOWN && connected()) {
+                throw;
+            }
+			switchDataNode(host, port);
+		}
+	}
 	return Constant::void_;
 }
 
@@ -498,16 +452,10 @@ ConstantSP DBConnection::upload(vector<string>& names, vector<ConstantSP>& objs)
 			catch (IOException& e) {
 				string host;
 				int port = 0;
-				if (connected()) {
-					ExceptionType type = parseException(e.what(), host, port);
-					if (type == ET_IGNORE)
-						return Constant::void_;
-					else if (type == ET_UNKNOW)
-						throw;
-				}
-				else {
-					parseException(e.what(), host, port);
-				}
+				ExceptionType type = parseException(e.what(), host, port);
+                if (type == ET_UNKNOWN && connected()) {
+					throw;
+                }
 				switchDataNode(host, port);
 			}
 		}
@@ -543,8 +491,7 @@ void DBConnection::initClientID(){
     if(nodes_.empty()){
         return;
     }
-    auto versionStr = conn_->run("version()")->getString();
-    versionStr = Util::split(versionStr, ' ')[0];
+    auto versionStr = version();
 
     if ((versionStr >= "1.30.20.5" && versionStr < "2") || versionStr >= "2.00.9") {
         //server support clientId and seqNo
@@ -813,34 +760,28 @@ AutoFitTableAppender::AutoFitTableAppender(string dbUrl, string tableName, DBCon
     VectorSP typeInts;
     DictionarySP tableInfo;
     VectorSP colNames;
-    try {
-        string task;
-        if(dbUrl == ""){
-            task = "schema(" + tableName+ ")";
-            appendScript_ = "tableInsert{" + tableName + "}";
-        }
-        else{
-            task = "schema(loadTable(\"" + dbUrl + "\", \"" + tableName + "\"))";
-            appendScript_ = "tableInsert{loadTable('" + dbUrl + "', '" + tableName + "')}";
-        }
+    string task;
+    if(dbUrl == ""){
+        task = "schema(" + tableName+ ")";
+        appendScript_ = "tableInsert{" + tableName + "}";
+    } else{
+        task = "schema(loadTable(\"" + dbUrl + "\", \"" + tableName + "\"))";
+        appendScript_ = "tableInsert{loadTable('" + dbUrl + "', '" + tableName + "')}";
+    }
         
-        tableInfo =  conn_.run(task);
-        colDefs = tableInfo->getMember("colDefs");
-        cols_ = colDefs->rows();
-        typeInts = colDefs->getColumn("typeInt");
-        colNames = colDefs->getColumn("name");
-        columnCategories_.resize(cols_);
-        columnTypes_.resize(cols_);
-        columnNames_.resize(cols_);
-        for (int i = 0; i < cols_; ++i) {
-            columnTypes_[i] = (DATA_TYPE)typeInts->getInt(i);
-            columnCategories_[i] = Util::getCategory(columnTypes_[i]);
-            columnNames_[i] = colNames->getString(i);
-        }
-        
-    } catch (std::exception& e) {
-        throw e;
-    } 
+    tableInfo =  conn_.run(task);
+    colDefs = tableInfo->getMember("colDefs");
+    cols_ = colDefs->rows();
+    typeInts = colDefs->getColumn("typeInt");
+    colNames = colDefs->getColumn("name");
+    columnCategories_.resize(cols_);
+    columnTypes_.resize(cols_);
+    columnNames_.resize(cols_);
+    for (int i = 0; i < cols_; ++i) {
+        columnTypes_[i] = (DATA_TYPE)typeInts->getInt(i);
+        columnCategories_[i] = Util::getCategory(columnTypes_[i]);
+        columnNames_[i] = colNames->getString(i);
+    }
 }
 
 int AutoFitTableAppender::append(TableSP table){
@@ -978,35 +919,6 @@ void AutoFitTableUpsert::checkColumnType(int col, DATA_CATEGORY category, DATA_T
     }
 }
 
-
-
-DLogger::Level DLogger::minLevel_ = DLogger::LevelDebug;
-std::string DLogger::levelText_[] = { "Debug","Info","Warn","Error" };
-//std::string DLogger::logFilePath_="/tmp/ddb_python_api.log";
-std::string DLogger::logFilePath_;
-void DLogger::SetMinLevel(Level level) {
-	minLevel_ = level;
-}
-
-bool DLogger::WriteLog(std::string &text){
-    puts(text.data());
-    if(logFilePath_.empty()==false){
-        text+="\n";
-        Util::writeFile(logFilePath_.data(),text.data(),text.length());
-    }
-    return true;
-}
-
-bool DLogger::FormatFirst(std::string &text, Level level) {
-	if (level < minLevel_) {
-		return false;
-	}
-	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-	text = text + Util::toMicroTimestampStr(now, true) + ": [" +
-		std::to_string(Util::getCurThreadId()) + "] " + levelText_[level] + ":";
-	return true;
-}
-
 std::unordered_map<std::string, RecordTime::Node*> RecordTime::codeMap_;
 Mutex RecordTime::mapMutex_;
 long RecordTime::lastRecordOrder_ = 0;
@@ -1067,7 +979,7 @@ std::string RecordTime::printAllTime() {
 			}
 		}
         size_t timeCount = node->costTime.size();
-		double sum = sumNsOverflow * (LLONG_MAX / ns2s) + sumNs / ns2s;
+		double sum = sumNsOverflow * (double(LLONG_MAX) / ns2s) + sumNs / ns2s;
         double avg = sum / timeCount;
 		double min = minNs / ns2s;
 		double max = maxNs / ns2s;

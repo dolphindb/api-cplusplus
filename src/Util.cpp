@@ -56,12 +56,12 @@ using std::vector;
 
 static SmartPointer<ConstantFactory> s_constFactory(new ConstantFactory());
 const bool Util::LITTLE_ENDIAN_ORDER = isLittleEndian();
-string Util::VER = "3.00.2.2";
+string Util::VER = "3.00.2.3";
 #ifndef _MSC_VER
 constexpr int Util::BUF_SIZE;
 #endif
-int Util::VERNUM = 30022;
-string Util::BUILD = "2024.11.18";
+int Util::VERNUM = 30023;
+string Util::BUILD = "2024.12.20";
 
 int Util::SEQUENCE_SEARCH_NUM_THRESHOLD = 10;
 int Util::MAX_LENGTH_FOR_ANY_VECTOR = 1048576;
@@ -504,7 +504,7 @@ bool Util::fromHex(const char* str, size_t len, bool littleEndian, unsigned char
 		int lowValue = low >= 97 ? low -87 : (low >= 65 ? low -55 : (low >= 58 ? -1 : low -48));
 		if(highValue < 0 || highValue > 15 || lowValue < 0 || lowValue > 15)
 			return false;
-		data[littleEndian ? (lastPos - i/2) : i/2] = (highValue << 4) + lowValue;
+		data[littleEndian ? (lastPos - i/2) : i/2] = static_cast<unsigned char>((highValue << 4) + lowValue);
 	}
 	return true;
 }
@@ -802,13 +802,13 @@ string Util::replace(const string& str, char pattern, char replacement){
 
 string Util::lower(const string& str){
 	string data(str);
-	std::transform(data.begin(), data.end(), data.begin(), ::tolower);
+	std::transform(data.begin(), data.end(), data.begin(), [](char c){ return static_cast<char>(std::tolower(c)); });
 	return data;
 }
 
 string Util::upper(const string& str){
 	string data(str);
-	std::transform(data.begin(), data.end(), data.begin(), ::toupper);
+	std::transform(data.begin(), data.end(), data.begin(), [](char c){ return static_cast<char>(std::toupper(c)); });
 	return data;
 }
 
@@ -1432,15 +1432,11 @@ bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, long long val, const c
 }
 
 bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, char val, ErrorCodeInfo &errorCodeInfo, int extraParam) {
-	switch (LIKE_TYPE(dataType, DT_CHAR)) {
-	case DATA_TYPE::DT_BOOL:
+	if (LIKE_TYPE(dataType, DT_CHAR) == DATA_TYPE::DT_BOOL) {
 		data->setBool(val);
 		return true;
-	default:
-		return setValue(data, dataType,(long long)val,"char", errorCodeInfo, extraParam);
-		break;
 	}
-	return false;
+	return setValue(data, dataType,(long long)val,"char", errorCodeInfo, extraParam);
 }
 bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, short val, ErrorCodeInfo &errorCodeInfo, int extraParam) {
 	return setValue(data, dataType, (long long)val, "short", errorCodeInfo, extraParam);

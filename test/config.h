@@ -1,5 +1,6 @@
 #pragma once
 #include "gtest/gtest.h"
+#include "gmock/gmock.h"
 #include "DolphinDB.h"
 #include "Util.h"
 #include "BatchTableWriter.h"
@@ -33,6 +34,8 @@ using namespace std;
 using std::atomic_long;
 using std::cout;
 using std::endl;
+using testing::Return;
+using testing::NiceMock;
 
 extern string hostName;
 extern string errCode;
@@ -83,4 +86,18 @@ TableSP AnyVectorToTable(VectorSP vec);
         };\
         undef all;go");
 
-
+#define CLEAR_ENV2(_sessionsp) \
+    _sessionsp->run("\
+        def clear_env(){\
+            for (name in (exec name from objs(true) where shared=true))\
+            {\
+                try{dropStreamTable(name, true)}catch(ex){};go;\
+                try{undef(name, SHARED)}catch(ex){};go;\
+            };\
+        };\
+        pnodeRun(clear_env);\
+        for(db in getClusterDFSDatabases())\
+        {\
+            try{dropDatabase(db)}catch(ex){};go;\
+        };\
+        undef all;go");

@@ -26,7 +26,7 @@ IO_ERR AttributeSerializer::serialize(const ConstantSP& attribute, DataOutputStr
 IO_ERR FastArrayAttributeSerializer::serialize(const ConstantSP &attribute, DataOutputStreamSP outStream){
     int curCount = attribute->size();
     if (curCount == 0) {
-        short tCnt = curCount;
+        short tCnt = static_cast<short>(curCount);
         outStream->write((char*)&tCnt, sizeof(short));
         return OK;
     }
@@ -44,17 +44,17 @@ IO_ERR FastArrayAttributeSerializer::serialize(const ConstantSP &attribute, Data
     outStream->write((char*)&reserved, sizeof(char));
     switch (curCountBytes) {
         case 1 : {
-            unsigned char tCnt = curCount;
+            unsigned char tCnt = static_cast<unsigned char>(curCount);
             outStream->write((char*)&tCnt, sizeof(unsigned char));
             break;
         }
         case 2 : {
-            unsigned short tCnt = curCount;
+            unsigned short tCnt = static_cast<unsigned short>(curCount);
             outStream->write((char*)&tCnt, sizeof(unsigned short));
             break;
         }
         default : {
-            unsigned int tCnt = curCount;
+            unsigned int tCnt = static_cast<unsigned int>(curCount);
             outStream->write((char*)&tCnt, sizeof(unsigned int));
         }
     }
@@ -128,7 +128,7 @@ ConstantSP EventHandler::deserializeAny(DATA_TYPE type, DATA_FORM form, DataInpu
     return unmarshall->getConstant();
 }
 
-bool EventHandler::checkSchema(const std::vector<EventSchema>& eventSchemas, const std::vector<std::string> &expandTimeKeys, const std::vector<std::string>& commonKeys, std::string& errMsg){
+bool EventHandler::checkSchema(const std::vector<EventSchema>& eventSchemas, const std::vector<std::string> &expandTimeKeys, const std::vector<std::string>& commonFields, std::string& errMsg){
     int index = 0;
     for(const auto& schema : eventSchemas){
         if(eventInfos_.count(schema.eventType_) != 0){
@@ -142,19 +142,19 @@ bool EventHandler::checkSchema(const std::vector<EventSchema>& eventSchemas, con
         if(isNeedEventTime_){
             auto iter = std::find(schema.fieldNames_.begin(), schema.fieldNames_.end(), expandTimeKeys[index]);
             if(iter == schema.fieldNames_.end()){
-                errMsg = "Event " + schema.eventType_ + " doesn't contain eventTimeKey " + expandTimeKeys[index];
+                errMsg = "Event " + schema.eventType_ + " doesn't contain eventTimeField " + expandTimeKeys[index];
                 return false;
             }
             schemaEx->timeIndex_ = static_cast<int>(std::distance(schema.fieldNames_.begin(), iter));
         }
 
-        for(const auto& commonKey : commonKeys){
-            auto iter = std::find(schema.fieldNames_.begin(), schema.fieldNames_.end(), commonKey);
+        for(const auto& commonField : commonFields){
+            auto iter = std::find(schema.fieldNames_.begin(), schema.fieldNames_.end(), commonField);
             if(iter == schema.fieldNames_.end()){
-                errMsg = "Event " + schema.eventType_ + " doesn't contain commonField " + commonKey;
+                errMsg = "Event " + schema.eventType_ + " doesn't contain commonField " + commonField;
                 return false;
             }
-            schemaEx->commonKeyIndex_.push_back(static_cast<int>(std::distance(schema.fieldNames_.begin(), iter)));
+            schemaEx->commonFieldIndex_.push_back(static_cast<int>(std::distance(schema.fieldNames_.begin(), iter)));
         }
 
         std::vector<AttributeSerializerSP> serls;
@@ -209,8 +209,8 @@ bool EventHandler::checkSchema(const std::vector<EventSchema>& eventSchemas, con
     return true;
 }
 
-EventHandler::EventHandler(const std::vector<EventSchema>& eventSchemas, const std::vector<std::string>& eventTimeKeys, const std::vector<std::string>& commonKeys)
-    : isNeedEventTime_(false), outputColNums_(0), commonKeySize_(0)
+EventHandler::EventHandler(const std::vector<EventSchema>& eventSchemas, const std::vector<std::string>& eventTimeFields, const std::vector<std::string>& commonFields)
+    : isNeedEventTime_(false), outputColNums_(0), commonFieldSize_(0)
 {
     std::string funcName = "createEventSender";
     //check eventSchemas
@@ -226,37 +226,37 @@ EventHandler::EventHandler(const std::vector<EventSchema>& eventSchemas, const s
         if(event.fieldExtraParams_.empty()){
             event.fieldExtraParams_.resize(length, 0);
         }
-        if(length == 0){
-            throw IllegalArgumentException(funcName, "the eventKey in eventSchema must not be empty");
+        if(length != event.fieldTypes_.size() || length != event.fieldForms_.size() || length != event.fieldExtraParams_.size()){
+            throw IllegalArgumentException(funcName, "Vectors in EventSchema must be of the same length.");
         }
-        if(length != event.fieldExtraParams_.size() || length != event.fieldForms_.size() || length != event.fieldTypes_.size()){
-            throw IllegalArgumentException(funcName, "The number of eventKey, eventTypes, eventForms and eventExtraParams must have the same length.");
+        if(length == 0){
+            throw IllegalArgumentException(funcName, "Empty EventSchema in eventSchemas.");
         }
     }
     size_t eventNum = eventSchemas.size();
 
-    //check eventTimeKeys
+    //check eventTimeFields
     std::vector<std::string> expandTimeKeys;
-    if(!eventTimeKeys.empty()){
-        //if eventTimeKeys only contain one element, it means every event has this key
-        if(eventTimeKeys.size() == 1){
-            expandTimeKeys.resize(eventNum, eventTimeKeys[0]);
+    if(!eventTimeFields.empty()){
+        //if eventTimeFields only contain one element, it means every event has this key
+        if(eventTimeFields.size() == 1){
+            expandTimeKeys.resize(eventNum, eventTimeFields[0]);
         }
         else{
-            if(eventTimeKeys.size() != eventNum){
-                throw IllegalArgumentException(funcName, "The number of eventTimeKey is inconsistent with the number of events in eventSchemas.");
+            if(eventTimeFields.size() != eventNum){
+                throw IllegalArgumentException(funcName, "The number of eventTimeField is inconsistent with the number of events in eventSchemas.");
             }
-            expandTimeKeys = eventTimeKeys;
+            expandTimeKeys = eventTimeFields;
         }
         isNeedEventTime_ = true;
     }
 
     //prepare eventInfos_
     std::string errMsg;
-    if(!checkSchema(expandEventSchemas, expandTimeKeys, commonKeys, errMsg)){
+    if(!checkSchema(expandEventSchemas, expandTimeKeys, commonFields, errMsg)){
         throw IllegalArgumentException(funcName, errMsg);
     }
-    commonKeySize_ = static_cast<int>(commonKeys.size());
+    commonFieldSize_ = static_cast<int>(commonFields.size());
 }
 
 bool EventHandler::deserializeEvent(ConstantSP obj, std::vector<std::string>& eventTypes, std::vector<std::vector<ConstantSP>>& attributes, ErrorCodeInfo& errorInfo){
@@ -362,7 +362,7 @@ bool EventHandler::serializeEvent(const std::string& eventType, const std::vecto
     }
     oneLineContent->append(Util::createBlob(std::string(outStream->getBuffer(), outStream->size())));
 
-    for(auto commonIndex : info.eventSchema_->commonKeyIndex_){
+    for(auto commonIndex : info.eventSchema_->commonFieldIndex_){
         if(info.eventSchema_->schema_.fieldForms_[commonIndex] == DF_VECTOR){
             VectorSP any = Util::createVector(DT_ANY, 0, 0);
             any->append(attributes[commonIndex]);
@@ -377,7 +377,7 @@ bool EventHandler::serializeEvent(const std::string& eventType, const std::vecto
 }
 
 bool EventHandler::checkOutputTable(TableSP outputTable, std::string& errMsg){
-    outputColNums_ = isNeedEventTime_ ? (3 + commonKeySize_) : (2 + commonKeySize_);
+    outputColNums_ = isNeedEventTime_ ? (3 + commonFieldSize_) : (2 + commonFieldSize_);
     if(outputColNums_ != outputTable->columns()){
         errMsg = "Incompatible outputTable columnns, expected: " + std::to_string(outputColNums_) + ", got: " + std::to_string(outputTable->columns());
         return false;
@@ -385,7 +385,7 @@ bool EventHandler::checkOutputTable(TableSP outputTable, std::string& errMsg){
     int colIdx = 0;
     if(isNeedEventTime_){
         if(Util::getCategory(outputTable->getColumnType(0)) != TEMPORAL){
-            errMsg = "The first column of the output table must be temporal if eventTimeKey is specified.";
+            errMsg = "The first column of the output table must be temporal if eventTimeField is specified.";
             return false;
         }
         colIdx++;

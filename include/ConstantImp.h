@@ -27,7 +27,12 @@
 #include "WideInteger.h"
 #include "SysIO.h"
 #include "Matrix.h"
+#include "FixSTL.h"
 
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4100 )
+#endif
 
 namespace dolphindb {
 
@@ -43,7 +48,7 @@ public:
 	virtual void setNullFlag(bool containNull){containNull_=containNull;}
 	virtual INDEX getCapacity() const {return 0;}
 	virtual bool isFastMode() const {return false;}
-	virtual short getUnitLength() const {return 0;}
+	virtual size_t getUnitLength() const {return 0;}
 	virtual void clear();
 	virtual bool sizeable() const {return true;}
 	virtual DATA_TYPE getType() const {return DT_ANY;}
@@ -306,7 +311,7 @@ public:
 	virtual INDEX getCapacity() const {return capacity_;}
 	virtual bool isFastMode() const {return true;}
 	virtual void* getDataArray() const {return (void*)data_;}
-	virtual short getUnitLength() const {return sizeof(T);}
+	virtual size_t getUnitLength() const {return sizeof(T);}
 	virtual bool sizeable() const {return capacity_>0;}
 	virtual ConstantSP get(INDEX index) const = 0;
 	virtual char getBool() const {
@@ -1466,7 +1471,7 @@ public:
 			}
 		}
 		size_           = index_->size();
-		baseUnitLength_ = value_->getUnitLength();
+		baseUnitLength_ = static_cast<int>(value_->getUnitLength());
 	}
 
 	FastArrayVector(const VectorSP& index, const VectorSP& value) {
@@ -1483,7 +1488,7 @@ public:
 		if(!index->isFastMode())
 			throw RuntimeException("The index vector for the constructor of FastArrayVector must be a regular vector.");
 		baseType_ = value_->getType();
-		baseUnitLength_ = value_->getUnitLength();
+		baseUnitLength_ = static_cast<int>(value_->getUnitLength());
 		dataType_ = (DATA_TYPE)(baseType_ + ARRAY_TYPE_BASE);
 		size_ = index->size();
 		valueSize_ = value->size();
@@ -1524,7 +1529,7 @@ public:
 	virtual ConstantSP    getValue() const;
 	virtual ConstantSP    getValue(INDEX capacity) const;
 	virtual INDEX 		  getCapacity() const { return index_->getCapacity(); }
-	virtual short 		  getUnitLength() const { return value_->getUnitLength(); }
+	virtual size_t 		  getUnitLength() const { return value_->getUnitLength(); }
 	virtual ConstantSP    getInstance(INDEX size) const;
 	virtual INDEX 		  size() const { return size_; }
 	virtual bool 		  sizeable() const {return value_->sizeable();}
@@ -2351,7 +2356,7 @@ public:
 	virtual INDEX getCapacity() const {return static_cast<INDEX>(data_.capacity());}
 	virtual	INDEX reserve(INDEX capacity);
 	virtual bool isFastMode() const {return false;}
-	virtual short getUnitLength() const {return 0;}
+	virtual size_t getUnitLength() const {return 0;}
 	virtual void clear(){
 		data_.clear();
 		containNull_ = false;
@@ -2475,7 +2480,7 @@ public:
 	virtual	INDEX reserve(INDEX capacity);
 	virtual	void resize(INDEX size);
 	virtual bool isFastMode() const {return true;}
-	virtual short getUnitLength() const {return fixedLength_;}
+	virtual size_t getUnitLength() const {return fixedLength_;}
 	virtual void clear();
 	virtual void initialize();
 	virtual bool sizeable() const {return true;}
@@ -3421,34 +3426,53 @@ inline void toDecimal(const std::string &str, int scale, T& rawData) {
     rawData = tempRawData;
 }
 
-template <typename T, typename R>
-inline void valueToDecimalraw(T value, int scale, R* result) {
+template <typename T, typename R, std::enable_if_t<std::is_floating_point<T>::value, bool> = true>
+inline void valueToDecimalraw(T value, int scale, R* result)
+{
     if (scale < 0 || scale > decimal_util::MaxPrecision<R>::value) {
         throw RuntimeException("Scale out of bound (valid range: [0, " + std::to_string(decimal_util::MaxPrecision<R>::value) + "], but get: " + std::to_string(scale) + ")");
     }
+    if(getNullValue<T>() == value){
+        *result = std::numeric_limits<R>::min();
+		return;
+	}
 
+    const auto factor = decimal_util::scaleMultiplier<R>(scale);
+    if (std::trunc(value) != value) {
+        using UU = typename std::conditional<std::is_same<R, wide_integer::int128>::value, long double, double>::type;
+        const UU tmp = static_cast<UU>(value) * static_cast<UU>(factor);
+        if (tmp > static_cast<UU>(std::numeric_limits<R>::max()) || tmp <= static_cast<UU>(std::numeric_limits<R>::min())) {
+            throw MathException("Decimal math overflow");
+        }
+        *result  = static_cast<R>(tmp);
+    } else {
+        if (static_cast<wide_integer::int128>(value) > static_cast<wide_integer::int128>(std::numeric_limits<R>::max()) || static_cast<wide_integer::int128>(value) <= static_cast<wide_integer::int128>(std::numeric_limits<R>::min())) {
+            throw MathException("Decimal math overflow");
+        }
+        bool overflow = decimal_util::mulOverflow(static_cast<R>(value), factor, *result );
+        if (overflow || static_cast<wide_integer::int128>(value) == static_cast<wide_integer::int128>(std::numeric_limits<R>::min())) {
+            throw MathException("Decimal math overflow");
+        }
+    }
+}
+
+template <typename T, typename R, std::enable_if_t<std::is_integral<T>::value, bool> = true>
+inline void valueToDecimalraw(T value, int scale, R* result)
+{
+    if (scale < 0 || scale > decimal_util::MaxPrecision<R>::value) {
+        throw RuntimeException("Scale out of bound (valid range: [0, " + std::to_string(decimal_util::MaxPrecision<R>::value) + "], but get: " + std::to_string(scale) + ")");
+    }
     if(getNullValue<T>() == value){
         *result = std::numeric_limits<R>::min();
     }
-    else{
-        const auto factor = decimal_util::scaleMultiplier<R>(scale);
 
-        if ((std::is_same<T, float>::value || std::is_same<T, double>::value) && std::trunc(value) != value) {
-            using UU = typename std::conditional<std::is_same<R, wide_integer::int128>::value, long double, double>::type;
-            const UU tmp = static_cast<UU>(value) * static_cast<UU>(factor);
-            if (tmp > static_cast<UU>(std::numeric_limits<R>::max()) || tmp <= static_cast<UU>(std::numeric_limits<R>::min())) {
-                throw MathException("Decimal math overflow");
-            }
-            *result  = static_cast<R>(tmp);
-        } else {
-            if (static_cast<wide_integer::int128>(value) > static_cast<wide_integer::int128>(std::numeric_limits<R>::max()) || static_cast<wide_integer::int128>(value) <= static_cast<wide_integer::int128>(std::numeric_limits<R>::min())) {
-                throw MathException("Decimal math overflow");
-            }
-            bool overflow = decimal_util::mulOverflow(static_cast<R>(value), factor, *result );
-            if (overflow || static_cast<wide_integer::int128>(value) == static_cast<wide_integer::int128>(std::numeric_limits<R>::min())) {
-                throw MathException("Decimal math overflow");
-            }
-        }
+    const auto factor = decimal_util::scaleMultiplier<R>(scale);
+    if (static_cast<wide_integer::int128>(value) > static_cast<wide_integer::int128>(std::numeric_limits<R>::max()) || static_cast<wide_integer::int128>(value) <= static_cast<wide_integer::int128>(std::numeric_limits<R>::min())) {
+        throw MathException("Decimal math overflow");
+    }
+    bool overflow = decimal_util::mulOverflow(static_cast<R>(value), factor, *result );
+    if (overflow || static_cast<wide_integer::int128>(value) == static_cast<wide_integer::int128>(std::numeric_limits<R>::min())) {
+        throw MathException("Decimal math overflow");
     }
 }
 
@@ -3709,15 +3733,14 @@ public:  /// Interface of Constant
 
         if (target->getType() == DT_DECIMAL32) {
             return compare(*reinterpret_cast<Decimal<int32_t>*>(target.get()));
-        } else if (target->getType() == DT_DECIMAL64) {
-            return compare(*reinterpret_cast<Decimal<int64_t>*>(target.get()));
-        } else if (target->getType() == DT_DECIMAL128) {
-            return compare(*reinterpret_cast<Decimal<wide_integer::int128>*>(target.get()));
-        } else {
-            throw RuntimeException("Unsupported decimal type: " + Util::getDataTypeString(target->getType()));
         }
-
-        return 0;
+		if (target->getType() == DT_DECIMAL64) {
+            return compare(*reinterpret_cast<Decimal<int64_t>*>(target.get()));
+        }
+		if (target->getType() == DT_DECIMAL128) {
+            return compare(*reinterpret_cast<Decimal<wide_integer::int128>*>(target.get()));
+        }
+        throw RuntimeException("Unsupported decimal type: " + Util::getDataTypeString(target->getType()));
     }
 
     int serialize(char *buf, int bufSize, INDEX indexStart, int offset, int &numElement, int &partial) const override {
@@ -4337,4 +4360,9 @@ typedef SmartPointer<FastDecimal32Vector> FastDecimal32VectorSP;
 typedef SmartPointer<FastDecimal64Vector> FastDecimal64VectorSP;
 typedef SmartPointer<FastDecimal128Vector> FastDecimal128VectorSP;
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif
+
 #endif /* CONSTANTIMP_H_ */

@@ -22,7 +22,7 @@ struct EXPORT_DECL EventSchema{
 struct EXPORT_DECL EventSchemaEx{
     EventSchema     schema_;
     int             timeIndex_;
-    std::vector<int>    commonKeyIndex_;
+    std::vector<int>    commonFieldIndex_;
 };
 
 class AttributeSerializer{
@@ -73,12 +73,12 @@ struct EventInfo{
 
 class EventHandler{
 public:
-    EventHandler(const std::vector<EventSchema>& eventSchemas, const std::vector<std::string>& eventTimeKeys, const std::vector<std::string>& commonKeys);
+    EventHandler(const std::vector<EventSchema>& eventSchemas, const std::vector<std::string>& eventTimeFields, const std::vector<std::string>& commonFields);
     bool checkOutputTable(TableSP outputTable, std::string& errMsg);
     bool serializeEvent(const std::string& eventType, const std::vector<ConstantSP>& attributes, std::vector<ConstantSP>& serializedEvent, std::string& errMsg);
     bool deserializeEvent(ConstantSP obj, std::vector<std::string>& eventTypes, std::vector<std::vector<ConstantSP>>& attributes, ErrorCodeInfo& errorInfo);
 private:
-    bool checkSchema(const std::vector<EventSchema>& eventSchemas, const std::vector<std::string> &expandTimeKeys, const std::vector<std::string>& commonKeys, std::string& errMsg);
+    bool checkSchema(const std::vector<EventSchema>& eventSchemas, const std::vector<std::string> &expandTimeKeys, const std::vector<std::string>& commonFields, std::string& errMsg);
     ConstantSP deserializeScalar(DATA_TYPE type, int extraParam, DataInputStreamSP input, IO_ERR& ret);
     ConstantSP deserializeFastArray(DATA_TYPE type, int extraParam, DataInputStreamSP input, IO_ERR& ret);
     ConstantSP deserializeAny(DATA_TYPE type, DATA_FORM form, DataInputStreamSP input, IO_ERR& ret);
@@ -87,7 +87,7 @@ private:
     bool isNeedEventTime_;
 
     int outputColNums_;                 //the number of columns of the output table
-    int commonKeySize_;
+    int commonFieldSize_;
 };
 
 class EXPORT_DECL EventSender{

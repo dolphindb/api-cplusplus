@@ -22,6 +22,11 @@
 #include "Table.h"
 #include "ErrorCodeInfo.h"
 
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4100 )
+#endif
+
 namespace dolphindb {
 
 class Dictionary;
@@ -871,5 +876,9 @@ private:
 };
 
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif
 
 #endif /* UTIL_H_ */

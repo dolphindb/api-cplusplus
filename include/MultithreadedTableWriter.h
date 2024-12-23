@@ -123,7 +123,7 @@ private:
 		WriterThread() : nonemptySignal(false,true){}
 		SmartPointer<DBConnection> conn;
 
-        std::list<std::vector<ConstantSP>*> writeQueue_;   //每个元素都是一个子表，按列排好，最大行数为perVectorSize_
+        std::list<std::vector<ConstantSP>*> writeQueue_;
         std::vector<std::vector<ConstantSP>*> failedQueue_;
         ThreadSP writeThread;
         Signal nonemptySignal;

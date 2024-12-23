@@ -1,12 +1,12 @@
 #include "Types.h"
 #include <string>
-#include <unordered_map>
+#include <map>
 
 namespace dolphindb {
 
 std::string getDataTypeName(DATA_TYPE type)
 {
-    static std::unordered_map<DATA_TYPE, std::string> arrTypeStr {
+    static std::map<DATA_TYPE, std::string> arrTypeStr {
         {DT_VOID, "VOID"},
         {DT_BOOL, "BOOL"},
         {DT_CHAR, "CHAR"},

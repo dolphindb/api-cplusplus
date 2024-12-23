@@ -44,10 +44,10 @@ void BatchTableWriter::addTable(const std::string& dbName, const std::string& ta
     DictionarySP schema;
     std::string tmpDiskGlobal;
     if(tableName.empty()){
-        tableInsert = std::move(std::string("tableInsert{") + dbName + "}");
+        tableInsert = std::string("tableInsert{") + dbName + "}";
         schema = conn.run("schema(" + dbName + ")");
     }else if(partitioned){
-        tableInsert = std::move(std::string("tableInsert{loadTable(\"") + dbName + "\",\"" + tableName + "\")}");
+        tableInsert = std::string("tableInsert{loadTable(\"") + dbName + "\",\"" + tableName + "\")}";
         schema = conn.run(std::string("schema(loadTable(\"") + dbName + "\",\"" + tableName + "\"))");
     }else{
         tmpDiskGlobal = "tmpDiskGlobal";
@@ -56,8 +56,8 @@ void BatchTableWriter::addTable(const std::string& dbName, const std::string& ta
         tmpDbName.erase(std::remove(tmpDbName.begin(), tmpDbName.end(), '\\'), tmpDbName.end());
         tmpDbName.erase(std::remove(tmpDbName.begin(), tmpDbName.end(), '/'), tmpDbName.end());
         tmpDiskGlobal = tmpDiskGlobal +  tmpDbName + tableName;
-        tableInsert = std::move(std::string("tableInsert{") + tmpDiskGlobal + "}");
-        saveTable = std::move(std::string("saveTable(database(\"") + dbName + "\")" + "," + tmpDiskGlobal +  ",\"" + tableName + "\", 1)");
+        tableInsert = std::string("tableInsert{") + tmpDiskGlobal + "}";
+        saveTable = std::string("saveTable(database(\"") + dbName + "\")" + "," + tmpDiskGlobal +  ",\"" + tableName + "\", 1)";
         schema = conn.run(std::string("schema(loadTable(\"") + dbName + "\",\"" + tableName + "\"))");
     }
 
@@ -99,7 +99,7 @@ void BatchTableWriter::addTable(const std::string& dbName, const std::string& ta
             colName += "`" + colDefsName->getString(i);
             colType += "`" + colDefsTypeString->getString(i);
         }
-        destTable->createTmpSharedTable = std::move(std::string("share table(") + "1000:0," + colName + "," + colType + ") as " + tmpDiskGlobal);
+        destTable->createTmpSharedTable = std::string("share table(") + "1000:0," + colName + "," + colType + ") as " + tmpDiskGlobal;
     }
 
     DestTable *destTableRawPtr = destTable.get();

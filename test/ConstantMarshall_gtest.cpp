@@ -1582,11 +1582,11 @@ TEST_F(MarshallTest, ConstantFactory_parseConstant){
     EXPECT_ANY_THROW(f.createConstantMatrix((DATA_TYPE)100, 1, 1, 1, 1, nullptr, nullptr, 0, false));
     EXPECT_EQ(DT_VOID, f.getDataType("FOR"));
     EXPECT_EQ(-1, f.getDataForm("FOR"));
-    EXPECT_EQ("UknownType-1", f.getDataTypeString((DATA_TYPE)-1));
-    EXPECT_EQ("UknownForm-1", f.getDataFormString((DATA_FORM)-1));
-    EXPECT_EQ("UknownForm10", f.getDataFormString((DATA_FORM)10));
-    EXPECT_EQ("UknownTable-1", f.getTableTypeString((TABLE_TYPE)-1));
-    EXPECT_EQ("UknownTable10", f.getTableTypeString((TABLE_TYPE)10));
+    EXPECT_EQ("Uknown data type -1", f.getDataTypeString((DATA_TYPE)-1));
+    EXPECT_EQ("Uknown data form -1", f.getDataFormString((DATA_FORM)-1));
+    EXPECT_EQ("Uknown data form 10", f.getDataFormString((DATA_FORM)10));
+    EXPECT_EQ("Uknown table type -1", f.getTableTypeString((TABLE_TYPE)-1));
+    EXPECT_EQ("Uknown table type 10", f.getTableTypeString((TABLE_TYPE)10));
 }
 
 TEST_F(MarshallTest, ConstantFactory_createDictionary){

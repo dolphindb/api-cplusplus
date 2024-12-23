@@ -195,8 +195,7 @@ private:
 
 private:
 	enum ExceptionType {
-		ET_IGNORE = 0,
-		ET_UNKNOW = 1,
+		ET_UNKNOWN = 1,
 		ET_NEWLEADER = 2,
 		ET_NODENOTAVAIL = 3,
 	};

@@ -2238,7 +2238,7 @@ int FastArrayVector::serializeFixedLength(char* buf, int bufSize, INDEX indexSta
 	//one block can't exceed 65535 rows
 	if (targetNumElement > 65535)
 		targetNumElement = 65535;
-	int i = 0;
+	short i = 0;
 	for (; i<targetNumElement && remainingBytes > 0; ++i) {
 		INDEX curStart = pindex[indexStart + i];
 		int curCount = curStart - prevStart;
@@ -2257,22 +2257,17 @@ int FastArrayVector::serializeFixedLength(char* buf, int bufSize, INDEX indexSta
 				partial = (remainingBytes - curCountBytes) / baseUnitLength_;
 				if (partial <= 0) {
 					partial = 0;
-				}
-				else {
+				} else {
 					++i;
-					remainingBytes -= curCountBytes + partial * baseUnitLength_;
 				}
-			}
-			else {
+			} else {
 				if (oldCountBytes != curCountBytes)
 					curCountBytes = oldCountBytes;
 			}
 			break;
 		}
-		else {
-			remainingBytes -= bytesRequired;
-			++numElement;
-		}
+		remainingBytes -= bytesRequired;
+		++numElement;
 	}
 
 	if (UNLIKELY(i == 0))
@@ -2292,7 +2287,7 @@ int FastArrayVector::serializeFixedLength(char* buf, int bufSize, INDEX indexSta
 	if (curCountBytes == 1) {
 		for (int k = 0; k<i; ++k) {
 			INDEX curStart = pindex[indexStart + k];
-			unsigned char curCount = curStart - prevStart;
+			unsigned char curCount = static_cast<unsigned char>(curStart - prevStart);
 			memcpy(buf + k, &curCount, 1);
 			prevStart = curStart;
 		}
@@ -2300,7 +2295,7 @@ int FastArrayVector::serializeFixedLength(char* buf, int bufSize, INDEX indexSta
 	else if (curCountBytes == 2) {
 		for (int k = 0; k<i; ++k) {
 			INDEX curStart = pindex[indexStart + k];
-			unsigned short curCount = curStart - prevStart;
+			unsigned short curCount = static_cast<unsigned short>(curStart - prevStart);
 			memcpy(buf + 2 * k, &curCount, 2);
 			prevStart = curStart;
 		}
@@ -2308,7 +2303,7 @@ int FastArrayVector::serializeFixedLength(char* buf, int bufSize, INDEX indexSta
 	else {
 		for (int k = 0; k<i; ++k) {
 			INDEX curStart = pindex[indexStart + k];
-			unsigned int curCount = curStart - prevStart;
+			unsigned int curCount = static_cast<unsigned int>(curStart - prevStart);
 			memcpy(buf + 4 * k, &curCount, 4);
 			prevStart = curStart;
 		}
@@ -2349,7 +2344,7 @@ ConstantSP FastArrayVector::getInstance(INDEX sz) const {
 	if(sz>0)
 		valueSize = pindex[sz - 1];
 	INDEX capacity = (std::max)(1, valueSize);
-	INDEX bytes = capacity * value_->getUnitLength();
+	INDEX bytes = capacity * static_cast<int>(value_->getUnitLength());
 	unsigned char* data = new unsigned char[bytes];
 	VectorSP value = Util::createVector(baseType_, valueSize, capacity, true, value_->getExtraParamForType(), data);
 	return new FastArrayVector(index, value);
@@ -2987,6 +2982,7 @@ bool FastArrayVector::append(const ConstantSP& value, const ConstantSP& index) {
 }
 
 long long FastArrayVector::count(INDEX start, INDEX length) const {
+	checkSize(start, length);
 	if(!containNull_ || ! value_->getNullFlag())
 		return length;
 
@@ -3078,7 +3074,7 @@ bool FastArrayVector::remove(const ConstantSP& index) {
 	INDEX cursor = newCursor;
 	INDEX newPrev = newCursor == 0 ? 0 : pindex[newCursor - 1];
 	INDEX pre = newPrev;
-	INDEX delIndex = newCursor;
+	INDEX delIndex{};
 
 	INDEX start = 0;
 	while(start < sz){

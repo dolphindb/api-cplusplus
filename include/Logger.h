@@ -2,16 +2,21 @@
 
 #include <string>
 #include "Exports.h"
+#include <spdlog/spdlog.h>
+
 namespace dolphindb {
+
+// The DolphinDB API Logger
+extern std::shared_ptr<spdlog::logger> DdbLogger;
 
 class EXPORT_DECL DLogger {
 public:
     enum Level {
-        LevelDebug,
-        LevelInfo,
-        LevelWarn,
-        LevelError,
-        LevelCount,
+        LevelDebug = spdlog::level::debug,
+        LevelInfo = spdlog::level::info,
+        LevelWarn = spdlog::level::warn,
+        LevelError = spdlog::level::err,
+        LevelCount = spdlog::level::n_levels,
     };
     template<typename... TArgs>
     static bool Info(TArgs... args) {
@@ -39,9 +44,8 @@ public:
 private:
     static Level minLevel_;
     static std::string logFilePath_;
-    static std::string levelText_[LevelCount];
     static bool FormatFirst(std::string &text, Level level);
-    static bool WriteLog(std::string &text);
+    static bool WriteLog(std::string &text, spdlog::level::level_enum level);
     template<typename TA, typename... TArgs>
     static bool Write(std::string &text, Level level, int deepth, TA first, TArgs... args) {
         if (deepth == 0) {
@@ -58,7 +62,7 @@ private:
                 return false;
         }
         text += " " + Create(first);
-        return WriteLog(text);
+        return WriteLog(text, static_cast<spdlog::level::level_enum>(level));
     }
     static std::string Create(const char *value) {
         std::string str(value);

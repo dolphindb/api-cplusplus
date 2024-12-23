@@ -43,6 +43,7 @@
 int main(int argc, char *argv[]){
     // DBConnection::initialize();
     testing::InitGoogleTest(&argc, argv);
+    testing::InitGoogleMock(&argc, argv);
     // test filter example:
     // ?	单个字符
     // *	任意字符

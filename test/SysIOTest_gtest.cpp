@@ -1,3 +1,4 @@
+#define USE_OPENSSL
 #include "config.h"
 
 class SysIOTest:public testing::Test
@@ -53,15 +54,15 @@ TEST_F(SysIOTest, test_Socket_No_Parameter){
     EXPECT_EQ(s1.getPort(),port);
     Socket s2 = Socket(s1.getHandle(), true, 7200);
 
-    char *val = (char *)"ccc579";
+    char *val = (char *)"aksdjopqweknmg812378195;'']=-_1!";
     size_t actualLength = 1;
 
     for(auto i=0;i<10;i++){
-        IO_ERR res = s1.write(val,10, actualLength);
+        IO_ERR res = s1.write(val, 6, actualLength);
         EXPECT_EQ(res, OK);
     }
-    EXPECT_EQ(s1.read(val,10,actualLength), NODATA); // when send tcp-data to connected socket(host:port), it can read datas;
-    EXPECT_EQ(s2.read(val,10,actualLength), NODATA);
+    EXPECT_EQ(s1.read(val,6,actualLength), NODATA); // when send tcp-data to connected socket(host:port), it can read datas;
+    EXPECT_EQ(s2.read(val,6,actualLength), NODATA);
 
     s1.enableTcpNoDelay(true);
     EXPECT_TRUE(s1.ENABLE_TCP_NODELAY);
@@ -75,57 +76,32 @@ TEST_F(SysIOTest, test_Socket_No_Parameter){
     EXPECT_FALSE(s1.isValid());
 }
 
-// TEST_F(SysIOTest, test_Socket_with_Parameter){
-//     Socket s1 = Socket(hostName, port, true, 7200);
-//     EXPECT_TRUE(s1.isValid());
-//     EXPECT_EQ(s1.getHost(), hostName);
-//     EXPECT_EQ(s1.getPort(), port);
-//     cout<<"now get socket handle: "<<s1.getHandle()<<endl;
+TEST_F(SysIOTest, test_Socket_with_Parameter){
+    Socket s1 = Socket(hostName, port, true, 7200);
+    EXPECT_TRUE(s1.isValid());
+    EXPECT_EQ(s1.getHost(), hostName);
+    EXPECT_EQ(s1.getPort(), port);
+    cout<<"now get socket handle: "<<s1.getHandle()<<endl;
 
-//     char *val = (char *)"ccc579";
-//     size_t actualLength = 1;
-//     for(auto i=0;i<10;i++){
-//         IO_ERR res = s1.write(val,10, actualLength);
-//         cout<<res<<endl;
-//         // EXPECT_EQ(res, OK);
-//         Sleep(100);
-//     }
-//     EXPECT_EQ(s1.read(val,10,actualLength), NODATA);
+    char *val = (char *)"ccc579";
+    size_t actualLength = 1;
+    for(auto i=0;i<10;i++){
+        IO_ERR res = s1.write(val,10, actualLength);
+        cout<<res<<endl;
+        // EXPECT_EQ(res, OK);
+        Util::sleep(100);
+    }
+    EXPECT_EQ(s1.read(val,10,actualLength), OTHERERR);
 
-//     s1.enableTcpNoDelay(true);
-//     EXPECT_TRUE(s1.ENABLE_TCP_NODELAY);
+    s1.enableTcpNoDelay(true);
+    EXPECT_TRUE(s1.ENABLE_TCP_NODELAY);
 
-//     EXPECT_TRUE(s1.skipAll());
+    EXPECT_TRUE(s1.skipAll());
 
-//     s1.close();
-//     EXPECT_EQ(s1.write(val,7, actualLength),OTHERERR);
-//     EXPECT_FALSE(s1.isValid());
-// }
-
-
-// TEST_F(SysIOTest, test_UdpSocket){
-//     srand((int)time(NULL));
-//     int port1 = 13900 + rand()%100;
-//     int port2 = 13900 + rand()%100;
-
-//     UdpSocket s1 = UdpSocket(port1);
-//     UdpSocket s2 = UdpSocket(hostName, port2);
-//     s1.bind();
-//     s2.bind();
-
-//     char *buf = (char *)"dolphindb123";
-//     char *recvbuf = new char[10];
-//     size_t actualLength = 1;
-//     cout<<s1.send(buf, 1)<<endl;
-//     cout<<s1.recv(recvbuf, 10, actualLength);
-    
-
-//     // EXPECT_EQ(s1.getPort(), port1);
-//     // EXPECT_EQ(s2.getPort(), port2);
-
-//     delete[] buf, recvbuf;
-
-// }
+    s1.close();
+    EXPECT_EQ(s1.write(val,7, actualLength),DISCONNECTED);
+    EXPECT_FALSE(s1.isValid());
+}
 
 TEST_F(SysIOTest, test_DataStream_scalar_int)
 {
@@ -3038,32 +3014,8 @@ TEST_F(SysIOTest, test_class_Buffer)
     EXPECT_EQ((string)bf3->getBuffer(), buf2);
 }
 
-TEST_F(SysIOTest, test_UdpSocket_Normal){
-    char *readBuf = new char[256];
-    memset(readBuf, 0, 256);
-    size_t readLength = 0;
-    ThreadSP readThread = new Thread(new Executor([=, &readLength](){
-        UdpSocket st(10087);
-        st.bind();
-        st.recv(readBuf, 256, readLength);
-    }));
-    readThread->start();
-    Util::sleep(100);
-    char sendBuf[] = {"Hello World!"};
-    UdpSocket sender("127.0.0.1", 10087);
-    sender.send(sendBuf, sizeof(sendBuf));
-
-    readThread->join();
-    EXPECT_EQ(0, strcmp(readBuf, sendBuf));
-
-    delete[] readBuf;
-}
-
+#ifndef _WIN32
 TEST_F(SysIOTest, test_DataStream_File){
-#ifdef WINDOWS
-    cout<<"skip this case."<<endl;
-    EXPECT_EQ(1,1);
-#else
     char workDir[256]{};
     getcwd(workDir, sizeof(workDir));
     std::string file = std::string(workDir).append(1, '/').append("tempFile123");
@@ -3109,12 +3061,69 @@ TEST_F(SysIOTest, test_DataStream_File){
         EXPECT_EQ(END_OF_STREAM, input->readBytes(buf, 6, actualLength));
     }
     remove(file.c_str());
-#endif
 }
 
-#ifdef USE_OPENSSL
-TEST_F(SysIOTest, test_USE_OPENSSL){
-	const char* openSSLVersion = SSLeay_version(SSLEAY_VERSION);
-	std::cout << "OpenSSL Version: " << openSSLVersion << std::endl;
+TEST_F(SysIOTest, test_DataOutputStream_write){
+    char workDir[256]{};
+    getcwd(workDir, sizeof(workDir));
+    std::string file = std::string(workDir).append(1, '/').append("tempFile123");
+    { //FILE_STREAM
+        FILE* f = fopen(file.c_str(), "w+");
+        ASSERT_NE(f, nullptr);
+        DataOutputStreamSP output = new DataOutputStream(f, true);
+        char buf1[] = "Hello!\r\n";
+        std::size_t sent = 0;
+        EXPECT_EQ(output->write(buf1, strlen(buf1), sent), OK);
+        std::string str = "My Name is\r\n";
+        EXPECT_EQ(output->writeData(str), OK);
+        char buf3[] = "汤姆克兰西！";
+        EXPECT_EQ(output->write(buf3, strlen(buf3), sent), OK);
+        EXPECT_EQ(output->close(), OK);
+
+        std::ifstream ifs(file);
+        std::string data = "";
+        std::string line;
+        while (std::getline(ifs, line)) {
+            data.append(line);
+            data.append("\n");
+        }
+        ifs.close();
+        EXPECT_EQ(data, "Hello!\r\nMy Name is\r\n汤姆克兰西！\n");
+    }
+    { // FILE_STREAM
+        FILE* f = fopen(file.c_str(), "r"); // readonly
+        ASSERT_NE(f, nullptr);
+        DataOutputStreamSP output = new DataOutputStream(f, true);
+        size_t sent = 0;
+        EXPECT_EQ(output->write("123456", 6, sent), OTHERERR);
+    }
+    remove(file.c_str());
+    // { // BIGARRAY_STREAM
+    //     char* buffer = new char[1024*1024];
+    //     DataOutputStreamSP output = new DataOutputStream(BIGARRAY_STREAM);
+    //     char buf1[] = "Hello!\r\n";
+    //     std::size_t sent = 0;
+    //     EXPECT_EQ(output->write(buf1, strlen(buf1), sent), OK);
+
+    // }
 }
+
 #endif
+
+// class Mock_DataOutputStream : public DataOutputStream {
+// public:
+//     size_t myMin(size_t a, size_t b) {
+//         return std::min(a, b);
+//     };
+//     MOCK_METHOD(size_t, std::min<size_t, size_t>, (size_t a, size_t b), (const));
+// };
+
+// TEST_F(SysIOTest, test_DataOutputStream_write_mock){
+//     Mock_DataOutputStream output;
+
+//     char buf1[] = "Hello!\r\n";
+//     std::size_t sent = 0;
+//     EXPECT_CALL(output, myMin(testing::_, testing::_))
+//         .WillOnce(testing::Return(-1));
+//     cout << output.write(buf1, strlen(buf1), sent) << endl;
+// }

@@ -11,6 +11,12 @@
 #include "Util.h"
 #include <unordered_map>
 #include "Dictionary.h"
+
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4100 )
+#endif
+
 namespace dolphindb {
 
 typedef void (*U8VectorReader)(const ConstantSP& value, int start, int count, U8* output);
@@ -380,5 +386,9 @@ private:
 };
 
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif
 
 #endif /* DICTIONARYIMP_H_ */

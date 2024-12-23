@@ -1,7 +1,9 @@
 if (UNIX)
-    target_compile_definitions(${CMAKE_PROJECT_NAME} PUBLIC LINUX)
-else()
-    target_compile_definitions(${CMAKE_PROJECT_NAME} PUBLIC WINDOWS)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE LINUX)
+elseif (WIN32)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE WINDOWS)
+elseif (APPLE)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE MAC)
 endif()
 
 target_include_directories(${CMAKE_PROJECT_NAME}
@@ -26,7 +28,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Format.cpp
     Guid.cpp
     int128.cpp
-    LZ4.cpp
+    Logger.cpp
+    lz4.c
     Matrix.cpp
     MultithreadedTableWriter.cpp
     ScalarImp.cpp

@@ -359,7 +359,7 @@ TemporalFormat::TemporalFormat(const string& form) : quickFormat_(false), segmen
 
 void TemporalFormat::initialize(const string& form) {
 	if(formatMap.empty())
-		formatMap = std::move(TemporalFormat::initFormatMap());
+		formatMap = TemporalFormat::initFormatMap();
 	int len = static_cast<int>(form.length());
 	if(len == 0)
 		throw RuntimeException("The format string can't be empty.");

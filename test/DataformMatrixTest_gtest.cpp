@@ -75,7 +75,7 @@ TEST_F(DataformMatrixTest, testDecimal128Matrix)
     EXPECT_ANY_THROW(VectorSP v1 = Util::createMatrix(DT_DECIMAL128, 2, 2, 4));
 }
 
-#ifndef WINDOWS
+#ifndef _WIN32
 TEST_F(DataformMatrixTest, testBoolMatrix_getValue)
 {
     char val[4] = {1, 1, 0, 0};
@@ -2723,7 +2723,7 @@ TEST_F(DataformMatrixTest, test_Indexedmatrix)
 {
     VectorSP mat = conn.run("m=matrix(1..5, 11..15);\
                 m.rename!(2020.01.01..2020.01.05, `A`B);\
-                m.setIndexedMatrix!()");
+                m.setIndexedMatrix!();m");
     EXPECT_EQ(Util::getDataFormString(mat->getForm()), "MATRIX");
     EXPECT_EQ(mat->getColumnLabel()->getString(), "[\"A\",\"B\"]");
     EXPECT_EQ(mat->getRowLabel()->getString(), "[2020.01.01,2020.01.02,2020.01.03,2020.01.04,2020.01.05]");
@@ -2740,7 +2740,7 @@ TEST_F(DataformMatrixTest, test_Indexedmatrix_gt1048576)
 {
     VectorSP mat = conn.run("m=matrix(1..1100000, -1..-1100000);\
                 m.rename!(datetime(1..1100000), `A`B);\
-                m.setIndexedMatrix!()");
+                m.setIndexedMatrix!();m");
     EXPECT_EQ(Util::getDataFormString(mat->getForm()), "MATRIX");
     EXPECT_EQ(mat->getColumnLabel()->getString(), "[\"A\",\"B\"]");
     VectorSP row_labelv = mat->getRowLabel();
@@ -2884,3 +2884,5 @@ TEST_P(DataformMatrixTest_funcs, test_getWindow_getRow_getColumn){
     delete res, ex;
 
 }
+
+

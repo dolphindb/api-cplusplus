@@ -1,5 +1,10 @@
 #pragma once
 
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4100 )
+#endif
+
 #include "Constant.h"
 #include "SmartPointer.h"
 namespace dolphindb {
@@ -37,3 +42,7 @@ private:
 
 typedef SmartPointer<Dictionary> DictionarySP;
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

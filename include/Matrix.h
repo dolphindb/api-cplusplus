@@ -1,5 +1,10 @@
 #pragma once
 
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4100 )
+#endif
+
 #include "Constant.h"
 #include "Util.h"
 namespace dolphindb {
@@ -32,3 +37,7 @@ protected:
 };
 
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

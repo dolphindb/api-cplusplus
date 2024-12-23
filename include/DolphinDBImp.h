@@ -13,7 +13,6 @@ public:
             throw IOException("Failed to initialize the windows socket.");
         }
     #endif
-        initFormatters();
     }
 };
 

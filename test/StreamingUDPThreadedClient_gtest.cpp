@@ -1,21 +1,7 @@
 #include "config.h"
 
-#define CLEAR_ENV2(_sessionsp) \
-    _sessionsp->run("\
-        def clear_env(){\
-            for (name in (exec name from objs(true) where shared=true))\
-            {\
-                try{dropStreamTable(name, true)}catch(ex){};go;\
-                try{undef(name, SHARED)}catch(ex){};go;\
-            };\
-        };\
-        pnodeRun(clear_env);\
-        for(db in getClusterDFSDatabases())\
-        {\
-            try{dropDatabase(db)}catch(ex){};go;\
-        };\
-        undef all;go");
 
+#ifdef TEST_AERON
 namespace UDPCT
 {
 
@@ -25,11 +11,9 @@ public:
     // Suite
     static void SetUpTestCase()
     {
-        // DBConnection conn;
 
         conn300->initialize();
-        conn.initialize();
-        bool ret = conn300->connect(hostName, port300, "admin", "123456") && conn.connect(hostName, port, "admin", "123456");
+        bool ret = conn300->connect(hostName, port300, "admin", "123456");
         if (!ret)
         {
             cout << "Failed to connect to the server" << endl;
@@ -37,7 +21,6 @@ public:
         else
         {
             cout << "connect to " + hostName + ":" + std::to_string(port300) << endl;
-            cout << "connect to " + hostName + ":" + std::to_string(port) << endl;
         }
         scfg.protocol = TransportationProtocol::UDP;
     }
@@ -199,12 +182,13 @@ TableSP UDPmsgToTable(VectorSP tupleVal)
     return Util::createTable(colNames, columnVecs);
 }
 
-TEST_F(StreamingUDPThreadedClientTester, DISABLED_DDB_version_200)
+TEST_F(StreamingUDPThreadedClientTester, DDB_version_200)
 {
     string st = "outTables_" + getRandString(10);
     UDPCT::createSharedTableAndReplay(st, 1000);
     ThreadedClient client(scfg);
     EXPECT_ANY_THROW(client.subscribe(hostName, port, [](Message msg){}, st));
+    try{client.unsubscribe(hostName, port, st, DEFAULT_ACTION_NAME);}catch(...){};
 }
 
 
@@ -259,7 +243,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_offset_negative)
     Mutex mtx;
     string res_tab = "res_UDPCT";
     int msg_total = 0;
-    AutoFitTableAppender appender("", res_tab, conn);
+    AutoFitTableAppender appender("", res_tab, *conn300);
 
     auto handler = [&](Message msg){
         LockGuard<Mutex> lock(&mtx);
@@ -268,7 +252,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_offset_negative)
         int rows = appender.append(tmp);
         // EXPECT_EQ(rows, msg->get(0)->size());
         // EXPECT_EQ(msg.getOffset(), 100);
-        
+
         if (msg_total == 10)
         {
             notify.set();
@@ -301,7 +285,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_offset_gt0)
     Mutex mtx;
     string res_tab = "res_UDPCT";
     int msg_total = 0;
-    AutoFitTableAppender appender("", res_tab, conn);
+    AutoFitTableAppender appender("", res_tab, *conn300);
 
     auto handler = [&](Message msg){
         LockGuard<Mutex> lock(&mtx);
@@ -310,7 +294,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_offset_gt0)
         TableSP tmp = UDPmsgToTable(msg);
         int rows = appender.append(tmp);
         EXPECT_EQ(rows, msg->get(0)->size());
-        
+
         if (msg_total == 100-10)
         {
             notify.set();
@@ -339,7 +323,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_filter)
     Mutex mtx;
     string res_tab = "res_UDPCT";
     int msg_total = 0;
-    AutoFitTableAppender appender("", res_tab, conn);
+    AutoFitTableAppender appender("", res_tab, *conn300);
 
     auto handler = [&](Message msg){
         LockGuard<Mutex> lock(&mtx);
@@ -348,7 +332,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_filter)
         TableSP tmp = UDPmsgToTable(msg);
         int rows = appender.append(tmp);
         EXPECT_EQ(rows, msg->get(0)->size());
-        
+
         if (msg_total == 34)
         {
             notify.set();
@@ -378,7 +362,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_twice_with_same_action)
     Mutex mtx;
     string res_tab = "res_UDPCT";
     int msg_total = 0;
-    AutoFitTableAppender appender("", res_tab, conn);
+    AutoFitTableAppender appender("", res_tab, *conn300);
 
     auto handler = [&](Message msg){
         LockGuard<Mutex> lock(&mtx);
@@ -387,7 +371,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_twice_with_same_action)
         TableSP tmp = UDPmsgToTable(msg);
         int rows = appender.append(tmp);
         EXPECT_EQ(rows, msg->get(0)->size());
-        
+
         if (msg_total == 2000)
         {
             notify.set();
@@ -415,7 +399,7 @@ TEST_F(StreamingUDPThreadedClientTester, unsubscribe_twice)
     Mutex mtx;
     string res_tab = "res_UDPCT";
     int msg_total = 0;
-    AutoFitTableAppender appender("", res_tab, conn);
+    AutoFitTableAppender appender("", res_tab, *conn300);
 
     auto handler = [&](Message msg){
         LockGuard<Mutex> lock(&mtx);
@@ -424,7 +408,7 @@ TEST_F(StreamingUDPThreadedClientTester, unsubscribe_twice)
         TableSP tmp = UDPmsgToTable(msg);
         int rows = appender.append(tmp);
         EXPECT_EQ(rows, msg->get(0)->size());
-        
+
         if (msg_total == 2000)
         {
             notify.set();
@@ -452,7 +436,7 @@ TEST_F(StreamingUDPThreadedClientTester, not_unsubscribe_after_subscribe)
     Mutex mtx;
     string res_tab = "res_UDPCT";
     int msg_total = 0;
-    AutoFitTableAppender appender("", res_tab, conn);
+    AutoFitTableAppender appender("", res_tab, *conn300);
 
     auto handler = [&](Message msg){
         LockGuard<Mutex> lock(&mtx);
@@ -461,7 +445,7 @@ TEST_F(StreamingUDPThreadedClientTester, not_unsubscribe_after_subscribe)
         TableSP tmp = UDPmsgToTable(msg);
         int rows = appender.append(tmp);
         EXPECT_EQ(rows, msg->get(0)->size());
-        
+
         if (msg_total == 2000)
         {
             notify.set();
@@ -495,7 +479,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_actionName_null)
     Mutex mtx;
     string res_tab = "res_UDPCT";
     int msg_total = 0;
-    AutoFitTableAppender appender("", res_tab, conn);
+    AutoFitTableAppender appender("", res_tab, *conn300);
 
     auto handler = [&](Message msg){
         LockGuard<Mutex> lock(&mtx);
@@ -504,7 +488,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_actionName_null)
         TableSP tmp = UDPmsgToTable(msg);
         int rows = appender.append(tmp);
         EXPECT_EQ(rows, msg->get(0)->size());
-        
+
         if (msg_total == 2000)
         {
             notify.set();
@@ -539,7 +523,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_multithread)
     {
         string res_tab = res_tabs[i];
         auto handler = [=](Message msg){
-            AutoFitTableAppender appender("", res_tab, conn);
+            AutoFitTableAppender appender("", res_tab, *conn300);
             TableSP tmp = UDPmsgToTable(msg);
             int rows = appender.append(tmp);
             EXPECT_EQ(rows, msg->get(0)->size());
@@ -587,7 +571,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_with_alldataTypes)
     Mutex mtx;
     string res_tab = "res_UDPCT";
     int msg_total = 0;
-    AutoFitTableAppender appender("", res_tab, conn);
+    AutoFitTableAppender appender("", res_tab, *conn300);
 
     auto handler = [&](Message msg){
         LockGuard<Mutex> lock(&mtx);
@@ -596,7 +580,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_with_alldataTypes)
         TableSP tmp = UDPmsgToTable(msg);
         int rows = appender.append(tmp);
         EXPECT_EQ(rows, msg->get(0)->size());
-        
+
         if (msg_total == 1000)
         {
             notify.set();
@@ -625,7 +609,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_with_arrayVector)
     Mutex mtx;
     string res_tab = "res_UDPCT";
     int msg_total = 0;
-    AutoFitTableAppender appender("", res_tab, conn);
+    AutoFitTableAppender appender("", res_tab, *conn300);
 
     auto handler = [&](Message msg){
         LockGuard<Mutex> lock(&mtx);
@@ -634,7 +618,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_with_arrayVector)
         TableSP tmp = UDPmsgToTable(msg);
         int rows = appender.append(tmp);
         EXPECT_EQ(rows, msg->get(0)->size());
-        
+
         if (msg_total == 1000)
         {
             notify.set();
@@ -691,11 +675,11 @@ public:
         }
 
         cout << "ok" << endl;
-        CLEAR_ENV(conn);
+        CLEAR_ENV2(conn300);
     }
     virtual void TearDown()
     {
-        CLEAR_ENV(conn);
+        CLEAR_ENV2(conn300);
     }
     static vector<pair<DATA_TYPE, string>> getAVData()
     {
@@ -758,20 +742,20 @@ public:
             };
     };
     void createST(DBConnection& conn, const string& name, const string& dtStr){
-        string s = 
+        string s =
             "colName = `ts`testCol;"
             "colType = [TIMESTAMP, "+dtStr+"];"
             "share streamTable(1:0, colName, colType) as "+name+";"
             "share table(1:0, colName, colType) as res_UDPCT;go;";
-        conn300->run(s);
+        conn.run(s);
     };
     void insertData(DBConnection& conn, const string& name, const string& colScript){
-        string s = 
+        string s =
             "row_num = 1000;"
             "col0 = now()..(now()+row_num-1);"
             "col1 = "+colScript+";"
             "for (i in 0..(row_num-1)){insert into "+name+" values([col0[i]], [col1[i]]);};";
-        conn300->run(s);
+        conn.run(s);
     };
 public:
     static StreamingClientConfig scfg_realtime;
@@ -791,20 +775,20 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         typeString = typeString.substr(0, 9) + "(15)";
     else if (typeString.compare(0, 10, "DECIMAL128") == 0)
         typeString = typeString.substr(0, 10) + "(25)";
-    
+
     if (ttp > ARRAY_TYPE_BASE && typeString.compare(0, 7, "DECIMAL") == 0){
         typeString = typeString + "[]";
     }
     cout << "test type: " << typeString << endl;
 
     const string st = "test_realtime_" + getRandString(10);
-    createST(conn, st, typeString);
+    createST(*conn300, st, typeString);
     ThreadedClient client(scfg_realtime);
     Signal notify;
     Mutex mtx;
     string res_tab = "res_UDPCT";
     int msg_total = 0;
-    AutoFitTableAppender appender("", res_tab, conn);
+    AutoFitTableAppender appender("", res_tab, *conn300);
 
     auto handler = [&](Message msg){
         LockGuard<Mutex> lock(&mtx);
@@ -823,7 +807,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
     string dataScript = GetParam().second;
     std::thread th = std::thread([&]() {
-        insertData(conn, st, dataScript);
+        insertData(*conn300, st, dataScript);
     });
 
     auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0);
@@ -846,13 +830,13 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int msg_total = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
-        
+
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -882,6 +866,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by datetimev;\
                             ex = select * from ex_UDPCT order by datetimev;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(msg_total, 1000);
@@ -895,7 +880,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int msg_total = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto batchhandler = [&](vector<Message> msgs)
         {
@@ -903,7 +888,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
             for (auto &msg : msgs)
             {
                 msg_total += 1;
-                bool succeeded = false; 
+                bool succeeded = false;
                 TableSP tmp = AnyVectorToTable(msg);
                 while(!succeeded){
                     try
@@ -934,6 +919,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by datetimev;\
                             ex = select * from ex_UDPCT order by datetimev;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(msg_total, 1000);
@@ -1029,12 +1015,12 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         Signal notify;
         Mutex mutex;
 
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -1069,6 +1055,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by datetimev;\
                             ex = select * from ex_UDPCT order by datetimev limit 5, 5;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(msg_total, 5);
@@ -1083,7 +1070,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         Signal notify;
         Mutex mutex;
 
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto batchhandler = [&](vector<Message> msgs)
         {
@@ -1091,7 +1078,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
             for (auto &msg : msgs)
             {
                 msg_total += 1;
-                bool succeeded = false; 
+                bool succeeded = false;
                 TableSP tmp = AnyVectorToTable(msg);
                 while(!succeeded){
                     try
@@ -1125,6 +1112,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by datetimev;\
                             ex = select * from ex_UDPCT order by datetimev limit 5, 5;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(msg_total, 5);
@@ -1139,13 +1127,13 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int msg_total = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
         int target_rows = conn300->run("(exec count(*) from ex_UDPCT where sym='b')[0]")->getInt();
 
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -1177,6 +1165,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         threadedClient.exit();
         EXPECT_TRUE(threadedClient.isExit());
         EXPECT_TRUE(conn300->run("re = exec sym from res_UDPCT; all(re == `b)")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_TRUE(msg_total > 0);
@@ -1190,7 +1179,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int msg_total = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto batchhandler = [&](vector<Message> msgs)
         {
@@ -1198,7 +1187,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
             for (auto &msg : msgs)
             {
                 msg_total += 1;
-                bool succeeded = false; 
+                bool succeeded = false;
                 TableSP tmp = AnyVectorToTable(msg);
                 while(!succeeded){
                     try
@@ -1230,6 +1219,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         threadedClient.exit();
         EXPECT_TRUE(threadedClient.isExit());
         EXPECT_TRUE(conn300->run("re = exec sym from res_UDPCT; all(re == `b)")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_TRUE(msg_total > 0);
@@ -1242,13 +1232,13 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int msg_total = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto onehandler = [&](Message msg)
         {
             ASSERT_EQ(msg->getForm(), DF_TABLE);
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             while(!succeeded){
                 try
                 {
@@ -1281,6 +1271,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by datetimev;\
                             ex = select * from ex_UDPCT order by datetimev;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(msg_total, 1000);
@@ -1294,7 +1285,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int msg_total = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto batchhandler = [&](vector<Message> msgs)
         {
@@ -1304,7 +1295,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
                 ASSERT_EQ(msg->getForm(), DF_TABLE);
                 msg_total += msg->rows();
                 cout << msg->rows() << endl;
-                bool succeeded = false; 
+                bool succeeded = false;
                 while(!succeeded){
                     try
                     {
@@ -1338,6 +1329,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by datetimev;\
                             ex = select * from ex_UDPCT order by datetimev;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(msg_total, 10000);
@@ -1389,7 +1381,6 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(threadedClient2.isExit());
 
         Util::sleep(1000);
-        cout << conn300->run("exec * from getStreamingStat()[`pubConns]")->getString() << endl;
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(threadedClient2.getQueueDepth(thread2), 0);
@@ -1500,7 +1491,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int msg_total = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto batchhandler = [&](vector<Message> msgs)
         {
@@ -1508,7 +1499,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
             for (auto &msg : msgs)
             {
                 msg_total += 1;
-                bool succeeded = false; 
+                bool succeeded = false;
                 TableSP tmp = AnyVectorToTable(msg);
                 while(!succeeded){
                     try
@@ -1540,6 +1531,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by datetimev;\
                             ex = select * from ex_UDPCT order by datetimev;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(msg_total, 1000);
@@ -1553,7 +1545,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int msg_total = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
         long long start, end;
 
         auto batchhandler = [&](vector<Message> msgs)
@@ -1562,7 +1554,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
             for (auto &msg : msgs)
             {
                 msg_total += 1;
-                bool succeeded = false; 
+                bool succeeded = false;
                 TableSP tmp = AnyVectorToTable(msg);
                 while(!succeeded){
                     try
@@ -1596,6 +1588,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by datetimev;\
                             ex = select * from ex_UDPCT order by datetimev;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(msg_total, 10);
@@ -1932,12 +1925,12 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int index = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -1966,6 +1959,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by ind;\
                             ex = select * from ex_UDPCT order by ind;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(msg_total, 1000);
@@ -1979,7 +1973,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int msg_total = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto batchhandler = [&](vector<Message> msgs)
         {
@@ -1987,7 +1981,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
             for (auto &msg : msgs)
             {
                 msg_total += 1;
-                bool succeeded = false; 
+                bool succeeded = false;
                 TableSP tmp = AnyVectorToTable(msg);
                 while(!succeeded){
                     try
@@ -2017,6 +2011,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by ind;\
                             ex = select * from ex_UDPCT order by ind;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(msg_total, 1000);
@@ -2030,13 +2025,13 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int msg_total = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto onehandler = [&](Message msg)
         {
             cout << msg->getString() << endl;
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             TableSP tmp = AnyVectorToTable(msg);
             while(!succeeded){
                 try
@@ -2065,6 +2060,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by ts;\
                             ex = select * from ex_UDPCT order by ts;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(msg_total, 1000);
@@ -2078,7 +2074,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int msg_total = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto batchhandler = [&](vector<Message> msgs)
         {
@@ -2086,7 +2082,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
             for (auto &msg : msgs)
             {
                 msg_total += 1;
-                bool succeeded = false; 
+                bool succeeded = false;
                 TableSP tmp = AnyVectorToTable(msg);
                 while(!succeeded){
                     try
@@ -2116,6 +2112,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by ts;\
                             ex = select * from ex_UDPCT order by ts;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
         EXPECT_EQ(msg_total, 1000);
@@ -2201,12 +2198,12 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         int msg_total = 0;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto onehandler = [&](Message msg)
         {
             LockGuard<Mutex> lock(&mutex);
-            bool succeeded = false; 
+            bool succeeded = false;
             while(!succeeded){
                 try
                 {
@@ -2236,6 +2233,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by datetimev;\
                             ex = select * from ex_UDPCT order by datetimev;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
 
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
@@ -2262,7 +2260,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         long long end_time;
         Signal notify;
         Mutex mutex;
-        AutoFitTableAppender appender("", "res_UDPCT", conn);
+        AutoFitTableAppender appender("", "res_UDPCT", *conn300);
 
         auto batchhandler = [&](vector<Message> msgs)
         {
@@ -2273,7 +2271,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
                 int rows = msg->rows();
                 EXPECT_TRUE(rows == actual_batchSize || rows == remain_rows);
                 msg_total += rows;
-                bool succeeded = false; 
+                bool succeeded = false;
                 while(!succeeded){
                     try
                     {
@@ -2309,6 +2307,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(conn300->run("re = select * from res_UDPCT order by datetimev;\
                             ex = select * from ex_UDPCT order by datetimev;\
                             all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
 
         EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
@@ -2339,9 +2338,31 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         conn300->run("for (i in 0..9999) {tableInsert(`"+st+", now()+i, rand(1000, 1)[0]);};");
         // notify.wait();
         EXPECT_EQ(msg_total, 1); // only one message is in handler, because unsubscribe is called before the first message received
+        Util::sleep(1000);
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
     }
 
+    TEST_F(StreamingUDPThreadedClientTester, test_resub_true_with_resubscribeTimeout)
+    {
+        GTEST_SKIP() << "resub in UDP subscribe not support yet.";
+        string st = "outTables_" + getRandString(10);
+        UDPCT::createSharedTableAndReplay(st, 1000);
+
+        ThreadedClient client(scfg);
+        unsigned int resubscribeTimeout = 500;
+        ThreadedClient client1(scfg);
+        client.subscribe(hostName, port300, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true);
+        auto t = client1.subscribe(hostName, port300, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "", "", nullptr, {}, 100, false, resubscribeTimeout);
+
+        Util::sleep(resubscribeTimeout+1000);
+        client.unsubscribe(hostName, port300, st, DEFAULT_ACTION_NAME);
+        client1.exit();
+        Util::sleep(1000);
+        EXPECT_TRUE(t->isComplete());
+        EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
+    }
 
 
 } // UDPCT namespace
+
+#endif // TEST_AERON

@@ -46,7 +46,7 @@ protected:
     }
 };
 
-#ifndef WINDOWS
+#ifndef _WIN32
 TEST_F(DataformVectorTest, testSymbolVector_get)
 {
 	ConstantSP v1 = Util::createVector(DT_SYMBOL, 0, 2);

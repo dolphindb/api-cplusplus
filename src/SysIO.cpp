@@ -168,15 +168,15 @@ readdata:
 	} else {
 #ifdef USE_OPENSSL
 readdata2:
-        actualLength = SSL_read(ssl_, buffer, length);
-		RECORD_READ(buffer, actualLength);
-		if (actualLength < 0) {
-			DLogger::Error("socket read error", actualLength);
-		}
-        if(actualLength <= 0){
-        int err = SSL_get_error(ssl_, actualLength);
-        if(err == SSL_ERROR_WANT_READ) goto readdata2;
-            LOG_ERR("Socket(SSL)::read err =" + std::to_string(err));
+        int ret = SSL_read(ssl_, buffer, static_cast<int>(length));
+        if (ret > 0) {
+            actualLength = ret;
+            RECORD_READ(buffer, ret);
+        } else {
+            DLogger::Error("socket read error", ret);
+            ret = SSL_get_error(ssl_, ret);
+            if(ret == SSL_ERROR_WANT_READ) goto readdata2;
+            LOG_ERR("Socket(SSL)::read err =" + std::to_string(ret));
             return OTHERERR;
         }
 #endif
@@ -230,15 +230,17 @@ IO_ERR Socket::write(const char* buffer, size_t length, size_t& actualLength){
 	else {
 #ifdef USE_OPENSSL
 		senddata2:
-		actualLength = SSL_write(ssl_, (const void*)buffer, length);
-		RECORD_WRITE(buffer, actualLength);
-		if (actualLength <= 0) {
-			int err = SSL_get_error(ssl_, actualLength);
-			if (err == SSL_ERROR_WANT_WRITE) goto senddata2;
-			DLogger::Error("socket write error", err);
-			LOG_ERR("Socket(SSL)::write err =" + std::to_string(err));
-			return OTHERERR;
-		}
+        int ret = SSL_write(ssl_, (const void*)buffer, static_cast<int>(length));
+        if (ret > 0) {
+            actualLength = ret;
+            RECORD_WRITE(buffer, ret);
+        } else {
+            int err = SSL_get_error(ssl_, ret);
+            if (err == SSL_ERROR_WANT_WRITE) goto senddata2;
+            DLogger::Error("socket write error", err);
+            LOG_ERR("Socket(SSL)::write err =" + std::to_string(err));
+            return OTHERERR;
+        }
 #endif
 		return OK;
 	}
@@ -252,7 +254,7 @@ IO_ERR Socket::bind(){
 	memset((void*)&addr, 0, sizeof(addr));
 	addr.sin_family      = AF_INET;
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	addr.sin_port        = htons(port_);
+	addr.sin_port        = htons(static_cast<unsigned short>(port_));
 
 	int flag=1;
 	setsockopt(handle_, SOL_SOCKET, SO_REUSEADDR, (char*)&flag, sizeof(int));
@@ -386,14 +388,11 @@ IO_ERR Socket::connect(){
 	if(handle_==INVALID_SOCKET)
 		return DISCONNECTED;
 
-	if(!enableSSL_)
-		return OK;
 #ifdef USE_OPENSSL
-	else if(sslConnect() != OK)
+	if(enableSSL_ && sslConnect() != OK)
 		return DISCONNECTED;
 #endif
-	else
-		return OK;
+	return OK;
 }
 
 IO_ERR Socket::close(){
@@ -593,7 +592,7 @@ bool Socket::sslInit() {
     if (ssl_ == nullptr) {
         return false;
     }
-    SSL_set_fd(ssl_, handle_);
+    SSL_set_fd(ssl_, static_cast<int>(handle_));
     return true;
 }
 
@@ -630,91 +629,6 @@ void Socket::showCerts(SSL *ssl) {
         printf("Info: No client certificates configured.\n");
 }
 #endif
-UdpSocket::UdpSocket(int port) : port_(port), remotePort_(-1){
-    if ((handle_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
-    	throw IOException("Couldn't create a udp socket with error code " + std::to_string(getErrorCode()));
-    }
-}
-
-UdpSocket::UdpSocket(const std::string& remoteHost, int remotePort ) : port_(0), remoteHost_(remoteHost), remotePort_(remotePort){
-    if ((handle_ = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
-    	throw IOException("Couldn't create a udp socket with error code " + std::to_string(getErrorCode()));
-    }
-    if(remoteHost_.empty()){
-		const int opt = 1;
-		if(setsockopt(handle_, SOL_SOCKET, SO_BROADCAST, (char *)&opt, sizeof(opt)) < 0){
-			throw IOException("set udp socket with error code " + std::to_string(getErrorCode()));
-		}
-		memset(&addrRemote_, 0 , sizeof(struct sockaddr_in));
-		addrRemote_.sin_family=AF_INET;
-		addrRemote_.sin_addr.s_addr=htonl(INADDR_BROADCAST);
-		addrRemote_.sin_port=htons(remotePort_);
-    }
-    else{
-		memset(&addrRemote_, 0 , sizeof(struct sockaddr_in));
-		addrRemote_.sin_family=AF_INET;
-		int ret = inet_pton(AF_INET, remoteHost.c_str(), &addrRemote_.sin_addr);
-		if(ret <= 0){
-			throw RuntimeException("Couldn't convert ip address from string to num, ret " + std::to_string(ret));
-		}
-		addrRemote_.sin_port=htons(remotePort_);
-    }
-}
-
-UdpSocket::~UdpSocket(){
-#ifdef WINDOWS
-	closesocket(handle_);
-#else
-	close(handle_);
-#endif
-}
-
-IO_ERR UdpSocket::bind(){
-    struct sockaddr_in addrto;
-    memset(&addrto,0,sizeof(struct sockaddr_in));
-    addrto.sin_family = AF_INET;
-    addrto.sin_addr.s_addr=INADDR_ANY;
-    addrto.sin_port = htons(port_);
-    int on = 1;
-    setsockopt(handle_, SOL_SOCKET, SO_REUSEADDR, (char*)&on, sizeof(on));
-	int r = ::bind(handle_,(struct sockaddr *)&(addrto), sizeof(struct sockaddr_in));
-	if(SOCKET_ERROR == r) {
-		LOG_ERR("Failed to bind the udp socket on port " + std::to_string(port_) + " with error code " + std::to_string(getErrorCode()));
-		closesocket(handle_);
-		return OTHERERR;
-	}
-	return OK;
-}
-
-IO_ERR UdpSocket::recv(char* buffer, size_t length, size_t& actualLength){
-    int ret=recvfrom(handle_, buffer, static_cast<int>(length), 0, NULL,NULL);
-    if(ret < 0 ){
-        LOG_ERR("UdpSocket::recv error code " + std::to_string(getErrorCode()));
-        return OTHERERR;
-    }
-    else{
-    	actualLength = ret;
-    	return OK;
-    }
-}
-
-IO_ERR UdpSocket::send(const char* buffer, size_t length){
-    int ret=sendto(handle_, buffer, static_cast<int>(length), 0, (sockaddr*)&addrRemote_, sizeof(addrRemote_));
-    if(ret<0){
-        LOG_ERR("UdpSocket::send error code " + std::to_string(getErrorCode()));
-        return OTHERERR;
-    }
-    else
-    	return OK;
-}
-
-int UdpSocket::getErrorCode(){
-#ifdef WINDOWS
-	return WSAGetLastError();
-#else
-	return errno;
-#endif
-}
 
 DataInputStream::DataInputStream(STREAM_TYPE type, std::size_t bufSize) : file_(0), buf_(new char[bufSize]), source_(type), reverseOrder_(false), externalBuf_(false),
 		closed_(false), capacity_(bufSize), size_(0), cursor_(0){
@@ -1293,7 +1207,6 @@ IO_ERR DataInputStream::prepareBytesEndWith(char endChar, size_t& endPos){
 				if( ret != OK)
 					return ret;
 				size_ += actualLength;
-				usedSpace += actualLength;
 			}
 			else if(source_ == FILE_STREAM){
 				actualLength = fread(buf_ + usedSpace, 1, capacity_ - usedSpace, file_);
@@ -1565,7 +1478,6 @@ IO_ERR DataOutputStream::write(const char* buffer, size_t length){
 			if(count > 0)
 				memcpy(buf_ + size_, buffer + actualWritten, count);
 			if(size_ + count < capacity_){
-				actualWritten += count;
 				size_ += count;
 				return OK;
 			}
@@ -1631,8 +1543,9 @@ char* DataOutputStream::createBuffer(size_t& capacity){
 	throw RuntimeException("DataOutputStream::createBuffer not implemented yet.");
 }
 
-DataStream::DataStream(FILE* file, bool readable, bool writable) : DataInputStream(file),
-		outBuf_(new char[2048]), outSize_(2048){
+DataStream::DataStream(FILE* file, bool readable, bool writable)
+	: DataInputStream(file), outBuf_(new char[2048])
+{
 	isReadable(readable);
 	isWritable(writable);
 }
