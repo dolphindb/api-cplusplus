@@ -8,7 +8,7 @@ using namespace std;
 int main(int argc, char* argv[]) {
 
     DBConnection conn;
-    bool ret = conn.connect("192.168.0.23", 8848);
+    bool ret = conn.connect("192.168.0.104", 8848);
     if (!ret) {
         cout << "Failed to connect to the server" << endl;
         return 0;

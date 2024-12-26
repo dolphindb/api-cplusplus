@@ -20,3 +20,6 @@ libtest/
 report/coverage/*
 bin/*
 __pycache__
+demo/bin
+demo/lib
+demo/build
