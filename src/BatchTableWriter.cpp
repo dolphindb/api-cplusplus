@@ -1,6 +1,9 @@
 #include "BatchTableWriter.h"
 #include "ScalarImp.h"
 #include "DolphinDB.h"
+#include "SysIO.h"
+#include <iostream>
+
 namespace dolphindb{
 
 BatchTableWriter::BatchTableWriter(const std::string& hostName, int port, const std::string& userId, const std::string& password, bool acquireLock):
@@ -103,7 +106,7 @@ void BatchTableWriter::addTable(const std::string& dbName, const std::string& ta
     }
 
     DestTable *destTableRawPtr = destTable.get();
-    destTable->writeThread = new Thread(new Executor([=](){
+    destTable->writeThread = new Thread(new Executor([this, partitioned, destTable, destTableRawPtr](){
         while(destTableRawPtr->destroy==false){
             while(true){
                 if(writeTableAllData(destTable,partitioned)==false)
@@ -275,9 +278,11 @@ void BatchTableWriter::removeTable(const std::string& dbName, const std::string&
 }
 
 ConstantSP BatchTableWriter::createObject(int dataType, Constant* val){
+    std::ignore = dataType;
     return val;
 }
 ConstantSP BatchTableWriter::createObject(int dataType, ConstantSP val){
+    std::ignore = dataType;
     return val;
 }
 ConstantSP BatchTableWriter::createObject(int dataType, char val){

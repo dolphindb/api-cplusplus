@@ -1,5 +1,6 @@
-#ifndef _STREAMING_H_
-#define _STREAMING_H_
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include <string>
 #include <vector>
@@ -10,6 +11,11 @@
 #include "EventHandler.h"
 #include "StreamingUtil.h"
 #include "DolphinDB.h"
+
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4251 )
+#endif
 
 namespace dolphindb {
 
@@ -25,15 +31,22 @@ struct SubscribeQueue {
 		:queue_(queue), stopped_(stopped) {}
 };
 
-struct StreamingClientConfig {
-    TransportationProtocol protocol{TransportationProtocol::TCP};
+enum class SubscribeState {
+    Connected,
+    Disconnected,
+    Resubscribing,
 };
 
-struct SubscribeClient;
+using SubscribeCallbackT = std::function<bool(const SubscribeState state, const SubscribeInfo &info)>;
+
+struct StreamingClientConfig {
+    TransportationProtocol protocol{TransportationProtocol::TCP};
+    SubscribeCallbackT callback;
+};
 
 class EXPORT_DECL StreamingClient {
 public:
-    explicit StreamingClient(const StreamingClientConfig config);
+    explicit StreamingClient(const StreamingClientConfig &config);
 	//listeningPort > 0 : listen mode, wait for server connection
 	//listeningPort = 0 : active mode, connect server by DBConnection socket
 	explicit StreamingClient(int listeningPort);
@@ -42,12 +55,12 @@ public:
 	void exit();
 
 protected:
-    SubscribeQueue subscribeInternal(std::string host, int port, std::string tableName, std::string actionName,
+    SubscribeQueue subscribeInternal(const SubscribeInfo &info,
                                      int64_t offset, bool resubscribe, const VectorSP &filter,
                                      bool msgAsTable, bool allowExists, int batchSize,
 									 std::string userName, std::string password,
 									 const StreamDeserializerSP &blobDeserializer, const std::vector<std::string>& backupSites, bool isEvent, int resubscribeInterval, bool subOnce, bool convertMsgRowData, int resubscribeTimeout);
-    void unsubscribeInternal(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME);
+    bool unsubscribeInternal(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME);
 
 protected:
     SmartPointer<StreamingClientImpl> impl_;
@@ -59,7 +72,7 @@ public:
     EventClient(const std::vector<EventSchema>& eventSchema, const std::vector<std::string>& eventTimeFields, const std::vector<std::string>& commonFields);
     ThreadSP subscribe(const std::string& host, int port, const EventMessageHandler &handler, const std::string& tableName, const std::string& actionName = DEFAULT_ACTION_NAME, int64_t offset = -1,
         bool resub = true, const std::string& userName="", const std::string& password="", int resubscribeTimeout=0);
-    void unsubscribe(const std::string& host, int port, const std::string& tableName, const std::string& actionName = DEFAULT_ACTION_NAME);
+    bool unsubscribe(const std::string& host, int port, const std::string& tableName, const std::string& actionName = DEFAULT_ACTION_NAME);
 
 private:
     EventHandler      eventHandler_;
@@ -67,7 +80,7 @@ private:
 
 class EXPORT_DECL ThreadedClient : public StreamingClient {
 public:
-    explicit ThreadedClient(const StreamingClientConfig config) : StreamingClient(config) {}
+    explicit ThreadedClient(const StreamingClientConfig &config) : StreamingClient(config) {}
 	//listeningPort > 0 : listen mode, wait for server connection
 	//listeningPort = 0 : active mode, connect server by DBConnection socket
     explicit ThreadedClient(int listeningPort = 0);
@@ -84,7 +97,7 @@ public:
 						std::string userName = "", std::string password = "",
 						const StreamDeserializerSP &blobDeserializer = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(),int resubscribeInterval = 100,bool subOnce = false, int resubscribeTimeout = 0);
 	size_t getQueueDepth(const ThreadSP &thread);
-    void unsubscribe(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME);
+    bool unsubscribe(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME);
 };
 
 class EXPORT_DECL ThreadPooledClient : public StreamingClient {
@@ -98,7 +111,7 @@ public:
                                const VectorSP &filter = nullptr, bool msgAsTable = false, bool allowExists = false,
 								std::string userName = "", std::string password = "",
 							   const StreamDeserializerSP &blobDeserializer = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(), int resubscribeInterval = 100, bool subOnce = false, int resubscribeTimeout = 0);
-    void unsubscribe(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME);
+    bool unsubscribe(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME);
 	size_t getQueueDepth(const ThreadSP &thread);
 
 private:
@@ -107,6 +120,7 @@ private:
 
 class EXPORT_DECL PollingClient : public StreamingClient {
 public:
+	explicit PollingClient(const StreamingClientConfig &config) : StreamingClient(config) {}
 	//listeningPort > 0 : listen mode, wait for server connection
 	//listeningPort = 0 : active mode, connect server by DBConnection socket
     explicit PollingClient(int listeningPort = 0);
@@ -116,10 +130,10 @@ public:
                              bool msgAsTable = false, bool allowExists = false,
 							std::string userName="", std::string password="",
 							 const StreamDeserializerSP &blobDeserializer = nullptr, const std::vector<std::string>& backupSites = std::vector<std::string>(), int resubscribeInterval = 100, bool subOnce = false, int resubscribeTimeout = 0);
-    void unsubscribe(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME);
+    bool unsubscribe(std::string host, int port, std::string tableName, std::string actionName = DEFAULT_ACTION_NAME);
 };
 
-#ifdef LINUX
+#ifdef __linux__
 
 class EXPORT_DECL IPCInMemoryStreamClient {
 public:
@@ -141,4 +155,7 @@ private:
 #endif//LINUX
 
 }  // namespace dolphindb
-#endif  // _STREAMING_H_
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

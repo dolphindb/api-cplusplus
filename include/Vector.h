@@ -1,8 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
 #pragma once
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #pragma warning( push )
-#pragma warning( disable : 4100 )
+#pragma warning( disable : 4100 4251 )
+#elif defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#else // gcc
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 
 #include "Constant.h"
@@ -47,6 +55,7 @@ public:
     virtual bool isSorted(bool asc, bool strict = false) const {throw RuntimeException("Vector::isSorted method not supported");}
     virtual ConstantSP getInstance() const {return getInstance(size());}
     virtual ConstantSP getInstance(INDEX size) const = 0;
+    using Constant::getValue;
     virtual ConstantSP getValue(INDEX capacity) const {throw RuntimeException("Vector::getValue method not supported");}
     virtual ConstantSP get(INDEX column, INDEX rowStart,INDEX rowEnd) const {return getSubVector(column*rows()+rowStart,rowEnd-rowStart);}
     virtual ConstantSP get(INDEX index) const = 0;
@@ -67,6 +76,7 @@ public:
     virtual void lower(){throw RuntimeException("lower method not supported");}
     virtual void trim(){throw RuntimeException("trim method not supported");}
     virtual void strip(){throw RuntimeException("strip method not supported");}
+    using Constant::getAllocatedMemory;
     virtual long long getAllocatedMemory(INDEX sz) const {return Constant::getAllocatedMemory();}
     virtual int asof(const ConstantSP& value) const {throw RuntimeException("asof not supported.");}
     virtual ConstantSP castTemporal(DATA_TYPE expectType){throw RuntimeException("castTemporal not supported");}
@@ -80,6 +90,10 @@ private:
 typedef SmartPointer<Vector> VectorSP;
 }
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #pragma warning( pop )
+#elif defined(__clang__)
+#pragma clang diagnostic pop
+#else // gcc
+#pragma GCC diagnostic pop
 #endif

@@ -1,4 +1,4 @@
-#ifdef LINUX
+#ifdef __linux__
 #include "config.h"
 
 class StreamingIPCinMemoryTableTest : public testing::Test
@@ -81,6 +81,9 @@ void insertRow(TableSP table)
     appender.append(table);
     return;
 }
+
+
+#ifdef __linux__
 
 TEST_F(StreamingIPCinMemoryTableTest, test_basic)
 {
@@ -312,6 +315,23 @@ TEST_F(StreamingIPCinMemoryTableTest, test_unsubscribe_twice)
     IPCMclient.unsubscribe(tableName);
 }
 
+
+TEST_F(StreamingIPCinMemoryTableTest, test_subscribe_empty_table)
+{
+    string tableName = "pubTable";
+    IPCInMemoryStreamClient IPCMclient;
+
+    vector<string> colNames = {"timestamp", "temperature", "currenttime"};
+    vector<DATA_TYPE> colTypes = {DT_TIMESTAMP, DT_DOUBLE, DT_NANOTIMESTAMP};
+    int rowNum = 0, indexCapacity = 100;
+    TableSP outputTable = Util::createTable(colNames, colTypes, rowNum, indexCapacity);
+
+    ThreadSP thread0 = IPCMclient.subscribe(tableName, [](TableSP t){}, nullptr, false);
+
+    Util::sleep(2000);
+    IPCMclient.unsubscribe(tableName);
+}
+
 TEST_F(StreamingIPCinMemoryTableTest, test_subscribe_hugetable)
 {
     thread th1 = thread(insertTask, 1000000, 0);
@@ -400,7 +420,7 @@ TEST_F(StreamingIPCinMemoryTableTest, test_subscribeUnsubscribe_with_gt1048576ro
         Util::sleep(1000);
         for(auto i=0;i<50;i++){
             IPCInMemoryStreamClient IPCMclient;
-            
+
             ThreadSP thread0 = IPCMclient.subscribe(tableName, handler, outputTable, false);
             Util::sleep(500);
 
@@ -468,7 +488,7 @@ TEST_F(StreamingIPCinMemoryTableTest, test_subscribeUnsubscribe_overwriteTrue_wi
         Util::sleep(1000);
         for(auto i=0;i<50;i++){
             IPCInMemoryStreamClient IPCMclient;
-            
+
             ThreadSP thread0 = IPCMclient.subscribe(tableName, handler, outputTable, true);
             Util::sleep(500);
 
@@ -480,4 +500,5 @@ TEST_F(StreamingIPCinMemoryTableTest, test_subscribeUnsubscribe_overwriteTrue_wi
     th_new.join();
     th2.join();
 }
-#endif // if LINUX
+#endif // if __linux__
+#endif // if __linux__

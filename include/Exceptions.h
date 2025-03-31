@@ -1,17 +1,17 @@
-/*
- * Exceptions.h
- *
- *  Created on: Jul 22, 2012
- *      Author: dzhou
- */
-
-#ifndef EXCEPTIONS_H_
-#define EXCEPTIONS_H_
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include <exception>
 #include <string>
 #include "Types.h"
 #include "Exports.h"
+
+#ifdef _MSC_VER
+#define __FUNCNAME__ __FUNCSIG__
+#else
+#define __FUNCNAME__ __PRETTY_FUNCTION__
+#endif
 
 namespace dolphindb {
 
@@ -222,4 +222,3 @@ private:
 };
 
 }
-#endif /* EXCEPTIONS_H_ */

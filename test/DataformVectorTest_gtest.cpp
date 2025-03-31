@@ -8253,3 +8253,168 @@ TEST_F(DataformVectorTest, test_stringVector_exception){
 		}
 	}
 }
+
+
+TEST_F(DataformVectorTest, testCreateVector){
+	bool s1 = false;
+	char s2 = char(-128);
+	int s3 = INT_MIN;
+	short s4 = SHRT_MIN;
+	long long s5 = LLONG_MIN;
+	float s6 = FLT_MIN;
+	double s7 = DBL_MIN;
+	string str = "";
+	string sym = "";
+	string blob = "";
+	unsigned char int128[16];
+	unsigned char ip[16];
+	unsigned char uuid[16];
+	for(auto i=0;i<16;i++){
+		int128[i] = CHAR_MIN;
+		ip[i] = CHAR_MIN;
+		uuid[i] = CHAR_MIN;
+	}
+
+	ConstantSP boolval = Util::createBool(s1);
+	ConstantSP charval = Util::createChar(s2);
+	ConstantSP intval = Util::createInt(s3);
+	ConstantSP shortval = Util::createShort(s4);
+	ConstantSP longval = Util::createLong(s5);
+	ConstantSP floatval = Util::createFloat(s6);
+	ConstantSP doubleval = Util::createDouble(s7);
+	ConstantSP stringval = Util::createString(str);
+	ConstantSP symbolval = Util::createString(sym);
+	ConstantSP blobval = Util::createString(blob);
+	ConstantSP int128val = Util::createConstant(DT_INT128);
+	int128val->setBinary(int128, sizeof(Guid));
+	ConstantSP ipval = Util::createConstant(DT_IP);
+	ipval->setBinary(ip, sizeof(Guid));
+	ConstantSP uuidval = Util::createConstant(DT_UUID);
+	uuidval->setBinary(uuid, sizeof(Guid));
+	ConstantSP dateval = Util::createDate(s3);
+	ConstantSP monthval = Util::createMonth(s3);
+	ConstantSP timeval = Util::createTime(s3);
+	ConstantSP minuteval = Util::createMinute(s3);
+	ConstantSP secondval = Util::createSecond(s3);
+	ConstantSP datetimeval = Util::createDateTime(s3);
+	ConstantSP timestampval = Util::createTimestamp(s5);
+	ConstantSP nanotimeval = Util::createNanoTime(s5);
+	ConstantSP nanotimestampval = Util::createNanoTimestamp(s5);
+	VectorSP boolVec = Util::createVector(DT_BOOL, 0);
+	boolVec->append(boolval);
+	VectorSP charVec = Util::createVector(DT_CHAR, 0);
+	charVec->append(charval);
+	VectorSP intVec = Util::createVector(DT_INT, 0);
+	intVec->append(intval);
+	VectorSP shortVec = Util::createVector(DT_SHORT, 0);
+	shortVec->append(shortval);
+	VectorSP longVec = Util::createVector(DT_LONG, 0);
+	longVec->append(longval);
+	VectorSP floatVec = Util::createVector(DT_FLOAT, 0);
+	floatVec->append(floatval);
+	VectorSP doubleVec = Util::createVector(DT_DOUBLE, 0);
+	doubleVec->append(doubleval);
+	VectorSP stringVec = Util::createVector(DT_STRING, 0);
+	stringVec->append(stringval);
+	VectorSP symbolVec = Util::createVector(DT_SYMBOL, 0);
+	symbolVec->append(symbolval);
+	VectorSP blobVec = Util::createVector(DT_BLOB, 0);
+	blobVec->append(blobval);
+	VectorSP int128Vec = Util::createVector(DT_INT128, 0);
+	int128Vec->append(int128val);
+	VectorSP ipVec = Util::createVector(DT_IP, 0);
+	ipVec->append(ipval);
+	VectorSP uuidVec = Util::createVector(DT_UUID, 0);
+	uuidVec->append(uuidval);
+	VectorSP dateVec = Util::createVector(DT_DATE, 0);
+	dateVec->append(dateval);
+	VectorSP monthVec = Util::createVector(DT_MONTH, 0);
+	monthVec->append(monthval);
+	VectorSP timeVec = Util::createVector(DT_TIME, 0);
+	timeVec->append(timeval);
+	VectorSP minuteVec = Util::createVector(DT_MINUTE, 0);
+	minuteVec->append(minuteval);
+	VectorSP secondVec = Util::createVector(DT_SECOND, 0);
+	secondVec->append(secondval);
+	VectorSP datetimeVec = Util::createVector(DT_DATETIME, 0);
+	datetimeVec->append(datetimeval);
+	VectorSP timestampVec = Util::createVector(DT_TIMESTAMP, 0);
+	timestampVec->append(timestampval);
+	VectorSP nanotimeVec = Util::createVector(DT_NANOTIME, 0);
+	nanotimeVec->append(nanotimeval);
+	VectorSP nanotimestampVec = Util::createVector(DT_NANOTIMESTAMP, 0);
+	nanotimestampVec->append(nanotimestampval);
+
+	vector<ConstantSP> vals = {boolVec,charVec,intVec,shortVec,longVec,floatVec,doubleVec,stringVec,symbolVec,blobVec,int128Vec,ipVec,uuidVec,dateVec,monthVec,timeVec,minuteVec,secondVec,datetimeVec,timestampVec,nanotimeVec,nanotimestampVec};
+	vector<string> names = {"boolVec","charVec","intVec","shortVec","longVec","floatVec","doubleVec","stringVec","symbolVec","blobVec","int128Vec","ipVec","uuidVec","dateVec","monthVec","timeVec","minuteVec","secondVec","datetimeVec","timestampVec","nanotimeVec","nanotimestampVec"};
+	conn.upload(names,vals);
+
+	EXPECT_TRUE(conn.run("eqObj(boolVec, bool("+boolVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(charVec, char("+charVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(intVec, int("+intVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(shortVec, short("+shortVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(longVec, long("+longVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(floatVec, float("+floatVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(doubleVec, double("+doubleVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(stringVec, string("+stringVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(symbolVec, symbol("+symbolVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(blobVec, blob("+blobVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(int128Vec, int128([`80808080808080808080808080808080]))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(ipVec, ipaddr(['8080:8080:8080:8080:8080:8080:8080:8080']))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(uuidVec, uuid(['80808080-8080-8080-8080-808080808080']))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(dateVec, date("+dateVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(monthVec, month("+monthVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(timeVec, time("+timeVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(minuteVec, minute("+minuteVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(secondVec, second("+secondVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(datetimeVec, datetime("+datetimeVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(timestampVec, timestamp("+timestampVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(nanotimeVec, nanotime("+nanotimeVec->getString()+"))")->getBool());
+	EXPECT_TRUE(conn.run("eqObj(nanotimestampVec, nanotimestamp("+nanotimestampVec->getString()+"))")->getBool());
+}
+
+
+
+class DataformVectorTest_download : public DataformVectorTest, public testing::WithParamInterface<std::tuple<std::string, std::string, dolphindb::DATA_TYPE>> 
+{
+public:
+    static std::vector<std::tuple<std::string, std::string, dolphindb::DATA_TYPE>> getData(){
+        return {
+            {"x=true false NULL;x", "[1,0,]", DT_BOOL},
+            {"x=127c -128c NULL;x", "[127,,]", DT_CHAR},
+            {"x=2147483647 -2147483648 NULL;x", "[2147483647,,]", DT_INT},
+			{"x=32768h 32767h NULL;x", "[,32767,]", DT_SHORT},
+			{"x=9223372036854775807l NULL;x", "[9223372036854775807,]", DT_LONG},
+			{"x=3.14f NULL;x", "[3.14,]", DT_FLOAT},
+			{"x=3.1415926 NULL;x", "[3.141593,]", DT_DOUBLE},
+			{"x=`aaa`bbb`;x", "[\"aaa\",\"bbb\",]", DT_STRING},
+			{"x=symbol(`aaa`bbb`);x", "[\"aaa\",\"bbb\",]", DT_SYMBOL},
+			{"x=blob(`aaa`bbb`);x", "[\"aaa\",\"bbb\",]", DT_BLOB},
+			{"x=int128(`0123456789abcdef0123456789abcdef`);x", "[0123456789abcdef0123456789abcdef,]", DT_INT128},
+			{"x=ipaddr('192.168.1.1''');x", "[192.168.1.1,]", DT_IP},
+			{"x=uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87''');x", "[5d212a78-cc48-e3b1-4235-b4d91473ee87,]", DT_UUID},
+			{"x=2022.01.01 NULL;x", "[2022.01.01,]", DT_DATE},
+			{"x=2022.01M NULL;x", "[2022.01M,]", DT_MONTH},
+			{"x=13:30:00.000 NULL;x", "[13:30:00.000,]", DT_TIME},
+			{"x=23:59m NULL;x", "[23:59m,]", DT_MINUTE},
+			{"x=01:08:54 NULL;x", "[01:08:54,]", DT_SECOND},
+			{"x=2022.01.01T13:30:00 NULL;x", "[2022.01.01T13:30:00,]", DT_DATETIME},
+			{"x=2022.01.01T13:30:00.123 NULL;x", "[2022.01.01T13:30:00.123,]", DT_TIMESTAMP},
+			{"x=13:30:00.123456789 NULL;x", "[13:30:00.123456789,]", DT_NANOTIME},
+			{"x=2022.01.01T13:30:00.123456789 NULL;x", "[2022.01.01T13:30:00.123456789,]", DT_NANOTIMESTAMP}
+        };
+    }
+};
+INSTANTIATE_TEST_SUITE_P(, DataformVectorTest_download, testing::ValuesIn(DataformVectorTest_download::getData()));
+
+TEST_P(DataformVectorTest_download, test_download_vector) {
+    std::string script = std::get<0>(GetParam());
+    std::string ex = std::get<1>(GetParam());
+    dolphindb::DATA_TYPE type = std::get<2>(GetParam());
+    ConstantSP res = conn.run(script);
+    EXPECT_EQ(res->getString(), ex);
+    EXPECT_TRUE(res->isVector());
+    EXPECT_EQ(res->getType(), type == DT_SYMBOL? DT_STRING : type);
+	EXPECT_TRUE(res->hasNull());
+	EXPECT_TRUE(res->isNull(res->size()-1));
+}

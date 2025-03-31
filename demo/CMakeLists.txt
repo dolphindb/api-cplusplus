@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.15)
 
 project(DolphinDBDemo)
 
@@ -11,12 +11,10 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib/)
 target_link_libraries(${CMAKE_PROJECT_NAME} DolphinDBAPI)
 
-if(UNIX)
-    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE LINUX)
-elseif(WIN32)
-    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE WINDOWS NOMINMAX FMT_UNICODE=0)
+if(WIN32)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 
 if (MSVC)
-    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE /wd4251)
+    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE /Zc:__cplusplus /utf-8 /wd4251)
 endif()

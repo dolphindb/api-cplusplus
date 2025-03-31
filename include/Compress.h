@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
 #pragma once
-#ifndef COMPRESSION_H_
-#define COMPRESSION_H_
 
 #include "Types.h"
 #include "SysIO.h"
@@ -64,4 +64,3 @@ private:
 };
 
 }//dolphindb
-#endif//COMPRESSION_H_

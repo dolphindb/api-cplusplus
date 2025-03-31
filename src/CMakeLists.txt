@@ -1,7 +1,11 @@
 if (UNIX)
-    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE LINUX)
+    target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+        platform/Linux.cpp
+    )
 elseif (WIN32)
-    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE WINDOWS)
+    target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+        platform/Windows.cpp
+    )
 elseif (APPLE)
     target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE MAC)
 endif()

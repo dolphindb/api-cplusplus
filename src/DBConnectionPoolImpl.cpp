@@ -1,5 +1,5 @@
 #include "DBConnectionPoolImpl.h"
-
+#include "SysIO.h"
 #include "DolphinDB.h"
 #include "AsynWorker.h"
 namespace dolphindb {

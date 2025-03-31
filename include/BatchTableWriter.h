@@ -1,5 +1,6 @@
-#ifndef BATCHTABLEWRITER_H_
-#define BATCHTABLEWRITER_H_
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include "Exports.h"
 #include "Concurrent.h"
@@ -15,6 +16,11 @@
 #include <functional>
 #include <tuple>
 #include <cassert>
+
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4251 )
+#endif
 
 namespace dolphindb{
 
@@ -85,7 +91,7 @@ public:
         if(destTable->destroy)
             throw RuntimeException("Failed to insert into table, the table is being removed.");
         auto argSize = sizeof...(Fargs);
-        if(argSize != destTable->columnNum)
+        if(argSize != static_cast<size_t>(destTable->columnNum))
             throw RuntimeException("Failed to insert into table, number of arguments must match the number of columns of table.");
         if(argSize == 0)
             return;
@@ -123,6 +129,7 @@ private:
     bool writeTableAllData(SmartPointer<DestTable> destTable,bool partitioned);
     void insertRecursive(std::vector<ConstantSP>* row, DestTable* destTable, int colIndex){
         assert(colIndex == destTable->columnNum);
+        std::ignore = colIndex;
         RWLockGuard<RWLock> _(&rwLock, false, acquireLock_);
         if(destTable->finished){
             throw RuntimeException(std::string("Failed to insert data. Error writing data in backgroud thread. Please use getUnwrittenData to get data not written to server and remove talbe (") + destTable->dbName + " " + destTable->tableName + ").");
@@ -149,6 +156,8 @@ private:
 
     template<typename T>
     ConstantSP createObject(int dataType, T val){
+        std::ignore = dataType;
+        std::ignore = val;
         throw RuntimeException("Failed to insert data, unsupported data type.");
     }
     ConstantSP createObject(int dataType, Constant* val);
@@ -184,4 +193,7 @@ private:
 
 
 }
-#endif /* BATCHTABLEWRITER_H_ */
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

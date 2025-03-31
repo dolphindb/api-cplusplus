@@ -1,8 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
 #pragma once
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #pragma warning( push )
 #pragma warning( disable : 4100 )
+#elif defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#else // gcc
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 
 #include "Constant.h"
@@ -29,20 +37,22 @@ public:
     virtual std::string getScript() const {return "dict()";}
     virtual std::string getString(int index) const {throw RuntimeException("Dictionary::getString(int index) not supported");}
     virtual bool remove(const ConstantSP& key) = 0;
+    using Constant::set;
     virtual bool set(const ConstantSP& key, const ConstantSP& value)=0;
     virtual bool set(const std::string& key, const ConstantSP& value){throw RuntimeException("String key not supported");}
+    using Constant::get;
     virtual ConstantSP get(const ConstantSP& key) const {return getMember(key);}
     virtual void contain(const ConstantSP& target, const ConstantSP& resultSP) const = 0;
     virtual bool isLargeConstant() const {return true;}
-
-private:
-    using Constant::get;
-    using Constant::set;
 };
 
 typedef SmartPointer<Dictionary> DictionarySP;
 }
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #pragma warning( pop )
+#elif defined(__clang__)
+#pragma clang diagnostic pop
+#else // gcc
+#pragma GCC diagnostic pop
 #endif

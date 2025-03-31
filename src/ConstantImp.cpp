@@ -2351,6 +2351,13 @@ ConstantSP FastArrayVector::getInstance(INDEX sz) const {
 }
 
 int FastArrayVector::serializeVariableLength(char* buf, int bufSize, INDEX indexStart, int offset, int targetNumElement, int& numElement, int& partial) const {
+	std::ignore = buf;
+	std::ignore = bufSize;
+	std::ignore = indexStart;
+	std::ignore = offset;
+	std::ignore = targetNumElement;
+	std::ignore = numElement;
+	std::ignore = partial;
 	return 0;
 }
 
@@ -2725,6 +2732,10 @@ IO_ERR FastArrayVector::deserializeFixedLength(DataInputStream* in, INDEX indexS
 }
 
 IO_ERR FastArrayVector::deserializeVariableLength(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement) {
+	std::ignore = in;
+	std::ignore = indexStart;
+	std::ignore = targetNumElement;
+	std::ignore = numElement;
 	return OK;
 }
 
@@ -4859,6 +4870,7 @@ long long FastFixedLengthVector::getAllocatedMemory() const {
 }
 
 int FastFixedLengthVector::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const {
+	std::ignore = offset;
 	//assume offset==0 and bufSize>=sizeof(T)
 	if(indexStart >= size_)
 		return -1;
@@ -4870,6 +4882,7 @@ int FastFixedLengthVector::serialize(char* buf, int bufSize, INDEX indexStart, i
 }
 
 int FastFixedLengthVector::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int cellCountToSerialize, int& numElement, int& partial) const {
+	std::ignore = offset;
 	if (indexStart >= size_)
 		return -1;
 	int len = fixedLength_;
@@ -4909,27 +4922,38 @@ void FastFixedLengthVector::reverse(INDEX start, INDEX length){
 }
 
 bool FastFixedLengthVector::getBinary(INDEX start, int len, int unitLenght, unsigned char* buf) const {
+	std::ignore = unitLenght;
 	memcpy(buf, data_ + start * fixedLength_, len * fixedLength_);
 	return true;
 }
 
 const unsigned char* FastFixedLengthVector::getBinaryConst(INDEX start, int len, int unitLength, unsigned char* buf) const {
+	std::ignore = len;
+	std::ignore = unitLength;
+	std::ignore = buf;
 	return data_ + start * fixedLength_;
 }
 
 unsigned char* FastFixedLengthVector::getBinaryBuffer(INDEX start, int len, int unitLength, unsigned char* buf) const {
+	std::ignore = len;
+	std::ignore = unitLength;
+	std::ignore = buf;
 	return data_ + start * fixedLength_;
 }
 
 void* FastFixedLengthVector::getDataBuffer(INDEX start, int len, void* buf) const {
+	std::ignore = len;
+	std::ignore = buf;
 	return (void*)(data_ + start * fixedLength_);
 }
 
 void FastFixedLengthVector::setBinary(INDEX index, int unitLength, const unsigned char* val){
+	std::ignore = unitLength;
 	memcpy(data_ + index * fixedLength_, val, fixedLength_);
 }
 
 bool FastFixedLengthVector::setBinary(INDEX start, int len, int unitLength, const unsigned char* buf){
+	std::ignore = unitLength;
 	if(buf == data_ + start*fixedLength_)
 		return true;
 	memcpy(data_ + start * fixedLength_, buf, fixedLength_ * len);

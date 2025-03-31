@@ -10,8 +10,8 @@ using std::string;
 namespace dolphindb {
 
 DdbInit DBConnectionImpl::ddbInit_;
-DBConnectionImpl::DBConnectionImpl(bool sslEnable, bool asynTask, int keepAliveTime, bool compress, bool python, bool isReverseStreaming)
-    : port_(0), encrypted_(false), isConnected_(false), littleEndian_(Util::isLittleEndian()), sslEnable_(sslEnable),asynTask_(asynTask)
+DBConnectionImpl::DBConnectionImpl(bool sslEnable, bool asynTask, int keepAliveTime, bool compress, bool python, bool isReverseStreaming, bool enableSCRAM)
+    : port_(0), encrypted_(false), isConnected_(false), littleEndian_(Util::isLittleEndian()), sslEnable_(sslEnable),enableSCRAM_(enableSCRAM),asynTask_(asynTask)
     , keepAliveTime_(keepAliveTime), compress_(compress), enablePickle_(false), python_(python), isReverseStreaming_(isReverseStreaming)
 {
 }
@@ -58,8 +58,6 @@ bool DBConnectionImpl::connect() {
     }
 
     string body = "connect\n";
-    if (!userId_.empty() && !encrypted_)
-        body.append("login\n" + userId_ + "\n" + pwd_ + "\nfalse");
     string out("API 0 ");
     out.append(Util::convert((int)body.size()));
     out.append(" / "+ std::to_string(generateRequestFlag())+"_1_" + std::to_string(4) + "_" + std::to_string(2));
@@ -115,9 +113,9 @@ bool DBConnectionImpl::connect() {
     isConnected_ = true;
     littleEndian_ = remoteLittleEndian;
 
-    if (!userId_.empty() && encrypted_) {
+    if (!userId_.empty()) {
         try {
-            login();
+            login(userId_, pwd_, false);
         } catch (...) {
             close();
             throw;
@@ -125,7 +123,7 @@ bool DBConnectionImpl::connect() {
     }
 
     ConstantSP requiredVersion;
-    
+
     try {
         if(asynTask_) {
             SmartPointer<DBConnection> newConn = new DBConnection(false, false);
@@ -156,6 +154,17 @@ bool DBConnectionImpl::connect() {
 void DBConnectionImpl::login(const string& userId, const string& password, bool enableEncryption) {
     userId_ = userId;
     pwd_ = password;
+    if (enableSCRAM_) {
+        return scramLogin();
+    }
+    try {
+        return scramLogin();
+    } catch (DataCorruptionException&) {
+        throw;
+    } catch (...) {
+        // try scram login first, if failed use normal login quietly
+    }
+
     encrypted_ = enableEncryption;
     if (encrypted_) {
 #ifdef USE_OPENSSL
@@ -171,10 +180,6 @@ void DBConnectionImpl::login(const string& userId, const string& password, bool 
         throw RuntimeException("Encrypted login is unavailble without OpenSSL.");
 #endif
     }
-    login();
-}
-
-void DBConnectionImpl::login() {
     std::vector<ConstantSP> args;
     args.push_back(new String(userId_));
     args.push_back(new String(pwd_));
@@ -183,6 +188,114 @@ void DBConnectionImpl::login() {
     if (!result->getBool())
         throw IOException("Failed to authenticate the user " + userId_);
 }
+
+void DBConnectionImpl::scramLogin() {
+#ifdef USE_OPENSSL
+    // call scramClientFirst
+    std::vector<ConstantSP> args;
+    args.push_back(new String(userId_));
+    string clientNonce = Crypto::generateNonce();
+    args.push_back(new String(clientNonce));
+
+    ConstantSP result;
+    try {
+        result = run("scramClientFirst", args);
+    } catch (std::exception &e) {
+        std::string unsupportStr("Can't recognize function name scramClientFirst");
+        std::string wrongAuthModeStr("sha256 authMode doesn't support scram authMode");
+        std::string errMsg(e.what());
+        if (errMsg.find(unsupportStr) != string::npos) {
+            throw IOException("SCRAM login is unavailble on current server.");
+        } else if (errMsg.find(wrongAuthModeStr) != string::npos) {
+            throw IOException("user '" + userId_ + "' doesn't support scram authMode.");
+        } else {
+            throw;
+        }
+    }
+
+    if (!result->isVector() || result->size() != 3) {
+        throw IOException("SCRAM login failed, server error: get server nonce failed.");
+    }
+
+    string saltString = result->get(0)->getString();
+    std::vector<uint8_t> salt = Crypto::Base64Decode(saltString, BIO_FLAGS_BASE64_NO_NL);
+    int iterCount = result->get(1)->getInt();
+    string combinedNonce = result->get(2)->getString();
+
+    // calculate saltedPassword
+    std::vector<uint8_t> saltedPassword(SHA256_DIGEST_LENGTH);
+    PKCS5_PBKDF2_HMAC(
+        pwd_.c_str(), static_cast<int>(pwd_.length()),
+        salt.data(), static_cast<int>(salt.size()),
+        iterCount,
+        EVP_sha256(),
+        SHA256_DIGEST_LENGTH, saltedPassword.data()
+    );
+
+    // calculate clientKey
+    std::vector<uint8_t> clientKey(SHA256_DIGEST_LENGTH);
+    HMAC(EVP_sha256(),
+        saltedPassword.data(), static_cast<int>(saltedPassword.size()),
+        (const uint8_t*)"Client Key", 10,
+        clientKey.data(), nullptr);
+
+    // calculate storedKey
+    std::vector<uint8_t> storedKey(SHA256_DIGEST_LENGTH);
+    SHA256(clientKey.data(), clientKey.size(), storedKey.data());
+
+    // calculate auth
+    string authMessage = "n=" + userId_ + ",r=" + clientNonce + ","
+        + "r=" + combinedNonce + ",s=" + saltString + ",i=" + std::to_string(iterCount) + ","
+        + "c=biws,r=" + combinedNonce;
+
+    // calculate client signature
+    std::vector<uint8_t> clientSignature(SHA256_DIGEST_LENGTH);
+    HMAC(EVP_sha256(),
+        storedKey.data(), static_cast<int>(storedKey.size()),
+        (const uint8_t*)authMessage.c_str(), authMessage.size(),
+        clientSignature.data(), nullptr);
+
+    // calculate client proof
+    std::vector<uint8_t> proof(clientSignature.size());
+    for (size_t i = 0; i < clientSignature.size(); ++i) {
+        proof[i] = clientKey[i] ^ clientSignature[i];
+    }
+
+    // call scramClientFinal
+    args.clear();
+    args.push_back(new String(userId_));
+    args.push_back(new String(combinedNonce));
+    args.push_back(new String(Crypto::Base64Encode(proof, BIO_FLAGS_BASE64_NO_NL)));
+    result = run("scramClientFinal", args);
+    if (!result->isScalar() || result->getType() != DT_STRING) {
+        throw IOException("SCRAM login failed, server error: get server signature failed.");
+    }
+
+    // calculate serverKey
+    std::vector<uint8_t> serverKey(SHA256_DIGEST_LENGTH);
+    HMAC(EVP_sha256(),
+        saltedPassword.data(), static_cast<int>(saltedPassword.size()),
+        (const uint8_t*)"Server Key", 10,
+        serverKey.data(), nullptr);
+
+    // check server signature
+    std::vector<uint8_t> serverSignature(SHA256_DIGEST_LENGTH);
+    HMAC(EVP_sha256(),
+        serverKey.data(), static_cast<int>(serverKey.size()),
+        (const uint8_t*)authMessage.c_str(), authMessage.length(),
+        serverSignature.data(), nullptr);
+
+    string serverSigResult = result->getString();
+    if (!serverSigResult.empty() && Crypto::Base64Encode(serverSignature, BIO_FLAGS_BASE64_NO_NL) != serverSigResult) {
+        close(); // if check failed, close connection
+        throw DataCorruptionException("SCRAM login failed, Invalid server signature");
+    }
+    DLogger::Debug("SCRAM login succeed.");
+#else
+    throw RuntimeException("SCRAM login is unavailble without OpenSSL.");
+#endif
+}
+
 
 ConstantSP DBConnectionImpl::run(const string& script, int priority, int parallelism, int fetchSize, bool clearMemory, long seqNum) {
     std::vector<ConstantSP> args;
@@ -196,6 +309,9 @@ ConstantSP DBConnectionImpl::run(const string& funcName, std::vector<ConstantSP>
 ConstantSP DBConnectionImpl::upload(const string& name, const ConstantSP& obj) {
     if (!Util::isVariableCandidate(name))
         throw RuntimeException(name + " is not a qualified variable name.");
+    if (obj.isNull()) {
+        throw IllegalArgumentException(__FUNCNAME__, "Invalid obj (nullptr).");
+    }
     std::vector<ConstantSP> args(1, obj);
     return run(name, "variable", args);
 }
@@ -307,10 +423,10 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
             throw IOException("Couldn't send script/function to the remote host because the connection has been closed, IO error type " + std::to_string(ret));
         }
     }
-    
+
     if(asynTask_)
         return new Void();
-    
+
     if (littleEndian_ != (char)Util::isLittleEndian())
         inputStream_->enableReverseIntegerByteOrder();
 
@@ -351,13 +467,13 @@ ConstantSP DBConnectionImpl::run(const string& script, const string& scriptType,
     if (numObject == 0) {
         return new Void();
     }
-    
+
     short flag;
     if ((ret = inputStream_->readShort(flag)) != OK) {
         close();
         throw IOException("Failed to read object flag from the socket with IO error type " + std::to_string(ret));
     }
-    
+
     DATA_FORM form = static_cast<DATA_FORM>(flag >> 8);
     DATA_TYPE type = static_cast<DATA_TYPE >(flag & 0xff);
     if(fetchSize > 0 && form == DF_VECTOR && type == DT_ANY)

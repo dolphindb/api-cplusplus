@@ -139,7 +139,8 @@ TEST_F(ConcurrentTest, test_threadedClient_multi_client_subscribe_concurrent){
         auto hd = [=](Message msg){
             // cout << msg->getString();
             TableSP tmp = (TableSP)msg;
-            conn.run("tableInsert{res_"+to_string(i)+"}", tmp);
+            vector<ConstantSP> args = {tmp};
+            conn.run("tableInsert{res_"+to_string(i)+"}", args);
         };
         auto tsp = clients[i]->subscribe(hostName, port, hd, tab, subActions[i], 0, true, nullptr, true, true, "admin", "123456");
         cout << "thread id: " << tsp->getID() << endl;
@@ -195,7 +196,8 @@ TEST_F(ConcurrentTest, test_threadedClient_single_client_multi_subscribe_concurr
         auto hd = [=](Message msg){
             // cout << msg->getString();
             TableSP tmp = (TableSP)msg;
-            conn.run("tableInsert{res_"+to_string(i)+"}", tmp);
+            vector<ConstantSP> args = {tmp};
+            conn.run("tableInsert{res_"+to_string(i)+"}", args);
         };
         auto tsp = client.subscribe(hostName, port, hd, tab, subActions[i], 0, true, nullptr, true, true, "admin", "123456");
     }

@@ -87,10 +87,10 @@ if (USE_AERON)
 endif()
 
 if (WIN32)
-    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE NOMINMAX _DDBAPIDLL)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE _DDBAPIDLL)
     target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32 crypt32)
     if (MINGW)
-        target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE WINDOWS _WIN32_WINNT=0x0600)
+        target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE _WIN32_WINNT=0x0600)
     endif()
 else()
     check_include_file_cxx("uuid/uuid.h" HAS_UUID)
@@ -101,22 +101,13 @@ else()
 endif()
 
 if (MSVC)
-    # C4251: Class member of an exported class is not marked dllexport. This is triggered by std::string but we cannot modify STL.
-    # C4100: Parameter is unused. We should fix this later.
-    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE /W4 /MP /wd4251 /wd4100)
-    # Unicode support of fmt (used in spdlog) requires /utf-8 of MSVC.
-    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE FMT_UNICODE=0)
+    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE /W4 /MP /Zc:__cplusplus /utf-8)
     if (${CMAKE_BUILD_TYPE} MATCHES "Dev")
         target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE /WX)
     endif()
 else()
-    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wall)
-    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
-        -Wno-overloaded-virtual # ConstantImp.h
-        -Wno-inconsistent-missing-override # ConstantImp.h
-    >)
-    # Enable Wextra and Wconversion when possible
-    set(CMAKE_CXX_FLAGS_DEV "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -Werror -Wpedantic")
+    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
+    set(CMAKE_CXX_FLAGS_DEV "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -Werror")
 endif()
 
 if (WITH_UNITTEST)
@@ -156,24 +147,19 @@ if (API_TEST)
 
     if(USE_OPENSSL AND OPENSSL_FOUND)
         target_compile_definitions(${TEST_BINARY_NAME} PRIVATE TEST_OPENSSL)
-        target_include_directories(${TEST_BINARY_NAME} PRIVATE ${OPENSSL_INCLUDE_DIR})
-        target_link_libraries(${TEST_BINARY_NAME} PRIVATE ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
     endif()
     if(USE_AERON AND HAS_AERON)
         target_compile_definitions(${TEST_BINARY_NAME} PRIVATE TEST_AERON)
-        target_include_directories(${TEST_BINARY_NAME} PRIVATE ${AERON_INCLUDE_DIR})
-        target_link_directories(${TEST_BINARY_NAME} PRIVATE ${AERON_LIBRARY_DIR})
-        target_link_libraries(${TEST_BINARY_NAME} PRIVATE ${AERON_LIBRARY})
     endif()
 
     if (MSVC)
         target_compile_options(${TEST_BINARY_NAME} PRIVATE /W0 /utf-8 /MP /bigobj)
-        target_compile_definitions(${TEST_BINARY_NAME} PRIVATE WINDOWS NOMINMAX)
+        target_compile_definitions(${TEST_BINARY_NAME} PRIVATE WINDOWS NOMINMAX WIN32_LEAN_AND_MEAN)
     elseif (MINGW)
-        target_compile_options(${TEST_BINARY_NAME} PRIVATE -w -Wa,-mbig-obj -pthread -std=c++11 -g)
+        target_compile_options(${TEST_BINARY_NAME} PRIVATE -w -Wa,-mbig-obj -pthread -std=c++11 -g -O0)
         target_compile_definitions(${TEST_BINARY_NAME} PRIVATE WINDOWS _WIN32_WINNT=0x0600)
     else()
-        target_compile_options(${TEST_BINARY_NAME} PRIVATE -w -pthread -std=c++11 -g)
+        target_compile_options(${TEST_BINARY_NAME} PRIVATE -w -pthread -std=c++11 -g -O0)
     endif()
 
     if(CMAKE_VERSION VERSION_GREATER "3.27.0")

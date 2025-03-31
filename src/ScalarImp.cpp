@@ -5,17 +5,10 @@
  *      Author: dzhou
  */
 
-#ifdef WINDOWS
-	#include <winsock2.h>
-	#include <windows.h>
-	#include <objbase.h>
-#else
-	#include <uuid/uuid.h>
-#endif
-
 #include "ScalarImp.h"
 #include "Format.h"
 #include "ConstantImp.h"
+#include "spdlog/fmt/fmt.h"
 namespace dolphindb {
 
 std::string DoubleToString(double val){
@@ -37,28 +30,33 @@ inline long long countTemporalUnit(int days, long long multiplier, long long rem
 }
 
 bool Void::isNull(INDEX start, int len, char* buf) const {
+	std::ignore = start;
 	memset(buf,1,len);
 	return true;
 }
 
 bool Void::isValid(INDEX start, int len, char* buf) const {
+	std::ignore = start;
 	memset(buf,0,len);
 	return true;
 }
 
 bool Void::getBool(INDEX start, int len, char* buf) const {
+	std::ignore = start;
 	for(int i=0;i<len;++i)
 		buf[i]=CHAR_MIN;
 	return true;
 }
 
 const char* Void::getBoolConst(INDEX start, int len, char* buf) const {
+	std::ignore = start;
 	for(int i=0;i<len;++i)
 		buf[i]=CHAR_MIN;
 	return buf;
 }
 
 bool Void::getChar(INDEX start, int len, char* buf) const {
+	std::ignore = start;
 	char tmp=CHAR_MIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -66,6 +64,7 @@ bool Void::getChar(INDEX start, int len, char* buf) const {
 }
 
 const char* Void::getCharConst(INDEX start, int len, char* buf) const {
+	std::ignore = start;
 	char tmp=CHAR_MIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -73,6 +72,7 @@ const char* Void::getCharConst(INDEX start, int len, char* buf) const {
 }
 
 bool Void::getShort(INDEX start, int len, short* buf) const {
+	std::ignore = start;
 	short tmp=SHRT_MIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -80,6 +80,7 @@ bool Void::getShort(INDEX start, int len, short* buf) const {
 }
 
 const short* Void::getShortConst(INDEX start, int len, short* buf) const {
+	std::ignore = start;
 	short tmp=SHRT_MIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -87,6 +88,7 @@ const short* Void::getShortConst(INDEX start, int len, short* buf) const {
 }
 
 bool Void::getInt(INDEX start, int len, int* buf) const {
+	std::ignore = start;
 	int tmp=INT_MIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -94,6 +96,7 @@ bool Void::getInt(INDEX start, int len, int* buf) const {
 }
 
 const int* Void::getIntConst(INDEX start, int len, int* buf) const {
+	std::ignore = start;
 	int tmp=INT_MIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -101,6 +104,7 @@ const int* Void::getIntConst(INDEX start, int len, int* buf) const {
 }
 
 bool Void::getLong(INDEX start, int len, long long* buf) const {
+	std::ignore = start;
 	long long tmp=LLONG_MIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -108,6 +112,7 @@ bool Void::getLong(INDEX start, int len, long long* buf) const {
 }
 
 const long long* Void::getLongConst(INDEX start, int len, long long* buf) const {
+	std::ignore = start;
 	long long tmp=LLONG_MIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -115,6 +120,7 @@ const long long* Void::getLongConst(INDEX start, int len, long long* buf) const 
 }
 
 bool Void::getIndex(INDEX start, int len, INDEX* buf) const {
+	std::ignore = start;
 	INDEX tmp=INDEX_MIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -122,6 +128,7 @@ bool Void::getIndex(INDEX start, int len, INDEX* buf) const {
 }
 
 const INDEX* Void::getIndexConst(INDEX start, int len, INDEX* buf) const {
+	std::ignore = start;
 	INDEX tmp=INDEX_MIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -129,6 +136,7 @@ const INDEX* Void::getIndexConst(INDEX start, int len, INDEX* buf) const {
 }
 
 bool Void::getFloat(INDEX start, int len, float* buf) const {
+	std::ignore = start;
 	float tmp=FLT_NMIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -136,6 +144,7 @@ bool Void::getFloat(INDEX start, int len, float* buf) const {
 }
 
 const float* Void::getFloatConst(INDEX start, int len, float* buf) const {
+	std::ignore = start;
 	float tmp=FLT_NMIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -143,6 +152,7 @@ const float* Void::getFloatConst(INDEX start, int len, float* buf) const {
 }
 
 bool Void::getDouble(INDEX start, int len, double* buf) const {
+	std::ignore = start;
 	double tmp=DBL_NMIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -150,6 +160,7 @@ bool Void::getDouble(INDEX start, int len, double* buf) const {
 }
 
 const double* Void::getDoubleConst(INDEX start, int len, double* buf) const {
+	std::ignore = start;
 	double tmp=DBL_NMIN;
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -157,18 +168,21 @@ const double* Void::getDoubleConst(INDEX start, int len, double* buf) const {
 }
 
 bool Void::getString(INDEX start, int len, string** buf) const {
+	std::ignore = start;
 	for(int i=0;i<len;++i)
 		buf[i]=&Constant::EMPTY;
 	return true;
 }
 
 string** Void::getStringConst(INDEX start, int len, string** buf) const {
+	std::ignore = start;
 	for(int i=0;i<len;++i)
 		buf[i]=&Constant::EMPTY;
 	return buf;
 }
 
 bool Void::getBinary(INDEX start, int len, int unitLength, unsigned char* buf) const {
+	std::ignore = start;
 	memset(buf, 0, unitLength * len);
 	return true;
 }
@@ -177,6 +191,9 @@ long long Void::getAllocatedMemory() const {return sizeof(Void);}
 
 
 int Void::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const {
+    std::ignore = bufSize;
+    std::ignore = indexStart;
+    std::ignore = offset;
 	buf[0] = isNothing() ? 0 : 1;
 	numElement = 1;
 	partial = 0;
@@ -184,6 +201,8 @@ int Void::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& n
 }
 
 IO_ERR Void::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement) {
+    std::ignore = indexStart;
+    std::ignore = targetNumElement;
 	bool explicitNull;
 	IO_ERR ret = in->readBool(explicitNull);
 	if(ret == OK)
@@ -193,6 +212,7 @@ IO_ERR Void::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumE
 }
 
 int String::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const {
+    std::ignore = indexStart;
     int len = static_cast<int>(val_.size());
     if(len >= 262144){
         throw RuntimeException("String too long, Serialization failed, length must be less than 256K bytes");
@@ -242,6 +262,8 @@ int String::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int&
 }
 
 IO_ERR String::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
+    std::ignore = indexStart;
+    std::ignore = targetNumElement;
     IO_ERR ret;
     if (blob_) {
         int len;
@@ -280,6 +302,8 @@ Bool* Bool::parseBool(const string& str){
 }
 
 IO_ERR Bool::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
+    std::ignore = indexStart;
+    std::ignore = targetNumElement;
 	IO_ERR ret = in->readChar(val_);
 	if(ret == OK)
 		numElement = 1;
@@ -341,6 +365,8 @@ Char* Char::parseChar(const string& str){
 }
 
 IO_ERR Char::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
+    std::ignore = indexStart;
+    std::ignore = targetNumElement;
 	IO_ERR ret = in->readChar(val_);
 	if(ret == OK)
 		numElement = 1;
@@ -371,6 +397,8 @@ string Short::toString(short val){
 }
 
 IO_ERR Short::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
+    std::ignore = indexStart;
+    std::ignore = targetNumElement;
 	IO_ERR ret = in->readShort(val_);
 	if(ret == OK)
 		numElement = 1;
@@ -396,6 +424,8 @@ string Int::toString(int val){
 }
 
 IO_ERR Int::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
+    std::ignore = indexStart;
+    std::ignore = targetNumElement;
 	IO_ERR ret = in->readInt(val_);
 	if(ret == OK)
 		numElement = 1;
@@ -422,6 +452,8 @@ string Long::toString(long long val){
 }
 
 IO_ERR Long::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
+    std::ignore = indexStart;
+    std::ignore = targetNumElement;
 	IO_ERR ret = in->readLong(val_);
 	if(ret == OK)
 		numElement = 1;
@@ -437,6 +469,7 @@ Int128::Int128(){
 }
 
 int Int128::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int& numElement, int& partial) const {
+    std::ignore = indexStart;
 	int len = 16 - offset;
 	if(len < 0)
 		return -1;
@@ -456,6 +489,8 @@ int Int128::serialize(char* buf, int bufSize, INDEX indexStart, int offset, int&
 }
 
 IO_ERR Int128::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement) {
+    std::ignore = indexStart;
+    std::ignore = targetNumElement;
 	IO_ERR ret = in->readBytes((char*)uuid_, 16, false);
 	if(ret == OK)
 		numElement = 1;
@@ -472,10 +507,12 @@ void Int128::setNull(){
 }
 
 void Int128::setBinary(const unsigned char* val, int unitLength){
+    std::ignore = unitLength;
 	memcpy(uuid_, val, 16);
 }
 
 bool Int128::getBinary(INDEX start, int len, int unitLength, unsigned char* buf) const{
+    std::ignore = start;
 	if(unitLength != 16)
 		return false;
 	for(int i=0; i<len; ++i){
@@ -486,6 +523,8 @@ bool Int128::getBinary(INDEX start, int len, int unitLength, unsigned char* buf)
 }
 
 const unsigned char* Int128::getBinaryConst(INDEX start, int len, int unitLength, unsigned char* buf) const {
+    std::ignore = start;
+    std::ignore = unitLength;
 	unsigned char* original = buf;
 	for(int i=0; i<len; ++i){
 		memcpy(buf, uuid_, 16);
@@ -524,6 +563,7 @@ bool Int128::parseInt128(const char* str, size_t len, unsigned char *buf) {
 }
 
 int Int128::compare(INDEX index, const ConstantSP& target) const {
+    std::ignore = index;
 	return guid_.compare(target->getInt128());
 }
 
@@ -532,7 +572,7 @@ Uuid::Uuid(bool newUuid){
 		memset(uuid_, 0, 16);
 	}
 	else{
-#ifdef WINDOWS
+#ifdef _WIN32
 	CoCreateGuid((GUID*)uuid_);
 #else
 	uuid_generate(uuid_);
@@ -742,6 +782,7 @@ bool IPAddr::parseIP6(const char* str, size_t len, unsigned char* buf){
 }
 
 bool Float::getChar(INDEX start, int len, char* buf) const {
+    std::ignore = start;
 	char tmp = isNull() ? CHAR_MIN : static_cast<char>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -749,6 +790,7 @@ bool Float::getChar(INDEX start, int len, char* buf) const {
 }
 
 const char* Float::getCharConst(INDEX start, int len, char* buf) const {
+    std::ignore = start;
 	char tmp = isNull() ? CHAR_MIN : static_cast<char>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -756,6 +798,7 @@ const char* Float::getCharConst(INDEX start, int len, char* buf) const {
 }
 
 bool Float::getShort(INDEX start, int len, short* buf) const {
+    std::ignore = start;
 	short tmp = isNull() ? SHRT_MIN : static_cast<short>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -763,6 +806,7 @@ bool Float::getShort(INDEX start, int len, short* buf) const {
 }
 
 const short* Float::getShortConst(INDEX start, int len, short* buf) const {
+    std::ignore = start;
 	short tmp = isNull() ? SHRT_MIN : static_cast<short>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -770,6 +814,7 @@ const short* Float::getShortConst(INDEX start, int len, short* buf) const {
 }
 
 bool Float::getInt(INDEX start, int len, int* buf) const {
+    std::ignore = start;
 	int tmp = isNull() ? INT_MIN : static_cast<int>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -777,6 +822,7 @@ bool Float::getInt(INDEX start, int len, int* buf) const {
 }
 
 const int* Float::getIntConst(INDEX start, int len, int* buf) const {
+    std::ignore = start;
 	int tmp = isNull() ? INT_MIN : static_cast<int>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -784,6 +830,7 @@ const int* Float::getIntConst(INDEX start, int len, int* buf) const {
 }
 
 bool Float::getLong(INDEX start, int len, long long* buf) const {
+    std::ignore = start;
 	long long tmp = isNull() ? LLONG_MIN : static_cast<long long>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -791,6 +838,7 @@ bool Float::getLong(INDEX start, int len, long long* buf) const {
 }
 
 const long long* Float::getLongConst(INDEX start, int len, long long* buf) const {
+    std::ignore = start;
 	long long tmp = isNull() ? LLONG_MIN : static_cast<long long>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -820,6 +868,8 @@ Float* Float::parseFloat(const string& str){
 }
 
 IO_ERR Float::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
+    std::ignore = indexStart;
+    std::ignore = targetNumElement;
 	IO_ERR ret = in->readFloat(val_);
 	if(ret == OK)
 		numElement = 1;
@@ -827,6 +877,7 @@ IO_ERR Float::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNum
 }
 
 bool Double::getChar(INDEX start, int len, char* buf) const {
+    std::ignore = start;
 	char tmp = isNull() ? CHAR_MIN : static_cast<char>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -834,6 +885,7 @@ bool Double::getChar(INDEX start, int len, char* buf) const {
 }
 
 const char* Double::getCharConst(INDEX start, int len, char* buf) const {
+    std::ignore = start;
 	char tmp = isNull() ? CHAR_MIN : static_cast<char>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -841,6 +893,7 @@ const char* Double::getCharConst(INDEX start, int len, char* buf) const {
 }
 
 bool Double::getShort(INDEX start, int len, short* buf) const {
+    std::ignore = start;
 	short tmp = isNull() ? SHRT_MIN : static_cast<short>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -848,6 +901,7 @@ bool Double::getShort(INDEX start, int len, short* buf) const {
 }
 
 const short* Double::getShortConst(INDEX start, int len, short* buf) const {
+    std::ignore = start;
 	short tmp = isNull() ? SHRT_MIN : static_cast<short>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -855,6 +909,7 @@ const short* Double::getShortConst(INDEX start, int len, short* buf) const {
 }
 
 bool Double::getInt(INDEX start, int len, int* buf) const {
+    std::ignore = start;
 	int tmp = isNull() ? INT_MIN : static_cast<int>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -862,6 +917,7 @@ bool Double::getInt(INDEX start, int len, int* buf) const {
 }
 
 const int* Double::getIntConst(INDEX start, int len, int* buf) const {
+    std::ignore = start;
 	int tmp = isNull() ? INT_MIN : static_cast<int>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -869,12 +925,14 @@ const int* Double::getIntConst(INDEX start, int len, int* buf) const {
 }
 
 bool Double::getLong(INDEX start, int len, long long* buf) const {
+    std::ignore = start;
 	long long tmp = isNull() ? LLONG_MIN : static_cast<long long>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
 	return true;
 }
 const long long* Double::getLongConst(INDEX start, int len, long long* buf) const {
+    std::ignore = start;
 	long long tmp = isNull() ? LLONG_MIN : static_cast<long long>(val_ < 0 ? (val_ - 0.5) : (val_ + 0.5));
 	for(int i=0;i<len;++i)
 		buf[i]=tmp;
@@ -904,6 +962,8 @@ Double* Double::parseDouble(const string& str){
 }
 
 IO_ERR Double::deserialize(DataInputStream* in, INDEX indexStart, INDEX targetNumElement, INDEX& numElement){
+    std::ignore = indexStart;
+    std::ignore = targetNumElement;
 	IO_ERR ret = in->readDouble(val_);
 	if(ret == OK)
 		numElement = 1;
@@ -944,8 +1004,11 @@ Date* Date::parseDate(const string& date){
 string Date::toString(int val){
     if(val == INT_MIN)
         return "";
-    static TemporalFormat dateFormat("yyyy.MM.dd");
-    return dateFormat.format(val, DT_DATE);
+    int y;
+    int m;
+    int d;
+    Util::parseDate(val, y, m, d);
+    return fmt::format("{:04d}.{:02d}.{:02d}", y, m, d);
 }
 
 DateTime::DateTime(int year, int month, int day, int hour, int minute,int second):

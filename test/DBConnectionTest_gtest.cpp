@@ -136,6 +136,7 @@ TEST_F(DBConnectionTest, test_connection_enableSSL)
     conn_demo.close();
 }
 
+#ifndef _WIN32
 TEST_F(DBConnectionTest, test_connection_asyncTask)
 {
     connReconn.run("try{undef(`tab, SHARED);}catch(ex){}");
@@ -160,6 +161,7 @@ TEST_F(DBConnectionTest, test_connection_asyncTask)
     connReconn.run("undef(`tab, SHARED)");
     conn_demo.close();
 }
+#endif
 
 TEST_F(DBConnectionTest, test_connection_function_login)
 {
@@ -729,9 +731,10 @@ TEST_F(DBConnectionTest, test_connectionPool_parallel)
     connReconn.run("login(`admin,`123456);try{createUser(`test1, `123456)}catch(ex){};go;setMaxJobParallelism(`test1, 10);");
     { // TestConnectionParallel_lt_MaxJobParallelism
         int priority = 3;
-        int parallel = rand() % 10;
+        int parallel = rand() % 10 + 1;
         DBConnectionPoolSP _tmpP = new DBConnectionPool(hostName, port, 10, "test1", "123456");
         int id = rand() % 1000;
+        EXPECT_ANY_THROW(_tmpP->run("getConsoleJobs()", id, priority, 0));
         _tmpP->run("getConsoleJobs()", id, priority, parallel);
         while (!_tmpP->isFinished(id))
         {
@@ -782,4 +785,91 @@ TEST_F(DBConnectionTest, test_connection_login_encrypt){
         EXPECT_ANY_THROW(_c->login("admin", "123456", true));
     #endif
     _c->close();
+}
+
+
+TEST_F(DBConnectionTest, test_connection_login_ban_guest){
+    {
+        DBConnectionSP _c = new DBConnection(false, false);
+        _c->connect(hostName, port);
+        _c->login("admin", "123456", false);
+        bool res = _c->run("bool(getConfig(`enableClientAuth))")->getBool();
+        EXPECT_TRUE(res);
+        _c->close();
+    }
+    {
+        DBConnectionSP _c = new DBConnection(false, false);
+        _c->connect(hostName, port);
+        EXPECT_ANY_THROW(_c->run("bool(getConfig(`enableClientAuth))")); // guest user is banned
+        _c->close();
+    }
+    {
+        DBConnectionPoolSP _p = new DBConnectionPool(hostName, port, 10, "admin", "123456");
+        int id = rand() % 1000;
+        _p->run("bool(getConfig(`enableClientAuth))", id);
+        while (!_p->isFinished(id))
+        {
+            Util::sleep(500);
+        }
+        bool res = _p->getData(id)->getBool();
+        EXPECT_TRUE(res);
+        _p->shutDown();
+    }
+    {
+        DBConnectionPoolSP _p = new DBConnectionPool(hostName, port, 10);
+        int id = rand() % 1000;
+        try{
+            _p->run("bool(getConfig(`enableClientAuth))", id);
+            while (!_p->isFinished(id))
+            {
+                Util::sleep(500);
+            }
+        }catch(const std::exception& e){
+            EXPECT_PRED_FORMAT2(testing::IsSubstring, "RefId: S04009", e.what());
+        }
+  
+        _p->shutDown();
+    }
+
+}
+
+TEST_F(DBConnectionTest, test_connection_SCRAM){
+    try{
+        connReconn.run("try{deleteUser('scramUser')}catch(ex){};go;createUser(`scramUser, `123456, authMode='scram')");
+    }catch(const std::exception& e){
+        GTEST_SKIP() << e.what();
+    }
+    {
+        DBConnectionSP _c = new DBConnection(false, false, 7200, false, false, false, true);
+        _c->connect(hostName, port);
+        _c->login("scramUser", "123456", true);
+        ConstantSP res = _c->run("getCurrentSessionAndUser()[1]");
+        EXPECT_EQ(res->getString(), "scramUser");
+        _c->close();
+        cout << "test_connection_SCRAM1 passed" << endl;
+    }
+    {
+        DBConnection _c = DBConnection(false, false, 7200, false, false, false, true);
+        _c.connect(hostName, port, "scramUser", "123456");
+        ConstantSP res = _c.run("getCurrentSessionAndUser()[1]");
+        EXPECT_EQ(res->getString(), "scramUser");
+        _c.close();
+        cout << "test_connection_SCRAM2 passed" << endl;
+    }
+}
+
+TEST_F(DBConnectionTest, test_connectionPool_SCRAM){
+    try{
+        connReconn.run("try{deleteUser('scramUser')}catch(ex){};go;createUser(`scramUser, `123456, authMode='scram')");
+    }catch(const std::exception& e){
+        GTEST_SKIP() << e.what();
+    }
+    DBConnectionPoolSP _p = new DBConnectionPool(hostName, port, 10, "scramUser", "123456");
+    _p->run("getCurrentSessionAndUser()[1]", 0);
+    while (!_p->isFinished(0)){
+        Util::sleep(500);
+    }
+    EXPECT_EQ(_p->getData(0)->getString(), "scramUser");
+    _p->shutDown();
+    cout << "test_connectionPool_SCRAM passed" << endl;
 }

@@ -13,6 +13,7 @@
 #include "Format.h"
 #include "DFSChunkMeta.h"
 #include "Logger.h"
+#include "ResultSet.h"
 // #include "Database.h"
 // #include "Utility.h"
 // #include "DBTable.h"

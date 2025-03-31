@@ -1,4 +1,3 @@
-#define USE_OPENSSL
 #include "config.h"
 
 class SysIOTest:public testing::Test
@@ -32,7 +31,7 @@ protected:
 		{
 			conn.connect(hostName, port, "admin", "123456");
 		}
-		
+
         cout<<"ok"<<endl;
 		CLEAR_ENV(conn);
     }
@@ -2874,7 +2873,7 @@ TEST_P(SysIOTest_Parameterized, test_DataStream_table_Null){
 
 TEST_F(SysIOTest, test_DataStream_table_withAllType)
 {
-	int colNum = 25, rowNum = 1; 
+	int colNum = 25, rowNum = 1;
 	vector<string> colNamesVec1;
 	for (int i = 0; i < colNum; i++){
 		colNamesVec1.emplace_back("col"+to_string(i));
@@ -2932,7 +2931,7 @@ TEST_F(SysIOTest, test_DataStream_table_withAllType)
 		columnVecs[14]->set(i, Util::createFloat(rand()/float(RAND_MAX)));
 		columnVecs[15]->set(i, Util::createDouble(rand()/double(RAND_MAX)));
 		columnVecs[16]->set(i, Util::createString("str"+to_string(i)));
-		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));	
+		columnVecs[17]->set(i, Util::parseConstant(DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87"));
 		columnVecs[18]->set(i, Util::parseConstant(DT_IP,"192.0.0."+to_string(rand()%255)));
 		columnVecs[19]->set(i, Util::parseConstant(DT_INT128,"e1671797c52e15f763380b45e841ec32"));
 		columnVecs[20]->set(i, Util::createBlob("blob"+to_string(i)));

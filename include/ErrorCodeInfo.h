@@ -1,7 +1,15 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
 #pragma once
 
 #include "Exports.h"
 #include "Constant.h"
+
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4251 )
+#endif
+
 namespace dolphindb {
 
 class EXPORT_DECL ErrorCodeInfo {
@@ -42,3 +50,7 @@ public:
 };
 
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

@@ -43,6 +43,7 @@ void ConstantUnmarshallImp::decodeFlag(short flag, DATA_FORM& form, DATA_TYPE& t
 }
 
 bool ScalarMarshall::start(const char* requestHeader, size_t headerSize, const ConstantSP& target, bool blocking, bool compress, IO_ERR& ret){
+	std::ignore = compress;
 	if(headerSize > 1024){
 		ret = INVALIDDATA;
 		return false;
@@ -237,6 +238,7 @@ void VectorMarshall::resetSymbolBaseMarshall(bool createIfNotExist){
 }
 
 bool MatrixMarshall::sendMeta(const char* requestHeader, size_t headerSize, const ConstantSP& target, bool blocking, IO_ERR& ret){
+	std::ignore = blocking;
 	if(headerSize > 1024){
 		ret = INVALIDDATA;
 		return false;
@@ -292,6 +294,7 @@ void MatrixMarshall::reset(){
 }
 
 bool TableMarshall::sendMeta(const char* requestHeader, size_t headerSize, const ConstantSP& target, bool blocking, bool compress, IO_ERR& ret) {
+	std::ignore = blocking;
 	if(headerSize > 1024){
 		ret = INVALIDDATA;
 		return false;
@@ -400,6 +403,7 @@ void TableMarshall::reset(){
 }
 
 bool SetMarshall::sendMeta(const char* requestHeader, size_t headerSize, const ConstantSP& target, bool blocking, IO_ERR& ret){
+	std::ignore = blocking;
 	if(headerSize > 1024){
 		ret = INVALIDDATA;
 		return false;
@@ -434,6 +438,7 @@ void SetMarshall::reset(){
 }
 
 bool DictionaryMarshall::sendMeta(const char* requestHeader, size_t headerSize, const ConstantSP& target, bool blocking, IO_ERR& ret){
+	std::ignore = blocking;
 	if(headerSize > 1024){
 		ret = INVALIDDATA;
 		return false;
@@ -476,6 +481,8 @@ void DictionaryMarshall::reset(){
 }
 
 bool ChunkMarshall::start(const char* requestHeader, size_t headerSize, const ConstantSP& target, bool blocking, bool compress, IO_ERR& ret){
+	std::ignore = blocking;
+	std::ignore = compress;
 	if(headerSize > 1024){
 		ret = INVALIDDATA;
 		return false;
@@ -576,6 +583,7 @@ void SymbolBaseMarshall::reset(){
 }
 
 bool ScalarUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
+	std::ignore = blocking;
 	DATA_FORM form;
 	DATA_TYPE type;
 	decodeFlag(flag, form, type);
@@ -625,6 +633,7 @@ void ScalarUnmarshall::reset(){
 }
 
 bool SymbolBaseUnmarshall::start(bool blocking, IO_ERR& ret){
+	std::ignore = blocking;
 	symbaseId_ = -1;
 	size_ = -1;
 
@@ -1002,6 +1011,8 @@ void DictionaryUnmarshall::reset(){
 }
 
 bool ChunkUnmarshall::start(short flag, bool blocking, IO_ERR& ret){
+	std::ignore = flag;
+	std::ignore = blocking;
 	size_ = -1;
 	ret = in_->readShort(size_);
 	if(ret != OK)

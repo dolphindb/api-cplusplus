@@ -721,7 +721,7 @@ TEST_F(CompressTest,insertTableCompressWithDecimal128ArrayVector){
 TEST_F(CompressTest, upload_other_dataforms_with_compress)
 {
     auto matrx = conn_compress.run("a = matrix(1 2, 3 4);a");
-    auto vec = conn_compress.run("b = 1 2 3 4;b");
+    auto vec = conn_compress.run("b = [`abc, 1h, 3.14, ipaddr('1.1.1.1')];b");
     auto par = conn_compress.run("c = 1:2;c");
     auto st = conn_compress.run("d = set(1 1 2 3);d");
     auto dt = conn_compress.run("ee = dict(int(1 2),int(3 4));ee");

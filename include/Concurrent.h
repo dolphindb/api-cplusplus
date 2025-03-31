@@ -1,12 +1,11 @@
-/*
- * Concurrent.h
- *
- *  Created on: Jan 26, 2013
- *      Author: dzhou
- */
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
-#ifndef CONCURRENT_H_
-#define CONCURRENT_H_
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4251 )
+#endif
 
 #include <vector>
 #include <queue>
@@ -14,17 +13,7 @@
 #include <algorithm>
 #include <memory>
 #include <functional>
-
-#ifdef WINDOWS
-	#include <winsock2.h>
-    #include <windows.h>
-#else
-    #include <pthread.h>
-    #include <unistd.h>
-    #include <sys/syscall.h>
-	#include <semaphore.h>
-#endif
-
+#include "Platform.h"
 #include "Exports.h"
 #include "SmartPointer.h"
 
@@ -74,7 +63,7 @@ public:
 
 private:
 
-#ifdef WINDOWS
+#ifdef _WIN32
 	CRITICAL_SECTION mutex_;
 #else
 	pthread_mutexattr_t attr_;
@@ -94,7 +83,7 @@ public:
 	bool tryAcquireRead();
 	bool tryAcquireWrite();
 private:
-#ifdef WINDOWS
+#ifdef _WIN32
 	SRWLOCK lock_;
 #else
 	pthread_rwlock_t lock_;
@@ -123,7 +112,7 @@ public:
 	void notifyAll();
 
 private:
-#ifdef WINDOWS
+#ifdef _WIN32
 	CONDITION_VARIABLE conditionalVariable_;
 #else
 	pthread_cond_t conditionalVariable_;
@@ -285,7 +274,7 @@ public:
 	void release();
 
 private:
-#ifdef WINDOWS
+#ifdef _WIN32
 	HANDLE sem_;
 #elif defined MAC
 	sem_t *sem_;
@@ -474,7 +463,7 @@ private:
 	}
 
 	RunnableSP run_;
-#ifdef WINDOWS
+#ifdef _WIN32
 	HANDLE thread_;
 	DWORD threadId_;
 #else
@@ -649,4 +638,6 @@ private:
 
 }
 
-#endif /* CONCURRENT_H_ */
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

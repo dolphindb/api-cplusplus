@@ -1,7 +1,8 @@
-#ifndef __SharedMem_H
-#define __SharedMem_H
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
-#ifdef LINUX
+#ifdef __linux__
 
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -130,6 +131,7 @@ class SharedMemStream {
     * @param size  max data size of shared memory. the actual size is max of 1G and the param.
     */
    SharedMemStream(bool create, std::string path, int64_t size): path_(path), size_(size), isFirstRead_(true){
+      std::ignore = create;
       shmpHeader_ = NULL;
       shmFd_ = 0;
    }
@@ -217,6 +219,4 @@ class IPCInMemTable : public BasicTable {
 };
 
 } // namespace dolphindb
-#endif
-
 #endif

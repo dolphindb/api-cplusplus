@@ -2954,3 +2954,40 @@ TEST_P(PTA_append_null, test_append_empty_table)
 	EXPECT_EQ(res->rows(), 0);
 	conn.run("dropDatabase('dfs://test_append_empty_table')");
 }
+
+
+TEST_F(PartitionedTableAppenderTest, test_PartitionedTableAppender_SCRAM_user){
+    try{
+        conn.run("try{deleteUser('scramUser')}catch(ex){};go;createUser(`scramUser, `123456, authMode='scram');");
+    }catch(const std::exception& e){
+        GTEST_SKIP() << e.what();
+    }
+	string script;
+	script += "dbPath = \"dfs://test_PartitionedTableAppender_SCRAM_user\";";
+	script += "if(existsDatabase(dbPath)){dropDatabase(dbPath)};";
+	script += "db1 = database(\"\",VALUE,2012.01.01..2012.01.10);";
+	script += "ranges=cutPoints(\"A\"+string(0..999), 5);";
+	script += "db2 = database(\"\",RANGE,ranges);";
+	script += "db3 = database(\"\",HASH,[INT, 2]);";
+	script += "db = database(dbPath,COMPO,[db1, db2, db3]);";
+	script += "try{undef(`dummy, SHARED)}catch(ex){};share table(1..100 as id, \"A\"+string(0..99) as sym, take(2012.01.01..2013.01.10, 100) as date, 1..100 as value) as dummy;";
+	script += "pt = db.createPartitionedTable(dummy,`pt,`date`sym`id);"
+				"grant(`scramUser, DB_MANAGE, 'dfs://test_PartitionedTableAppender_SCRAM_user');"
+				"grant(`scramUser, TABLE_WRITE, 'dfs://test_PartitionedTableAppender_SCRAM_user/pt');"
+				"grant(`scramUser, TABLE_READ, 'dfs://test_PartitionedTableAppender_SCRAM_user/pt');";
+
+	DBConnectionPool pool(hostName, port, 10, "scramUser", "123456");
+	conn.run(script);
+
+	pool.run("dummy", 1);
+	while (!pool.isFinished(1)) {
+		Util::sleep(1000);
+	}
+	TableSP t = pool.getData(1);
+
+	PartitionedTableAppender appender("dfs://test_PartitionedTableAppender_SCRAM_user", "pt", "id", pool);
+	int rows = appender.append(t);
+	EXPECT_EQ(rows, 100);
+	EXPECT_TRUE(conn.run("res = select * from dummy order by id;ex = select * from loadTable('dfs://test_PartitionedTableAppender_SCRAM_user', `pt) order by id;all(each(eqObj, res.values(), ex.values()))")->getBool());
+	pool.shutDown();
+}

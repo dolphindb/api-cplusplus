@@ -3,6 +3,7 @@
 #include "Exceptions.h"
 #include <openssl/pem.h>
 #include <openssl/err.h>
+#include <openssl/rand.h>
 #include <string>
 #include <vector>
 #include <iostream>
@@ -62,11 +63,12 @@ void Crypto::printOpenSSLError() const
     }
 }
 
-std::string Crypto::Base64Encode(const std::vector<unsigned char> &text) const
+std::string Crypto::Base64Encode(const std::vector<unsigned char> &text, int flags)
 {
     BIO* b64 = BIO_new(BIO_f_base64());
     BIO* bio = BIO_new(BIO_s_mem());
     bio = BIO_push(b64, bio);
+	BIO_set_flags(bio, flags);
     BIO_write(bio, text.data(), static_cast<int>(text.size()));
     std::ignore = BIO_flush(bio);
     BUF_MEM* bufferPtr;
@@ -74,6 +76,29 @@ std::string Crypto::Base64Encode(const std::vector<unsigned char> &text) const
     std::string encoded(bufferPtr->data, bufferPtr->length);
     BIO_free_all(bio);
     return encoded;
+}
+
+std::vector<unsigned char> Crypto::Base64Decode(const std::string &input, int flags)
+{
+    std::vector<uint8_t> output(input.length());
+
+    BIO *b64 = BIO_new(BIO_f_base64());
+    BIO *bio = BIO_new_mem_buf(input.data(), static_cast<int>(input.length()));
+    bio = BIO_push(b64, bio);
+
+	BIO_set_flags(bio, flags);
+
+    int len = BIO_read(bio, output.data(), static_cast<int>(input.length()));
+    output.resize(len);
+
+    BIO_free_all(bio);
+    return output;
+}
+
+std::string Crypto::generateNonce(int length) {
+    std::vector<uint8_t> buffer(length);
+    RAND_bytes(buffer.data(), length);
+    return Crypto::Base64Encode(buffer, BIO_FLAGS_BASE64_NO_NL);
 }
 
 }

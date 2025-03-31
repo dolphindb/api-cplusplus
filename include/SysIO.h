@@ -1,16 +1,10 @@
-/*
- * Socket.h
- *
- *  Created on: Mar 14, 2015
- *      Author: dzhou
- */
-
-#ifndef SYSIO_H_
-#define SYSIO_H_
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #ifdef _MSC_VER
 #pragma warning( push )
-#pragma warning( disable : 4100 )
+#pragma warning( disable : 4251 )
 #endif
 
 #include <iostream>
@@ -18,36 +12,33 @@
 #include "SmartPointer.h"
 #include "Types.h"
 #include "Concurrent.h"
-
-#define MAX_CAPACITY 262144
-#define MAX_PACKET_SIZE 1400
-
-#ifdef WINDOWS
-	#include <winsock2.h>
-	#include <windows.h>
-#else
-	#include <netinet/in.h>
-    #include <netinet/tcp.h>
-    #include <sys/socket.h>
-	typedef int SOCKET;
-	#define INVALID_SOCKET -1
-	#define SOCKET_ERROR   -1
-#endif
+#include "Platform.h"
 
 #ifdef USE_OPENSSL
+
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+
+#else
+
+using SSL_CTX = int;
+using SSL = int;
+
+#endif
+
+#ifdef __linux__
+typedef int SOCKET;
+#define INVALID_SOCKET -1
+#define SOCKET_ERROR   -1
 #endif
 
 namespace dolphindb {
 
 class Constant;
-class Socket;
 class DataInputStream;
 class DataOutputStream;
 class DataStream;
 class DataBlock;
-typedef SmartPointer<Socket> SocketSP;
 typedef SmartPointer<DataInputStream> DataInputStreamSP;
 typedef SmartPointer<DataOutputStream> DataOutputStreamSP;
 typedef SmartPointer<DataStream> DataStreamSP;
@@ -67,9 +58,6 @@ public:
 	IO_ERR listen();
 	IO_ERR connect(const std::string& host, int port, bool blocking, int keepAliveTime, bool enableSSL = false);
 	IO_ERR connect();
-#ifdef USE_OPENSSL
-	IO_ERR sslConnect();
-#endif
 	IO_ERR close();
 	Socket* accept();
 	SOCKET getHandle();
@@ -87,11 +75,10 @@ private:
 	bool setBlocking();
 	bool setTcpNoDelay();
 	int getErrorCode();
-#ifdef USE_OPENSSL
 	SSL_CTX* initCTX();
 	bool sslInit();
+	IO_ERR sslConnect();
 	void showCerts(SSL* ssl);
-#endif
 private:
 	std::string host_;
 	int port_;
@@ -99,12 +86,12 @@ private:
 	bool blocking_;
 	bool autoClose_;
 	bool enableSSL_;
-#ifdef USE_OPENSSL
 	SSL_CTX* ctx_;
 	SSL* ssl_;
-#endif
 	int keepAliveTime_;
 };
+
+typedef SmartPointer<Socket> SocketSP;
 
 class DataBlock{
 public:
@@ -190,15 +177,6 @@ public:
 	 * Reset the size of an external buffer. The cursor moves to the beginning of the buffer.
 	 */
 	bool reset(int size);
-protected:
-	/**
-	 * Read up to number of bytes specified by the length. If the underlying device doesn't have even one byte
-	 * or any other error occurs, return a IO error code other than OK.
-	 */
-	virtual IO_ERR internalStreamRead(char* buf, size_t length, size_t& actualLength);
-	virtual IO_ERR internalClose();
-	virtual bool internalMoveToPosition(long long offset){return false;}
-
 
 private:
 	IO_ERR prepareBytes(size_t length);
@@ -249,11 +227,6 @@ public:
 	size_t size() const { return size_;}
 	IO_ERR flush();
 	IO_ERR close();
-
-protected:
-	virtual IO_ERR internalFlush(size_t size);
-	virtual IO_ERR internalClose();
-	virtual char* createBuffer(size_t& capacity);
 
 protected:
 	STREAM_TYPE source_;
@@ -381,6 +354,4 @@ struct EXPORT_DECL FileAttributes{
 
 #ifdef _MSC_VER
 #pragma warning( pop )
-#endif
-
 #endif

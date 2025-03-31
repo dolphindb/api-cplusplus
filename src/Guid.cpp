@@ -1,11 +1,6 @@
 #include "Guid.h"
 #include "Util.h"
-
-#ifdef WINDOWS
-    #include <objbase.h>
-#else
-    #include <uuid/uuid.h>
-#endif
+#include "Platform.h"
 
 namespace dolphindb {
 
@@ -122,7 +117,7 @@ Guid::Guid(bool newGuid) {
     if (!newGuid) {
         memset(uuid_, 0, 16);
     } else {
-#ifdef WINDOWS
+#ifdef _WIN32
         CoCreateGuid((GUID*)uuid_);
 #else
         uuid_generate(uuid_);

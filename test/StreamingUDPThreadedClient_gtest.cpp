@@ -187,7 +187,7 @@ TEST_F(StreamingUDPThreadedClientTester, DDB_version_200)
     string st = "outTables_" + getRandString(10);
     UDPCT::createSharedTableAndReplay(st, 1000);
     ThreadedClient client(scfg);
-    EXPECT_ANY_THROW(client.subscribe(hostName, port, [](Message msg){}, st));
+    EXPECT_ANY_THROW(client.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
     try{client.unsubscribe(hostName, port, st, DEFAULT_ACTION_NAME);}catch(...){};
 }
 
@@ -195,7 +195,7 @@ TEST_F(StreamingUDPThreadedClientTester, DDB_version_200)
 TEST_F(StreamingUDPThreadedClientTester, tableNotExist)
 {
     ThreadedClient client(scfg);
-    EXPECT_ANY_THROW(client.subscribe(hostName, port300, [](Message msg){}, "ajwdhwjkae", DEFAULT_ACTION_NAME, 0));
+    EXPECT_ANY_THROW(client.subscribe(hostName, port300, [](Message msg){}, "ajwdhwjkae", DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
 }
 
 TEST_F(StreamingUDPThreadedClientTester, subscribe_host_error)
@@ -203,7 +203,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_host_error)
     string st = "outTables_" + getRandString(10);
     UDPCT::createSharedTableAndReplay(st, 1000);
     ThreadedClient client(scfg);
-    EXPECT_ANY_THROW(client.subscribe("abcd", port300, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0));
+    EXPECT_ANY_THROW(client.subscribe("abcd", port300, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
 }
 
 TEST_F(StreamingUDPThreadedClientTester, subscribe_port_error)
@@ -212,7 +212,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_port_error)
     UDPCT::createSharedTableAndReplay(st, 1000);
     ThreadedClient client(scfg);
 
-    EXPECT_ANY_THROW(client.subscribe(hostName, -1, [](Message msg){},  st, DEFAULT_ACTION_NAME, 0));
+    EXPECT_ANY_THROW(client.subscribe(hostName, -1, [](Message msg){},  st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
 }
 
 TEST_F(StreamingUDPThreadedClientTester, subscribe_username_error)
@@ -222,6 +222,24 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_username_error)
     ThreadedClient client(scfg);
 
     EXPECT_ANY_THROW(client.subscribe(hostName, port300, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "sjkdwae", "123456"));
+}
+
+TEST_F(StreamingUDPThreadedClientTester, subscribe_usernameNull)
+{
+    string st = "outTables_" + getRandString(10);
+    UDPCT::createSharedTableAndReplay(st, 1000);
+    ThreadedClient client(scfg);
+    bool enableClientAuth = conn300->run("bool(getConfig('enableClientAuth'))")->getBool();
+    if (enableClientAuth){
+        EXPECT_ANY_THROW(client.subscribe(hostName, port300, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, false));
+    }else{
+        auto thread = client.subscribe(hostName, port300, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
+        Util::sleep(1000);
+        EXPECT_FALSE(conn300->run("(exec count(*) from getStreamingStat()[`udpPubTables] where tableName =`"+st+") ==0")->getBool());
+        client.unsubscribe(hostName, port300, st, DEFAULT_ACTION_NAME);
+        Util::sleep(2000);
+        EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat()[`udpPubTables] where tableName =`"+st+") ==0")->getBool());
+    }
 }
 
 TEST_F(StreamingUDPThreadedClientTester, subscribe_password_error)
@@ -259,7 +277,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_offset_negative)
         }
     };
 
-    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, -1);
+    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, -1, true, nullptr, false, false, "admin", "123456");
     Util::sleep(1000);
     vector<ConstantSP> args = {extra_data};
     conn300->run("append!{" + st + "}", args);
@@ -301,7 +319,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_offset_gt0)
         }
     };
 
-    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 10);
+    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 10, true, nullptr, false, false, "admin", "123456");
     notify.wait();
     client.unsubscribe(hostName, port300, st, DEFAULT_ACTION_NAME);
     Util::sleep(2000);
@@ -342,7 +360,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_filter)
     VectorSP filters = Util::createVector(DT_STRING, 1);
     filters->setString(0, "a");
     // cout << "filters: " << filters->getString() << endl;
-    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0, true, filters);
+    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0, true, filters, false, false, "admin", "123456");
     notify.wait();
     client.unsubscribe(hostName, port300, st, DEFAULT_ACTION_NAME);
     Util::sleep(2000);
@@ -378,8 +396,8 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_twice_with_same_action)
         }
     };
 
-    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0);
-    EXPECT_ANY_THROW(client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0));
+    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
+    EXPECT_ANY_THROW(client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
     notify.wait();
     client.unsubscribe(hostName, port300, st, DEFAULT_ACTION_NAME);
     Util::sleep(2000);
@@ -415,10 +433,10 @@ TEST_F(StreamingUDPThreadedClientTester, unsubscribe_twice)
         }
     };
 
-    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0);
+    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
     notify.wait();
     client.unsubscribe(hostName, port300, st, DEFAULT_ACTION_NAME);
-    EXPECT_ANY_THROW(client.unsubscribe(hostName, port300, st, DEFAULT_ACTION_NAME));
+    EXPECT_FALSE(client.unsubscribe(hostName, port300, st, DEFAULT_ACTION_NAME));
     Util::sleep(2000);
     EXPECT_TRUE(conn300->run("ex = exec * from ex_UDPCT order by timestampv;"
                         "res = exec * from res_UDPCT order by timestampv;"
@@ -452,7 +470,7 @@ TEST_F(StreamingUDPThreadedClientTester, not_unsubscribe_after_subscribe)
         }
     };
 
-    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0);
+    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
     notify.wait();
     EXPECT_TRUE(conn300->run("ex = exec * from ex_UDPCT order by timestampv;"
                         "res = exec * from res_UDPCT order by timestampv;"
@@ -495,7 +513,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_actionName_null)
         }
     };
 
-    auto thread = client.subscribe(hostName, port300, handler, st, "", 0);
+    auto thread = client.subscribe(hostName, port300, handler, st, "", 0, true, nullptr, false, false, "admin", "123456");
     notify.wait();
     client.unsubscribe(hostName, port300, st, "");
     Util::sleep(2000);
@@ -530,7 +548,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_multithread)
         };
         string action = "action"+to_string(i);
         conn300->run("t= select * from res_UDPCT;share t as " + res_tabs[i]);
-        clients[i].subscribe(hostName, port300, handler, st, action, 0);
+        clients[i].subscribe(hostName, port300, handler, st, action, 0, true, nullptr, false, false, "admin", "123456");
     }
 
     function<void()> wait_all = [&]() {
@@ -587,7 +605,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_with_alldataTypes)
         }
     };
 
-    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0);
+    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
     notify.wait();
     client.unsubscribe(hostName, port300, st, DEFAULT_ACTION_NAME);
     Util::sleep(1000);
@@ -625,7 +643,7 @@ TEST_F(StreamingUDPThreadedClientTester, subscribe_with_arrayVector)
         }
     };
 
-    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0);
+    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
     notify.wait();
     client.unsubscribe(hostName, port300, st, DEFAULT_ACTION_NAME);
     Util::sleep(1000);
@@ -810,7 +828,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         insertData(*conn300, st, dataScript);
     });
 
-    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0);
+    auto thread = client.subscribe(hostName, port300, handler, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
 
     th.join();
     notify.wait();
@@ -857,7 +875,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         };
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0, true, nullptr, false, false, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -910,7 +928,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, false, 1, 1.0, false, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -930,7 +948,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
     {
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port300, [](Message msg){}, "st_notExist", "actionTest"));
+        EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port300, [](Message msg){}, "st_notExist", "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
     }
 
     TEST_F(StreamingUDPThreadedClientTester, test_subscribe_onehandler_tableNameNull)
@@ -940,7 +958,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
 
-        EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port300, onehandler, "", "cppStreamingAPI", 0, false));
+        EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port300, onehandler, "", "cppStreamingAPI", 0, true, nullptr, false, false, "admin", "123456"));
     }
 
     TEST_F(StreamingUDPThreadedClientTester, test_subscribe_batchhandler_tableNameNull)
@@ -949,7 +967,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port300, batchhandler, "", "cppStreamingAPI", 0, false));
+        EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port300, batchhandler, "", "cppStreamingAPI", 0, false, nullptr, 1, 1.0, false, "admin", "123456"));
     }
 
     TEST_F(StreamingUDPThreadedClientTester, test_subscribe_onehandler_offsetNegative)
@@ -966,7 +984,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", -1);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", -1, true, nullptr, false, false, "admin", "123456");
 
         cout << "total size: " << msg_total << endl;
         threadedClient.unsubscribe(hostName, port300, st, "actionTest");
@@ -995,7 +1013,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         };
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", -1);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", -1, true, nullptr, false, 1, 1.0, false, "admin", "123456");
 
         cout << "total size: " << msg_total << endl;
         threadedClient.unsubscribe(hostName, port300, st, "actionTest");
@@ -1045,7 +1063,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 5);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 5, true, nullptr, false, false, "admin", "123456");
         notify.wait();
         cout << "total size: " << msg_total << endl;
         threadedClient.unsubscribe(hostName, port300, st, "actionTest");
@@ -1102,7 +1120,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", 5);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", 5, true, nullptr, false, 1, 1.0, false, "admin", "123456");
         notify.wait();
         cout << "total size: " << msg_total << endl;
         threadedClient.unsubscribe(hostName, port300, st, "actionTest");
@@ -1157,7 +1175,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         ThreadedClient threadedClient = ThreadedClient(scfg);
         VectorSP filter = Util::createVector(DT_SYMBOL, 1, 1);
         filter->setString(0, "b");
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0, true, filter);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0, true, filter, false, false, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -1211,7 +1229,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         VectorSP filter = Util::createVector(DT_SYMBOL, 1, 1);
         filter->setString(0, "b");
 
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", 0, true, filter);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", 0, true, filter, false, 1, 1.0, false, "admin", "123456");
         Util::sleep(2000);
 
         cout << "total size: " << msg_total << endl;
@@ -1261,7 +1279,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0, false, nullptr, true);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0, false, nullptr, true, false, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -1319,7 +1337,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", 0, false, nullptr, false, 2000, 0.1, true);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", 0, true, nullptr, false, 2000, 0.1, true, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -1368,8 +1386,8 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
         ThreadedClient threadedClient2(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0, false, nullptr, false, true);
-        auto thread2 = threadedClient2.subscribe(hostName, port300, onehandler2, st, "actionTest", 0, false, nullptr, false, true);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0, true, nullptr, false, true, "admin", "123456");
+        auto thread2 = threadedClient2.subscribe(hostName, port300, onehandler2, st, "actionTest", 0, true, nullptr, false, true, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -1423,8 +1441,8 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
         ThreadedClient threadedClient2(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", 0, false, nullptr, false, true);
-        auto thread2 = threadedClient2.subscribe(hostName, port300, batchhandler2, st, "actionTest", 0, false, nullptr, false, true);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", 0, true, nullptr, false, true, 1, 1.0, "admin", "123456");
+        auto thread2 = threadedClient2.subscribe(hostName, port300, batchhandler2, st, "actionTest", 0, true, nullptr, false, true, 1, 1.0, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -1444,30 +1462,28 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
     TEST_F(StreamingUDPThreadedClientTester, test_subscribe_resub_false)
     {
-        auto batchhandler = [&](vector<Message> msgs){};
+        auto onehandler = [&](Message msg){};
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port300, batchhandler, "st", "actionTest", 0, false));
+        EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port300, onehandler, "st", "actionTest", 0, false, nullptr, false, false, "admin", "123456"));
     }
 
     TEST_F(StreamingUDPThreadedClientTester, test_subscribe_resub_true)
     {
         GTEST_SKIP() << "resub not support yet.";
         vector<Message> msgs;
-        auto batchhandler = [&](vector<Message> ms)
+        auto onehandler = [&](Message msg)
         {
-            for (auto &msg : ms)
-            {
-                msgs.push_back(msg);
-            }
+            msgs.push_back(msg);
         };
 
         string st = "st_" + getRandString(10);
+
         conn300->run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "resubTest", 0, true);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "resubTest", 0, true, nullptr, false, true, "admin", "123456");
         Util::sleep(2000);
         conn300->run("\
             info = exec * from getStreamingStat().udpPubTables where tableName=`"+st+";\
@@ -1521,7 +1537,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", 0, true, nullptr, false, 200);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", 0, true, nullptr, false, 200, 1.0, false, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -1577,7 +1593,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", 0, true, nullptr, false, 5000, 2.5);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "actionTest", 0, true, nullptr, false, 5000, 2.5, false, "admin", "123456");
         start = Util::getEpochTime();
         notify.wait();
 
@@ -1611,7 +1627,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        EXPECT_ANY_THROW(threadedClient.subscribe("", port300, onehandler, st, "actionTest", 0));
+        EXPECT_ANY_THROW(threadedClient.subscribe("", port300, onehandler, st, "actionTest", 0, true, nullptr, false, true, "admin", "123456"));
 
     }
 
@@ -1632,7 +1648,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        EXPECT_ANY_THROW(threadedClient.subscribe("", port300, batchhandler, st, "actionTest", 0));
+        EXPECT_ANY_THROW(threadedClient.subscribe("", port300, batchhandler, st, "actionTest", 0, true, nullptr, false, true, 1, 1.0, "admin", "123456"));
 
     }
 
@@ -1650,7 +1666,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        EXPECT_ANY_THROW(threadedClient.subscribe(hostName, NULL, onehandler, st, "actionTest", 0));
+        EXPECT_ANY_THROW(threadedClient.subscribe(hostName, NULL, onehandler, st, "actionTest", 0, true, nullptr, false, true, "admin", "123456"));
 
     }
 
@@ -1675,7 +1691,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "", 0, true, nullptr, false, false, "admin", "123456");
         notify.wait();
 
         TableSP res = conn300->run("exec msgOffset, actions from getStreamingStat().udpPubTables where tableName=`"+st);
@@ -1716,7 +1732,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "", 0, true, nullptr, false, true, 1, 1.0, "admin", "123456");
         notify.wait();
 
         TableSP stat = conn300->run("getStreamingStat().udpPubTables");
@@ -1747,10 +1763,10 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
 
         cout << "total size: " << msg_total << endl;
-        EXPECT_ANY_THROW(threadedClient.unsubscribe("", port300, st, "actionTest"));
+        EXPECT_FALSE(threadedClient.unsubscribe("", port300, st, "actionTest"));
 
         threadedClient.unsubscribe(hostName, port300, st, "actionTest");
         threadedClient.exit();
@@ -1773,10 +1789,10 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
         cout << "total size: " << msg_total << endl;
 
-        EXPECT_ANY_THROW(threadedClient.unsubscribe(hostName, NULL, st, "actionTest"));
+        EXPECT_FALSE(threadedClient.unsubscribe(hostName, NULL, st, "actionTest"));
         threadedClient.unsubscribe(hostName, port300, st, "actionTest");
         threadedClient.exit();
         EXPECT_TRUE(threadedClient.isExit());
@@ -1798,10 +1814,10 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
 
         cout << "total size: " << msg_total << endl;
-        EXPECT_ANY_THROW(threadedClient.unsubscribe(hostName, port300, "", "actionTest"));
+        EXPECT_FALSE(threadedClient.unsubscribe(hostName, port300, "", "actionTest"));
 
         threadedClient.unsubscribe(hostName, port300, st, "actionTest");
         threadedClient.exit();
@@ -1831,11 +1847,11 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
-        EXPECT_ANY_THROW(threadedClient.unsubscribe(hostName, port300, st, ""));
+        EXPECT_FALSE(threadedClient.unsubscribe(hostName, port300, st, ""));
         TableSP res = conn300->run("exec msgOffset, actions from getStreamingStat().udpPubTables where tableName=`"+st);
         EXPECT_EQ(res->getColumn(0)->getRow(0)->getInt(), 1000);
         EXPECT_EQ(res->getColumn(1)->getRow(0)->getString(), "actionTest");
@@ -1867,8 +1883,8 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         };
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread1 = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0, false);
-        EXPECT_ANY_THROW(auto thread2 = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0, false));
+        auto thread1 = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0, true, nullptr, false, false, "admin", "123456");
+        EXPECT_ANY_THROW(auto thread2 = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0, true, nullptr, false, false, "admin", "123456"));
         notify.wait();
         cout << "total size: " << msg_total << endl;
         threadedClient.unsubscribe(hostName, port300, st, "mutiSchemaOne");
@@ -1904,8 +1920,8 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread1 = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0, false);
-        EXPECT_ANY_THROW(auto thread2 = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0, false));
+        auto thread1 = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, false, true, 1, 1.0, "admin", "123456");
+        EXPECT_ANY_THROW(auto thread2 = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, false, true, 1, 1.0, "admin", "123456"));
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -1951,7 +1967,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         };
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0, true, nullptr, false, false, "admin", "123456");
         notify.wait();
         cout << "total size: " << msg_total << endl;
         threadedClient.unsubscribe(hostName, port300, st, "mutiSchemaOne");
@@ -2003,7 +2019,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, false, true, 1, 1.0, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -2052,7 +2068,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         };
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "arrayVectorTableTest", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "arrayVectorTableTest", 0, true, nullptr, false, true, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -2104,7 +2120,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "arrayVectorTableTest", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "arrayVectorTableTest", 0, true, nullptr, false, true, 1, 1.0, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -2140,7 +2156,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         };
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0, true, nullptr, false, false, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -2179,7 +2195,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, false, true, 1, 1.0, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -2225,7 +2241,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         };
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0, false, nullptr, true);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0, true, nullptr, true, false, "admin", "123456");
         notify.wait();
 
         cout << "total size: " << msg_total << endl;
@@ -2298,7 +2314,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
 
 
         ThreadedClient threadedClient = ThreadedClient(scfg);
-        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, test_batchSize, test_throttle, true);
+        auto thread = threadedClient.subscribe(hostName, port300, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, false, test_batchSize, test_throttle, true, "admin", "123456");
         notify.wait();
         end_time = Util::getEpochTime();
 
@@ -2334,7 +2350,7 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
             threadedClient.unsubscribe(hostName, port300, st, "mutiSchemaOne");
             // notify.set();
         };
-        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0, true, nullptr, false, false, "admin", "123456");
         conn300->run("for (i in 0..9999) {tableInsert(`"+st+", now()+i, rand(1000, 1)[0]);};");
         // notify.wait();
         EXPECT_EQ(msg_total, 1); // only one message is in handler, because unsubscribe is called before the first message received
@@ -2351,8 +2367,8 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         ThreadedClient client(scfg);
         unsigned int resubscribeTimeout = 500;
         ThreadedClient client1(scfg);
-        client.subscribe(hostName, port300, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true);
-        auto t = client1.subscribe(hostName, port300, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "", "", nullptr, {}, 100, false, resubscribeTimeout);
+        client.subscribe(hostName, port300, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
+        auto t = client1.subscribe(hostName, port300, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456", nullptr, {}, 100, false, resubscribeTimeout);
 
         Util::sleep(resubscribeTimeout+1000);
         client.unsubscribe(hostName, port300, st, DEFAULT_ACTION_NAME);
@@ -2361,6 +2377,67 @@ TEST_P(StreamingUDPThreadedClientTester_realtime, test_realtime)
         EXPECT_TRUE(t->isComplete());
         EXPECT_TRUE(conn300->run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
     }
+
+
+    TEST_F(StreamingUDPThreadedClientTester, test_subscribe_onehandler_SCRAM_user)
+    {
+        try{
+            conn300->run("try{deleteUser('scramUser')}catch(ex){};go;createUser(`scramUser, `123456, authMode='scram')");
+        }catch(const std::exception& e){
+            GTEST_SKIP() << e.what();
+        }
+        DBConnectionSP conn_scram = new DBConnection(false, false, 7200, false, false, false, true);
+        conn_scram->connect(hostName, port300, "scramUser", "123456");
+
+        string st = "outTables_" + getRandString(10);
+        UDPCT::createSharedTableAndReplay(st, 1000);
+        int msg_total = 0;
+        Signal notify;
+        Mutex mutex;
+        AutoFitTableAppender appender("", "res_UDPCT", *conn_scram);
+
+
+        auto onehandler = [&](Message msg)
+        {
+            LockGuard<Mutex> lock(&mutex);
+            bool succeeded = false;
+            TableSP tmp = AnyVectorToTable(msg);
+            while(!succeeded){
+                try
+                {
+                    appender.append(tmp);
+                    succeeded = true;
+                }
+                catch(const std::exception& e)
+                {
+                    Util::sleep(100);
+                }
+            }
+            msg_total+=1;
+            if (msg.getOffset() == 999)
+            {
+                notify.set();
+            }
+        };
+
+        ThreadedClient threadedClient = ThreadedClient(scfg);
+        auto thread = threadedClient.subscribe(hostName, port300, onehandler, st, "mutiSchemaOne", 0, true, nullptr, false, false, "scramUser", "123456");
+        notify.wait();
+
+        cout << "total size: " << msg_total << endl;
+        threadedClient.unsubscribe(hostName, port300, st, "mutiSchemaOne");
+        Util::sleep(1000);
+        EXPECT_TRUE(conn_scram->run("re = select * from res_UDPCT order by datetimev;\
+                            ex = select * from ex_UDPCT order by datetimev;\
+                            all(each(eqObj, re.values(), ex.values()))")->getBool());
+        Util::sleep(1000);
+        EXPECT_TRUE(conn_scram->run("(exec count(*) from getStreamingStat().udpPubTables where tableName =`"+st+") ==0")->getBool());
+        EXPECT_EQ(threadedClient.getQueueDepth(thread), 0);
+        EXPECT_EQ(msg_total, 1000);
+        conn_scram->close();
+    }
+
+
 
 
 } // UDPCT namespace

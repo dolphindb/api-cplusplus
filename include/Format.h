@@ -1,12 +1,6 @@
-/*
- * Format.h
- *
- *  Created on: Sep 21, 2018
- *      Author: dzhou
- */
-
-#ifndef FORMAT_H_
-#define FORMAT_H_
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include <string>
 #include <vector>
@@ -90,5 +84,3 @@ private:
 };
 
 }
-
-#endif /* FORMAT_H_ */

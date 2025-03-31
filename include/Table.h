@@ -1,8 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
 #pragma once
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #pragma warning( push )
 #pragma warning( disable : 4100 )
+#elif defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#else // gcc
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 
 #include "Constant.h"
@@ -35,6 +43,7 @@ public:
     virtual ConstantSP get(const ConstantSP& index) const = 0;
     virtual ConstantSP getValue(INDEX capacity) const = 0;
     virtual ConstantSP getValue() const = 0;
+    using Constant::getInstance;
     virtual ConstantSP getInstance(INDEX size) const = 0;
     virtual INDEX size() const = 0;
     virtual bool sizeable() const = 0;
@@ -65,6 +74,10 @@ public:
 typedef SmartPointer<Table> TableSP;
 }
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #pragma warning( pop )
+#elif defined(__clang__)
+#pragma clang diagnostic pop
+#else // gcc
+#pragma GCC diagnostic pop
 #endif

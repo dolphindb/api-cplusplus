@@ -1,6 +1,8 @@
 #include "AsynWorker.h"
 #include "DolphinDB.h"
 #include "ScalarImp.h"
+#include "SysIO.h"
+#include <iostream>
 
 namespace dolphindb {
     void AsynWorker::run() {

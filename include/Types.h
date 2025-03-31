@@ -1,13 +1,6 @@
-/*
- * Types.h
- *
- *  Created on: Jul 24, 2012
- *      Author: dzhou
- */
-
-
-#ifndef TYPES_H_
-#define TYPES_H_
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include <cfloat>
 #include <string>
@@ -256,9 +249,6 @@ enum STREAM_TYPE {
     SOCKET_STREAM,
     QUEUE_STREAM,
     FILE_STREAM,
-    BIGARRAY_STREAM,
-    FILEBLOCK_STREAM,
-    OBJECT_STREAM
 };
 
 enum COMPRESS_METHOD {
@@ -292,5 +282,3 @@ typedef union {
 } U8;
 
 }
-
-#endif /* TYPES_H_ */

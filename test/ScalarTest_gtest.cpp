@@ -62,26 +62,24 @@ TEST_F(ScalarTest,testCreateObjectDecimal128){
     EXPECT_EQ(d4->getString(), "1");
 }
 
-TEST_F(ScalarTest,testScalar){
-    srand(time(NULL));
-
-    bool s1 = rand() % 2;
-    char s2 = rand() % CHAR_MAX;
-    int s3 = rand() % INT_MAX;
-    short s4 = rand() % SHRT_MAX;
-    long long s5 = rand() % LLONG_MAX;
-    float s6 = rand() / float(RAND_MAX);
-    double s7 = rand() / double(RAND_MAX);
-    string str = "string"+to_string(rand()%100);
-    string sym = "symbol"+to_string(rand()%100);
-    string blob = "blob"+to_string(rand()%100);
+TEST_F(ScalarTest,testScalar1){
+    bool s1 = false;
+    char s2 = char(-128);
+    int s3 = INT_MIN;
+    short s4 = SHRT_MIN;
+    long long s5 = LLONG_MIN;
+    float s6 = FLT_MIN;
+    double s7 = DBL_MIN;
+    string str = "";
+    string sym = "";
+    string blob = "";
     unsigned char int128[16];
     unsigned char ip[16];
     unsigned char uuid[16];
     for(auto i=0;i<16;i++){
-        int128[i] = rand() % CHAR_MAX;
-        ip[i] = rand() % CHAR_MAX;
-        uuid[i] = rand() % CHAR_MAX;
+        int128[i] = CHAR_MIN;
+        ip[i] = CHAR_MIN;
+        uuid[i] = CHAR_MIN;
     }
 
     ConstantSP boolval = Util::createBool(s1);
@@ -101,10 +99,10 @@ TEST_F(ScalarTest,testScalar){
     ConstantSP uuidval = Util::createConstant(DT_UUID);
     uuidval->setBinary(uuid, sizeof(Guid));
     ConstantSP dateval = Util::createDate(s3);
-    ConstantSP monthval = Util::createMonth(2022,2);
+    ConstantSP monthval = Util::createMonth(s3);
     ConstantSP timeval = Util::createTime(s3);
-    ConstantSP minuteval = Util::createMinute(rand()%1440);
-    ConstantSP secondval = Util::createSecond(rand()%86400);
+    ConstantSP minuteval = Util::createMinute(s3);
+    ConstantSP secondval = Util::createSecond(s3);
     ConstantSP datetimeval = Util::createDateTime(s3);
     ConstantSP timestampval = Util::createTimestamp(s5);
     ConstantSP nanotimeval = Util::createNanoTime(s5);
@@ -115,6 +113,30 @@ TEST_F(ScalarTest,testScalar){
     vector<string> names = {"boolval","charval","intval","shortval","longval","floatval","doubleval","stringval","symbolval","blobval","int128val",\
                                 "ipval","uuidval","dateval","monthval","timeval","minuteval","secondval","datetimeval","timestampval","nanotimeval","nanotimestampval"};
     conn.upload(names,vals);
+
+    EXPECT_TRUE(conn.run("eqObj(boolval,bool("+boolval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(charval,'"+charval->getString()+"')")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(intval,"+intval->getString()+")")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(shortval,"+shortval->getString()+")")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(longval,"+longval->getString()+")")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(floatval,"+floatval->getString()+", 4)")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(doubleval,"+doubleval->getString()+", 5)")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(stringval,\""+stringval->getString()+"\")")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(symbolval,\""+symbolval->getString()+"\")")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(blobval,\""+blobval->getString()+"\")")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(int128val,int128('"+int128val->getString()+"'))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(ipval,ipaddr('"+ipval->getString()+"'))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(uuidval,uuid('"+uuidval->getString()+"'))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(dateval,date("+dateval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(monthval,month("+monthval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(timeval,time("+timeval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(minuteval,minute("+minuteval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(secondval,second("+secondval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(datetimeval,datetime("+datetimeval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(timestampval,timestamp("+timestampval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(nanotimeval,nanotime("+nanotimeval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(nanotimestampval,nanotimestamp("+nanotimestampval->getString()+"))")->getBool());
+
     for(auto i=0; i<vals.size();i++){
         EXPECT_TRUE(vals[i]->isScalar());
         EXPECT_FALSE(vals[i]->isMatrix());
@@ -312,6 +334,83 @@ TEST_F(ScalarTest,testScalar){
     EXPECT_EQ(ss4.getString(), "00:00:00.000000000");
     #endif
 
+}
+
+
+TEST_F(ScalarTest,testScalar2){
+    bool s1 = true;
+    char s2 = char(127);
+    int s3 = INT_MAX;
+    short s4 = SHRT_MAX;
+    long long s5 = LLONG_MAX;
+    float s6 = -31649.1234f;
+    double s7 = -126553.123456789;
+    string str = "中文《；‘【】*&……%￥%#’@“”：“”？》";
+    string sym = "中文《；‘【】*&……%￥%#’@“”：“”？》";
+    string blob = "中文《；‘【】*&……%￥%#’@“”：“”？》";
+    unsigned char int128[16];
+    unsigned char ip[16];
+    unsigned char uuid[16];
+    for(auto i=0;i<16;i++){
+        int128[i] = CHAR_MAX;
+        ip[i] = CHAR_MAX;
+        uuid[i] = CHAR_MAX;
+    }
+
+    ConstantSP boolval = Util::createBool(s1);
+    ConstantSP charval = Util::createChar(s2);
+    ConstantSP intval = Util::createInt(s3);
+    ConstantSP shortval = Util::createShort(s4);
+    ConstantSP longval = Util::createLong(s5);
+    ConstantSP floatval = Util::createFloat(s6);
+    ConstantSP doubleval = Util::createDouble(s7);
+    ConstantSP stringval = Util::createString(str);
+    ConstantSP symbolval = Util::createString(sym);
+    ConstantSP blobval = Util::createString(blob);
+    ConstantSP int128val = Util::createConstant(DT_INT128);
+    int128val->setBinary(int128, sizeof(Guid));
+    ConstantSP ipval = Util::createConstant(DT_IP);
+    ipval->setBinary(ip, sizeof(Guid));
+    ConstantSP uuidval = Util::createConstant(DT_UUID);
+    uuidval->setBinary(uuid, sizeof(Guid));
+    ConstantSP dateval = Util::createDate(2025,12,31);
+    ConstantSP monthval = Util::createMonth(2025,12);
+    ConstantSP timeval = Util::createTime(23,59,59,999);
+    ConstantSP minuteval = Util::createMinute(23,59);
+    ConstantSP secondval = Util::createSecond(23,59,59);
+    ConstantSP datetimeval = Util::createDateTime(2025,12,31,23,59,59);
+    ConstantSP timestampval = Util::createTimestamp(2025,12,31,23,59,59,999999);
+    ConstantSP nanotimeval = Util::createNanoTime(23,59,59,999999999);
+    ConstantSP nanotimestampval = Util::createNanoTimestamp(2025,12,31,23,59,59,999999999);
+
+    vector<ConstantSP> vals = {boolval,charval,intval,shortval,longval,floatval,doubleval,stringval,symbolval,blobval,int128val,\
+                                ipval,uuidval,dateval,monthval,timeval,minuteval,secondval,datetimeval,timestampval,nanotimeval,nanotimestampval};
+    vector<string> names = {"boolval","charval","intval","shortval","longval","floatval","doubleval","stringval","symbolval","blobval","int128val",\
+                                "ipval","uuidval","dateval","monthval","timeval","minuteval","secondval","datetimeval","timestampval","nanotimeval","nanotimestampval"};
+    conn.upload(names,vals);
+
+    EXPECT_TRUE(conn.run("eqObj(boolval,bool("+boolval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(charval,"+charval->getString()+"c)")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(intval,"+intval->getString()+")")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(shortval,"+shortval->getString()+")")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(longval,"+longval->getString()+")")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(floatval,float("+floatval->getString()+"), 4)")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(doubleval,double("+doubleval->getString()+"), 5)")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(stringval,\""+stringval->getString()+"\")")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(symbolval,\""+symbolval->getString()+"\")")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(blobval,\""+blobval->getString()+"\")")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(int128val,int128('"+int128val->getString()+"'))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(ipval,ipaddr('"+ipval->getString()+"'))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(uuidval,uuid('"+uuidval->getString()+"'))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(dateval,date("+dateval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(monthval,month("+monthval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(timeval,time("+timeval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(minuteval,minute("+minuteval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(secondval,second("+secondval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(datetimeval,datetime("+datetimeval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(timestampval,timestamp("+timestampval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(nanotimeval,nanotime("+nanotimeval->getString()+"))")->getBool());
+    EXPECT_TRUE(conn.run("eqObj(nanotimestampval,nanotimestamp("+nanotimestampval->getString()+"))")->getBool());
 }
 
 TEST_F(ScalarTest,testGuid){
@@ -2630,4 +2729,47 @@ TEST_F(ScalarTest,test_string_exception){
             EXPECT_EQ(std::string(e.what()), "A String cannot contain the character '\\0'");
         }
     }
+}
+
+
+class ScalarTest_download : public ScalarTest, public testing::WithParamInterface<std::tuple<std::string, std::string, dolphindb::DATA_TYPE>> 
+{
+public:
+    static std::vector<std::tuple<std::string, std::string, dolphindb::DATA_TYPE>> getData(){
+        return {
+            {"x=false;x", "0", DT_BOOL},
+            {"x=127c;x", "127", DT_CHAR},
+            {"x=2147483647;x", "2147483647", DT_INT},
+            {"x=-32768h;x", "", DT_SHORT},
+            {"x=9223372036854775807l;x", "9223372036854775807", DT_LONG},
+            {"x=3.14f;x", "3.14", DT_FLOAT},
+            {"x=3.1415926;x", "3.141593", DT_DOUBLE},
+            {"x=\"hello,world!\";x", "hello,world!", DT_STRING},
+            {"x=symbol(`a`b`c)[0];x", "a", DT_SYMBOL},
+            {"x=blob(`a`b`c)[0];x", "a", DT_BLOB},
+            {"x=int128(`0123456789abcdef0123456789abcdef);x", "0123456789abcdef0123456789abcdef", DT_INT128},
+            {"x=ipaddr('192.168.1.1');x", "192.168.1.1", DT_IP},
+            {"x=uuid('5d212a78-cc48-e3b1-4235-b4d91473ee87');x", "5d212a78-cc48-e3b1-4235-b4d91473ee87", DT_UUID},
+            {"x=date(2022.01.01);x", "2022.01.01", DT_DATE},
+            {"x=month('2022.01');x", "2022.01M", DT_MONTH},
+            {"x=13:30:00.000;x", "13:30:00.000", DT_TIME},
+            {"x=minute(534);x", "08:54m", DT_MINUTE},
+            {"x=second(534);x", "00:08:54", DT_SECOND},
+            {"x=datetime(2022.01.01T13:30:00);x", "2022.01.01T13:30:00", DT_DATETIME},
+            {"x=timestamp(2022.01.01T13:30:00.123);x", "2022.01.01T13:30:00.123", DT_TIMESTAMP},
+            {"x=nanotime(13:30:00.123456789);x", "13:30:00.123456789", DT_NANOTIME},
+            {"x=nanotimestamp(2022.01.01T13:30:00.123456789);x", "2022.01.01T13:30:00.123456789", DT_NANOTIMESTAMP}
+        };
+    }
+};
+INSTANTIATE_TEST_SUITE_P(, ScalarTest_download, testing::ValuesIn(ScalarTest_download::getData()));
+
+TEST_P(ScalarTest_download, test_download_scalar) {
+    std::string script = std::get<0>(GetParam());
+    std::string ex = std::get<1>(GetParam());
+    dolphindb::DATA_TYPE type = std::get<2>(GetParam());
+    ConstantSP res = conn.run(script);
+    EXPECT_EQ(res->getString(), ex);
+    EXPECT_TRUE(res->isScalar());
+    EXPECT_EQ(res->getType(), type == DT_SYMBOL? DT_STRING : type);
 }

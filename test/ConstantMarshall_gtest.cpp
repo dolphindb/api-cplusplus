@@ -4,7 +4,7 @@ class MarshallTest:public testing::Test
 {
 };
 
-#ifdef LINUX
+#ifdef __linux__
 
 TEST_F(MarshallTest, ScalarUnmarshallStart){
     conn.connect(hostName, port, "admin", "123456");
@@ -1036,11 +1036,11 @@ TEST_F(MarshallTest, StringVectorGetString_Char){
 
 TEST_F(MarshallTest, StringVectorGetGetAllocatedMemory){
     ConstantSP vec = Util::createVector(DT_STRING, 0, 9);
-    EXPECT_EQ(vec->getAllocatedMemory(), 64);
-    EXPECT_EQ(dynamic_cast<StringVector*>(vec.get())->getAllocatedMemory(0), 64);
+    EXPECT_EQ(vec->getAllocatedMemory(), 88);
+    EXPECT_EQ(dynamic_cast<StringVector*>(vec.get())->getAllocatedMemory(0), 88);
     std::vector<std::string> names{"Lily", "Bob", "Lucy", "Tom", "Riddle"};
     dynamic_cast<StringVector*>(vec.get())->appendString(names.data(), names.size());
-    EXPECT_EQ(vec->getAllocatedMemory(), 129);
+    EXPECT_EQ(vec->getAllocatedMemory(), 273);
 }
 
 TEST_F(MarshallTest, AnyVectorAssign_Fail){
@@ -1070,7 +1070,7 @@ TEST_F(MarshallTest, AnyVectorFill_SizeNotEqual){
     vec2->appendString(names.data(), names.size());
 
     vec->fill(0, 1, vec2);
-    EXPECT_EQ(dynamic_cast<AnyVector*>(vec.get())->getAllocatedMemory(), 281);
+    EXPECT_EQ(dynamic_cast<AnyVector*>(vec.get())->getAllocatedMemory(), 449);
     EXPECT_EQ(vec->get(0)->getString(), vec2->getString());
 }
 

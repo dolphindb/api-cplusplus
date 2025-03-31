@@ -4,11 +4,212 @@
 #include "Logger.h"
 #include "DolphinDB.h"
 #include <thread>
-//#include "DdbPythonUtil.h"
+#include "SysIO.h"
 
 using std::string;
 using std::vector;
 namespace dolphindb {
+
+MTWConfig::MTWConfig(const std::shared_ptr<DBConnection> conn, const std::string &tableName)
+{
+    // check connection
+    if (tableName.empty()) {
+        throw IllegalArgumentException(__FUNCNAME__,  "Empty tableName.");
+    }
+    conn_ = conn->copy();
+    if (conn_ == nullptr) {
+        throw IllegalArgumentException(__FUNCNAME__,  "Please provide a connected DBConnecton to MTWOption.");
+    }
+    conn_->setAsync(false);
+    if (!conn_->connect()) {
+        throw RuntimeException("Failed to connect to server.");
+    }
+    // check table
+    try {
+        schema_ = conn_->run("schema(" + tableName + ")");
+    } catch (std::exception &e) {
+        throw IllegalArgumentException(__FUNCNAME__, "invalid table name (failed to execute typestr/schema with " + tableName + "): " + e.what());
+    }
+    tableName_ = tableName;
+    auto columnNames = schema_->getMember("partitionColumnName");
+    if (!columnNames->isNull()) {
+        if (columnNames->isScalar()) {
+            partitionColumnNames_.push_back(columnNames->getString());
+        } else {
+            getStringVector(columnNames, partitionColumnNames_);
+        }
+    }
+    colDefs_ = schema_->getMember("colDefs");
+    ConstantSP colNames = colDefs_->getColumn("name");
+    ConstantSP colTypes = colDefs_->getColumn("typeInt");
+    int columnNum = colDefs_->size();
+    for (int i = 0; i < columnNum; i++) {
+        columnInfo_.push_back(std::make_pair(colNames->getString(i), static_cast<DATA_TYPE>(colTypes->getInt(i))));
+    }
+    insertScript_ = std::string("tableInsert{") + tableName_ + "}";
+}
+
+MTWConfig& MTWConfig::setCompression(const std::vector<COMPRESS_METHOD> &compressMethods)
+{
+    if (compressMethods.size() != columnInfo_.size()) {
+        throw RuntimeException("Column number mismatch. "
+            "Table column number: " + std::to_string(columnInfo_.size()) + ".");
+    }
+    inited_ = true;
+    compression_ = compressMethods;
+    conn_->setCompress(true);
+    return *this;
+}
+
+MTWConfig& MTWConfig::setThreads(const size_t threadNum, const std::string& partitionColumnName)
+{
+    if (threadNum == 0) {
+        throw IllegalArgumentException(__FUNCNAME__, "Invalid threadNum.");
+    }
+    if (threadNum == 1) {
+        return *this;
+    }
+    const std::string memoryTable{"IN-MEMORY TABLE"};
+    if (conn_->run("typestr(" + tableName_ + ")")->getString() == memoryTable) {
+        throw RuntimeException("ThreadCount must be 1 for " + memoryTable);
+    }
+    auto column = columnInfo_.end();
+    if (partitionColumnNames_.empty()) {
+        column = std::find_if(columnInfo_.begin(), columnInfo_.end(), [partitionColumnName](const std::pair<std::string, int> &col){
+            return col.first == partitionColumnName;
+        });
+    } else {
+        auto partitionColumn = std::find_if(partitionColumnNames_.begin(), partitionColumnNames_.end(), [partitionColumnName](const std::string &col){
+            return col == partitionColumnName;
+        });
+        if (partitionColumn == partitionColumnNames_.end()) {
+            throw IllegalArgumentException(__FUNCNAME__, "The partitionColumnName of a partition table must be a partition column of the table");
+        }
+        auto index = partitionColumn - partitionColumnNames_.begin();
+        column = columnInfo_.begin() + schema_->getMember("partitionColumnIndex")->getInt(static_cast<int>(index));
+    }
+    if (column == columnInfo_.end()) {
+        throw IllegalArgumentException(__FUNCNAME__, "No column named " + partitionColumnName);
+    }
+    if (column->second >= ARRAY_TYPE_BASE) {
+        throw IllegalArgumentException(__FUNCNAME__, "Partition column cannot be array vector.");
+    }
+    partitionColumnIndex_ = column - columnInfo_.begin();
+    inited_ = true;
+    threadNum_ = threadNum;
+    partitionColumnName_ = partitionColumnName;
+    return *this;
+}
+
+MTWConfig& MTWConfig::setWriteMode(const WriteMode mode, const std::vector<std::string> &option)
+{
+    inited_ = true;
+    writeMode_ = mode;
+    writeOptions_ = option;
+    if (writeMode_ == WriteMode::Upsert) {
+        // upsert!(obj, newData, [ignoreNull=false], [keyColNames], [sortColumns])
+        insertScript_ = std::string("upsert!{") + tableName_;
+        // ignore newData
+        insertScript_ += ",";
+        for (auto &one : writeOptions_) {
+            insertScript_ += "," + one;
+        }
+        insertScript_ += "}";
+    }
+    return *this;
+}
+
+MTWConfig& MTWConfig::setStreamTableTimestamp()
+{
+    if (inited_) {
+        throw RuntimeException("setStreamTableTimestamp must be called before other functions.");
+    }
+    inited_ = true;
+    hasStreamTableTimestamp_ = true;
+    columnInfo_.pop_back();
+    return *this;
+}
+
+MultithreadedTableWriter::MultithreadedTableWriter(const MTWConfig &config)
+{
+    conn_ = config.conn_;
+    tableName_ = config.tableName_;
+    stateCallback_ = config.stateCallback_;
+    mode_ = static_cast<Mode>(config.writeMode_);
+    modeOption_ = config.writeOptions_;
+    threadCount_ = static_cast<int>(config.threadNum_);
+    partitionCol_ = config.partitionColumnName_;
+    batchSize_ = static_cast<int>(config.batchSize_);
+    throttleMilsecond_ = static_cast<int>(config.throttleTimeMs_);
+    saveCompressMethods_ = config.compression_;
+    enableStreamTableTimestamp_ = config.hasStreamTableTimestamp_;
+    scriptTableInsert_ = config.insertScript_;
+    isPartionedTable_ = !config.partitionColumnNames_.empty();
+    callbackFunc_ = config.dataCallback_;
+
+    for (auto &info : config.columnInfo_) {
+        colNames_.push_back(info.first);
+        colTypes_.push_back(info.second);
+    }
+    colExtras_.resize(config.columnInfo_.size());
+    int colIndex = config.colDefs_->getColumnIndex("extra");
+    if (colIndex >= 0) {
+        ConstantSP colExtra = config.colDefs_->getColumn(colIndex);
+        for (int i = 0; i < static_cast<int>(colExtras_.size()); i++) {
+            colExtras_[i] = colExtra->getInt(i);
+        }
+    }
+
+    if (threadCount_ > 1) {//Only multithread need partition col info
+        int index = static_cast<int>(config.partitionColumnIndex_);
+        if (isPartionedTable_) {
+            ConstantSP partitionSchema;
+            int partitionType;
+            DATA_TYPE partitionColType;
+            partitionColumnIdx_ = config.schema_->getMember("partitionColumnIndex")->getInt(index);
+            partitionSchema = config.schema_->getMember("partitionSchema")->get(index);
+            partitionType = config.schema_->getMember("partitionType")->getInt(index);
+            partitionColType = (DATA_TYPE)config.schema_->getMember("partitionColumnType")->getInt(index);
+            partitionDomain_ = Util::createDomain((PARTITION_TYPE)partitionType, partitionColType, partitionSchema);
+        } else {
+            threadByColIndexForNonPartion_ = index;
+        }
+    }
+    saveColNames_ = colNames_;
+    saveColTypes_ = colTypes_;
+    saveColExtras_ = colExtras_;
+    if (callbackFunc_ != nullptr) {
+        colExtras_.insert(colExtras_.begin(), 0);
+        colNames_.insert(colNames_.begin(), "callbackId");
+        colTypes_.insert(colTypes_.begin(), DT_STRING);
+        if (threadByColIndexForNonPartion_ >= 0)
+            threadByColIndexForNonPartion_++;
+        if (partitionColumnIdx_ >= 0)
+            partitionColumnIdx_++;
+    }
+    // init done, start thread now.
+    perBlockSize_ = batchSize_ < 65535 ? 65535 : batchSize_;
+    threads_.resize(threadCount_);
+    for (unsigned int i = 0; i < threads_.size(); i++) {
+        WriterThread& writerThread = threads_[i];
+        writerThread.threadId = 0;
+        writerThread.sentRows = 0;
+        writerThread.writeQueue_.push_back(createColumnBlock());
+        writerThread.exit = false;
+        LockGuard<Mutex> _(&writerThread.mutex_);
+
+        writerThread.conn = conn_->copy();
+        writerThread.conn->onConnectionStateChange([this](const ConnectionState state, const std::string &host, int port) {
+            return stateCallback(state, host, port);
+        });
+        if (!writerThread.conn->connect()) {
+            throw RuntimeException("Failed to connect to server");
+        }
+
+        writerThread.writeThread = new Thread(new SendExecutor(*this, writerThread));
+        writerThread.writeThread->start();
+    }
+}
 
 MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, int port, const std::string& userId, const std::string& password,
     const string& dbName, const string& tableName, bool useSSL,
@@ -24,7 +225,6 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
     hasError_(false),
     partitionColumnIdx_(-1),
     threadByColIndexForNonPartion_(-1),
-    //,pytoDdb_(new PytoDdbRowPool(*this))
     mode_(mode),
     callbackFunc_(callbackFunc),
     enableStreamTableTimestamp_(enableStreamTableTimestamp)
@@ -102,7 +302,6 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
     for (INDEX i = 0; i < static_cast<INDEX>(columnSize); i++) {
         colNames_.push_back(colDefsName->getString(i));
         colTypes_.push_back(static_cast<DATA_TYPE>(colDefsTypeInt->getInt(i)));
-        colTypeString_.push_back(colDefsTypeString->getString(i));
     }
     if (threadCount > 1) {//Only multithread need partition col info
         if (isPartionedTable_) {
@@ -117,12 +316,8 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
                 partitionSchema = schema->getMember("partitionSchema");
                 partitionType = schema->getMember("partitionType")->getInt();
                 partitionColType = (DATA_TYPE)schema->getMember("partitionColumnType")->getInt();
-            }
-            else {
+            } else {
                 int dims = partColNames->size();
-                if (dims > 1 && partitionCol.empty()) {
-                    throw RuntimeException("The parameter partitionCol must be specified for a partitioned table");
-                }
                 int index = -1;
                 for (int i = 0; i < dims; ++i) {
                     if (partColNames->getString(i) == partitionCol) {
@@ -168,7 +363,6 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
         colExtras_.insert(colExtras_.begin(), 0);
         colNames_.insert(colNames_.begin(), "callbackId");
         colTypes_.insert(colTypes_.begin(), DT_STRING);
-        colTypeString_.insert(colTypeString_.begin(), Util::getDataTypeString(colTypes_.front()));
         if (threadByColIndexForNonPartion_ >= 0)
             threadByColIndexForNonPartion_++;
         if (partitionColumnIdx_ >= 0)
@@ -208,7 +402,7 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
         writerThread.exit = false;
         LockGuard<Mutex> _(&writerThread.mutex_);
 
-        writerThread.conn = new DBConnection(useSSL, false, keepAliveTime, isCompress);
+        writerThread.conn = std::make_shared<DBConnection>(useSSL, false, keepAliveTime, isCompress);
         if (writerThread.conn->connect(hostName, port, userId, password, "", enableHighAvailability, highAvailabilitySites, 30, true) == false) {
             throw RuntimeException("Failed to connect to server " + hostName + ":" + std::to_string(port));
         }
@@ -235,6 +429,32 @@ MultithreadedTableWriter::~MultithreadedTableWriter() {
             delete pitem;
         }
     }
+}
+
+bool MultithreadedTableWriter::stateCallback(const ConnectionState state, const std::string &host, int port)
+{
+    std::unique_lock<std::mutex> stateLock{stateMtx_};
+    bool call{false};
+    if (state == ConnectionState::Connected) {
+        ++readyThreadCnt_;
+        if (!stateCallback_(MTWState::ConnectedOne, host, port)) {
+            return false;
+        }
+        if (readyThreadCnt_ == threads_.size()) {
+            state_ = MTWState::ConnectedAll;
+            call = true;
+        }
+    } else if (state == ConnectionState::Reconnecting) {
+        --readyThreadCnt_;
+        if (!stateCallback_(MTWState::ReconnectingOne, host, port)) {
+            return false;
+        }
+        if (readyThreadCnt_ == 0) {
+            state_ = MTWState::ReconnectingAll;
+            call = true;
+        }
+    }
+    return call ? stateCallback_(state_, host, port) : true;
 }
 
 void MultithreadedTableWriter::waitForThreadCompletion() {
@@ -370,6 +590,7 @@ void MultithreadedTableWriter::getUnwrittenData(std::vector<std::vector<Constant
                 }
                 unwrittenData.push_back(oneUnwrittenRow);
             }
+            delete block;
         }
         writeThread.writeQueue_.clear();
         writeThread.writeQueue_.push_back(createColumnBlock());
@@ -508,6 +729,7 @@ bool MultithreadedTableWriter::SendExecutor::writeAllData(){
             delete items;
         }
     }catch (std::exception &e){//failed
+        DLogger::Warn("[MultithreadedTableWriter] Insert failed: ", e.what(), ", retrying.");
         string errmsg=e.what();
         if(runscript.empty()==false && errmsg.find(" script:")==string::npos){
             errmsg+=" script: "+runscript;
@@ -523,6 +745,7 @@ bool MultithreadedTableWriter::SendExecutor::writeAllData(){
                 writeThread_.failedQueue_.push_back(oneFailedRow);
             }
             MultithreadedTableWriter::callBack(tableWriter_.callbackFunc_, false, items);
+            delete items;
         }
         tableWriter_.setError(ErrorCodeInfo::EC_Server, std::string("Failed to save the inserted data: ") + errmsg);
     }

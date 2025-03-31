@@ -5,37 +5,21 @@
  *      Author: dzhou
  */
 
+#include "Util.h"
+
 #include <fstream>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <WideInteger.h>
-#ifdef _MSC_VER
-	#include <time.h>
-#else
-	#include <sys/time.h>
-#endif
+#include "internal/WideInteger.h"
 
 #include <errno.h>
 #include <algorithm>
 #include <cstdio>
 #include <stdlib.h>
 
-#ifdef WINDOWS
-	#include <winsock2.h>
-    #include<windows.h>
-    #include <direct.h>
-	#include <winnls.h>
-    #define GetCurrentDir _getcwd
-#else
-    #include <unistd.h>
-    #include <dirent.h>
-    #define GetCurrentDir getcwd
-#endif
-
 #include <chrono>
 #include <unordered_map>
 
-#include "Util.h"
 #include "ConstantFactory.h"
 #include "TableImp.h"
 #include "DomainImp.h"
@@ -56,12 +40,12 @@ using std::vector;
 
 static SmartPointer<ConstantFactory> s_constFactory(new ConstantFactory());
 const bool Util::LITTLE_ENDIAN_ORDER = isLittleEndian();
-string Util::VER = "3.00.2.3";
+string Util::VER = "3.00.2.4";
 #ifndef _MSC_VER
 constexpr int Util::BUF_SIZE;
 #endif
-int Util::VERNUM = 30023;
-string Util::BUILD = "2024.12.20";
+int Util::VERNUM = 30024;
+string Util::BUILD = "2025.03.11";
 
 int Util::SEQUENCE_SEARCH_NUM_THRESHOLD = 10;
 int Util::MAX_LENGTH_FOR_ANY_VECTOR = 1048576;
@@ -137,33 +121,37 @@ int Util::parseYear(int days) {
     return similarYears + resultYear;
 }
 
-void Util::parseDate(int days, int& year, int& month, int& day){
-    days += 719529;
-    int circleIn400Years = days / 146097;
-    int offsetIn400Years = days % 146097;
-    int resultYear = circleIn400Years * 400;
-    int similarYears = offsetIn400Years / 365;
-    int tmpDays = similarYears * 365;
-    if(similarYears) tmpDays += (similarYears - 1) / 4 + 1 - (similarYears - 1) / 100;
-    if(tmpDays >= offsetIn400Years) --similarYears;
-    year = similarYears + resultYear;
-    days -= circleIn400Years * 146097 + tmpDays;
+void Util::parseDate(int days, int& year, int& month, int& day)
+{
+    constexpr int offsetAD {719529}; // convert 1970 to 0000
+    constexpr int daysInCycle {146097}; // days in 400 years
+    constexpr int cycleYears {400};
+    constexpr int daysOfYear {365};
+    int64_t value {days};
+    value += offsetAD;
+    int cycles = static_cast<int>(value / daysInCycle);
+    int fraction = static_cast<int>(value % daysInCycle);
+    int estimate = static_cast<int>(fraction / daysOfYear);
+    int tmpDays = estimate * daysOfYear;
+    if (estimate > 0) {
+        tmpDays += (estimate + 3) / 4 - (estimate - 1) / 100;
+    }
+    if (tmpDays >= fraction) {
+        --estimate;
+    }
+    year = cycles * cycleYears + estimate;
+    value -= cycles * daysInCycle + tmpDays;
+    days = static_cast<int>(value);
     bool leap = ( (year%4==0 && year%100!=0) || year%400==0 );
     if(days <= 0) {
         days += leap ? 366 : 365;
     }
-    if(leap){
-		month=days/32+1;
-		if(days>cumLeapMonthDays[month])
-			month++;
-		day=days-cumLeapMonthDays[month-1];
-	}
-	else{
-		month=days/32+1;
-		if(days>cumMonthDays[month])
-			month++;
-		day=days-cumMonthDays[month-1];
-	}
+    month = days / 32+1;
+    auto cumDays = leap ? cumLeapMonthDays : cumMonthDays;
+    if(days > cumDays[month]) {
+        month++;
+    }
+    day = days - cumDays[month - 1];
 }
 
 int Util::getMonthEnd(int days){
@@ -434,6 +422,7 @@ Vector* Util::createVector(DATA_TYPE type, INDEX size, INDEX capacity, bool fast
 }
 
 Vector* Util::createArrayVector(DATA_TYPE type, INDEX size, INDEX capacity, bool fast, int extraParam, void* data, INDEX *pindex, bool containNull){
+	std::ignore = fast;
 	return s_constFactory->createConstantArrayVector(type,size,capacity,true,extraParam, data, pindex, 0, 0, containNull);
 }
 
@@ -467,6 +456,7 @@ Vector* Util::createIndexVector(INDEX start, INDEX length){
 }
 
 Vector* Util::createIndexVector(INDEX length, bool arrayOnly, INDEX capacity){
+	std::ignore = arrayOnly;
 	if (capacity < length) {
 		capacity = length;
 	}
@@ -923,23 +913,10 @@ bool Util::getLocalTime(struct tm& result){
 	return getLocalTime(t, result);
 }
 
-bool Util::getLocalTime(time_t t, struct tm& result){
-#ifdef WINDOWS
-    localtime_s(&result, &t);
-#else
-    localtime_r(&t, &result);
-#endif
-	return true;
-}
-
 int Util::toLocalDateTime(int epochTime){
 	time_t t = epochTime;
 	struct tm lt;
-#ifdef WINDOWS
-    localtime_s(&lt, &t);
-#else
-    localtime_r(&t, &lt);
-#endif
+	getLocalTime(t, lt);
     int days = countDays(lt.tm_year+1900,lt.tm_mon+1,lt.tm_mday);
     return  days == INT_MIN ? INT_MIN : days * 86400 + ((lt.tm_hour * 60 + lt.tm_min)* 60 + lt.tm_sec);
 }
@@ -950,11 +927,7 @@ int* Util::toLocalDateTime(int* epochTimes, int n){
 		if(epochTimes[i] == INT_MIN)
 			continue;
 		time_t t = epochTimes[i];
-	#ifdef WINDOWS
-	    localtime_s(&lt, &t);
-	#else
-	    localtime_r(&t, &lt);
-	#endif
+		getLocalTime(t, lt);
 	    int days = countDays(lt.tm_year+1900,lt.tm_mon+1,lt.tm_mday);
 	    epochTimes[i] = days == INT_MIN ? INT_MIN : days * 86400 + ((lt.tm_hour * 60 + lt.tm_min)* 60 + lt.tm_sec);
 	}
@@ -964,11 +937,7 @@ int* Util::toLocalDateTime(int* epochTimes, int n){
 long long Util::toLocalTimestamp(long long epochTime){
 	time_t t = epochTime / 1000;
 	struct tm lt;
-#ifdef WINDOWS
-    localtime_s(&lt, &t);
-#else
-    localtime_r(&t, &lt);
-#endif
+	getLocalTime(t, lt);
     int days = countDays(lt.tm_year+1900,lt.tm_mon+1,lt.tm_mday);
     return days == INT_MIN ? LLONG_MIN : days * 86400000ll + ((lt.tm_hour * 60 + lt.tm_min)* 60 + lt.tm_sec) * 1000ll + (epochTime % 1000);
 }
@@ -979,11 +948,7 @@ long long* Util::toLocalTimestamp(long long* epochTimes, int n){
 		if(epochTimes[i] == LLONG_MIN)
 			continue;
 		time_t t = epochTimes[i] / 1000;
-	#ifdef WINDOWS
-	    localtime_s(&lt, &t);
-	#else
-	    localtime_r(&t, &lt);
-	#endif
+		getLocalTime(t, lt);
 	    int days = countDays(lt.tm_year+1900,lt.tm_mon+1,lt.tm_mday);
 	    epochTimes[i] = days == INT_MIN ? LLONG_MIN : days * 86400000ll + ((lt.tm_hour * 60 + lt.tm_min)* 60 + lt.tm_sec) * 1000ll + (epochTimes[i] % 1000);
 	}
@@ -993,11 +958,7 @@ long long* Util::toLocalTimestamp(long long* epochTimes, int n){
 long long Util::toLocalNanoTimestamp(long long epochNanoTime){
 	time_t t = epochNanoTime / 1000000000;
 	struct tm lt;
-#ifdef WINDOWS
-    localtime_s(&lt, &t);
-#else
-    localtime_r(&t, &lt);
-#endif
+	getLocalTime(t, lt);
     int days = countDays(lt.tm_year+1900,lt.tm_mon+1,lt.tm_mday);
     return days == INT_MIN ? LLONG_MIN : days * 86400000000000ll + ((lt.tm_hour * 60 + lt.tm_min)* 60 + lt.tm_sec) * 1000000000ll + (epochNanoTime % 1000000000);
 }
@@ -1008,11 +969,7 @@ long long* Util::toLocalNanoTimestamp(long long* epochNanoTimes, int n){
 		if(epochNanoTimes[i] == LLONG_MIN)
 			continue;
 		time_t t = epochNanoTimes[i] / 1000000000;
-	#ifdef WINDOWS
-	    localtime_s(&lt, &t);
-	#else
-	    localtime_r(&t, &lt);
-	#endif
+		getLocalTime(t, lt);
 	    int days = countDays(lt.tm_year+1900,lt.tm_mon+1,lt.tm_mday);
 	    epochNanoTimes[i] = days == INT_MIN ? LLONG_MIN : days * 86400000000000ll + ((lt.tm_hour * 60 + lt.tm_min)* 60 + lt.tm_sec) * 1000000000ll + (epochNanoTimes[i] % 1000000000);
 	}
@@ -1022,11 +979,7 @@ long long* Util::toLocalNanoTimestamp(long long* epochNanoTimes, int n){
 string Util::toMicroTimestampStr(std::chrono::system_clock::time_point& tp, bool printDate){
 	struct tm lt;
 	std::time_t now_c = std::chrono::system_clock::to_time_t(tp);
-	#ifdef WINDOWS
-		localtime_s(&lt, &now_c);
-	#else
-		localtime_r(&now_c, &lt);
-	#endif
+	getLocalTime(now_c, lt);
 	int microsecond= (tp.time_since_epoch()/std::chrono::microseconds(1)) % 1000000;
 	char buf[100]{};
 #ifdef _MSC_VER
@@ -1167,7 +1120,7 @@ starCheck:
 }
 
 bool Util::isWindows(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	return true;
 #else
 	return false;
@@ -1175,7 +1128,7 @@ bool Util::isWindows(){
 }
 
 int Util::getCoreCount(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	SYSTEM_INFO sysinfo;
 	GetSystemInfo(&sysinfo);
 	return sysinfo.dwNumberOfProcessors;
@@ -1185,7 +1138,7 @@ int Util::getCoreCount(){
 }
 
 long long Util::getPhysicalMemorySize() {
-#ifdef WINDOWS
+#ifdef _WIN32
 	MEMORYSTATUSEX status;
 	status.dwLength = sizeof(status);
 	GlobalMemoryStatusEx(&status);
@@ -1210,7 +1163,7 @@ void Util::writeDoubleQuotedString(string& dest, const string& source){
 void Util::sleep(int milliSeconds){
 	if(milliSeconds <= 0)
 		return;
-#ifdef WINDOWS
+#ifdef _WIN32
 	::Sleep(milliSeconds);
 #else
 	usleep(1000 * milliSeconds);
@@ -1218,7 +1171,7 @@ void Util::sleep(int milliSeconds){
 }
 
 int Util::getLastErrorCode(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	return WSAGetLastError();
 #else
 	return errno;
@@ -1238,7 +1191,7 @@ string tcharToString(TCHAR *tchar){
 #endif
 
 string Util::getLastErrorMessage(){
-#ifdef WINDOWS
+#ifdef _WIN32
 #ifdef _MSC_VER
 	TCHAR buf[256];
 	FormatMessage(
@@ -1270,7 +1223,7 @@ string Util::getLastErrorMessage(){
 }
 
 string Util::getErrorMessage(int errCode){
-#ifdef WINDOWS
+#ifdef _WIN32
 #ifdef _MSC_VER
 	TCHAR buf[256];
 	FormatMessage(
@@ -1296,6 +1249,7 @@ string Util::getErrorMessage(int errCode){
 #endif
 
 #else
+	std::ignore = errCode;
 	char buf[256]={0};
 	char *msg=strerror_r(errno, buf, 256);
 	return string(msg);
@@ -1338,29 +1292,39 @@ Vector* Util::createSubVector(const VectorSP& source, vector<int> indices){
 	return result;
 }
 Vector* Util::createSymbolVector(const SymbolBaseSP& symbolBase, INDEX size, INDEX capacity, bool fast, void* data, void** dataSegment, int segmentSizeInBit, bool containNull){
+	std::ignore = fast;
+	std::ignore = segmentSizeInBit;
 		if(data == NULL && dataSegment == NULL){
-			try{
-				data = (void*)new int[std::max(size, capacity)];
-			}
-			catch(...){
-				data = NULL;
-			}
+		try{
+			data = (void*)new int[std::max(size, capacity)];
+		} catch(...){
+			data = NULL;
 		}
-		if(data != NULL)
-			return new FastSymbolVector(symbolBase, size, capacity, (int*)data, containNull);
-		else
-			return NULL;
+	}
+	if(data != NULL)
+		return new FastSymbolVector(symbolBase, size, capacity, (int*)data, containNull);
+	return NULL;
 }
 
 bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, std::nullptr_t val, ErrorCodeInfo &errorCodeInfo, int extraParam) {
+	std::ignore = dataType;
+	std::ignore = val;
+	std::ignore = errorCodeInfo;
+	std::ignore = extraParam;
 	data->setNull();
 	return true;
 }
 bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, Constant* val, ErrorCodeInfo &errorCodeInfo, int extraParam) {
+	std::ignore = dataType;
+	std::ignore = errorCodeInfo;
+	std::ignore = extraParam;
 	data = val;
 	return true;
 }
 bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, const ConstantSP& val, ErrorCodeInfo &errorCodeInfo, int extraParam) {
+	std::ignore = dataType;
+	std::ignore = errorCodeInfo;
+	std::ignore = extraParam;
 	data = val;
 	return true;
 }
@@ -1374,6 +1338,7 @@ void Util::SetOrThrowErrorInfo(ErrorCodeInfo *errorCodeInfo, int errorCode, cons
 }
 
 bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, bool val, ErrorCodeInfo &errorCodeInfo, int extraParam) {
+	std::ignore = extraParam;
 	switch (dataType) {
 	case DATA_TYPE::DT_BOOL:
 		data->setBool(val);
@@ -1386,6 +1351,7 @@ bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, bool val, ErrorCodeInf
 }
 
 bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, long long val, const char *pTypeName, ErrorCodeInfo &errorCodeInfo, int extraParam) {
+	std::ignore = extraParam;
 	switch (dataType) {
 	case DATA_TYPE::DT_DECIMAL128:
 		static_cast<SmartPointer<Decimal128>>(data)->setLong(val);
@@ -1442,6 +1408,7 @@ bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, short val, ErrorCodeIn
 	return setValue(data, dataType, (long long)val, "short", errorCodeInfo, extraParam);
 }
 bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, const char* val, ErrorCodeInfo &errorCodeInfo, int extraParam) {
+	std::ignore = extraParam;
 	if (val != (const void*)0) {
 		switch (LIKE_TYPE(dataType, DT_STRING)) {
 		case DATA_TYPE::DT_INT128:
@@ -1496,6 +1463,7 @@ bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, const char* val, Error
 	return true;
 }
 bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, const void* val, ErrorCodeInfo &errorCodeInfo, int extraParam) {
+	std::ignore = extraParam;
 	if (val != (const void*)0) {
 		switch (dataType) {
 		case DATA_TYPE::DT_DECIMAL32:
@@ -1582,6 +1550,7 @@ bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, long long val, ErrorCo
 	return true;
 }
 bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, float val, ErrorCodeInfo &errorCodeInfo, int extraParam) {
+	std::ignore = extraParam;
 	switch (LIKE_TYPE(dataType, DT_FLOAT)) {
 	case DATA_TYPE::DT_DECIMAL32:
 	case DATA_TYPE::DT_DECIMAL64:
@@ -1597,6 +1566,7 @@ bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, float val, ErrorCodeIn
 	return true;
 }
 bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, double val, ErrorCodeInfo &errorCodeInfo, int extraParam) {
+	std::ignore = extraParam;
 	switch (LIKE_TYPE(dataType, DT_DOUBLE)) {
 	case DATA_TYPE::DT_FLOAT:
 		if(val >= FLT_MIN && val <= FLT_MAX)
@@ -1727,17 +1697,27 @@ bool Util::setValue(ConstantSP& data, DATA_TYPE dataType, std::vector<const void
 }
 
 ConstantSP Util::createObject(DATA_TYPE dataType, std::nullptr_t val, ErrorCodeInfo *errorCodeInfo, int extraParam) {
+	std::ignore = val;
+	std::ignore = extraParam;
+	std::ignore = errorCodeInfo;
 	return createNullConstant(dataType);
 }
 ConstantSP Util::createObject(DATA_TYPE dataType, Constant* val, ErrorCodeInfo *errorCodeInfo, int extraParam) {
+	std::ignore = dataType;
+	std::ignore = errorCodeInfo;
+	std::ignore = extraParam;
 	return val;
 }
 ConstantSP Util::createObject(DATA_TYPE dataType, const ConstantSP& val, ErrorCodeInfo *errorCodeInfo, int extraParam) {
+	std::ignore = dataType;
+	std::ignore = errorCodeInfo;
+	std::ignore = extraParam;
 	return val;
 }
 
 
 ConstantSP Util::createObject(DATA_TYPE dataType, bool val, ErrorCodeInfo *errorCodeInfo, int extraParam) {
+	std::ignore = extraParam;
 	switch (dataType) {
 	case DATA_TYPE::DT_BOOL:
 		return createBool(val);
@@ -1814,6 +1794,7 @@ ConstantSP Util::createObject(DATA_TYPE dataType, short val, ErrorCodeInfo *erro
 	return createValue(dataType,(long long)val,"short", errorCodeInfo, extraParam);
 }
 ConstantSP Util::createObject(DATA_TYPE dataType, const char* val, ErrorCodeInfo *errorCodeInfo, int extraParam) {
+	std::ignore = extraParam;
 	if (val != (const void*)0) {
 		switch (dataType) {
 		case DATA_TYPE::DT_INT128:
@@ -2167,7 +2148,7 @@ bool Util::checkColDataType(DATA_TYPE colDataType, bool isColTemporal,ConstantSP
 }
 
 unsigned long Util::getCurThreadId() {
-#ifdef WINDOWS
+#ifdef _WIN32
 	return GetCurrentThreadId();
 #elif defined MAC
 	return syscall(SYS_thread_selfid);

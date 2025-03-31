@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
 #pragma once
 
 #include "SmartPointer.h"
@@ -9,6 +11,12 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4251 )
+#endif
+
 namespace dolphindb {
 
 struct EXPORT_DECL EventSchema{
@@ -102,3 +110,7 @@ private:
 };
 
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

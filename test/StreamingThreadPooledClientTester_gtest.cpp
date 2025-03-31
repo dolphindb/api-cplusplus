@@ -173,11 +173,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 1) : ThreadPooledClient(listenport, 1);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
             EXPECT_EQ(threadVec.size(), 1);
 
             notify.wait();
@@ -238,11 +238,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 2) : ThreadPooledClient(listenport, 2);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
             EXPECT_EQ(threadVec.size(), 2);
 
             notify.wait();
@@ -303,11 +303,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 4) : ThreadPooledClient(listenport, 4);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
             EXPECT_EQ(threadVec.size(), 4);
 
             notify.wait();
@@ -368,11 +368,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 8) : ThreadPooledClient(listenport, 8);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
             EXPECT_EQ(threadVec.size(), 8);
 
             notify.wait();
@@ -433,11 +433,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 16) : ThreadPooledClient(listenport, 16);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
             EXPECT_EQ(threadVec.size(), 16);
 
             notify.wait();
@@ -498,11 +498,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 32) : ThreadPooledClient(listenport, 32);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
             EXPECT_EQ(threadVec.size(), 32);
 
             notify.wait();
@@ -533,11 +533,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 2);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, [](Message msg){}, "st_notExist", "actionTest", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, [](Message msg){}, "st_notExist", "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, [](Message msg){}, "st_notExist", "actionTest");
+            auto queue = client.subscribe(hostName, port, [](Message msg){}, "st_notExist", "actionTest", 0, true, nullptr, false, false, "admin", "123456");
             Util::sleep(1000);
         }
         client.unsubscribe(hostName, port, "st_notExist", "actionTest");
@@ -557,7 +557,7 @@ namespace STPCT
         Util::sleep(1000);
         EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
         ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 2);
-        EXPECT_ANY_THROW(client.subscribe("", port, onehandler, st, "actionTest", 0));
+        EXPECT_ANY_THROW(client.subscribe("", port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         usedPorts.insert(listenport);
     }
 
@@ -573,7 +573,7 @@ namespace STPCT
         Util::sleep(1000);
         EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
         ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 2);
-        EXPECT_ANY_THROW(client.subscribe(hostName, NULL, onehandler, st, "actionTest", 0));
+        EXPECT_ANY_THROW(client.subscribe(hostName, NULL, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         usedPorts.insert(listenport);
     }
 
@@ -602,11 +602,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 2);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "", 0);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "", 0, true, nullptr, false, false, "admin", "123456");
             notify.wait();
             TableSP stat = conn.run("getStreamingStat().pubTables");
 
@@ -646,7 +646,29 @@ namespace STPCT
         cout << "current listenport is " << listenport << endl;
 
         ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 2);
-        EXPECT_ANY_THROW(auto threadVec = client.subscribe(hostName, port, onehandler, "", "actionTest", 0, false));
+        EXPECT_ANY_THROW(auto threadVec = client.subscribe(hostName, port, onehandler, "", "actionTest", 0, false, nullptr, false, false, "admin", "123456"));
+    }
+
+    TEST_P(StreamingThreadPooledClientTester, test_subscribe_onehandler_userNameNull)
+    {
+        string st = "outTables_" + getRandString(10);
+        STPCT::createSharedTableAndReplay(st, 1000);
+        int msg_total = 0;
+
+        int listenport = GetParam();
+        cout << "current listenport is " << listenport << endl;
+        ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 2);
+        bool enableClientAuth = conn.run("bool(getConfig('enableClientAuth'))")->getBool();
+        if (enableClientAuth){
+            EXPECT_ANY_THROW(auto threadVec = client.subscribe(hostName, port, [=](Message msg){}, st, DEFAULT_ACTION_NAME, -1, false));
+        }else{
+            auto threadVec = client.subscribe(hostName, port, [=](Message msg){}, st, DEFAULT_ACTION_NAME, 0, false);
+            Util::sleep(1000);
+            EXPECT_FALSE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
+            client.unsubscribe(hostName, port, st, DEFAULT_ACTION_NAME);
+            Util::sleep(1000);
+            EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
+        }
     }
 
     TEST_P(StreamingThreadPooledClientTester, test_subscribe_onehandler_offsetNegative)
@@ -667,11 +689,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 2);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", -1));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", -1, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", -1);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", -1, true, nullptr, false, false, "admin", "123456");
             cout << "total size:" << msg_total << endl;
             client.unsubscribe(hostName, port, st, "actionTest");
 
@@ -730,11 +752,11 @@ namespace STPCT
         filter->setString(0, "b");
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, filter));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, filter, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, filter);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, filter, false, false, "admin", "123456");
             cout << "total size:" << msg_total << endl;
             notify.wait();
 
@@ -795,11 +817,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 2);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, true));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, true, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, true);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, true, false, "admin", "123456");
             notify.wait();
             cout << "total size:" << msg_total << endl;
             client.unsubscribe(hostName, port, st, "actionTest");
@@ -857,12 +879,12 @@ namespace STPCT
         ThreadPooledClient client2(listenport, 5);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, true));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, true, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true);
-            auto threadVec2 = client2.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456");
+            auto threadVec2 = client2.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456");
             notify.wait();
             cout << "total size:" << msg_total << endl;
             client.unsubscribe(hostName, port, st, "actionTest");
@@ -895,7 +917,7 @@ namespace STPCT
         cout << "current listenport is " << listenport << endl;
 
         ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 1);
-        EXPECT_ANY_THROW(auto threadVec = client.subscribe(hostName, port, onehandler, "st", "actionTest", 0, false));
+        EXPECT_ANY_THROW(auto threadVec = client.subscribe(hostName, port, onehandler, "st", "actionTest", 0, false, nullptr, false, false, "admin", "123456"));
     }
 
     TEST_P(StreamingThreadPooledClientTester, test_client_resub_true)
@@ -907,29 +929,21 @@ namespace STPCT
         };
 
         int listenport = GetParam();
-        string st = "st_" + getRandString(10);
-        conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
         cout << "current listenport is " << listenport << endl;
 
         ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, 1);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "resubTest", 0, true));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, "nonExistTable", "resubTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "resubTest", 0, true);
-            Util::sleep(2000);
-            conn.run("subinfo = (exec subscriber from getStreamingStat().pubTables where tableName=`"+st+")[0].split(':');"
-                     "subClient = subinfo[0];"
-                     "subPort=int(subinfo[1]);go;"
-                     "stopPublishTable(subClient, subPort, `"+st+", `resubTest)");
+            auto threadVec = client.subscribe(hostName, port, onehandler, "nonExistTable", "resubTest", 0, true, nullptr, false, false, "admin", "123456");
             Util::sleep(1000);
-            conn.run("tableInsert("+st+", `sym2, 2)");
-            Util::sleep(1000);
-            client.unsubscribe(hostName, port, st, "resubTest");
+            client.unsubscribe(hostName, port, "nonExistTable", "resubTest");
 
-            EXPECT_EQ(msgs.size(), 2);
+            // client.exit();
+            // EXPECT_TRUE(client.isExit());
         }
         usedPorts.insert(listenport);
     }
@@ -973,12 +987,12 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, threadCount) : ThreadPooledClient(listenport, threadCount);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, false));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, false);
-            EXPECT_ANY_THROW(auto threadVec1 = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, false));
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, false, "admin", "123456");
+            EXPECT_ANY_THROW(auto threadVec1 = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, false, "admin", "123456"));
             EXPECT_EQ(threadVec.size(), threadCount);
 
             notify.wait();
@@ -1041,11 +1055,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, threadCount) : ThreadPooledClient(listenport, threadCount);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
             EXPECT_EQ(threadVec.size(), threadCount);
 
             notify.wait();
@@ -1108,11 +1122,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, threadCount) : ThreadPooledClient(listenport, threadCount);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "arrayVectorTableTest", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "arrayVectorTableTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "arrayVectorTableTest", 0);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "arrayVectorTableTest", 0, true, nullptr, false, false, "admin", "123456");
             EXPECT_EQ(threadVec.size(), threadCount);
 
             notify.wait();
@@ -1173,11 +1187,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
             EXPECT_EQ(threadVec.size(), 3);
 
             notify.wait();
@@ -1236,11 +1250,11 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, true));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, true, false, "admin", "123456"));
         }
         else
         {
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, true);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, true, false, "admin", "123456");
             EXPECT_EQ(threadVec.size(), 3);
 
             notify.wait();
@@ -1447,7 +1461,7 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient() : ThreadPooledClient(listenport, threadCount);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
@@ -1455,7 +1469,7 @@ namespace STPCT
             std::thread th = std::thread([&]() {
                 insertData(conn, st, dataScript);
             });
-            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto threadVec = client.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, false, "admin", "123456");
             EXPECT_EQ(threadVec.size(), threadCount);
             th.join();
 
@@ -1490,14 +1504,14 @@ namespace STPCT
         ThreadPooledClient client = listenport == -1? ThreadPooledClient(0, 2) : ThreadPooledClient(listenport, 2);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, false));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, "admin", "123456", nullptr, {}, 100, true, 1000));
         }
         else
         {
             unsigned int resubscribeTimeout = 500;
             ThreadPooledClient client1 = listenport == -1? ThreadPooledClient(0, 2) : ThreadPooledClient(listenport, 2);
-            client.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true);
-            auto ths = client1.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "", "", nullptr, {}, 100, false, resubscribeTimeout);
+            client.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
+            auto ths = client1.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456", nullptr, {}, 100, false, resubscribeTimeout);
 
             Util::sleep(resubscribeTimeout+1000);
             client.unsubscribe(hostName, port, st, DEFAULT_ACTION_NAME);

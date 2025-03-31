@@ -645,15 +645,6 @@ TEST_F(FunctionTest,test_Util_functions){
     EXPECT_FALSE(Util::strWildCmp("dolphindb","DolphinDB"));
     EXPECT_TRUE(Util::strWildCmp("DolphinDB","DolphinDB"));
 
-    #ifdef _WIN32
-    EXPECT_TRUE(Util::isWindows());
-    #else
-    EXPECT_FALSE(Util::isWindows());
-    #endif
-
-    cout<<Util::getCoreCount()<<endl;
-    cout<<Util::getPhysicalMemorySize()<<endl;
-
     string dest = "dolphindb";
     string source = "1";
     Util::writeDoubleQuotedString(dest,source);
@@ -1564,3 +1555,21 @@ TEST_F(FunctionTest,test_FastFixedLengthVector_getDataArray){
 }
 
 #endif
+
+
+TEST_F(FunctionTest,test_upload_not_initialized_constant){
+    ConstantSP data;
+    EXPECT_ANY_THROW(conn.upload({"data"}, {data}));
+}
+
+
+TEST_F(FunctionTest, test_createDate){
+    auto date_min = Util::createDate(INT_MIN);
+    auto date_max = Util::createDate(INT_MAX);
+    auto date0 = Util::createDate(0);
+    auto date1 = Util::createDate(9999, 12, 31);
+    EXPECT_EQ(date_min->getString(), "");
+    EXPECT_EQ(date_max->getString(), "5881580.07.11");
+    EXPECT_EQ(date0->getString(), "1970.01.01");
+    EXPECT_EQ(date1->getString(), "9999.12.31");
+}

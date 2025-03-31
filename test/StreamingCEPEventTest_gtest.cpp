@@ -6,28 +6,12 @@ class StreamingCEPEventTest : public testing::Test
 public:
     static string get_clear_script()
     {
-        return "a = getStreamingStat().pubTables\n"
-               "for(i in a){\n"
-               "\ttry{stopPublishTable(i.subscriber.split(\":\")[0],int(i.subscriber.split(\":\")[1]),i.tableName,i.actions)}catch(ex){}\n"
-               "};"
-               "def getAllShare(){\n"
-               "\treturn select name from objs(true) where shared=1\n"
-               "\t}\n"
-               "\n"
-               "def clearShare(){\n"
-               "\tlogin(`admin,`123456)\n"
-               "\tallShare=exec name from pnodeRun(getAllShare)\n"
-               "\tfor(i in allShare){\n"
-               "\t\ttry{\n"
-               "\t\t\trpc((exec node from pnodeRun(getAllShare) where name =i)[0],clearTablePersistence,objByName(i))\n"
-               "\t\t\t}catch(ex1){}\n"
-               "\t\trpc((exec node from pnodeRun(getAllShare) where name =i)[0],undef,i,SHARED)\n"
-               "\t}\n"
-               "\ttry{\n"
-               "\t\tPST_DIR=rpc(getControllerAlias(),getDataNodeConfig{getNodeAlias()})['persistenceDir']\n"
-               "\t}catch(ex1){}\n"
-               "}\n"
-               "clearShare();undef all;";
+        return "a = getStreamingStat().pubTables;"
+               "for(i in a){"
+               "try{stopPublishTable(i.subscriber.split(\":\")[0],int(i.subscriber.split(\":\")[1]),i.tableName,i.actions)}catch(ex){};};"
+               "for (t in (exec name from objs(true) where shared=true)){"
+                    "undef(t, SHARED)"
+                "}undef all;";
     }
     static void SetUpTestSuite()
     {
@@ -139,7 +123,7 @@ vector<string> subInputTable(const string &t, const int target_rows, const std::
         if (total_rows == target_rows) notify.set();
     };
 
-    auto th = client->subscribe(hostName, port300, _handler, t, DEFAULT_ACTION_NAME, 0);
+    auto th = client->subscribe(hostName, port300, _handler, t, DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
     notify.wait();
 
     client->unsubscribe(hostName, port300, t, DEFAULT_ACTION_NAME);
@@ -266,7 +250,7 @@ TEST_F(StreamingCEPEventTest, test_EventType_special_character)
     EventSender *sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeFields, commonFields);
 
     EventClient* client = new EventClient(eventSchemas, eventTimeFields, commonFields);
-    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
     sender->sendEvent(schema->eventType_, {Util::createString("sz"), Util::createString("000001"), Util::createDouble(10.5), Util::createInt(100), Util::createTimestamp(2021, 1, 1, 10, 30, 0, 100)});
     Util::sleep(2000);
 
@@ -504,7 +488,7 @@ TEST_F(StreamingCEPEventTest, test_eventTimeFields_not_time_column)
     string re1 = "";
     try{
         EventClient* client = new EventClient(eventSchemas, eventTimeFields, commonFields);
-        client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+        client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
     }catch(exception& ex){
         re1 = ex.what();
     }
@@ -530,7 +514,7 @@ TEST_F(StreamingCEPEventTest, test_eventTimeFields_two_column)
     vector<string> commonFields = {};
     EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeFields, commonFields);
     EventClient* client = new EventClient(eventSchemas, eventTimeFields, commonFields);
-    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
 
     vector<ConstantSP> attributes = {Util::createString("str"), Util::createTime(12,45,3,100)};
     sender->sendEvent("market", attributes);
@@ -572,7 +556,7 @@ TEST_F(StreamingCEPEventTest, test_EventClient_fields_null_but_subTable_has_colu
     vector<EventSchema> eventSchemas = {*schema};
     EventClient* client = new EventClient(eventSchemas, {}, {});
 
-    EXPECT_ANY_THROW(client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0));
+    EXPECT_ANY_THROW(client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456"));
     delete schema, client;
 }
 
@@ -595,7 +579,7 @@ TEST_F(StreamingCEPEventTest, test_commonFields_one_column)
     vector<string> commonFields = {"time"};
     EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeFields, commonFields);
     EventClient* client = new EventClient(eventSchemas, eventTimeFields, commonFields);
-    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
 
     vector<ConstantSP> attributes = {Util::createString("str"), Util::createTime(12,45,3,100)};
     sender->sendEvent("market", attributes);
@@ -667,7 +651,7 @@ TEST_F(StreamingCEPEventTest, test_two_schemas_two_commonFields)
     vector<string> commonFields = {"time", "sym"};
     EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeFields, commonFields);
     EventClient* client = new EventClient(eventSchemas, eventTimeFields, commonFields);
-    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
 
     vector<ConstantSP> attributes = {Util::createString("sz"), Util::createTime(12,45,3,100), Util::createString("sz000001")};
     sender->sendEvent("market", attributes);
@@ -719,7 +703,7 @@ TEST_F(StreamingCEPEventTest, test_commonFields_eventTimeFields_with_same_col)
     vector<string> commonFields = {"time", "sym"};
     EventSender* sender = new EventSender(conn300, "inputTable", eventSchemas, eventTimeFields, commonFields);
     EventClient* client = new EventClient(eventSchemas, eventTimeFields, commonFields);
-    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
 
     vector<ConstantSP> attributes = {Util::createString("sz"), Util::createTime(12,45,3,100), Util::createString("sz000001")};
     sender->sendEvent("market", attributes);
@@ -791,14 +775,14 @@ TEST_F(StreamingCEPEventTest, test_EventClient_error_hostinfo)
     string re = "";
 
     try{
-        client->subscribe(hostName, -100, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+        client->subscribe(hostName, -100, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
     }catch(exception& ex){
         re = ex.what();
     }
     // EXPECT_EQ("Subscribe Fail, cannot connect to 127.0.0.1 : -100", re);
     string ex = "Subscribe Fail, cannot connect to";
     EXPECT_PRED_FORMAT2(testing::IsSubstring, ex, re);
-    EXPECT_ANY_THROW(client->unsubscribe("", port300, "inputTable", DEFAULT_ACTION_NAME));
+    EXPECT_FALSE(client->unsubscribe("", port300, "inputTable", DEFAULT_ACTION_NAME));
 
     delete client, schema;
 }
@@ -815,10 +799,10 @@ TEST_F(StreamingCEPEventTest, test_EventClient_sub_twice_with_same_actionName)
     vector<string> eventTimeFields = {"time"};
     vector<string> commonFields = {};
     EventClient* client = new EventClient(eventSchemas, eventTimeFields, commonFields);
-    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, false);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456", false);
     string re = "";
     try{
-        client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, false);
+        client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, false, "admin", "123456", false);
     }catch(exception& ex){
         re = ex.what();
     }
@@ -955,9 +939,10 @@ TEST_F(StreamingCEPEventTest, test_EventSender_conn_not_admin)
     vector<EventSchema> eventSchemas = {*schema};
     vector<string> eventTimeFields = {"time"};
     vector<string> commonFields = {};
+    conn300->run("try{createUser(`yzou, `123456)}catch(ex){};go");
     DBConnectionSP tmp_connsp = new DBConnection(false, false, 7200, false);
-    tmp_connsp->connect(hostName, port300);
-    EXPECT_EQ(tmp_connsp->run("getCurrentSessionAndUser()[1]")->getString(), "guest");
+    tmp_connsp->connect(hostName, port300, "yzou", "123456");
+    EXPECT_EQ(tmp_connsp->run("getCurrentSessionAndUser()[1]")->getString(), "yzou");
     EventSender* sender = new EventSender(tmp_connsp, "inputTable", eventSchemas, eventTimeFields, commonFields);
 
     vector<ConstantSP> attributes = {Util::createString("sz"), Util::createTime(12,45,3,100)};
@@ -993,7 +978,7 @@ TEST_F(StreamingCEPEventTest, test_eventTable_not_exist)
     EventClient* client = new EventClient(eventSchemas, eventTimeFields, commonFields);
     string re1 = "";
     try{
-        auto th = client->subscribe(hostName, port300, test_handler, "notExistTable", DEFAULT_ACTION_NAME, 0, false);
+        auto th = client->subscribe(hostName, port300, test_handler, "notExistTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456", false);
         th->join();
     }catch(const exception& ex){
         re1 = ex.what();
@@ -1026,7 +1011,7 @@ TEST_F(StreamingCEPEventTest, test_eventTable_not_contail_eventCol)
     EventClient* client = new EventClient(eventSchemas, eventTimeFields, commonFields);
     string re1 = "";
     try{
-        auto th = client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, false);
+        auto th = client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456", false);
         th->join();
     }catch(const exception& ex){
         re1 = ex.what();
@@ -1058,7 +1043,7 @@ TEST_F(StreamingCEPEventTest, test_connect_tableName_null)
     EventClient* client = new EventClient(eventSchemas, eventTimeFields, commonFields);
     string re1 = "";
     try{
-        auto th = client->subscribe(hostName, port300, test_handler, "", DEFAULT_ACTION_NAME, 0, false);
+        auto th = client->subscribe(hostName, port300, test_handler, "", DEFAULT_ACTION_NAME, 0, true, "admin", "123456", false);
         th->join();
     }catch(exception& ex){
         re1 = ex.what();
@@ -1128,7 +1113,7 @@ TEST_F(StreamingCEPEventTest, test_EventClient_sub_eventType_null)
         EventClient* client = new EventClient(eventSchemas, eventTimeFields, commonFields);
 
 
-        auto th = client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0);
+        auto th = client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
         th->join();
     }catch(exception& ex){
         re = ex.what();
@@ -1232,7 +1217,7 @@ TEST_P(StreamingCEPEventTest_EventSender_alltypes, test_EventSender_alltype)
                         "testCol = c\n"
                         "commonCol = d\n}"
                 "};"
-                "class MainMonitor{"
+                "class MainMonitor:CEPMonitor{"
                     "def MainMonitor(){}\n"
                     "def updateMarketData(event)\n"
                     "def onload(){"
@@ -1351,7 +1336,7 @@ TEST_P(StreamingCEPEventTest_EventSender_vector, test_EventSender_vector)
                         "testCol = c\n"
                         "commonCol = d\n}"
                 "};"
-                "class MainMonitor{"
+                "class MainMonitor:CEPMonitor{"
                     "def MainMonitor(){}\n"
                     "def updateMarketData(event)\n"
                     "def onload(){"
@@ -1585,7 +1570,7 @@ TEST_P(StreamingCEPEventTest_EventClient_alltypes, test_EventClient_alltype)
         }
     };
 
-    client->subscribe(hostName, port300, imp_handler, "fromCEP", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, imp_handler, "fromCEP", DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
     conn300->run(
         "rows = "+to_string(test_rows)+";"
         "val_col0=rand(`sz`sh`bj`adk, rows);val_col1=now()..temporalAdd(now(), rows-1, 'ms');val_col2=rand("+type_data_str+", rows);val_col3=rand("+type_data_str+", rows);"
@@ -1728,7 +1713,7 @@ TEST_P(StreamingCEPEventTest_EventClient_alltypes_vector, test_EventClient_allty
         }
     };
 
-    client->subscribe(hostName, port300, imp_handler, "fromCEP", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, imp_handler, "fromCEP", DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
     vector<string> val_col2_scripts ={"rand("+type_data_str+", rows)", "rand(val_col2, vector_size)"};
     if (dataType == DT_BLOB)
         val_col2_scripts = {"blob(string(rand("+type_data_str+", rows)))", "blob(string(rand(val_col2, vector_size)))"};
@@ -1858,7 +1843,7 @@ TEST_P(StreamingCEPEventTest_EventClient_arrayVector, test_EventClient_arrayVect
         }
     };
 
-    client->subscribe(hostName, port300, imp_handler, "fromCEP", DEFAULT_ACTION_NAME, 0);
+    client->subscribe(hostName, port300, imp_handler, "fromCEP", DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
     vector<string> val_col2_scripts ={"rand("+type_data_str+", rows)", "rand(val_col2, vector_size)"};
     conn300->run(
         "rows = "+to_string(test_rows)+";"
@@ -1896,8 +1881,8 @@ TEST_F(StreamingCEPEventTest, test_resub_true_with_resubscribeTimeout)
 
     unsigned int resubscribeTimeout = 500;
 
-    client->subscribe(hostName, port300, nullptr, "inputTable", DEFAULT_ACTION_NAME, 0, true);
-    auto t = client2->subscribe(hostName, port300, nullptr, "inputTable", DEFAULT_ACTION_NAME, 0, true, "", "", resubscribeTimeout);
+    client->subscribe(hostName, port300, nullptr, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456");
+    auto t = client2->subscribe(hostName, port300, nullptr, "inputTable", DEFAULT_ACTION_NAME, 0, true, "admin", "123456", resubscribeTimeout);
 
     Util::sleep(resubscribeTimeout+1000);
     client->unsubscribe(hostName, port300, "inputTable", DEFAULT_ACTION_NAME);
@@ -1909,3 +1894,41 @@ TEST_F(StreamingCEPEventTest, test_resub_true_with_resubscribeTimeout)
     delete client, client2, schema;
 }
 
+
+TEST_F(StreamingCEPEventTest, test_CEP_SCRAM_user){
+    try{
+        conn300->run("try{deleteUser('scramUser')}catch(ex){};go;createUser(`scramUser, `123456, authMode='scram')");
+    }catch(const std::exception& e){
+        GTEST_SKIP() << e.what();
+    }
+	DBConnectionSP conn_scram = new DBConnection(false, false, 7200, false, false, false, true);
+	conn_scram->connect(hostName, port300, "scramUser", "123456");
+
+    string script = "share streamTable(1:0, `eventType`event, [STRING,BLOB]) as inputTable;\n"
+                    "share streamTable(1:0, `market`code`price`qty`eventTime, [STRING,STRING,DOUBLE,INT,TIMESTAMP]) as outputTable;";
+    conn_scram->run(script);
+    EventSchema *schema = new EventSchema();
+    //TODO 用C++API写入\r结尾的字符串数据，写入后会缺少\r，正在跟server讨论这个问题，这里先规避，后面加个1
+    schema->eventType_ = "!@#$%&*()_+《》>{}[]-=';./,~`1^;中文 \"\n\t\r1";
+    schema->fieldNames_ = {"market", "code", "price", "qty", "eventTime"};
+    schema->fieldTypes_ = {DT_STRING, DT_STRING, DT_DOUBLE, DT_INT, DT_TIMESTAMP};
+    schema->fieldForms_ = {DF_SCALAR, DF_SCALAR, DF_SCALAR, DF_SCALAR, DF_SCALAR};
+    vector<EventSchema> eventSchemas = {*schema};
+    vector<string> eventTimeFields = {};
+    vector<string> commonFields = {};
+    EventSender *sender = new EventSender(conn_scram, "inputTable", eventSchemas, eventTimeFields, commonFields);
+
+    EventClient* client = new EventClient(eventSchemas, eventTimeFields, commonFields);
+    client->subscribe(hostName, port300, test_handler, "inputTable", DEFAULT_ACTION_NAME, 0, true, "scramUser", "123456");
+    sender->sendEvent(schema->eventType_, {Util::createString("sz"), Util::createString("000001"), Util::createDouble(10.5), Util::createInt(100), Util::createTimestamp(2021, 1, 1, 10, 30, 0, 100)});
+    Util::sleep(2000);
+
+    client->unsubscribe(hostName, port300, "inputTable", DEFAULT_ACTION_NAME);
+    TableSP re = conn_scram->run("select * from outputTable");
+    EXPECT_EQ(1, re->rows());
+    EXPECT_EQ("sz", re->getColumn(0)->get(0)->getString());
+    EXPECT_EQ("000001", re->getColumn(1)->get(0)->getString());
+    EXPECT_EQ(10.5, re->getColumn(2)->get(0)->getDouble());
+    EXPECT_EQ(100, re->getColumn(3)->get(0)->getInt());
+    EXPECT_EQ("2021.01.01T10:30:00.100", re->getColumn(4)->get(0)->getString());
+}

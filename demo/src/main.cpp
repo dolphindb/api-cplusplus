@@ -5,10 +5,10 @@
 using namespace dolphindb;
 using namespace std;
 
-int main(int argc, char* argv[]) {
-
+int main()
+{
     DBConnection conn;
-    bool ret = conn.connect("192.168.0.104", 8848);
+    bool ret = conn.connect("127.0.0.1", 8848);
     if (!ret) {
         cout << "Failed to connect to the server" << endl;
         return 0;

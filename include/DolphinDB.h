@@ -1,12 +1,6 @@
-/*
- * DolphinDB.h
- *
- *  Created on: Sep 22, 2018
- *      Author: dzhou
- */
-
-#ifndef DOLPHINDB_H_
-#define DOLPHINDB_H_
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include <string>
 #include <unordered_map>
@@ -24,14 +18,20 @@
 #include "Types.h"
 #include "SmartPointer.h"
 #include "Exceptions.h"
-#include "SysIO.h"
-#include "WideInteger.h"
+#include "internal/WideInteger.h"
 #include "Constant.h"
 #include "Dictionary.h"
 #include "Table.h"
 // MSVC warning C4150: destructor of Domain is required during instantiation of SmartPointer<Domain>
 #include "Domain.h"
 #include "Util.h"
+#include "Concurrent.h"
+#include "Version.h"
+
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4251 )
+#endif
 
 namespace dolphindb {
 
@@ -79,16 +79,57 @@ struct SubscribeConfig {
     bool resetOffset;
 };
 
+enum class ConnectionState {
+    Initializing,
+    Connected,
+    Terminated,
+    Reconnecting,
+};
+
 class EXPORT_DECL DBConnection {
 public:
-    DBConnection(std::string host, int port)
+    DBConnection(const std::string &host, int port, const std::string &userName="", const std::string &password="")
         :DBConnection()
     {
         if (!connect(host, port)) {
             throw RuntimeException("Failed to connect to server: " + host + ":" + std::to_string(port));
         }
+        if (!userName.empty()) {
+            login(userName, password, true);
+        }
     }
-	DBConnection(bool enableSSL = false, bool asyncTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false, bool isReverseStreaming = false);
+    DBConnection(bool enableSSL = false, bool asyncTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false, bool isReverseStreaming = false, bool enableSCRAM = false);
+    using stateCallbackT = std::function<bool(const ConnectionState state, const std::string &host, const int port)>;
+    void onConnectionStateChange(const stateCallbackT callback) { callback_ = callback; }
+    std::shared_ptr<DBConnection> copy()
+    {
+        if (state_ != ConnectionState::Connected) {
+            return nullptr;
+        }
+        auto ret = std::make_shared<DBConnection>();
+        ret->host_ = host_;
+        ret->port_ = port_;
+        ret->uid_ = uid_;
+        ret->pwd_ = pwd_;
+        ret->enableSSL_ = enableSSL_;
+        ret->enableSCRAM_ = enableSCRAM_;
+        ret->nodes_ = nodes_;
+        ret->haSitesNum_ = haSitesNum_;
+        ret->lastConnNodeIndex_ = -1;
+        ret->state_ = ConnectionState::Initializing;
+        ret->initialScript_ = initialScript_;
+        ret->closed_ = false;
+        ret->keepAliveTime_ = keepAliveTime_;
+
+        // deprecated
+        ret->ha_ = ha_;
+        ret->reconnect_ = reconnect_;
+
+        return ret;
+    }
+    void setCompress(bool compress) { compress_ = compress; }
+    void setAsync(bool async) { asynTask_ = async; }
+    bool connect();
 	virtual ~DBConnection();
 	DBConnection(DBConnection&& oth);
 	DBConnection& operator=(DBConnection&& oth);
@@ -101,7 +142,10 @@ public:
 	bool connect(const std::string& hostName, int port, const std::string& userId = "", const std::string& password = "", const std::string& initialScript = "",
 		bool highAvailability = false, const std::vector<std::string>& highAvailabilitySites = std::vector<std::string>(), int keepAliveTime=7200, bool reconnect = false);
 
-	std::string version();
+    bool checkVersion(const std::vector<VersionT> &vers)
+    {
+        return version_.check(vers);
+    }
 
 	/**
 	 * Log onto the DolphinDB server using the given userId and password. If the parameter enableEncryption
@@ -138,7 +182,7 @@ public:
      */
     void restartMulticast(const SubscribeInfo &info, const std::string &topic, const SubscribeConfig &config)
     {
-        auto ret = run("triggerMulticastOnceInternal", info.tableName, topic, config.offset);
+        auto ret = call("triggerMulticastOnceInternal", info.tableName, topic, config.offset);
     }
 
 	/**
@@ -155,8 +199,9 @@ public:
 	 */
 	ConstantSP run(const std::string& funcName, std::vector<ConstantSP>& args, int priority=4, int parallelism=64, int fetchSize=0, bool clearMemory = false);
 
+    // Internal helper interface.
     template <typename... ArgsT>
-    ConstantSP run(const std::string &func, ArgsT &&... args)
+    ConstantSP call(const std::string &func, ArgsT &&... args)
     {
         std::vector<ConstantSP> argVec;
         Util::getConstantSP(argVec, std::forward<ArgsT>(args)...);
@@ -221,28 +266,35 @@ private:
 		Node(const std::string &hostName, int port, double load = DBL_MAX): hostName_(hostName), port_(port), load_(load){}
 		Node(const std::string &ipport, double loadValue = DBL_MAX);
 	};
-	static void parseIpPort(const std::string &ipport, std::string &ip, int &port);
+	static bool parseIpPort(const std::string &ipport, std::string &ip, int &port);
 	long nextSeqNo();
-	void initClientID();
-
 
     std::unique_ptr<DBConnectionImpl> conn_;
     std::string uid_;
     std::string pwd_;
     std::string initialScript_;
     bool ha_;
-	bool enableSSL_;
+    std::string host_;
+    int port_;
+    size_t haSitesNum_;
+    int keepAliveTime_;
+    bool enableSSL_;
+    bool enableSCRAM_;
     bool asynTask_;
     bool compress_;
-	std::vector<Node> nodes_;
-	int lastConnNodeIndex_;
-	bool enablePickle_, python_;
-	bool reconnect_, closed_;
-	static const int maxRerunCnt_ = 30;
-	long   runSeqNo_;
-	Mutex	mutex_;
+    std::vector<Node> nodes_;
+    int lastConnNodeIndex_;
+    bool enablePickle_, python_;
+    bool reconnect_;
+    std::atomic<bool> closed_{true};
+    static const int maxRerunCnt_ = 30;
+    long   runSeqNo_;
+    Mutex	mutex_;
+    VersionT version_;
     static const std::string udpIP_;
     static constexpr int udpPort_{1234};
+	stateCallbackT callback_{[](const ConnectionState, const std::string&, const int){ return true; }};
+	ConnectionState state_{ConnectionState::Initializing};
 };
 
 class EXPORT_DECL BlockReader : public Constant{
@@ -270,13 +322,13 @@ public:
 		bool loadBalance = false, bool highAvailability = false, bool compress = false, bool reConnect = false, bool python = false);
 	virtual ~DBConnectionPool();
 	void run(const std::string& script, int identity, int priority=4, int parallelism=64, int fetchSize=0, bool clearMemory = false);
-	
+
 	void run(const std::string& functionName, const std::vector<ConstantSP>& args, int identity, int priority=4, int parallelism=64, int fetchSize=0, bool clearMemory = false);
-    
+
 	bool isFinished(int identity);
 
     ConstantSP getData(int identity);
-	
+
     void shutDown();
 
     bool isShutDown();
@@ -284,7 +336,7 @@ public:
 	int getConnectionCount();
 private:
 	std::shared_ptr<DBConnectionPoolImpl> pool_;
-	friend class PartitionedTableAppender; 
+	friend class PartitionedTableAppender;
 
 };
 
@@ -375,7 +427,6 @@ private:
 
 }
 
-
-
-
-#endif /* DOLPHINDB_H_ */
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

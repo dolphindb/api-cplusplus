@@ -5,15 +5,7 @@
  *      Author: dzhou
  */
 
-#if defined LINUX
-	#include <unistd.h>
-	#include <netdb.h>
-	#include <sys/types.h>
-	#include <sys/socket.h>
-	#include <arpa/inet.h>
-	#include <fcntl.h>
-	#include <error.h>
-	#include <netinet/tcp.h>
+#if defined(__linux__)
 	#define closesocket(s) ::close(s)
 #elif defined MAC
 	#include <unistd.h>
@@ -26,10 +18,6 @@
 	#define closesocket(s) ::close(s)
 #else
 	#undef UNICODE
-	#include <winsock2.h>
-	#include <windows.h>
-	#include <ws2tcpip.h>
-	#include <mstcpip.h>
 #endif
 #include <string.h>
 #include <iostream>
@@ -51,11 +39,11 @@ namespace dolphindb {
 bool Socket::ENABLE_TCP_NODELAY = true;
 
 void LOG_ERR(const std::string& msg){
-	std::cout<<msg<<std::endl;
+	DLogger::Error(msg);
 }
 
 void LOG_INFO(const std::string& msg){
-	std::cout<<msg<<std::endl;
+	DLogger::Info(msg);
 }
 
 Socket::Socket():host_(""), port_(-1), blocking_(true), autoClose_(true), enableSSL_(false),
@@ -129,7 +117,7 @@ bool Socket::isValid(){
 IO_ERR Socket::read(char* buffer, size_t length, size_t& actualLength, bool msgPeek){
 	//RecordTime record("Socket.read");
 	if (!enableSSL_) {
-#ifdef WINDOWS
+#ifdef _WIN32
 		actualLength = recv(handle_, buffer, static_cast<int>(length), msgPeek ? MSG_PEEK : 0);
 		RECORD_READ(buffer, actualLength);
 		if (actualLength < 0) {
@@ -187,7 +175,7 @@ readdata2:
 IO_ERR Socket::write(const char* buffer, size_t length, size_t& actualLength){
 	//RecordTime record("Socket.write");
 	if(!enableSSL_){
-#ifdef WINDOWS
+#ifdef _WIN32
 		actualLength=send(handle_, buffer, static_cast<int>(length), 0);
 		RECORD_WRITE(buffer, actualLength);
 		if(actualLength != (size_t)SOCKET_ERROR)
@@ -322,7 +310,7 @@ IO_ERR Socket::connect(){
 	    }
 
         int enabled = 1;
-#ifdef WINDOWS
+#ifdef _WIN32
         if(::setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, (const char*)&enabled, sizeof(int)) != 0)
             LOG_ERR("Subscription socket failed to enable TCP_KEEPALIVE with error: " +  std::to_string(getErrorCode()));
 
@@ -365,7 +353,7 @@ IO_ERR Socket::connect(){
 		
 		if(::connect(handle_, p->ai_addr, static_cast<int>(p->ai_addrlen)) == SOCKET_ERROR) {
 			if(!blocking_){
-#ifdef WINDOWS
+#ifdef _WIN32
 				if(WSAGetLastError () == WSAEWOULDBLOCK){
 					freeaddrinfo(servinfo);
 					return INPROGRESS;
@@ -407,7 +395,7 @@ IO_ERR Socket::close(){
 	}
 #endif
 	if(handle_!= INVALID_SOCKET){
-#if defined LINUX
+#if defined __linux__
 		shutdown(handle_, SHUT_RDWR);
 #endif
 		if(closesocket(handle_) != 0){
@@ -429,14 +417,14 @@ IO_ERR Socket::close(){
 Socket* Socket::accept(){
 	struct sockaddr_in r_addr;
 
-#ifdef WINDOWS
+#ifdef _WIN32
 	int addrLen=sizeof(r_addr);
 #else
 	socklen_t addrLen=sizeof(r_addr);
 #endif
 	SOCKET t = ::accept(handle_, (struct sockaddr*)&r_addr, &addrLen);
 	if(t==INVALID_SOCKET){
-#ifdef WINDOWS
+#ifdef _WIN32
 		int errCode = WSAGetLastError();
 		if(errCode != WSAEWOULDBLOCK)
 			LOG_ERR("Failed to accept one incoming connection with error code " + std::to_string(errCode));
@@ -456,7 +444,7 @@ SOCKET Socket::getHandle(){
 }
 
 void Socket::setTimeout(int timeoutMs){
-#ifdef WINDOWS
+#ifdef _WIN32
 	int iTimeOut = timeoutMs;
     setsockopt(handle_, SOL_SOCKET, SO_RCVTIMEO,(char*)&iTimeOut,sizeof(iTimeOut));
     setsockopt(handle_, SOL_SOCKET, SO_SNDTIMEO,(char*)&iTimeOut,sizeof(iTimeOut));
@@ -470,7 +458,7 @@ void Socket::setTimeout(int timeoutMs){
 }
 
 void Socket::getTimeout(int &timeoutMs){
-#ifdef WINDOWS
+#ifdef _WIN32
 	int iTimeOut;
 	socklen_t readlen=sizeof(iTimeOut);
 	getsockopt(handle_, SOL_SOCKET, SO_RCVTIMEO,(char*)&iTimeOut,&readlen);
@@ -486,7 +474,7 @@ void Socket::getTimeout(int &timeoutMs){
 }
 
 bool Socket::setNonBlocking(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	unsigned long value = 1;
 	return ioctlsocket(handle_, FIONBIO, &value) == 0;
 #else
@@ -499,7 +487,7 @@ bool Socket::setNonBlocking(){
 }
 
 bool Socket::setBlocking(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	unsigned long value = 0;
 	return ioctlsocket(handle_, FIONBIO, &value) == 0;
 #else
@@ -540,7 +528,7 @@ bool Socket::skipAll(){
 
 bool Socket::setTcpNoDelay(){
 	int ret;
-#ifdef WINDOWS
+#ifdef _WIN32
 	char value = 1;
 	ret = setsockopt(handle_, IPPROTO_TCP, TCP_NODELAY, &value, sizeof(char));
 #else
@@ -556,7 +544,7 @@ bool Socket::setTcpNoDelay(){
 }
 
 int Socket::getErrorCode(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	return WSAGetLastError();
 #else
 	return errno;
@@ -672,14 +660,6 @@ DataInputStream::~DataInputStream(){
 	}
 }
 
-IO_ERR DataInputStream::internalStreamRead(char* buf, size_t length, size_t& actualLength){
-	throw RuntimeException("DataInputStream::internalStreamRead not implemented yet.");
-}
-
-IO_ERR DataInputStream::internalClose(){
-	throw RuntimeException("DataInputStream::internalClose not implemented yet.");
-}
-
 bool DataInputStream::reset(int size){
 	if(!externalBuf_)
 		return false;
@@ -726,14 +706,6 @@ bool DataInputStream::moveToPosition(long long offset){
 		else
 			return false;
 #endif
-	}
-	else if(source_ > FILE_STREAM){
-		bool ret = internalMoveToPosition(offset);
-		if(ret){
-			cursor_ = 0;
-			size_ = 0;
-		}
-		return ret;
 	}
 	else
 		return false;
@@ -1046,10 +1018,7 @@ IO_ERR DataInputStream::readBytes(char* buf, size_t length, size_t& actualLength
     	return END_OF_STREAM;
     }
     else{
-    	size_t readCount;
-    	IO_ERR ret = internalStreamRead(buf + actualLength, length - actualLength, readCount);
-   		actualLength += readCount;
-    	return ret;
+		return OTHERERR;
     }
 }
 
@@ -1102,7 +1071,7 @@ IO_ERR DataInputStream::prepareBytes(size_t length){
 		delete[] buf_;
 		buf_ = tmp;
 	}
-	else if(capacity_ - cursor_ <length || (source_ > FILE_STREAM && (cursor_ << 1) > capacity_)){
+	else if(capacity_ - cursor_ <length){
 		memmove(buf_, buf_+cursor_, size_);
 		cursor_ =0;
 	}
@@ -1135,13 +1104,7 @@ IO_ERR DataInputStream::prepareBytes(size_t length){
 			return OTHERERR;
 	}
 	else{
-		IO_ERR ret  = internalStreamRead(buf_ + usedSpace, capacity_ - usedSpace, actualLength);
-		size_ += actualLength;
-		if(size_ < length){
-			return END_OF_STREAM;
-		}
-		else
-			return ret;
+		return OTHERERR;
 	}
 }
 
@@ -1219,10 +1182,7 @@ IO_ERR DataInputStream::prepareBytesEndWith(char endChar, size_t& endPos){
 				size_ += actualLength;
 			}
 			else{
-				IO_ERR ret  = internalStreamRead(buf_ + usedSpace, capacity_ - usedSpace, actualLength);
-				size_ += actualLength;
-				if( ret != OK)
-					return ret;
+				return OTHERERR;
 			}
 		}
 	}
@@ -1249,10 +1209,7 @@ IO_ERR DataInputStream::close(){
 			return OTHERERR;
 	}
 	else {
-		IO_ERR ret  = internalClose();
-		if(ret == OK)
-			closed_ = true;
-		return ret;
+		return OTHERERR;
 	}
 }
 
@@ -1298,15 +1255,6 @@ IO_ERR DataOutputStream::close(){
 		}
 		else
 			return OTHERERR;
-	}
-	else if(source_ > FILE_STREAM){
-		if(size_ > 0){
-			IO_ERR ret = internalFlush(size_);
-			if(ret != OK)
-				LOG_ERR("Failed to write cached data to the underlying device before closing. size=" + std::to_string(size_) + " streamType=" + std::to_string(source_));
-			size_ = 0;
-		}
-		return internalClose();
 	}
 	else
 		return OK;
@@ -1388,36 +1336,7 @@ IO_ERR DataOutputStream::write(const char* buffer, size_t length, size_t& actual
 		return OK;
 
 	default:
-		if(capacity_ == 0){
-			buf_ = createBuffer(capacity_);
-		}
-		actualWritten = 0;
-		if(size_ + length < capacity_){
-			memcpy(buf_ + size_, buffer, length);
-			size_ += length;
-			actualWritten += length;
-			return OK;
-		}
-
-		while(actualWritten < length){
-			size_t count = ((std::min))(length - actualWritten, capacity_ - size_);
-			if(count > 0)
-				memcpy(buf_ + size_, buffer + actualWritten, count);
-			if(size_ + count < capacity_){
-				actualWritten += count;
-				size_ += count;
-				return OK;
-			}
-			ret = internalFlush(size_ + count);
-			if(ret != OK)
-				return ret;
-			actualWritten += count;
-			size_ = 0;
-			if(capacity_ == 0){
-				buf_ = createBuffer(capacity_);
-			}
-		}
-		return OK;
+		return OTHERERR;
 	}
 }
 
@@ -1461,36 +1380,7 @@ IO_ERR DataOutputStream::write(const char* buffer, size_t length){
 		return OK;
 
 	default:
-		if(capacity_ == 0){
-			buf_ = createBuffer(capacity_);
-		}
-
-		if(size_ + length < capacity_){
-			memcpy(buf_ + size_, buffer, length);
-			size_ += length;
-			return OK;
-		}
-
-		IO_ERR ret;
-		size_t actualWritten = 0;
-		while(actualWritten < length){
-			size_t count = ((std::min))(length - actualWritten, capacity_ - size_);
-			if(count > 0)
-				memcpy(buf_ + size_, buffer + actualWritten, count);
-			if(size_ + count < capacity_){
-				size_ += count;
-				return OK;
-			}
-			ret = internalFlush(size_ + count);
-			if(ret != OK)
-				return ret;
-			actualWritten += count;
-			size_ = 0;
-			if(capacity_ == 0){
-				buf_ = createBuffer(capacity_);
-			}
-		}
-		return OK;
+		return OTHERERR;
 	}
 }
 
@@ -1520,27 +1410,7 @@ IO_ERR DataOutputStream::flush(){
 	else if(source_ == FILE_STREAM){
 		fflush(file_);
 	}
-	else if(source_ > FILE_STREAM){
-		if(size_ > 0){
-			IO_ERR ret = internalFlush(size_);
-			if(ret != OK)
-				return ret;
-			size_ = 0;
-		}
-	}
 	return OK;
-}
-
-IO_ERR DataOutputStream::internalFlush(size_t sz){
-	throw RuntimeException("DataOutputStream::internalFlush not implemented yet.");
-}
-
-IO_ERR DataOutputStream::internalClose(){
-	throw RuntimeException("DataOutputStream::internalClose not implemented yet.");
-}
-
-char* DataOutputStream::createBuffer(size_t& capacity){
-	throw RuntimeException("DataOutputStream::createBuffer not implemented yet.");
 }
 
 DataStream::DataStream(FILE* file, bool readable, bool writable)

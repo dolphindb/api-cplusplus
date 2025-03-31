@@ -1,8 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
 #pragma once
 
 #include <string>
 #include "Exports.h"
+
+#define FMT_UNICODE 0
 #include <spdlog/spdlog.h>
+
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4251 )
+#endif
 
 namespace dolphindb {
 
@@ -107,3 +116,7 @@ private:
 };
 
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

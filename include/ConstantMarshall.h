@@ -1,15 +1,15 @@
-/*
- * ConstantMarshall.h
- *
- *  Created on: Oct 3, 2013
- *      Author: dzhou
- */
-
-#ifndef CONSTANTMARSHALL_H_
-#define CONSTANTMARSHALL_H_
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include "SysIO.h"
 #include "Constant.h"
+
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4251 )
+#endif
+
 #define MARSHALL_BUFFER_SIZE 4096
 
 namespace dolphindb {
@@ -347,4 +347,7 @@ private:
 };
 
 }
-#endif /* CONSTANTMARSHALL_H_ */
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

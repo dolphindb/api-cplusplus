@@ -20,6 +20,7 @@ namespace SPCT
             {
                 cout << "connect to " + hostName + ":" + std::to_string(port) << endl;
             }
+            scfg->protocol = TransportationProtocol::TCP;
         }
         static void TearDownTestCase()
         {
@@ -47,7 +48,10 @@ namespace SPCT
         {
             CLEAR_ENV(conn);
         }
+    public:
+        static StreamingClientConfig* scfg;
     };
+    StreamingClientConfig* StreamingPollingClientTester::scfg = new StreamingClientConfig();
 
     static void createSharedTableAndReplay(const string &st, int rows)
     {
@@ -146,11 +150,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
 
             Message msg;
             Signal notify;
@@ -210,11 +214,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, "st_notExist", DEFAULT_ACTION_NAME, 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, "st_notExist", DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, "st_notExist", DEFAULT_ACTION_NAME);
+            auto queue = client.subscribe(hostName, port, "st_notExist", DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
             Util::sleep(1000);
         }
         client.unsubscribe(hostName, port, "st_notExist", DEFAULT_ACTION_NAME);
@@ -228,7 +232,7 @@ namespace SPCT
         cout << "current listenport is " << listenport << endl;
 
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
-        EXPECT_ANY_THROW(client.subscribe("", port, "st", DEFAULT_ACTION_NAME, 0, false));
+        EXPECT_ANY_THROW(client.subscribe("", port, "st", DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, "admin", "123456"));
     }
 
     TEST_P(StreamingPollingClientTester, test_subscribe_portNull)
@@ -238,7 +242,7 @@ namespace SPCT
         cout << "current listenport is " << listenport << endl;
 
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
-        EXPECT_ANY_THROW(client.subscribe(hostName, NULL, "st", DEFAULT_ACTION_NAME, 0, false));
+        EXPECT_ANY_THROW(client.subscribe(hostName, NULL, "st", DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, "admin", "123456"));
     }
 
     TEST_P(StreamingPollingClientTester, test_subscribe_tableNameNull)
@@ -248,7 +252,29 @@ namespace SPCT
         cout << "current listenport is " << listenport << endl;
 
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
-        EXPECT_ANY_THROW(auto queue = client.subscribe(hostName, port, "", DEFAULT_ACTION_NAME, 0, false));
+        EXPECT_ANY_THROW(auto queue = client.subscribe(hostName, port, "", DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, "admin", "123456"));
+    }
+
+    TEST_P(StreamingPollingClientTester, test_subscribe_userNameNull)
+    {
+        string st = "outTables_" + getRandString(10);
+        SPCT::createSharedTableAndReplay(st, 1000);
+        int msg_total = 0;
+        int listenport = GetParam();
+        cout << "current listenport is " << listenport << endl;
+
+        PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
+        bool enableClientAuth = conn.run("bool(getConfig('enableClientAuth'))")->getBool();
+        if (enableClientAuth){
+            EXPECT_ANY_THROW(auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false));
+        }else{
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0);
+            Util::sleep(1000);
+            EXPECT_FALSE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
+            client.unsubscribe(hostName, port, st, DEFAULT_ACTION_NAME);
+            Util::sleep(1000);
+            EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
+        }
     }
 
     TEST_P(StreamingPollingClientTester, test_subscribe_actionNameNull)
@@ -262,11 +288,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, "", 0);
+            auto queue = client.subscribe(hostName, port, st, "", 0, true, nullptr, false, false, "admin", "123456");
             Message msg;
             Signal notify;
             Mutex mutex;
@@ -328,11 +354,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, -1, false));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, -1, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, -1, false);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, -1, true, nullptr, false, false, "admin", "123456");
             Message msg;
             Signal notify;
             Mutex mutex;
@@ -395,11 +421,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, filter));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, filter, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, filter);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, filter, false, false, "admin", "123456");
             Message msg;
             Signal notify;
             Mutex mutex;
@@ -461,11 +487,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, true));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, true, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, true);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, true, false, "admin", "123456");
             Message msg;
             Signal notify;
             Mutex mutex;
@@ -530,12 +556,12 @@ namespace SPCT
 
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, true));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, true, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false, nullptr, false, true);
-            auto queue2 = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false, nullptr, false, true);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false, nullptr, false, true, "admin", "123456");
+            auto queue2 = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false, nullptr, false, true, "admin", "123456");
             Message msg;
             Message msg2;
             Signal notify;
@@ -578,7 +604,7 @@ namespace SPCT
         cout << "current listenport is " << listenport << endl;
 
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
-        EXPECT_ANY_THROW(auto queue = client.subscribe(hostName, port, "st", DEFAULT_ACTION_NAME, 0, false));
+        EXPECT_ANY_THROW(auto queue = client.subscribe(hostName, port, "st", DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, "admin", "123456"));
 
         usedPorts.insert(listenport);
     }
@@ -587,42 +613,21 @@ namespace SPCT
     {
         // SPCT::createSharedTableAndReplay(1000);
         int listenport = GetParam();
-        string st = "st_" + getRandString(10);
-        conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
         cout << "current listenport is " << listenport << endl;
 
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "resubTest", 0, true));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, "nonExistTable", "resubTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, "resubTest", 0, true);
-            Util::sleep(2000);
-            conn.run("subinfo = (exec subscriber from getStreamingStat().pubTables where tableName=`"+st+")[0].split(':');"
-                     "subClient = subinfo[0];"
-                     "subPort=int(subinfo[1]);go;"
-                     "stopPublishTable(subClient, subPort, `"+st+", `resubTest)");
+            auto queue = client.subscribe(hostName, port, "nonExistTable", "resubTest", 0, true, nullptr, false, false, "admin", "123456");
             Util::sleep(1000);
-            conn.run("tableInsert("+st+", `sym2, 2)");
-            Util::sleep(1000);
-            client.unsubscribe(hostName, port, st, "resubTest");
-            client.exit();
-            EXPECT_TRUE(client.isExit());
+            client.unsubscribe(hostName, port, "nonExistTable", "resubTest");
 
-            Message msg;
-            vector<Message> msgs;
-            while (true)
-            {
-                queue->pop(msg);
-                if(msg.isNull()) {
-                        EXPECT_EQ(msg.getOffset(), -1);
-                        break;
-                    }
-                else{msgs.push_back(msg);}
-            };
-            EXPECT_EQ(msgs.size(), 2);
+            // client.exit();
+            // EXPECT_TRUE(client.isExit());
         }
 
         usedPorts.insert(listenport);
@@ -639,11 +644,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
             Message msg;
             Signal notify;
             Mutex mutex;
@@ -664,7 +669,7 @@ namespace SPCT
             } });
 
             notify.wait();
-            EXPECT_ANY_THROW(client.unsubscribe("", port, st, DEFAULT_ACTION_NAME));
+            EXPECT_FALSE(client.unsubscribe("", port, st, DEFAULT_ACTION_NAME));
 
             client.unsubscribe(hostName, port, st, DEFAULT_ACTION_NAME);
             th1.join();
@@ -688,11 +693,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
             Message msg;
             Signal notify;
             Mutex mutex;
@@ -713,7 +718,7 @@ namespace SPCT
             } });
 
             notify.wait();
-            EXPECT_ANY_THROW(client.unsubscribe(hostName, NULL, st, DEFAULT_ACTION_NAME));
+            EXPECT_FALSE(client.unsubscribe(hostName, NULL, st, DEFAULT_ACTION_NAME));
 
             client.unsubscribe(hostName, port, st, DEFAULT_ACTION_NAME);
             th1.join();
@@ -737,11 +742,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
             Message msg;
             Signal notify;
             Mutex mutex;
@@ -760,7 +765,7 @@ namespace SPCT
             } });
 
             notify.wait();
-            EXPECT_ANY_THROW(client.unsubscribe(hostName, port, "", DEFAULT_ACTION_NAME));
+            EXPECT_FALSE(client.unsubscribe(hostName, port, "", DEFAULT_ACTION_NAME));
 
             client.unsubscribe(hostName, port, st, DEFAULT_ACTION_NAME);
             th1.join();
@@ -784,11 +789,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
             Message msg;
             Signal notify;
             Mutex mutex;
@@ -834,11 +839,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, "admin", "123456");
             Message msg;
             Signal notify;
             Mutex mutex;
@@ -881,11 +886,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
             int index = 0;
 
             Message msg;
@@ -950,11 +955,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "arrayVectorTableTest", 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "arrayVectorTableTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, "arrayVectorTableTest", 0);
+            auto queue = client.subscribe(hostName, port, st, "arrayVectorTableTest", 0, true, nullptr, false, false, "admin", "123456");
 
             Util::sleep(1000);
             Message msg;
@@ -1017,11 +1022,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
 
             Message msg;
             // AutoFitTableAppender appender("", "res_SPCT", conn);
@@ -1080,11 +1085,11 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false, nullptr, true));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false, nullptr, true, false, "admin", "123456"));
         }
         else
         {
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false, nullptr, true);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false, nullptr, true, false, "admin", "123456");
 
             Message msg;
             Signal notify;
@@ -1295,7 +1300,7 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
@@ -1304,7 +1309,7 @@ namespace SPCT
                 insertData(conn, st, dataScript);
             });
 
-            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0);
+            auto queue = client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
             th.join();
             thread th1 = thread([&]{
                 while (true)
@@ -1352,14 +1357,14 @@ namespace SPCT
         PollingClient client = listenport == -1? PollingClient() : PollingClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false));
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, "admin", "123456"));
         }
         else
         {
             PollingClient client1 = listenport == -1? PollingClient() : PollingClient(listenport);
             unsigned int resubscribeTimeout = 500;
-            client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true);
-            auto queue1 = client1.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "", "", nullptr, {}, 100, resubscribeTimeout);
+            client.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
+            auto queue1 = client1.subscribe(hostName, port, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456", nullptr, {}, 100, resubscribeTimeout);
 
             Util::sleep(resubscribeTimeout+1000);
             client.unsubscribe(hostName, port, st, DEFAULT_ACTION_NAME);
@@ -1371,6 +1376,169 @@ namespace SPCT
 
         usedPorts.insert(listenport);
     }
+
+
+    TEST_F(StreamingPollingClientTester, test_new_subscribe_resub_true)
+    {
+        // SPCT::createSharedTableAndReplay(1000);
+        string st = "st_" + getRandString(10);
+        conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
+        unordered_set<SubscribeState> states;
+
+        scfg->callback = [&](const SubscribeState state, const SubscribeInfo &info) {
+            // cout << "subscribe state: " << static_cast<int>(state) << endl;
+            // cout << "subscribe info: " << info.tableName << " " << info.actionName << " " << info.hostName << ":" << info.port << endl;
+            states.insert(state);
+            EXPECT_EQ(info.tableName, st);
+            EXPECT_EQ(info.actionName, "resubTest");
+            EXPECT_EQ(info.hostName, hostName);
+            EXPECT_EQ(info.port, port);
+            return true;
+        };
+
+
+        PollingClient client = PollingClient(*scfg);
+        if (!isNewServer(conn, 2, 0, 8))
+        {
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "resubTest", 0, true, nullptr, false, false, "admin", "123456"));
+        }
+        else
+        {
+            auto queue = client.subscribe(hostName, port, st, "resubTest", 0, true, nullptr, false, false, "admin", "123456");
+            Util::sleep(2000);
+            conn.run("subinfo = (exec subscriber from getStreamingStat().pubTables where tableName=`"+st+")[0].split(':');"
+                     "subClient = subinfo[0];"
+                     "subPort=int(subinfo[1]);go;"
+                     "stopPublishTable(subClient, subPort, `"+st+", `resubTest)");
+            Util::sleep(1000);
+            conn.run("tableInsert("+st+", `sym2, 2)");
+            Util::sleep(1000);
+            client.unsubscribe(hostName, port, st, "resubTest");
+            // client.exit();
+            // EXPECT_TRUE(client.isExit());
+
+            Message msg;
+            vector<Message> msgs;
+            while (true)
+            {
+                queue->pop(msg);
+                if(msg.isNull()) {
+                        EXPECT_EQ(msg.getOffset(), -1);
+                        break;
+                    }
+                else{msgs.push_back(msg);}
+            };
+            EXPECT_EQ(msgs.size(), 2);
+            EXPECT_EQ(states.size(), 3);
+            EXPECT_EQ(states.count(SubscribeState::Connected), 1);
+            EXPECT_EQ(states.count(SubscribeState::Disconnected), 1);
+            EXPECT_EQ(states.count(SubscribeState::Resubscribing), 1);
+        }
+    }
+
+
+
+    TEST_F(StreamingPollingClientTester, test_new_subscribe_resub_false)
+    {
+        // SPCT::createSharedTableAndReplay(1000);
+        string st = "st_" + getRandString(10);
+        conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
+        unordered_set<SubscribeState> states;
+
+        scfg->callback = [&](const SubscribeState state, const SubscribeInfo &info) {
+            // cout << "subscribe state: " << static_cast<int>(state) << endl;
+            // cout << "subscribe info: " << info.tableName << " " << info.actionName << " " << info.hostName << ":" << info.port << endl;
+            states.insert(state);
+            EXPECT_EQ(info.tableName, st);
+            EXPECT_EQ(info.actionName, "resubTest");
+            EXPECT_EQ(info.hostName, hostName);
+            EXPECT_EQ(info.port, port);
+            return true;
+        };
+
+
+        PollingClient client = PollingClient(*scfg);
+        if (!isNewServer(conn, 2, 0, 8))
+        {
+            EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "resubTest", 0, false, nullptr, false, false, "admin", "123456"));
+        }
+        else
+        {
+            auto queue = client.subscribe(hostName, port, st, "resubTest", 0, false, nullptr, false, false, "admin", "123456");
+            Util::sleep(2000);
+            conn.run("subinfo = (exec subscriber from getStreamingStat().pubTables where tableName=`"+st+")[0].split(':');"
+                     "subClient = subinfo[0];"
+                     "subPort=int(subinfo[1]);go;"
+                     "stopPublishTable(subClient, subPort, `"+st+", `resubTest)");
+            Util::sleep(1000);
+            conn.run("tableInsert("+st+", `sym2, 2)");
+            Util::sleep(1000);
+            client.unsubscribe(hostName, port, st, "resubTest");
+            client.exit();
+            EXPECT_TRUE(client.isExit());
+
+            Message msg;
+            vector<Message> msgs;
+            while (true)
+            {
+                queue->pop(msg);
+                if(msg.isNull()) {
+                        EXPECT_EQ(msg.getOffset(), -1);
+                        break;
+                    }
+                else{msgs.push_back(msg);}
+            };
+            EXPECT_EQ(msgs.size(), 1);
+            EXPECT_EQ(states.size(), 2);
+            EXPECT_EQ(states.count(SubscribeState::Connected), 1);
+            EXPECT_EQ(states.count(SubscribeState::Disconnected), 1);
+            EXPECT_EQ(states.count(SubscribeState::Resubscribing), 0);
+        }
+    }
+
+
+    // TEST_F(StreamingPollingClientTester, test_new_subscribe_resub_true_callback_return_false)
+    // {
+    //     // SPCT::createSharedTableAndReplay(1000);
+    //     string st = "st_" + getRandString(10);
+    //     conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
+
+    //     scfg->callback = [&](const SubscribeState state, const SubscribeInfo &info) {
+    //         cout << "subscribe state: " << static_cast<int>(state) << endl;
+    //         if (state == SubscribeState::Connected)
+    //             return false;
+    //     };
+
+
+    //     PollingClient client = PollingClient(*scfg);
+    //     if (!isNewServer(conn, 2, 0, 8))
+    //     {
+    //         EXPECT_ANY_THROW(client.subscribe(hostName, port, st, "resubTest", 0, true, nullptr, false, false, "admin", "123456"));
+    //     }
+    //     else
+    //     {
+    //         auto queue = client.subscribe(hostName, port, st, "resubTest", 0, true, nullptr, false, false, "admin", "123456");
+    //         Util::sleep(2000);
+    //         conn.run("tableInsert("+st+", `sym2, 2)");
+    //         Util::sleep(1000);
+    //         client.unsubscribe(hostName, port, st, "resubTest");
+    //         client.exit();
+    //         EXPECT_TRUE(client.isExit());
+
+    //         Message msg;
+    //         vector<Message> msgs;
+    //         while (true)
+    //         {
+    //             queue->pop(msg);
+    //             if(msg.isNull()) {
+    //                     EXPECT_EQ(msg.getOffset(), -1);
+    //                     break;
+    //                 }
+    //             else{msgs.push_back(msg);}
+    //         };
+    //         EXPECT_EQ(msgs.size(), 1);
+    //     }
+    // }
 
 
 }

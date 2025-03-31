@@ -1,17 +1,6 @@
-/*
- * Table.h
- *
- *  Created on: Nov 3, 2012
- *      Author: dzhou
- */
-
-#ifndef TABLE_H_
-#define TABLE_H_
-
-#ifdef _MSC_VER
-#pragma warning( push )
-#pragma warning( disable : 4100 )
-#endif
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include <atomic>
 
@@ -32,7 +21,11 @@ public:
 	virtual ConstantSP get(INDEX col, INDEX row) const = 0;
 	virtual INDEX columns() const {return static_cast<INDEX>(colNames_->size());}
 	virtual const std::string& getColumnName(int index) const {return colNames_->at(index);}
-	virtual const std::string& getColumnQualifier(int index) const {return name_;}
+	virtual const std::string& getColumnQualifier(int index) const
+	{
+		std::ignore = index;
+		return name_;
+	}
 	virtual void setColumnName(int index, const std::string& name);
 	virtual int getColumnIndex(const std::string& name) const;
 	virtual bool contain(const std::string& name) const;
@@ -43,7 +36,7 @@ public:
 	virtual void setName(const std::string& name){name_=name;}
 	virtual const std::string& getName() const { return name_;}
 	virtual bool isTemporary() const {return false;}
-	virtual void setTemporary(bool temp){}
+	virtual void setTemporary(bool temp){std::ignore = temp;}
 	virtual bool sizeable() const {return false;}
 	virtual std::string getString(INDEX index) const;
 	virtual std::string getString() const;
@@ -131,9 +124,3 @@ private:
 typedef SmartPointer<BasicTable> BasicTableSP;
 
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
-
-#endif /* TABLE_H_ */

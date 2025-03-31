@@ -20,6 +20,7 @@ namespace STCT
             {
                 cout << "connect to " + hostName + ":" + std::to_string(port) << endl;
             }
+            scfg->protocol = TransportationProtocol::TCP;
         }
         static void TearDownTestCase()
         {
@@ -47,7 +48,10 @@ namespace STCT
         {
             CLEAR_ENV(conn);
         }
+    public:
+        static StreamingClientConfig* scfg;
     };
+    StreamingClientConfig* StreamingThreadedClientTester::scfg = new StreamingClientConfig();
 
     static void createSharedTableAndReplay(const string &st, int rows)
     {
@@ -172,11 +176,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, true, nullptr, false, false, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -234,11 +238,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, false, 1, 1.0, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, false, 1, 1.0, false, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -263,11 +267,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, [](Message msg){}, "st_notExist", "actionTest", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, [](Message msg){}, "st_notExist", "actionTest", 0, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto queue = threadedClient.subscribe(hostName, port, [](Message msg){}, "st_notExist", "actionTest");
+            auto queue = threadedClient.subscribe(hostName, port, [](Message msg){}, "st_notExist", "actionTest", 0, true, nullptr, false, false, "admin", "123456");
             Util::sleep(1000);
         }
         threadedClient.unsubscribe(hostName, port, "st_notExist", "actionTest");
@@ -283,7 +287,7 @@ namespace STCT
 
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
 
-        EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port, onehandler, "", "cppStreamingAPI", 0, false));
+        EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port, onehandler, "", DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, "admin", "123456"));
     }
 
     TEST_P(StreamingThreadedClientTester, test_subscribe_batchhandler_tableNameNull)
@@ -294,7 +298,29 @@ namespace STCT
         cout << "current listenport is " << listenport << endl;
 
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
-        EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port, batchhandler, "", "cppStreamingAPI", 0, false));
+        EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port, batchhandler, "", DEFAULT_ACTION_NAME, 0, false, nullptr, false, 1, 1.0, false, "admin", "123456"));
+    }
+
+    TEST_P(StreamingThreadedClientTester, test_subscribe_userNameNull)
+    {
+        string st = "outTables_" + getRandString(10);
+        STCT::createSharedTableAndReplay(st, 1000);
+        int msg_total = 0;
+        int listenport = GetParam();
+        cout << "current listenport is " << listenport << endl;
+
+        ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
+        bool enableClientAuth = conn.run("bool(getConfig('enableClientAuth'))")->getBool();
+        if (enableClientAuth){
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, [=](Message msg){}, st, DEFAULT_ACTION_NAME, -1, false));
+        }else{
+            auto thread = threadedClient.subscribe(hostName, port, [=](Message msg){}, st, DEFAULT_ACTION_NAME);
+            Util::sleep(1000);
+            EXPECT_FALSE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
+            threadedClient.unsubscribe(hostName, port, st, DEFAULT_ACTION_NAME);
+            Util::sleep(1000);
+            EXPECT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
+        }
     }
 
     TEST_P(StreamingThreadedClientTester, test_subscribe_onehandler_offsetNegative)
@@ -315,11 +341,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", -1));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", -1, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", -1);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", -1, true, nullptr, false, false, "admin", "123456");
 
             cout << "total size: " << msg_total << endl;
             threadedClient.unsubscribe(hostName, port, st, "actionTest");
@@ -353,11 +379,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", -1));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", -1, true, nullptr, false, 1, 1.0, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", -1);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", -1, true, nullptr, false, 1, 1.0, false, "admin", "123456");
 
             cout << "total size: " << msg_total << endl;
             threadedClient.unsubscribe(hostName, port, st, "actionTest");
@@ -413,11 +439,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 5));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 5, true, nullptr, false, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 5);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 5, true, nullptr, false, false, "admin", "123456");
             notify.wait();
             cout << "total size: " << msg_total << endl;
             threadedClient.unsubscribe(hostName, port, st, "actionTest");
@@ -479,11 +505,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 5));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 5, true, nullptr, false, 1, 1.0, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 5);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 5, true, nullptr, false, 1, 1.0, false, "admin", "123456");
             notify.wait();
             cout << "total size: " << msg_total << endl;
             threadedClient.unsubscribe(hostName, port, st, "actionTest");
@@ -543,11 +569,11 @@ namespace STCT
         filter->setString(0, "b");
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, filter));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, filter, false, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, filter);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, filter, false, false, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -605,11 +631,11 @@ namespace STCT
         filter->setString(0, "b");
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, filter));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, filter, false, 1, 1.0, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, filter);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, filter, false, 1, 1.0, false, "admin", "123456");
             Util::sleep(2000);
 
             cout << "total size: " << msg_total << endl;
@@ -665,11 +691,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, true));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, true, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, true);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, true, false, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -732,11 +758,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, false, nullptr, false, 2000, 0.1, true));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, false, nullptr, false, 2000, 0.1, true, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, false, nullptr, false, 2000, 0.1, true);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, false, nullptr, false, 2000, 0.1, true, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -791,12 +817,12 @@ namespace STCT
         ThreadedClient threadedClient2(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, true));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, true, nullptr, false, true, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true);
-            auto thread2 = threadedClient2.subscribe(hostName, port, onehandler2, st, "actionTest", 0, false, nullptr, false, true);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456");
+            auto thread2 = threadedClient2.subscribe(hostName, port, onehandler2, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -856,12 +882,12 @@ namespace STCT
         ThreadedClient threadedClient2(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, nullptr, false, true));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, false, nullptr, false, true);
-            auto thread2 = threadedClient2.subscribe(hostName, port, batchhandler2, st, "actionTest", 0, false, nullptr, false, true);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456");
+            auto thread2 = threadedClient2.subscribe(hostName, port, batchhandler2, st, "actionTest", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -889,7 +915,7 @@ namespace STCT
         cout << "current listenport is " << listenport << endl;
 
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
-        EXPECT_ANY_THROW(auto thread = threadedClient.subscribe(hostName, port, batchhandler, "st", "actionTest", 0, false));
+        EXPECT_ANY_THROW(auto th = threadedClient.subscribe(hostName, port, batchhandler, "st", "actionTest", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456"));
     }
 
     TEST_P(StreamingThreadedClientTester, test_subscribe_resub_true)
@@ -904,30 +930,24 @@ namespace STCT
         };
 
         int listenport = GetParam();
-        string st = "st_" + getRandString(10);
-        conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
+        // string st = "st_" + getRandString(10);
+        // conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
         cout << "current listenport is " << listenport << endl;
 
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "resubTest", 0, true));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, "nonExistTable", "resubTest", 0, true, nullptr, false, 1, 1.0, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "resubTest", 0, true);
-            Util::sleep(2000);
-            conn.run("subinfo = (exec subscriber from getStreamingStat().pubTables where tableName=`"+st+")[0].split(':');"
-                     "subClient = subinfo[0];"
-                     "subPort=int(subinfo[1]);go;"
-                     "stopPublishTable(subClient, subPort, `"+st+", `resubTest)");
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, "nonExistTable", "resubTest", 0, true, nullptr, false, 1, 1.0, false, "admin", "123456");
             Util::sleep(1000);
-            conn.run("tableInsert("+st+", `sym2, 2)");
-            Util::sleep(1000);
-            threadedClient.unsubscribe(hostName, port, st, "resubTest");
-            threadedClient.exit();
-            EXPECT_TRUE(threadedClient.isExit());
-            EXPECT_EQ(msgs.size(), 2);
+            threadedClient.unsubscribe(hostName, port, "nonExistTable", "resubTest");
+
+            // threadedClient.exit();
+            // EXPECT_TRUE(threadedClient.isExit());
+            EXPECT_EQ(msgs.size(), 0);
         }
         usedPorts.insert(listenport);
     }
@@ -973,11 +993,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, nullptr, false, 200));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, nullptr, false, 200, 0.1, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, nullptr, false, 200);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, nullptr, false, 200, 0.1, false, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -1038,11 +1058,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, nullptr, false, 5000, 2.5));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, nullptr, false, 5000, 2.5, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, nullptr, false, 5000, 2.5);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "actionTest", 0, true, nullptr, false, 5000, 2.5, false, "admin", "123456");
             start = Util::getEpochTime();
             notify.wait();
 
@@ -1080,7 +1100,7 @@ namespace STCT
         cout << "current listenport is " << listenport << endl;
 
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
-        EXPECT_ANY_THROW(threadedClient.subscribe("", port, onehandler, st, "actionTest", 0));
+        EXPECT_ANY_THROW(threadedClient.subscribe("", port, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456"));
 
         usedPorts.insert(listenport);
     }
@@ -1104,7 +1124,7 @@ namespace STCT
         cout << "current listenport is " << listenport << endl;
 
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
-        EXPECT_ANY_THROW(threadedClient.subscribe("", port, batchhandler, st, "actionTest", 0));
+        EXPECT_ANY_THROW(threadedClient.subscribe("", port, batchhandler, st, "actionTest", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456"));
 
         usedPorts.insert(listenport);
     }
@@ -1125,7 +1145,7 @@ namespace STCT
         cout << "current listenport is " << listenport << endl;
 
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
-        EXPECT_ANY_THROW(threadedClient.subscribe(hostName, NULL, onehandler, st, "actionTest", 0));
+        EXPECT_ANY_THROW(threadedClient.subscribe(hostName, NULL, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456"));
 
         usedPorts.insert(listenport);
     }
@@ -1155,11 +1175,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "", 0, false, nullptr, false, true, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "", 0);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "", 0, false, nullptr, false, true, "admin", "123456");
             notify.wait();
 
             TableSP stat = conn.run("getStreamingStat().pubTables");
@@ -1206,11 +1226,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "", 0);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456");
             notify.wait();
 
             TableSP stat = conn.run("getStreamingStat().pubTables");
@@ -1247,14 +1267,14 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456");
 
             cout << "total size: " << msg_total << endl;
-            EXPECT_ANY_THROW(threadedClient.unsubscribe("", port, st, "actionTest"));
+            EXPECT_FALSE(threadedClient.unsubscribe("", port, st, "actionTest"));
 
             threadedClient.unsubscribe(hostName, port, st, "actionTest");
             threadedClient.exit();
@@ -1283,14 +1303,14 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456");
             cout << "total size: " << msg_total << endl;
 
-            EXPECT_ANY_THROW(threadedClient.unsubscribe(hostName, NULL, st, "actionTest"));
+            EXPECT_FALSE(threadedClient.unsubscribe(hostName, NULL, st, "actionTest"));
             threadedClient.unsubscribe(hostName, port, st, "actionTest");
             threadedClient.exit();
             EXPECT_TRUE(threadedClient.isExit());
@@ -1318,14 +1338,14 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456");
 
             cout << "total size: " << msg_total << endl;
-            EXPECT_ANY_THROW(threadedClient.unsubscribe(hostName, port, "", "actionTest"));
+            EXPECT_FALSE(threadedClient.unsubscribe(hostName, port, "", "actionTest"));
 
             threadedClient.unsubscribe(hostName, port, st, "actionTest");
             threadedClient.exit();
@@ -1361,11 +1381,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "actionTest", 0, false, nullptr, false, true, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -1404,12 +1424,12 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false, nullptr, false, true, "admin", "123456"));
         }
         else
         {
-            auto thread1 = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false);
-            EXPECT_ANY_THROW(auto thread2 = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false));
+            auto thread1 = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false, nullptr, false, true, "admin", "123456");
+            EXPECT_ANY_THROW(auto thread2 = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false, nullptr, false, true, "admin", "123456"));
 
             threadedClient.unsubscribe(hostName, port, st, "mutiSchemaOne");
             Util::sleep(1000);
@@ -1449,12 +1469,12 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456"));
         }
         else
         {
-            auto thread1 = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false);
-            EXPECT_ANY_THROW(auto thread2 = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false));
+            auto thread1 = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456");
+            EXPECT_ANY_THROW(auto thread2 = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456"));
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -1506,11 +1526,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false, nullptr, false, true, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false, nullptr, false, true, "admin", "123456");
             notify.wait();
             cout << "total size: " << msg_total << endl;
             threadedClient.unsubscribe(hostName, port, st, "mutiSchemaOne");
@@ -1567,11 +1587,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -1624,11 +1644,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "arrayVectorTableTest", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "arrayVectorTableTest", 0, false, nullptr, false, true, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "arrayVectorTableTest", 0);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "arrayVectorTableTest", 0, false, nullptr, false, true, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -1685,11 +1705,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "arrayVectorTableTest", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "arrayVectorTableTest", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "arrayVectorTableTest", 0);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "arrayVectorTableTest", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -1731,11 +1751,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false, nullptr, false, true, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false, nullptr, false, true, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -1779,11 +1799,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -1835,11 +1855,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false, nullptr, true));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false, nullptr, true, false, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false, nullptr, true);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, false, nullptr, true, false, "admin", "123456");
             notify.wait();
 
             cout << "total size: " << msg_total << endl;
@@ -1917,11 +1937,11 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, test_batchSize, 1.0, true));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, test_batchSize, 1.0, true, "admin", "123456"));
         }
         else
         {
-            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, test_batchSize, test_throttle, true);
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, false, test_batchSize, test_throttle, true, "admin", "123456");
             notify.wait();
             end_time = Util::getEpochTime();
 
@@ -2123,7 +2143,7 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "test_realtime", 0));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, onehandler, st, "test_realtime", 0, true, nullptr, false, false, "admin", "123456", nullptr, {}, 100, false, 0));
         }
         else
         {
@@ -2132,7 +2152,7 @@ namespace STCT
                 insertData(conn, st, dataScript);
             });
 
-            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "test_realtime", 0);
+            auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "test_realtime", 0, true, nullptr, false, false, "admin", "123456", nullptr, {}, 100, false, 0);
             th.join();
             notify.wait();
             cout << "total size: " << msg_total << endl;
@@ -2169,7 +2189,7 @@ namespace STCT
             threadedClient.unsubscribe(hostName, port, st, "mutiSchemaOne");
             // notify.set();
         };
-        auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0);
+        auto thread = threadedClient.subscribe(hostName, port, onehandler, st, "mutiSchemaOne", 0, true, nullptr, false, false, "admin", "123456", nullptr, {}, 100, false, 0);
         conn.run("for (i in 0..9999) {tableInsert(`"+st+", now()+i, rand(1000, 1)[0]);};");
         // notify.wait();
         EXPECT_EQ(msg_total, 1); // only one message is in handler, because unsubscribe is called before the first message received
@@ -2188,14 +2208,14 @@ namespace STCT
         ThreadedClient threadedClient = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
         if (!isNewServer(conn, 2, 0, 8) && listenport == 0)
         {
-            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, false));
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, "admin", "123456", nullptr, {}, 100, false, 0));
         }
         else
         {
             unsigned int resubscribeTimeout = 500;
             ThreadedClient threadedClient1 = listenport == -1? ThreadedClient() : ThreadedClient(listenport);
-            threadedClient.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true);
-            auto t = threadedClient1.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "", "", nullptr, {}, 100, false, resubscribeTimeout);
+            threadedClient.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456");
+            auto t = threadedClient1.subscribe(hostName, port, [](Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, "admin", "123456", nullptr, {}, 100, false, resubscribeTimeout);
 
             Util::sleep(resubscribeTimeout+1000);
             threadedClient.unsubscribe(hostName, port, st, DEFAULT_ACTION_NAME);
@@ -2207,6 +2227,112 @@ namespace STCT
 
         }
         usedPorts.insert(listenport);
+    }
+
+
+    TEST_F(StreamingThreadedClientTester, test_new_subscribe_resub_true)
+    {
+        vector<Message> msgs;
+        auto batchhandler = [&](vector<Message> ms)
+        {
+            for (auto &msg : ms)
+            {
+                msgs.push_back(msg);
+            }
+        };
+        string st = "st_" + getRandString(10);
+        conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
+        unordered_set<SubscribeState> states;
+
+        scfg->callback = [&](const SubscribeState state, const SubscribeInfo &info) {
+            // cout << "subscribe state: " << static_cast<int>(state) << endl;
+            // cout << "subscribe info: " << info.tableName << " " << info.actionName << " " << info.hostName << ":" << info.port << endl;
+            states.insert(state);
+            EXPECT_EQ(info.tableName, st);
+            EXPECT_EQ(info.actionName, "resubTest");
+            EXPECT_EQ(info.hostName, hostName);
+            EXPECT_EQ(info.port, port);
+            return true;
+        };
+
+
+        ThreadedClient threadedClient = ThreadedClient(*scfg);
+        if (!isNewServer(conn, 2, 0, 8))
+        {
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "resubTest", 0, true, nullptr, false, 1, 1.0, false, "admin", "123456"));
+        }
+        else
+        {
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "resubTest", 0, true, nullptr, false, 1, 1.0, false, "admin", "123456");
+            Util::sleep(2000);
+            conn.run("subinfo = (exec subscriber from getStreamingStat().pubTables where tableName=`"+st+")[0].split(':');"
+                     "subClient = subinfo[0];"
+                     "subPort=int(subinfo[1]);go;"
+                     "stopPublishTable(subClient, subPort, `"+st+", `resubTest)");
+            conn.run("tableInsert("+st+", `sym2, 2)");
+            Util::sleep(1000);
+            threadedClient.unsubscribe(hostName, port, st, "resubTest");
+
+            EXPECT_EQ(msgs.size(), 2);
+            EXPECT_EQ(states.size(), 3);
+            EXPECT_EQ(states.count(SubscribeState::Connected), 1);
+            EXPECT_EQ(states.count(SubscribeState::Disconnected), 1);
+            EXPECT_EQ(states.count(SubscribeState::Resubscribing), 1);
+        }
+    }
+
+
+    TEST_F(StreamingThreadedClientTester, test_new_subscribe_resub_false)
+    {
+        vector<Message> msgs;
+        auto batchhandler = [&](vector<Message> ms)
+        {
+            for (auto &msg : ms)
+            {
+                msgs.push_back(msg);
+            }
+        };
+        string st = "st_" + getRandString(10);
+        conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
+        unordered_set<SubscribeState> states;
+
+        scfg->callback = [&](const SubscribeState state, const SubscribeInfo &info) {
+            // cout << "subscribe state: " << static_cast<int>(state) << endl;
+            // cout << "subscribe info: " << info.tableName << " " << info.actionName << " " << info.hostName << ":" << info.port << endl;
+            states.insert(state);
+            EXPECT_EQ(info.tableName, st);
+            EXPECT_EQ(info.actionName, "resubTest");
+            EXPECT_EQ(info.hostName, hostName);
+            EXPECT_EQ(info.port, port);
+            return true;
+        };
+
+
+        ThreadedClient threadedClient = ThreadedClient(*scfg);
+        if (!isNewServer(conn, 2, 0, 8))
+        {
+            EXPECT_ANY_THROW(threadedClient.subscribe(hostName, port, batchhandler, st, "resubTest", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456"));
+        }
+        else
+        {
+            auto thread = threadedClient.subscribe(hostName, port, batchhandler, st, "resubTest", 0, false, nullptr, false, 1, 1.0, false, "admin", "123456");
+            Util::sleep(2000);
+            conn.run("subinfo = (exec subscriber from getStreamingStat().pubTables where tableName=`"+st+")[0].split(':');"
+                     "subClient = subinfo[0];"
+                     "subPort=int(subinfo[1]);go;"
+                     "stopPublishTable(subClient, subPort, `"+st+", `resubTest)");
+            conn.run("tableInsert("+st+", `sym2, 2)");
+            Util::sleep(1000);
+            threadedClient.unsubscribe(hostName, port, st, "resubTest");
+            threadedClient.exit();
+
+            EXPECT_TRUE(threadedClient.isExit());
+            EXPECT_EQ(msgs.size(), 1);
+            EXPECT_EQ(states.size(), 2);
+            EXPECT_EQ(states.count(SubscribeState::Connected), 1);
+            EXPECT_EQ(states.count(SubscribeState::Disconnected), 1);
+            EXPECT_EQ(states.count(SubscribeState::Resubscribing), 0);
+        }
     }
 
 }

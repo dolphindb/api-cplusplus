@@ -1,6 +1,7 @@
 #include "StreamingUtil.h"
 #include "Util.h"
 #include "DolphinDB.h"
+#include "SysIO.h"
 
 namespace dolphindb {
 

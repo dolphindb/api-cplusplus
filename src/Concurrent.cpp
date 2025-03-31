@@ -40,7 +40,7 @@ bool Runnable::isComplete(){
 }
 
 Mutex::Mutex(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	InitializeCriticalSection(&mutex_);
 #else
 	pthread_mutexattr_init(&attr_);
@@ -50,7 +50,7 @@ Mutex::Mutex(){
 }
 
 Mutex::~Mutex(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	DeleteCriticalSection(&mutex_);;
 #else
 	pthread_mutex_destroy(&mutex_);
@@ -59,7 +59,7 @@ Mutex::~Mutex(){
 }
 
 void Mutex::lock(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	EnterCriticalSection(&mutex_);
 #else
 	pthread_mutex_lock(&mutex_);
@@ -67,7 +67,7 @@ void Mutex::lock(){
 }
 
 bool Mutex::tryLock(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	return TryEnterCriticalSection(&mutex_);
 #else
 	return pthread_mutex_trylock(&mutex_)==0;
@@ -75,7 +75,7 @@ bool Mutex::tryLock(){
 }
 
 void Mutex::unlock(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	LeaveCriticalSection(&mutex_);
 #else
 	pthread_mutex_unlock(&mutex_);
@@ -83,7 +83,7 @@ void Mutex::unlock(){
 }
 
 RWLock::RWLock(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	InitializeSRWLock(&lock_);
 #else
 	int rc = pthread_rwlock_init(&lock_, NULL);
@@ -93,13 +93,13 @@ RWLock::RWLock(){
 }
 
 RWLock::~RWLock(){
-#ifndef WINDOWS
+#ifndef _WIN32
 	pthread_rwlock_destroy(&lock_);
 #endif
 }
 
 void RWLock::acquireRead() {
-#ifdef WINDOWS
+#ifdef _WIN32
 	AcquireSRWLockShared(&lock_);
 #else
 	int rc;
@@ -114,7 +114,7 @@ lockagain:
 }
 
 void RWLock::acquireWrite() {
-#ifdef WINDOWS
+#ifdef _WIN32
 	AcquireSRWLockExclusive(&lock_);
 #else
 	int rc;
@@ -129,7 +129,7 @@ lockagain:
 }
 
 bool RWLock::tryAcquireRead(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	return TryAcquireSRWLockShared(&lock_);
 #else
 	return pthread_rwlock_tryrdlock(&lock_) == 0;
@@ -137,7 +137,7 @@ bool RWLock::tryAcquireRead(){
 }
 
 bool RWLock::tryAcquireWrite(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	return TryAcquireSRWLockExclusive(&lock_);
 #else
 	return  pthread_rwlock_trywrlock(&lock_) == 0;
@@ -145,7 +145,7 @@ bool RWLock::tryAcquireWrite(){
 }
 
 void RWLock::releaseRead(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	ReleaseSRWLockShared(&lock_);
 #else
 	int rc = pthread_rwlock_unlock(&lock_);
@@ -155,7 +155,7 @@ void RWLock::releaseRead(){
 }
 
 void RWLock::releaseWrite(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	ReleaseSRWLockExclusive(&lock_);
 #else
 	int rc = pthread_rwlock_unlock(&lock_);
@@ -166,7 +166,7 @@ void RWLock::releaseWrite(){
 
 
 ConditionalVariable::ConditionalVariable(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	InitializeConditionVariable (&conditionalVariable_);
 #else
 	pthread_cond_init (&conditionalVariable_, NULL);
@@ -174,7 +174,7 @@ ConditionalVariable::ConditionalVariable(){
 }
 
 ConditionalVariable::~ConditionalVariable(){
-#ifdef WINDOWS
+#ifdef _WIN32
 
 #else
 	pthread_cond_destroy(&conditionalVariable_);
@@ -182,7 +182,7 @@ ConditionalVariable::~ConditionalVariable(){
 }
 
 void ConditionalVariable::wait(Mutex& mutex){
-#ifdef WINDOWS
+#ifdef _WIN32
 	SleepConditionVariableCS(&conditionalVariable_, &mutex.mutex_, INFINITE);
 #else
 	pthread_cond_wait(&conditionalVariable_, &mutex.mutex_);
@@ -190,7 +190,7 @@ void ConditionalVariable::wait(Mutex& mutex){
 }
 
 bool ConditionalVariable::wait(Mutex& mutex, int milliSeconds){
-#ifdef WINDOWS
+#ifdef _WIN32
 	return SleepConditionVariableCS(&conditionalVariable_, &mutex.mutex_, milliSeconds);
 #else
 	struct timespec curTime;
@@ -203,7 +203,7 @@ bool ConditionalVariable::wait(Mutex& mutex, int milliSeconds){
 }
 
 void ConditionalVariable::notify(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	WakeConditionVariable(&conditionalVariable_);
 #else
 	pthread_cond_signal(&conditionalVariable_);
@@ -211,7 +211,7 @@ void ConditionalVariable::notify(){
 }
 
 void ConditionalVariable::notifyAll(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	WakeAllConditionVariable(&conditionalVariable_);
 #else
 	pthread_cond_broadcast(&conditionalVariable_);
@@ -270,7 +270,7 @@ Semaphore::Semaphore(int resources){
 	//if(resources < 1)
 	//	throw RuntimeException("Semaphore resource number must be positive.");
 
-#ifdef WINDOWS
+#ifdef _WIN32
 	if (resources == 0) {
 		sem_ = CreateSemaphore(NULL, 0, LONG_MAX, NULL);
 	}
@@ -309,7 +309,7 @@ Semaphore::Semaphore(int resources){
 }
 
 Semaphore::~Semaphore(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	CloseHandle(sem_);
 #elif defined MAC
 	sem_close(sem_);
@@ -319,7 +319,7 @@ Semaphore::~Semaphore(){
 }
 
 void Semaphore::acquire(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	DWORD ret = WaitForSingleObject(sem_, INFINITE);
 	if(ret != WAIT_OBJECT_0)
 		throw RuntimeException("Failed to acquire semaphore with error code " + std::to_string(GetLastError()));
@@ -383,7 +383,7 @@ int WaitEvent(sem_t *hEvent, unsigned int milliseconds){
 #endif
 
 bool Semaphore::tryAcquire(int waitMilliSeconds){
-#ifdef WINDOWS
+#ifdef _WIN32
 	return WaitForSingleObject(sem_, waitMilliSeconds) == WAIT_OBJECT_0;
 #elif defined MAC
 	return WaitEvent(sem_, waitMilliSeconds) == 0;
@@ -402,7 +402,7 @@ bool Semaphore::tryAcquire(int waitMilliSeconds){
 }
 
 void Semaphore::release(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	if(!ReleaseSemaphore(sem_, 1, NULL))
 		throw RuntimeException("Failed to release semaphore with error code " + std::to_string(GetLastError()));
 #elif defined MAC
@@ -421,7 +421,7 @@ void Semaphore::release(){
 }
 
 Thread::Thread(const RunnableSP& run):run_(run){
-#ifndef WINDOWS
+#ifndef _WIN32
 	thread_ = 0;
 	pthread_attr_init(&attr_);
 	pthread_attr_setdetachstate(&attr_, PTHREAD_CREATE_JOINABLE);
@@ -432,14 +432,14 @@ Thread::Thread(const RunnableSP& run):run_(run){
 }
 
 Thread::~Thread(){
-#ifndef WINDOWS
+#ifndef _WIN32
 	pthread_attr_destroy(&attr_);
 #endif
 }
 
 
 void Thread::setAffinity(int id) {
-#ifdef WINDOWS
+#ifdef _WIN32
 	SYSTEM_INFO SystemInfo;
 	GetSystemInfo(&SystemInfo);
 	if (static_cast<DWORD>(id) >= SystemInfo.dwNumberOfProcessors) {
@@ -466,7 +466,7 @@ void Thread::setAffinity(int id) {
 }
 
 void Thread::start(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	thread_=CreateThread(NULL,0,(LPTHREAD_START_ROUTINE) startFunc,this,0,&threadId_);
 	if(thread_==0){
 		std::cout<<"Failed to create thread with error code "<<GetLastError()<<std::endl;
@@ -480,7 +480,7 @@ void Thread::start(){
 }
 
 void Thread::join(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	WaitForSingleObject(thread_,INFINITE);
 #else
 	pthread_join(thread_, NULL);
@@ -488,7 +488,7 @@ void Thread::join(){
 }
 
 void Thread::sleep(int milliSeconds){
-#ifdef WINDOWS
+#ifdef _WIN32
 	Sleep(milliSeconds);
 #else
 	usleep(1000*milliSeconds);
@@ -496,7 +496,7 @@ void Thread::sleep(int milliSeconds){
 }
 
 int Thread::getID(){
-#ifdef WINDOWS
+#ifdef _WIN32
 	return GetCurrentThreadId();
 #elif defined MAC
 	return syscall(SYS_thread_selfid);

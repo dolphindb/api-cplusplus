@@ -2175,3 +2175,25 @@ TEST_P(AFTU_append_null, test_append_empty_table)
 	conn.run("dropDatabase('dfs://test_append_empty');go");
 	delete kcols;
 }
+
+
+TEST_F(AutoFitTableUpsertTest, test_AutoFitTableUpsert_with_SCRAM_session)
+{
+	try{
+		conn.run("try{deleteUser('scramUser')}catch(ex){};go;createUser(`scramUser, `123456, authMode='scram')");
+	}catch(const exception& e){
+		GTEST_SKIP() << e.what();
+	}
+
+	DBConnection conn_scram(false, false, 7200, false, false, false, true);
+	conn_scram.connect(hostName, port, "scramUser", "123456");
+
+	TableSP data = conn_scram.run("t = indexedTable(`c1, 1 2 3 as c1, rand(100.00, 3) as c2);t2 = t.copy(); t");
+
+	AutoFitTableUpsert upsert("", "t2", conn_scram);
+	upsert.upsert(data);
+	auto res = conn_scram.run("all(each(eqObj, values t2, values t))")->getBool();
+	EXPECT_EQ(res, true);
+
+	conn_scram.close();
+}

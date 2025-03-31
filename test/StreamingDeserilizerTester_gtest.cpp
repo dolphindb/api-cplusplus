@@ -62,7 +62,7 @@ class StreamingDeserilizerTester_basic : public StreamingDeserilizerTester, publ
 {
 };
 
-StreamDeserializerSP createStreamDeserializer(const string &st)
+StreamDeserializerSP createStreamDeserializer(DBConnection &conn, const string &st)
 {
     string script = "login(\"admin\",\"123456\")\n\
             st2 = streamTable(1:0, `timestampv`sym`blob`price1,[TIMESTAMP,SYMBOL,BLOB,DOUBLE])\n\
@@ -95,7 +95,7 @@ StreamDeserializerSP createStreamDeserializer(const string &st)
     return sdsp;
 }
 
-StreamDeserializerSP createStreamDeserializer_2(const string &st)
+StreamDeserializerSP createStreamDeserializer_2(DBConnection &conn, const string &st)
 {
     string script = "login(\"admin\",\"123456\")\n\
             st2 = streamTable(100:0, `timestampv`sym`blob`price1,[TIMESTAMP,SYMBOL,BLOB,DOUBLE])\n\
@@ -134,7 +134,7 @@ StreamDeserializerSP createStreamDeserializer_2(const string &st)
     return sdsp;
 }
 
-StreamDeserializerSP createStreamDeserializer_3(const string &st)
+StreamDeserializerSP createStreamDeserializer_3(DBConnection &conn, const string &st)
 {
     string script = "login(\"admin\",\"123456\")\n\
             st2 = streamTable(1:0, `timestampv`sym`blob`price1,[TIMESTAMP,SYMBOL,BLOB,DOUBLE])\n\
@@ -169,7 +169,7 @@ StreamDeserializerSP createStreamDeserializer_3(const string &st)
     return sdsp;
 }
 
-StreamDeserializerSP createStreamDeserializer_withallTypes(const string &st, const DATA_TYPE &dataType, const string &vecVal)
+StreamDeserializerSP createStreamDeserializer_withallTypes(DBConnection &conn, const string &st, const DATA_TYPE &dataType, const string &vecVal)
 {
     string typeString = Util::getDataTypeString(dataType);
     if (typeString.compare(0, 9, "DECIMAL32") == 0)
@@ -210,7 +210,7 @@ StreamDeserializerSP createStreamDeserializer_withallTypes(const string &st, con
     return sdsp;
 }
 
-StreamDeserializerSP createStreamDeserializer_witharrayVector(const string &st, const DATA_TYPE &dataType, const string &vecVal)
+StreamDeserializerSP createStreamDeserializer_witharrayVector(DBConnection &conn, const string &st, const DATA_TYPE &dataType, const string &vecVal)
 {
     string typeString = Util::getDataTypeString(dataType);
     if (typeString.compare(0, 9, "DECIMAL32") == 0)
@@ -261,7 +261,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer(conn, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -333,7 +333,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer(conn, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -408,7 +408,7 @@ TEST_F(StreamingDeserilizerTester_basic, test_UDPThreadclient_onehandler_subscri
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer(*conn300, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", *conn300);
     AutoFitTableAppender appender2("", "res2_SDT", *conn300);
@@ -470,7 +470,7 @@ TEST_F(StreamingDeserilizerTester_basic, test_UDPThreadclient_batchhandler_subsc
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer(*conn300, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", *conn300);
     AutoFitTableAppender appender2("", "res2_SDT", *conn300);
@@ -534,7 +534,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer(conn, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -613,7 +613,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_1_s
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer(conn, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -685,7 +685,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_2_s
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer(conn, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -755,7 +755,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_with_msgAsTable_True)
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer(conn, st);
 
     auto onehandler = [&](Message msg)
     {
@@ -776,7 +776,7 @@ TEST_F(StreamingDeserilizerTester_basic, test_UDPThreadclient_with_msgAsTable_Tr
         GTEST_SKIP() << "not support udp on Windows yet.";
     #endif
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer(*conn300, st);
 
     auto onehandler = [&](Message msg)
     {
@@ -795,7 +795,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_with_msgAsTable_True
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer(conn, st);
 
     auto onehandler = [&](Message msg)
     {
@@ -814,7 +814,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_with_msgAsTable
     int listenport = GetParam();
     cout << "current listenport is " << listenport << endl;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer(conn, st);
 
     auto onehandler = [&](Message msg)
     {
@@ -837,7 +837,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_2(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_2(conn, st);
 
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
@@ -911,7 +911,7 @@ TEST_F(StreamingDeserilizerTester_basic, test_UDPThreadclient_onehandler_subscri
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_2(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_2(*conn300, st);
 
 
     AutoFitTableAppender appender1("", "res1_SDT", *conn300);
@@ -978,7 +978,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_2(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_2(conn, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -1051,7 +1051,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_2(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_2(conn, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -1128,7 +1128,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_1_s
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_2(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_2(conn, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -1200,7 +1200,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_2_s
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_2(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_2(conn, st);
 
     Signal notify;
     Mutex mutex;
@@ -1270,7 +1270,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_with_msgAsTable_True_
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_2(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_2(conn, st);
 
     auto onehandler = [&](Message msg)
     {
@@ -1290,7 +1290,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_with_msgAsTable_True
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_2(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_2(conn, st);
 
     auto onehandler = [&](Message msg)
     {
@@ -1310,7 +1310,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_with_msgAsTable
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_2(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_2(conn, st);
 
     auto onehandler = [&](Message msg)
     {
@@ -1333,7 +1333,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_3(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_3(conn, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -1405,7 +1405,7 @@ TEST_F(StreamingDeserilizerTester_basic, test_UDPThreadclient_onehandler_subscri
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_3(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_3(*conn300, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", *conn300);
     AutoFitTableAppender appender2("", "res2_SDT", *conn300);
@@ -1470,7 +1470,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_3(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_3(conn, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -1543,7 +1543,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_3(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_3(conn, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -1620,7 +1620,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_1_s
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_3(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_3(conn, st);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -1691,7 +1691,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_3_s
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_3(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_3(conn, st);
 
     Signal notify;
     Mutex mutex;
@@ -1761,7 +1761,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_with_msgAsTable_True_
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_3(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_3(conn, st);
 
     auto onehandler = [&](Message msg)
     {
@@ -1781,7 +1781,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_with_msgAsTable_True
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_3(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_3(conn, st);
 
     auto onehandler = [&](Message msg)
     {
@@ -1801,7 +1801,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_with_msgAsTable
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_3(st);
+    StreamDeserializerSP sdsp = createStreamDeserializer_3(conn, st);
 
     auto onehandler = [&](Message msg)
     {
@@ -1863,7 +1863,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadclient_onehandler_subscri
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_withallTypes(st, ttp, scr);
+    StreamDeserializerSP sdsp = createStreamDeserializer_withallTypes(conn, st, ttp, scr);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -1938,7 +1938,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_UDPThreadclient_onehandler_subs
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_withallTypes(st, ttp, scr);
+    StreamDeserializerSP sdsp = createStreamDeserializer_withallTypes(*conn300, st, ttp, scr);
 
     AutoFitTableAppender appender1("", "res1_SDT", *conn300);
     AutoFitTableAppender appender2("", "res2_SDT", *conn300);
@@ -2006,7 +2006,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadclient_batchhandler_subsc
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_withallTypes(st, ttp, scr);
+    StreamDeserializerSP sdsp = createStreamDeserializer_withallTypes(conn, st, ttp, scr);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -2080,7 +2080,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Pollingclient_subscribeWithstre
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_withallTypes(st, ttp, scr);
+    StreamDeserializerSP sdsp = createStreamDeserializer_withallTypes(conn, st, ttp, scr);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -2159,7 +2159,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadpooledclient_subscribeWit
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_withallTypes(st, ttp, scr);
+    StreamDeserializerSP sdsp = createStreamDeserializer_withallTypes(conn, st, ttp, scr);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -2268,7 +2268,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadclient_onehandler_subs
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_witharrayVector(st, ttp, scr);
+    StreamDeserializerSP sdsp = createStreamDeserializer_witharrayVector(conn, st, ttp, scr);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -2344,7 +2344,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_UDPThreadclient_onehandler_s
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_witharrayVector(st, ttp, scr);
+    StreamDeserializerSP sdsp = createStreamDeserializer_witharrayVector(*conn300, st, ttp, scr);
 
     AutoFitTableAppender appender1("", "res1_SDT", *conn300);
     AutoFitTableAppender appender2("", "res2_SDT", *conn300);
@@ -2410,7 +2410,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadclient_batchhandler_su
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_witharrayVector(st, ttp, scr);
+    StreamDeserializerSP sdsp = createStreamDeserializer_witharrayVector(conn, st, ttp, scr);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -2484,7 +2484,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Pollingclient_subscribeWiths
     cout << "current listenport is " << listenport << endl;
 
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_witharrayVector(st, ttp, scr);
+    StreamDeserializerSP sdsp = createStreamDeserializer_witharrayVector(conn, st, ttp, scr);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);
@@ -2563,7 +2563,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadpooledclient_subscribe
     Signal notify;
     Mutex mutex;
     const string st = "test_SD_" + getRandString(10);
-    StreamDeserializerSP sdsp = createStreamDeserializer_witharrayVector(st, ttp, scr);
+    StreamDeserializerSP sdsp = createStreamDeserializer_witharrayVector(conn, st, ttp, scr);
 
     AutoFitTableAppender appender1("", "res1_SDT", conn);
     AutoFitTableAppender appender2("", "res2_SDT", conn);

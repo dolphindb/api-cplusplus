@@ -34,9 +34,71 @@
 #include <limits>
 #include <utility>
 
-#include "absl/base/config.h"
-#include "absl/base/macros.h"
-#include "absl/base/port.h"
+// Included for the __GLIBC__ macro (or similar macros on other systems).
+#include <limits.h>
+
+#ifdef __cplusplus
+// Included for __GLIBCXX__, _LIBCPP_VERSION
+#include <cstddef>
+#endif  // __cplusplus
+
+// ABSL_INTERNAL_CPLUSPLUS_LANG
+//
+// MSVC does not set the value of __cplusplus correctly, but instead uses
+// _MSVC_LANG as a stand-in.
+// https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros
+//
+// However, there are reports that MSVC even sets _MSVC_LANG incorrectly at
+// times, for example:
+// https://github.com/microsoft/vscode-cpptools/issues/1770
+// https://reviews.llvm.org/D70996
+//
+// For this reason, this symbol is considered INTERNAL and code outside of
+// Abseil must not use it.
+#if defined(_MSVC_LANG)
+#define ABSL_INTERNAL_CPLUSPLUS_LANG _MSVC_LANG
+#elif defined(__cplusplus)
+#define ABSL_INTERNAL_CPLUSPLUS_LANG __cplusplus
+#endif
+
+#if defined(__APPLE__)
+// Included for TARGET_OS_IPHONE, __IPHONE_OS_VERSION_MIN_REQUIRED,
+// __IPHONE_8_0.
+#include <Availability.h>
+#include <TargetConditionals.h>
+#endif
+
+// -----------------------------------------------------------------------------
+// Toolchain Check
+// -----------------------------------------------------------------------------
+
+// We support Visual Studio 2017 (MSVC++ 15.0) and later.
+// This minimum will go up.
+#if defined(_MSC_VER) && _MSC_VER < 1910 && !defined(__clang__)
+#error "This package requires Visual Studio 2017 (MSVC++ 15.0) or higher."
+#endif
+
+// We support Apple Xcode clang 4.2.1 (version 421.11.65) and later.
+// This corresponds to Apple Xcode version 4.5.
+// This minimum will go up.
+#if defined(__apple_build_version__) && __apple_build_version__ < 4211165
+#error "This package requires __apple_build_version__ of 4211165 or higher."
+#endif
+
+// -----------------------------------------------------------------------------
+// C++ Version Check
+// -----------------------------------------------------------------------------
+
+// Enforce C++14 as the minimum.
+#if defined(_MSVC_LANG)
+#if _MSVC_LANG < 201402L
+#error "C++ versions less than C++14 are not supported."
+#endif  // _MSVC_LANG < 201402L
+#elif defined(__cplusplus)
+#if __cplusplus < 201402L
+
+#endif  // __cplusplus < 201402L
+#endif
 
 #if defined(_MSC_VER)
 // In very old versions of MSVC and when the /Zc:wchar_t flag is off, wchar_t is
@@ -53,9 +115,59 @@
 #endif  // defined(_MSC_VER)
 
 namespace absl {
-ABSL_NAMESPACE_BEGIN
 
 class int128;
+
+// ABSL_IS_LITTLE_ENDIAN
+// ABSL_IS_BIG_ENDIAN
+//
+// Checks the endianness of the platform.
+//
+// Notes: uses the built in endian macros provided by GCC (since 4.6) and
+// Clang (since 3.2); see
+// https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html.
+// Otherwise, if _WIN32, assume little endian. Otherwise, bail with an error.
+
+#if (defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
+     __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#define ABSL_IS_LITTLE_ENDIAN 1
+#elif defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && \
+    __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define ABSL_IS_BIG_ENDIAN 1
+#elif defined(_WIN32)
+#define ABSL_IS_LITTLE_ENDIAN 1
+#endif
+
+// ABSL_HAVE_INTRINSIC_INT128
+//
+// Checks whether the __int128 compiler extension for a 128-bit integral type is
+// supported.
+//
+// Note: __SIZEOF_INT128__ is defined by Clang and GCC when __int128 is
+// supported, but we avoid using it in certain cases:
+// * On Clang:
+//   * Building using Clang for Windows, where the Clang runtime library has
+//     128-bit support only on LP64 architectures, but Windows is LLP64.
+// * On Nvidia's nvcc:
+//   * nvcc also defines __GNUC__ and __SIZEOF_INT128__, but not all versions
+//     actually support __int128.
+#ifdef ABSL_HAVE_INTRINSIC_INT128
+#error ABSL_HAVE_INTRINSIC_INT128 cannot be directly set
+#elif defined(__SIZEOF_INT128__)
+#if (defined(__clang__) && !defined(_WIN32)) || \
+    (defined(__CUDACC__) && __CUDACC_VER_MAJOR__ >= 9) ||                \
+    (defined(__GNUC__) && !defined(__clang__) && !defined(__CUDACC__))
+#define ABSL_HAVE_INTRINSIC_INT128 1
+#elif defined(__CUDACC__)
+// __CUDACC_VER__ is a full version number before CUDA 9, and is defined to a
+// string explaining that it has been removed starting with CUDA 9. We use
+// nested #ifs because there is no short-circuiting in the preprocessor.
+// NOTE: `__CUDACC__` could be undefined while `__CUDACC_VER__` is defined.
+#if __CUDACC_VER__ >= 70000
+#define ABSL_HAVE_INTRINSIC_INT128 1
+#endif  // __CUDACC_VER__ >= 70000
+#endif  // defined(__CUDACC__)
+#endif  // ABSL_HAVE_INTRINSIC_INT128
 
 // uint128
 //
@@ -235,11 +347,6 @@ class
 #endif  // byte order
 };
 
-// Prefer to use the constexpr `Uint128Max()`.
-//
-// TODO(absl-team) deprecate kuint128max once migration tool is released.
-ABSL_DLL extern const uint128 kuint128max;
-
 // allow uint128 to be logged
 std::ostream& operator<<(std::ostream& os, uint128 v);
 
@@ -250,7 +357,6 @@ constexpr uint128 Uint128Max() {
                  (std::numeric_limits<uint64_t>::max)());
 }
 
-ABSL_NAMESPACE_END
 }  // namespace absl
 
 // Specialized numeric_limits for uint128.
@@ -299,7 +405,6 @@ class numeric_limits<absl::uint128> {
 }  // namespace std
 
 namespace absl {
-ABSL_NAMESPACE_BEGIN
 
 // int128
 //
@@ -488,7 +593,6 @@ constexpr int128 Int128Min() {
   return int128((std::numeric_limits<int64_t>::min)(), 0);
 }
 
-ABSL_NAMESPACE_END
 }  // namespace absl
 
 // Specialized numeric_limits for int128.
@@ -540,7 +644,6 @@ class numeric_limits<absl::int128> {
 //                      Implementation details follow
 // --------------------------------------------------------------------------
 namespace absl {
-ABSL_NAMESPACE_BEGIN
 
 constexpr uint128 MakeUint128(uint64_t high, uint64_t low) {
   return uint128(high, low);
@@ -1167,12 +1270,11 @@ constexpr int64_t BitCastToSigned(uint64_t v) {
 }  // namespace int128_internal
 
 #if defined(ABSL_HAVE_INTRINSIC_INT128)
-#include "absl/numeric/int128_have_intrinsic.inc"  // IWYU pragma: export
+#include "absl/int128_have_intrinsic.inc"  // IWYU pragma: export
 #else  // ABSL_HAVE_INTRINSIC_INT128
-#include "absl/numeric/int128_no_intrinsic.inc"  // IWYU pragma: export
+#include "absl/int128_no_intrinsic.inc"  // IWYU pragma: export
 #endif  // ABSL_HAVE_INTRINSIC_INT128
 
-ABSL_NAMESPACE_END
 }  // namespace absl
 
 #undef ABSL_INTERNAL_WCHAR_T

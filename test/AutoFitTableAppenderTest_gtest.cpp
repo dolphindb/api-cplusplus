@@ -2414,3 +2414,25 @@ TEST_P(AFTA_append_null, test_append_empty_table)
 	EXPECT_EQ(res->rows(), 0);
 	conn.run("undef(`att, SHARED);go");
 }
+
+
+TEST_F(AutoFitTableappenderTest, test_AutoFitTableAppender_with_SCRAM_session)
+{
+	try{
+		conn.run("try{deleteUser('scramUser')}catch(ex){};go;createUser(`scramUser, `123456, authMode='scram')");
+	}catch(const exception& e){
+		GTEST_SKIP() << e.what();
+	}
+
+	DBConnection conn_scram(false, false, 7200, false, false, false, true);
+	conn_scram.connect(hostName, port, "scramUser", "123456");
+
+	TableSP data = conn_scram.run("t = table(1 2 3 as c1, rand(100.00, 3) as c2);t2 = select top 0* from t; t");
+
+	AutoFitTableAppender appender("", "t2", conn_scram);
+	appender.append(data);
+	auto res = conn_scram.run("all(each(eqObj, values t2, values t))")->getBool();
+	EXPECT_EQ(res, true);
+
+	conn_scram.close();
+}

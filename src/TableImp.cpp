@@ -90,6 +90,8 @@ ConstantSP AbstractTable::get(INDEX col, INDEX row) const {
 }
 
 void AbstractTable::setColumnName(int index, const string& name){
+	std::ignore = index;
+	std::ignore = name;
 	throw TableRuntimeException(getTableTypeName() + " can't rename columns.");
 }
 
@@ -260,6 +262,8 @@ ConstantSP AbstractTable::getInternal(INDEX index) const {
 }
 
 bool AbstractTable::set(INDEX index, const ConstantSP& value) {
+	std::ignore = index;
+	std::ignore = value;
 	throw TableRuntimeException(getTableClassName() + " does not support direct data update.");
 }
 
@@ -335,6 +339,7 @@ ConstantSP AbstractTable::getMemberInternal(const ConstantSP& key) const{
 }
 
 ConstantSP AbstractTable::getInstance(int sz) const{
+	std::ignore = sz;
 	throw TableRuntimeException(getTableTypeName() + " can't be copied.");
 }
 
@@ -343,20 +348,27 @@ ConstantSP AbstractTable::getValue() const {
 }
 
 ConstantSP AbstractTable::getValue(INDEX capacity) const{
+	std::ignore = capacity;
 	throw TableRuntimeException(getTableTypeName() + " can't be copied.");
 }
 
 bool AbstractTable::append(vector<ConstantSP>& value, INDEX& insertedRows, string& errMsg){
+	std::ignore = value;
+	std::ignore = insertedRows;
 	errMsg = getTableTypeName() + " doesn't support data append.";
 	return false;
 }
 
 bool AbstractTable::update(vector<ConstantSP>& value, const ConstantSP& indexSP, vector<string>& colNames, string& errMsg){
+	std::ignore = value;
+	std::ignore = indexSP;
+	std::ignore = colNames;
 	errMsg = getTableTypeName() + " doesn't support data update.";
 	return false;
 }
 
 bool AbstractTable::remove(const ConstantSP& indexSP, string& errMsg) {
+	std::ignore = indexSP;
 	errMsg = getTableTypeName() + " doesn't support data deletion.";
 	return false;
 }
@@ -366,6 +378,7 @@ BasicTable::BasicTable(const vector<ConstantSP>& cols, const vector<string>& col
 }
 
 BasicTable::BasicTable(const vector<ConstantSP>& cols, const vector<string>& colNames, const vector<int>& key) : AbstractTable(new vector<string>(colNames)){
+	std::ignore = key;
 	initData(cols, colNames);
 }
 
@@ -732,6 +745,7 @@ bool BasicTable::remove(const ConstantSP& indexSP, string& errMsg){
 }
 
 bool BasicTable::internalRemove(const ConstantSP& indexSP, string& errMsg){
+	std::ignore = errMsg;
 	bool noIndex = indexSP.isNull() || indexSP->isNothing();
 	std::size_t colCount = cols_.size();
 

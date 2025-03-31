@@ -1,4 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
 #pragma once
+
+#ifdef _MSC_VER
+#pragma warning( push )
+#pragma warning( disable : 4251 )
+#endif
 
 #include "Constant.h"
 #include "SmartPointer.h"
@@ -53,3 +60,7 @@ private:
 };
 typedef SmartPointer<DFSChunkMeta> DFSChunkMetaSP;
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif

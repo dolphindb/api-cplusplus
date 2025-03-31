@@ -107,14 +107,14 @@ TEST_F(ArrayVectorTest, testArrayVector_count)
     indexArray->set(1, Util::createInt(1));
 
     EXPECT_FALSE(av1->append(Util::createInt(1), indexArray));
-    EXPECT_EQ(av1->count(0, 3), 2);
+    EXPECT_ANY_THROW(av1->count(0, 3));
     EXPECT_FALSE(av1->append(v2, indexArray));
-    EXPECT_EQ(av1->count(0, 4), 3);
+    EXPECT_ANY_THROW(av1->count(0, 4));
 
     VectorSP anyVector = Util::createVector(DT_ANY, 2, 2);
     EXPECT_TRUE(av1->append(anyVector, indexArray));
     EXPECT_EQ(av1->size(), 4);
-    EXPECT_EQ(av1->count(0, 5), 2);
+    EXPECT_ANY_THROW(av1->count(0, 5));
 
     EXPECT_TRUE(av1->append(av1, indexArray));
     EXPECT_EQ(av1->size(), 6);

@@ -50,6 +50,8 @@ bool Matrix::reshape(INDEX cols, INDEX rows) {
 }
 
 void Matrix::calculateInvalidLength(INDEX colStart, int colLength,INDEX rowStart, int rowLength, int& invalidLenBeginning, int& invalidLenEnding) const{
+	std::ignore = colStart;
+	std::ignore = colLength;
     invalidLenBeginning = 0;
     invalidLenEnding = 0;
 

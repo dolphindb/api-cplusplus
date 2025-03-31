@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
 #pragma once
 
 #ifdef _MSC_VER
 #pragma warning( push )
-#pragma warning( disable : 4100 )
+#pragma warning( disable : 4251 )
 #endif
 
 #include "Constant.h"
@@ -24,7 +26,11 @@ public:
     virtual ConstantSP getInstance(INDEX size) const = 0;
     virtual ConstantSP getColumn(INDEX index) const = 0;
     virtual bool setColumn(INDEX index, const ConstantSP& value)=0;
-    virtual int asof(const ConstantSP& value) const {throw RuntimeException("asof not supported.");}
+    virtual int asof(const ConstantSP& value) const
+    {
+        std::ignore = value;
+        throw RuntimeException("asof not supported.");
+    }
 
 protected:
     void calculateInvalidLength(INDEX colStart, int colLength,INDEX rowStart, int rowLength, int& invalidLenBeginning, int& invalidLenEnding) const;

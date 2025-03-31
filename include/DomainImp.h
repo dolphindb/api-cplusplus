@@ -1,12 +1,6 @@
-/*
- * ConstantFactory.h
- *
- *  Created on: Jan 19, 2013
- *      Author: dzhou
- */
-
-#ifndef DOMAIN_H
-#define DOMAIN_H
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include "Domain.h"
 #include "Dictionary.h"
@@ -39,7 +33,7 @@ private:
 
 class ValueDomain : public Domain{
 public:
-	ValueDomain(DATA_TYPE partitionColType, ConstantSP partitionSchema) : Domain(VALUE, partitionColType){}
+	ValueDomain(DATA_TYPE partitionColType, ConstantSP partitionSchema) : Domain(VALUE, partitionColType){ std::ignore = partitionSchema; }
 	
 	virtual std::vector<int> getPartitionKeys(const ConstantSP& partitionCol) const;
 };
@@ -54,5 +48,3 @@ private:
 };
 
 }
-
-#endif /* TABLE_H_ */

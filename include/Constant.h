@@ -1,15 +1,25 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
 #pragma once
-#ifdef _MSC_VER
-#pragma warning( push )
-#pragma warning( disable : 4100 )
-#endif
+
 #include <string>
 #include "SmartPointer.h"
 #include "Types.h"
 #include "Exceptions.h"
-#include "WideInteger.h"
+#include "internal/WideInteger.h"
 #include "Guid.h"
 #include "SymbolBase.h"
+
+#if defined(_MSC_VER)
+#pragma warning( push )
+#pragma warning( disable : 4100 4251 )
+#elif defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#else // gcc
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
 
 #define NOT_IMPLEMENT \
     throw RuntimeException("Data type [" + std::to_string(static_cast<int>(getType())) + "] form [" + \
@@ -268,6 +278,10 @@ private:
 
 }
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #pragma warning( pop )
+#elif defined(__clang__)
+#pragma clang diagnostic pop
+#else // gcc
+#pragma GCC diagnostic pop
 #endif

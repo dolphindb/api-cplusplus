@@ -1,12 +1,6 @@
-/*
- * ConstantFactory.h
- *
- *  Created on: Jan 19, 2013
- *      Author: dzhou
- */
-
-#ifndef CONSTANTFACTORY_H_
-#define CONSTANTFACTORY_H_
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include "Types.h"
 #include "ScalarImp.h"
@@ -16,9 +10,15 @@
 #include "Exceptions.h"
 #include "Util.h"
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #pragma warning( push )
 #pragma warning( disable : 4100 )
+#elif defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#else // gcc
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 
 namespace dolphindb {
@@ -1033,8 +1033,10 @@ private:
 
 }
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #pragma warning( pop )
+#elif defined(__clang__)
+#pragma clang diagnostic pop
+#else // gcc
+#pragma GCC diagnostic pop
 #endif
-
-#endif /* CONSTANTFACTORY_H_ */

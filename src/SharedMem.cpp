@@ -1,4 +1,4 @@
-#ifdef LINUX
+#ifdef __linux__
 
 #include "Util.h"
 #include "SharedMem.h"
@@ -7,6 +7,7 @@ namespace dolphindb {
 
 
 TableSP SharedMemStream::readData(TableSP& copy, const bool& overwrite, size_t& readRows, int& microCost) {
+    std::ignore = microCost;
     if (!shmpHeader_) {
         std::string errMsg;
         if(!openSharedMem(errMsg)) {
@@ -37,6 +38,9 @@ TableSP SharedMemStream::readData(TableSP& copy, const bool& overwrite, size_t& 
         shmpHeader_->readPage_ = shmpHeader_->writePage_;
         dataStartBuf = shmpHeader_->data_ + shmpHeader_->readOffset_;
         dataHeader = (DataHeader*)(dataStartBuf);
+    }
+    if (tableMeta_.empty()) {
+        parseTableMeta(true);
     }
     isFirstRead_ = false;
     if (shmpHeader_->writePage_ == shmpHeader_->readPage_ && shmpHeader_->readOffset_ == shmpHeader_->writeOffset_) {
@@ -137,6 +141,7 @@ bool SharedMemStream::openSharedMem(std::string& errMsg) {
 }
 
 void SharedMemStream::parseTableMeta(bool print) {
+    std::ignore = print;
     if(!shmpHeader_) {
         std::string errMsg;
         if(!openSharedMem(errMsg)) {
@@ -182,6 +187,7 @@ IPCInMemTable::~IPCInMemTable() {
 
 
 TableSP IPCInMemTable::read(TableSP& copy, const bool& overwrite, size_t& readRows, int& timeout) {
+    std::ignore = timeout;
     return pShmStream_->readData(copy, overwrite, readRows, microCost_);
 }
 

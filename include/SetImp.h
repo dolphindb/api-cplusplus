@@ -1,22 +1,11 @@
-/*
- * SetImp.h
- *
- *  Created on: Jan 17, 2016
- *      Author: dzhou
- */
-
-#ifndef SETIMP_H_
-#define SETIMP_H_
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include <unordered_set>
 
 #include "Set.h"
 #include "Util.h"
-
-#ifdef _MSC_VER
-#pragma warning( push )
-#pragma warning( disable : 4100 )
-#endif
 
 namespace dolphindb {
 
@@ -66,13 +55,38 @@ public:
 		return str;
 	}
 	virtual void clear(){ data_.clear();}
-	virtual ConstantSP get(const ConstantSP& index) const {throw RuntimeException("set doesn't support random access.");}
+	virtual ConstantSP get(const ConstantSP& index) const
+	{
+		std::ignore = index;
+		throw RuntimeException("set doesn't support random access.");
+	}
 	virtual const std::string& getStringRef() const {throw RuntimeException("set doesn't support random access.");}
-	virtual ConstantSP get(INDEX index) const {throw RuntimeException("set doesn't support random access.");}
-	virtual ConstantSP get(INDEX column, INDEX row) const {throw RuntimeException("set doesn't support random access.");}
-	virtual ConstantSP getColumn(INDEX index) const {throw RuntimeException("set doesn't support random access.");}
-	virtual ConstantSP getRow(INDEX index) const {throw RuntimeException("set doesn't support random access.");}
-	virtual ConstantSP getItem(INDEX index) const {throw RuntimeException("set doesn't support random access.");}
+	virtual ConstantSP get(INDEX index) const
+	{
+		std::ignore = index;
+		throw RuntimeException("set doesn't support random access.");
+	}
+	virtual ConstantSP get(INDEX column, INDEX row) const
+	{
+		std::ignore = column;
+		std::ignore = row;
+		throw RuntimeException("set doesn't support random access.");
+	}
+	virtual ConstantSP getColumn(INDEX index) const
+	{
+		std::ignore = index;
+		throw RuntimeException("set doesn't support random access.");
+	}
+	virtual ConstantSP getRow(INDEX index) const
+	{
+		std::ignore = index;
+		throw RuntimeException("set doesn't support random access.");
+	}
+	virtual ConstantSP getItem(INDEX index) const
+	{
+		std::ignore = index;
+		throw RuntimeException("set doesn't support random access.");
+	}
 
 protected:
 	DATA_TYPE type_;
@@ -214,8 +228,3 @@ public:
 };
 
 }
-#endif /* SETIMP_H_ */
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif

@@ -1,12 +1,6 @@
-/*
- * SmartPointer.h
- *
- *  Created on: Jun 24, 2012
- *      Author: dzhou
- */
-
-#ifndef SMARTPOINTER_H_
-#define SMARTPOINTER_H_
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include <atomic>
 #include "Exports.h"
@@ -119,5 +113,3 @@ private:
 };
 
 }
-
-#endif /* SMARTPOINTER_H_ */

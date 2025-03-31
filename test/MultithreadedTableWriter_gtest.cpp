@@ -484,7 +484,7 @@ TEST_F(MultithreadedTableWriterTest, mutiThreadWithDimensionTable)
 					"pt = db.createTable(t,`pt,,`symbol)";
 	conn.run(script);
 	SmartPointer<MultithreadedTableWriter> mulwrite;
-	EXPECT_ANY_THROW(new MultithreadedTableWriter(hostName, port, "admin", "123456", dbName, "pt", false, false, nullptr, 10000, 1, 5, "sym"));
+	EXPECT_ANY_THROW(new MultithreadedTableWriter(hostName, port, "admin", "123456", dbName, "pt", false, false, nullptr, 10000, 1, 5, "symbol"));
 	string script2 = "if(exists(dbName)){\n"
 						"     dropDatabase(dbName)\n"
 						"}\n";
@@ -5406,4 +5406,31 @@ TEST_F(MultithreadedTableWriterTest, test_insertTable_arrayVector)
 	)->getBool());
 
 	conn.run("undef(`act, SHARED)");
+}
+
+
+TEST_F(MultithreadedTableWriterTest, MTW_with_SCRAM_user){
+    try{
+        conn.run("try{deleteUser('scramUser')}catch(ex){};go;createUser(`scramUser, `123456, authMode='scram')");
+    }catch(const std::exception& e){
+        GTEST_SKIP() << e.what();
+    }
+	DBConnection conn_scram(false, false, 7200, false, false, false, true);
+	conn_scram.connect(hostName, port, "scramUser", "123456");
+
+	TableSP data = conn_scram.run("t = table(1 2 3 as c1, rand(100.00, 3) as c2);share table(1:0, `c1`c2, [INT, DOUBLE]) as t2; t");
+	SmartPointer<MultithreadedTableWriter> mtwsp;
+	ErrorCodeInfo pErrorInfo;
+	mtwsp = new MultithreadedTableWriter(hostName, port, "scramUser", "123456", "", "t2", false);
+	for (auto i = 0; i < data->rows(); i++){
+		if (!mtwsp->insert(pErrorInfo, data->getColumn(0)->get(i), data->getColumn(1)->get(i))){
+			cout << "insert failed, reason: " << pErrorInfo.errorInfo<< endl;
+			break;
+		}
+	}
+	mtwsp->waitForThreadCompletion();
+	EXPECT_TRUE(conn_scram.run("res = select * from t2 order by c1;ex = select * from t order by c1;all(each(eqObj, res.values(), ex.values()))")->getBool());
+	conn_scram.run("undef(`t2, SHARED)");
+	conn_scram.close();
+
 }

@@ -1,21 +1,10 @@
-/*
- * DictionaryImp.h
- *
- *  Created on: Oct 23, 2013
- *      Author: dzhou
- */
-
-#ifndef DICTIONARYIMP_H_
-#define DICTIONARYIMP_H_
+// SPDX-License-Identifier: Apache-2.0
+// Copyright © 2018-2025 DolphinDB, Inc.
+#pragma once
 
 #include "Util.h"
 #include <unordered_map>
 #include "Dictionary.h"
-
-#ifdef _MSC_VER
-#pragma warning( push )
-#pragma warning( disable : 4100 )
-#endif
 
 namespace dolphindb {
 
@@ -39,11 +28,33 @@ public:
 	virtual DATA_TYPE getKeyType() const {return keyType_;}
 	virtual DATA_CATEGORY getKeyCategory() const {return keyCategory_;}
 	virtual const std::string& getStringRef() const {throw RuntimeException("dictionary doesn't support random access.");}
-	virtual ConstantSP get(INDEX index) const {throw RuntimeException("dictionary doesn't support random access.");}
-	virtual ConstantSP get(INDEX column, INDEX row) const {throw RuntimeException("dictionary doesn't support random access.");}
-	virtual ConstantSP getColumn(INDEX index) const {throw RuntimeException("dictionary doesn't support random access.");}
-	virtual ConstantSP getRow(INDEX index) const {throw RuntimeException("dictionary doesn't support random access.");}
-	virtual ConstantSP getItem(INDEX index) const {throw RuntimeException("dictionary doesn't support random access.");}
+	using Dictionary::get;
+	virtual ConstantSP get(INDEX index) const
+	{
+		std::ignore = index;
+		throw RuntimeException("dictionary doesn't support random access.");
+	}
+	virtual ConstantSP get(INDEX column, INDEX row) const
+	{
+		std::ignore = column;
+		std::ignore = row;
+		throw RuntimeException("dictionary doesn't support random access.");
+	}
+	virtual ConstantSP getColumn(INDEX index) const
+	{
+		std::ignore = index;
+		throw RuntimeException("dictionary doesn't support random access.");
+	}
+	virtual ConstantSP getRow(INDEX index) const
+	{
+		std::ignore = index;
+		throw RuntimeException("dictionary doesn't support random access.");
+	}
+	virtual ConstantSP getItem(INDEX index) const
+	{
+		std::ignore = index;
+		throw RuntimeException("dictionary doesn't support random access.");
+	}
 
 protected:
 	void init();
@@ -275,6 +286,7 @@ public:
 	virtual INDEX count() const {return (INDEX)dict_.size();}
 	virtual ConstantSP getInstance() const { return new IntAnyDictionary(keyType_);}
 	virtual ConstantSP getValue() const {return new IntAnyDictionary(dict_, keyType_);}
+	using AbstractDictionary::set;
 	virtual bool set(const ConstantSP& key, const ConstantSP& value);
 	virtual bool set(int key, const ConstantSP& value);
 	virtual bool remove(const ConstantSP& value);
@@ -386,9 +398,3 @@ private:
 };
 
 }
-
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
-
-#endif /* DICTIONARYIMP_H_ */
