@@ -327,7 +327,7 @@ bool DBConnection::connectNode(string hostName, int port, int keepAliveTime) {
             // check whether server support init stage check.
             try {
                 std::vector<ConstantSP> args;
-                inited = conn_->run("isNodeInitialized", args)->getBool();
+                inited = conn_->run("isDataNodeInitialized", args)->getBool();
                 if (inited) {
                     DLogger::Debug("Connection successfully established, and the node has been initialized.");
                 }
