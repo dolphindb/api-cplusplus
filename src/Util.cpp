@@ -40,12 +40,12 @@ using std::vector;
 
 static SmartPointer<ConstantFactory> s_constFactory(new ConstantFactory());
 const bool Util::LITTLE_ENDIAN_ORDER = isLittleEndian();
-string Util::VER = "3.00.2.4";
+string Util::VER = "3.00.2.5";
 #ifndef _MSC_VER
 constexpr int Util::BUF_SIZE;
 #endif
-int Util::VERNUM = 30024;
-string Util::BUILD = "2025.03.11";
+int Util::VERNUM = 30025;
+string Util::BUILD = "2025.05.19";
 
 int Util::SEQUENCE_SEARCH_NUM_THRESHOLD = 10;
 int Util::MAX_LENGTH_FOR_ANY_VECTOR = 1048576;

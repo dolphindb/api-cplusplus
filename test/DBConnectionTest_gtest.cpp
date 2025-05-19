@@ -57,18 +57,10 @@ void StopCurNode(string cur_node)
 
     conn1.run("try{stopDataNode(\"" + cur_node + "\")}catch(ex){};");
     cout << cur_node + " has stopped..." << endl;
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    // std::this_thread::yield();
-    conn1.run("try{startDataNode(\"" + cur_node + "\")}catch(ex){};");
-    bool state = conn1.run("exec state from getClusterPerf() where name = `" + cur_node)->getBool();
-    int wait_time = 0;
-    while (!state && wait_time < 60){
-        conn1.run("try{startDataNode(\"" + cur_node + "\")}catch(ex){};");
-        state = conn1.run("exec state from getClusterPerf() where name = `" + cur_node)->getBool();
-        cout << "waiting for " + cur_node + " to start..." << endl;
-        Util::sleep(1000);
-        wait_time += 1;
-    }
+    Util::sleep(5000);
+    cout << "restarting " + cur_node + "..." << endl;
+    conn1.run("startDataNode(exec name from getClusterPerf() where mode !=1 and state != 1);go;"
+    "do{sleep(1000);}while((exec distinct state from getClusterPerf()).size() !=1);");
 }
 
 bool assertUnConnect()
@@ -855,6 +847,21 @@ TEST_F(DBConnectionTest, test_connection_SCRAM){
         EXPECT_EQ(res->getString(), "scramUser");
         _c.close();
         cout << "test_connection_SCRAM2 passed" << endl;
+    }
+    { // login with no scram auth user admin
+        DBConnection _c = DBConnection(false, false, 7200, false, false, false, true);
+        _c.connect(hostName, port, "admin", "123456"); // stdout: [debug] [140591328847872] : user 'admin' doesn't support scram authMode.
+    }
+    { // enableEncryption with scram user
+        DBConnection _c = DBConnection(hostName, port);
+        _c.connect();
+        _c.login("scramUser", "123456", true);
+        ConstantSP res = _c.run("getCurrentSessionAndUser()[1]");
+        EXPECT_EQ(res->getString(), "scramUser");
+        _c.close();
+    }
+    { // async login with scram user
+        EXPECT_ANY_THROW(DBConnection(false, true, 7200, false, false, false, true));
     }
 }
 

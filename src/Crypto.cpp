@@ -45,7 +45,7 @@ auto Crypto::RSAEncrypt(const std::string &text) const -> std::string
 {
     int rsa_size = EVP_PKEY_size(rsa_);
     std::vector<unsigned char> encrypted(rsa_size);
-    size_t encrypted_len;
+    size_t encrypted_len = rsa_size;
     if (EVP_PKEY_encrypt(ctx_, encrypted.data(), &encrypted_len, (const unsigned char*)text.c_str(), text.size()) != 1) {
         printOpenSSLError();
         throw RuntimeException("Failed to encrypt userId or password.");

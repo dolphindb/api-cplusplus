@@ -118,25 +118,23 @@ IO_ERR Socket::read(char* buffer, size_t length, size_t& actualLength, bool msgP
 	//RecordTime record("Socket.read");
 	if (!enableSSL_) {
 #ifdef _WIN32
-		actualLength = recv(handle_, buffer, static_cast<int>(length), msgPeek ? MSG_PEEK : 0);
-		RECORD_READ(buffer, actualLength);
-		if (actualLength < 0) {
+		actualLength = 0;
+		int ret = recv(handle_, buffer, static_cast<int>(length), msgPeek ? MSG_PEEK : 0);
+		if (ret == SOCKET_ERROR) {
 			DLogger::Error("socket read error", actualLength);
-		}
-		if (actualLength == 0)
-			return DISCONNECTED;
-		else if (actualLength != (size_t)SOCKET_ERROR)
-			return OK;
-		else {
-			actualLength = 0;
 			int error = WSAGetLastError();
 			if (error == WSAENOTCONN || error == WSAESHUTDOWN || error == WSAENETRESET)
 				return DISCONNECTED;
-			else if (error == WSAEWOULDBLOCK)
+			if (error == WSAEWOULDBLOCK)
 				return NODATA;
-			else
-				return OTHERERR;
+			return OTHERERR;
 		}
+		if (ret == 0) {
+			return DISCONNECTED;
+		}
+		actualLength = ret;
+		RECORD_READ(buffer, ret);
+		return OK;
 #else //Linux
 readdata:
 		actualLength = recv(handle_, (void*)buffer, length, (blocking_ ? 0 : MSG_DONTWAIT) | (msgPeek ? MSG_PEEK : 0));
@@ -156,20 +154,20 @@ readdata:
 	} else {
 #ifdef USE_OPENSSL
 readdata2:
-        int ret = SSL_read(ssl_, buffer, static_cast<int>(length));
+        int ret = SSL_read((SSL*)ssl_, buffer, static_cast<int>(length));
         if (ret > 0) {
             actualLength = ret;
             RECORD_READ(buffer, ret);
         } else {
             DLogger::Error("socket read error", ret);
-            ret = SSL_get_error(ssl_, ret);
+            ret = SSL_get_error((SSL*)ssl_, ret);
             if(ret == SSL_ERROR_WANT_READ) goto readdata2;
             LOG_ERR("Socket(SSL)::read err =" + std::to_string(ret));
             return OTHERERR;
         }
 #endif
-        return OK;
     }
+    return OK;
 }
 
 IO_ERR Socket::write(const char* buffer, size_t length, size_t& actualLength){
@@ -218,12 +216,12 @@ IO_ERR Socket::write(const char* buffer, size_t length, size_t& actualLength){
 	else {
 #ifdef USE_OPENSSL
 		senddata2:
-        int ret = SSL_write(ssl_, (const void*)buffer, static_cast<int>(length));
+        int ret = SSL_write((SSL*)ssl_, (const void*)buffer, static_cast<int>(length));
         if (ret > 0) {
             actualLength = ret;
             RECORD_WRITE(buffer, ret);
         } else {
-            int err = SSL_get_error(ssl_, ret);
+            int err = SSL_get_error((SSL*)ssl_, ret);
             if (err == SSL_ERROR_WANT_WRITE) goto senddata2;
             DLogger::Error("socket write error", err);
             LOG_ERR("Socket(SSL)::write err =" + std::to_string(err));
@@ -387,10 +385,10 @@ IO_ERR Socket::close(){
 #ifdef USE_OPENSSL
 	if(ssl_ != nullptr) {
 		//shutdown until it done.
-		while (SSL_shutdown(ssl_) == 0) {
+		while (SSL_shutdown((SSL*)ssl_) == 0) {
 			Util::sleep(10);
 		}
-		SSL_free(ssl_);
+		SSL_free((SSL*)ssl_);
 		ssl_ = nullptr;
 	}
 #endif
@@ -407,7 +405,7 @@ IO_ERR Socket::close(){
 	}
 #ifdef USE_OPENSSL
 	if (ctx_ != nullptr) {
-		SSL_CTX_free(ctx_);
+		SSL_CTX_free((SSL_CTX*)ctx_);
 		ctx_ = nullptr;
 	}
 #endif
@@ -552,7 +550,7 @@ int Socket::getErrorCode(){
 }
 
 #ifdef USE_OPENSSL
-SSL_CTX* Socket::initCTX(){
+void* Socket::initCTX(){
     const SSL_METHOD* method;
     SSL_CTX* ctx;
 
@@ -576,11 +574,11 @@ bool Socket::sslInit() {
     if (ctx_ == nullptr) {
         return false;
     }
-    ssl_ = SSL_new(ctx_);
+    ssl_ = SSL_new((SSL_CTX*)ctx_);
     if (ssl_ == nullptr) {
         return false;
     }
-    SSL_set_fd(ssl_, static_cast<int>(handle_));
+    SSL_set_fd((SSL*)ssl_, static_cast<int>(handle_));
     return true;
 }
 
@@ -589,7 +587,7 @@ IO_ERR Socket::sslConnect() {
     if (!sslInit()) {
         return OTHERERR;
     }
-    if (SSL_connect(ssl_) == -1) {
+    if (SSL_connect((SSL*)ssl_) == -1) {
         if (!blocking_) {
             //TODO: solve error
         }
@@ -599,10 +597,10 @@ IO_ERR Socket::sslConnect() {
     return OK;
 }
 
-void Socket::showCerts(SSL *ssl) {
+void Socket::showCerts(void *ssl) {
     X509 *cert;
     char *line;
-    cert = SSL_get_peer_certificate(ssl); /* get the server's certificate */
+    cert = SSL_get_peer_certificate((SSL*)ssl); /* get the server's certificate */
     if ( cert != NULL ){
         std::cout << "Server certificates:\n";
         line = X509_NAME_oneline(X509_get_subject_name(cert), 0, 0);

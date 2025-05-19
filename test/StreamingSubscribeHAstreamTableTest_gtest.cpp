@@ -1409,6 +1409,7 @@ TEST_P(StreamingSubscribeHighAvailableTest, test_Pollingclient_stopDataNode)
                 if (msg1_total == insert_total_rows)
                 {
                     cout << "get all msg successfully!" << endl;
+                    break;
                 }
             }
         } };

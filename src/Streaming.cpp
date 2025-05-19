@@ -1402,7 +1402,7 @@ void StreamingClientImpl::sendPublishRequest(DBConnection &conn, SubscribeParam 
 			info.offset_, info.filter_, info.allowExists_);
 	}
 	else {
-		conn.login(info.userName_, info.password_, false);
+		conn.login(info.userName_, info.password_, HAS_OPENSSL);
 		re = run(conn, "publishTable", getLocalIP(), listeningPort_, info.info_.tableName, info.info_.actionName,
 			info.offset_, info.filter_, info.allowExists_);
 	}
@@ -1421,7 +1421,7 @@ void StreamingClientImpl::sendPublishRequest(DBConnection &conn, SubscribeParam 
 
 string StreamingClientImpl::subscribeInternal(DBConnection &conn, SubscribeParam &info) {
 	if (info.userName_.empty() == false)
-		conn.login(info.userName_, info.password_, false);
+		conn.login(info.userName_, info.password_, HAS_OPENSSL);
 	ConstantSP result = run(conn, "getSubscriptionTopic", info.info_.tableName, info.info_.actionName);
 	auto topic = result->get(0)->getString();
 	ConstantSP colLabels = result->get(1);
@@ -2029,7 +2029,7 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageHandler &
         }
         SubscribeConfig config { offset, msgAsTable, allowExists, false };
         if (!userName.empty()) {
-            conn->login(userName, password, false);
+            conn->login(userName, password, HAS_OPENSSL);
         }
         udpImpl_->subscribe(info, config, conn, handler, blobDeserializer);
         return nullptr;

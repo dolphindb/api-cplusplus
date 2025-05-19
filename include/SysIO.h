@@ -19,11 +19,6 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
-#else
-
-using SSL_CTX = int;
-using SSL = int;
-
 #endif
 
 #ifdef __linux__
@@ -75,10 +70,10 @@ private:
 	bool setBlocking();
 	bool setTcpNoDelay();
 	int getErrorCode();
-	SSL_CTX* initCTX();
+	void* initCTX();
 	bool sslInit();
 	IO_ERR sslConnect();
-	void showCerts(SSL* ssl);
+	void showCerts(void* ssl);
 private:
 	std::string host_;
 	int port_;
@@ -86,8 +81,8 @@ private:
 	bool blocking_;
 	bool autoClose_;
 	bool enableSSL_;
-	SSL_CTX* ctx_;
-	SSL* ssl_;
+	void* ctx_;
+	void* ssl_;
 	int keepAliveTime_;
 };
 

@@ -33,6 +33,12 @@
 #pragma warning( disable : 4251 )
 #endif
 
+#ifdef USE_OPENSSL
+constexpr bool HAS_OPENSSL{true};
+#else
+constexpr bool HAS_OPENSSL{false};
+#endif
+
 namespace dolphindb {
 
 class DBConnectionImpl;
@@ -95,7 +101,7 @@ public:
             throw RuntimeException("Failed to connect to server: " + host + ":" + std::to_string(port));
         }
         if (!userName.empty()) {
-            login(userName, password, true);
+            login(userName, password, HAS_OPENSSL);
         }
     }
     DBConnection(bool enableSSL = false, bool asyncTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false, bool isReverseStreaming = false, bool enableSCRAM = false);

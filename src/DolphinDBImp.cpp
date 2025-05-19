@@ -115,7 +115,7 @@ bool DBConnectionImpl::connect() {
 
     if (!userId_.empty()) {
         try {
-            login(userId_, pwd_, false);
+            login(userId_, pwd_, HAS_OPENSSL);
         } catch (...) {
             close();
             throw;
