@@ -60,10 +60,9 @@ DolphinDB C++ API requires g++ 6.2 or later versions in Linux.
 
 #### 1.1.2 Download bin file and header files
 
-Download the following files:
+[Download](https://github.com/dolphindb/api-cplusplus/releases) the following files:
 
-> bin (libDolphinDBAPI.so)
-  include (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h)
+> libDolphinDBAPI.so DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h
 
 #### 1.1.3 Compile main.cpp
 

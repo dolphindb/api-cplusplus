@@ -79,10 +79,10 @@ C++ API需要使用g++ 4.8.5及以上版本。
 
 #### 1.1.2 下载bin文件和头文件
 
-从本GitHub项目中下载以下文件：
+从本GitHub项目中[下载](https://github.com/dolphindb/api-cplusplus/releases)以下文件：
 
-- [bin](./bin) (libDolphinDBAPI.so)
-- [include](./include) (DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h)
+- libDolphinDBAPI.so
+- DolphinDB.h  Exceptions.h  SmartPointer.h  SysIO.h  Types.h  Util.h
 
 #### 1.1.3 编译main.cpp
 
