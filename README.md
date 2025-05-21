@@ -1,4 +1,5 @@
 This tutorial includes the following topics about how to use DolphinDB C++ API in Linux:
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/dolphindb/api-cplusplus)
 
 [DolphinDB C++ API](https://2xdb.net/dolphindb/api-cplusplus#dolphindb-c-api)
 - [1. Compilation](https://2xdb.net/dolphindb/api-cplusplus/-/blob/master/README.md#1-compilation)
