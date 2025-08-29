@@ -101,6 +101,9 @@ else()
         message(FATAL_ERROR "Failed to find uuid.")
     endif()
     target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pthread rt uuid)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND CMAKE_CXX_COMPILER_VERSION LESS 8)
+        target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -w)
+    endif()
 endif()
 
 if (MSVC)
@@ -126,12 +129,23 @@ if (WITH_UNITTEST)
 endif()
 
 if (UNIX)
-    file(GLOB HEADER_FILES "include/*.h")
-    set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES PUBLIC_HEADER "${HEADER_FILES}")
     include(GNUInstallDirs)
-    install(TARGETS ${CMAKE_PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dolphindb
-    )
+    if(CMAKE_VERSION VERSION_GREATER "3.23.0")
+        file(GLOB_RECURSE HEADER_FILES "include/*")
+        target_sources(${CMAKE_PROJECT_NAME} PUBLIC FILE_SET headers TYPE HEADERS
+            BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include"
+            FILES ${HEADER_FILES}
+        )
+        install(TARGETS ${CMAKE_PROJECT_NAME}
+            FILE_SET headers DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dolphindb
+        )
+    else()
+        install(DIRECTORY "include/"
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dolphindb
+            FILES_MATCHING PATTERN "*"
+        )
+        install(TARGETS ${CMAKE_PROJECT_NAME})
+    endif()
 endif()
 
 add_subdirectory(src)

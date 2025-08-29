@@ -52,7 +52,7 @@
 namespace dolphindb{
 
 #if __cplusplus < 201703L
-constexpr int Util::BUF_SIZE;
+const int Util::BUF_SIZE;
 #endif
 
 using std::string;
@@ -60,9 +60,9 @@ using std::vector;
 
 static SmartPointer<ConstantFactory> s_constFactory(new ConstantFactory());
 const bool Util::LITTLE_ENDIAN_ORDER = isLittleEndian();
-std::string Util::VER = "3.00.3.0";
-int Util::VERNUM = 30030;
-std::string Util::BUILD = "2025.07.02";
+std::string Util::VER = "3.00.3.1";
+int Util::VERNUM = 30031;
+std::string Util::BUILD = "2025.08.22";
 
 int Util::SEQUENCE_SEARCH_NUM_THRESHOLD = 10;
 int Util::MAX_LENGTH_FOR_ANY_VECTOR = 1048576;

@@ -98,8 +98,9 @@ enum class ConnectionState {
 
 class EXPORT_DECL DBConnection {
 public:
+    explicit DBConnection(bool enableSSL = false, bool asyncTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false, bool isReverseStreaming = false, bool enableSCRAM = false);
     DBConnection(const std::string &host, int port, const std::string &userName="", const std::string &password="")
-        :DBConnection()
+        :DBConnection(false)
     {
         if (!connect(host, port)) {
             throw RuntimeException("Failed to connect to server: " + host + ":" + std::to_string(port));
@@ -108,7 +109,6 @@ public:
             login(userName, password, HAS_OPENSSL);
         }
     }
-    explicit DBConnection(bool enableSSL = false, bool asyncTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false, bool isReverseStreaming = false, bool enableSCRAM = false);
     DBConnection(DBConnection&& oth) noexcept;
     DBConnection& operator=(DBConnection&& oth) noexcept;
     virtual ~DBConnection();

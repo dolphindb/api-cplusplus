@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
-#include <regex>
 #include "config.h"
+#include <algorithm>
 
 #ifdef _WIN32
     #include <windows.h>
@@ -45,15 +45,19 @@ std::string getRandString(int len){
 std::string getCaseName(){
     const auto* test_info = testing::UnitTest::GetInstance()->current_test_info();
     std::string case_suite = test_info->test_suite_name();
+    std::replace(case_suite.begin(), case_suite.end(), '/', '_');
     std::string case_name =  test_info->name();
-    return std::regex_replace(case_suite, std::regex("/"), "_") + "_" + std::regex_replace(case_name, std::regex("/"), "_");
+    std::replace(case_name.begin(), case_name.end(), '/', '_');
+    return case_suite + "_" + case_name;
 }
 
 std::string getCaseNameHash(){
     const auto* test_info = testing::UnitTest::GetInstance()->current_test_info();
     std::string case_suite = test_info->test_suite_name();
+    std::replace(case_suite.begin(), case_suite.end(), '/', '_');
     std::string case_name =  test_info->name();
-    std::string input = std::regex_replace(case_suite, std::regex("/"), "_") + "_" + std::regex_replace(case_name, std::regex("/"), "_");
+    std::replace(case_name.begin(), case_name.end(), '/', '_');
+    std::string input = case_name + "_" + case_name;
     std::hash<std::string> hasher;
     size_t hashValue = hasher(input);
     std::stringstream ss;

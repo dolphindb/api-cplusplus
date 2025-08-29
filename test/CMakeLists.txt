@@ -21,7 +21,7 @@ else()
     target_compile_options(${TEST_BINARY_NAME} PRIVATE -w -pthread -g -O0)
 endif()
 
-find_package(GTest 1.12.0 REQUIRED)
+find_package(GTest 1.10.0 REQUIRED)
 if (NOT DEFINED API_INSTALL_DIR)
     set(API_INSTALL_LIB ${CMAKE_PROJECT_NAME})
 else()

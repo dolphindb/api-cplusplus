@@ -1935,10 +1935,10 @@ namespace STCT
         };
         std::string st = case_;
         conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
-        std::unordered_set<dolphindb::SubscribeState> states;
+        std::vector<dolphindb::SubscribeState> states;
 
         scfg->callback = [&](const dolphindb::SubscribeState state, const dolphindb::SubscribeInfo &info) {
-            states.insert(state);
+            states.emplace_back(state);
             EXPECT_EQ(info.tableName, st);
             EXPECT_EQ(info.actionName, "resubTest");
             EXPECT_EQ(info.hostName, HOST);
@@ -1958,10 +1958,11 @@ namespace STCT
         threadedClient.unsubscribe(HOST, PORT, st, "resubTest");
 
         ASSERT_EQ(msgs.size(), 2);
-        ASSERT_EQ(states.size(), 3);
-        ASSERT_EQ(states.count(dolphindb::SubscribeState::Connected), 1);
-        ASSERT_EQ(states.count(dolphindb::SubscribeState::Disconnected), 1);
-        ASSERT_EQ(states.count(dolphindb::SubscribeState::Resubscribing), 1);
+        ASSERT_EQ(states.size(), 4);
+        ASSERT_EQ(states[0],dolphindb::SubscribeState::Connected);
+        ASSERT_EQ(states[1],dolphindb::SubscribeState::Disconnected);
+        ASSERT_EQ(states[2],dolphindb::SubscribeState::Resubscribing);
+        ASSERT_EQ(states[3],dolphindb::SubscribeState::Connected);
     }
 
 
@@ -1978,10 +1979,10 @@ namespace STCT
         };
         std::string st = case_;
         conn.run("share streamTable(1:0, `sym`val, [SYMBOL, INT]) as "+st+";tableInsert("+st+", `sym1, 1)");
-        std::unordered_set<dolphindb::SubscribeState> states;
+        std::vector<dolphindb::SubscribeState> states;
 
         scfg->callback = [&](const dolphindb::SubscribeState state, const dolphindb::SubscribeInfo &info) {
-            states.insert(state);
+            states.emplace_back(state);
             EXPECT_EQ(info.tableName, st);
             EXPECT_EQ(info.actionName, "resubTest");
             EXPECT_EQ(info.hostName, HOST);
@@ -2004,9 +2005,7 @@ namespace STCT
         ASSERT_TRUE(threadedClient.isExit());
         ASSERT_EQ(msgs.size(), 1);
         ASSERT_EQ(states.size(), 2);
-        ASSERT_EQ(states.count(dolphindb::SubscribeState::Connected), 1);
-        ASSERT_EQ(states.count(dolphindb::SubscribeState::Disconnected), 1);
-        ASSERT_EQ(states.count(dolphindb::SubscribeState::Resubscribing), 0);
+        ASSERT_EQ(states[0],dolphindb::SubscribeState::Connected);
+        ASSERT_EQ(states[1],dolphindb::SubscribeState::Disconnected);
     }
-
 }
