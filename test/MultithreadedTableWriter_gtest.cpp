@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "config.h"
 #include "MultithreadedTableWriter.h"
+#include "Set.h"
 
 class MultithreadedTableWriterTest : public testing::Test
 {
@@ -108,7 +109,7 @@ TEST_F(MultithreadedTableWriterTest, tableNameNULL)
     ASSERT_ANY_THROW(dolphindb::MultithreadedTableWriter(HOST, PORT, USER, PASSWD, dbName, "", false));
 }
 
-TEST_F(MultithreadedTableWriterTest, userHasNotaccess)
+TEST_F(MultithreadedTableWriterTest, userHasNotAccess)
 {
     std::string case_=getCaseName();
     std::string dbName="dfs://" + case_;
@@ -522,6 +523,42 @@ TEST_F(MultithreadedTableWriterTest, memoryTableanddbNameNULL)
     std::string script = "share table(1000:0, `sym`id`value,[SYMBOL, INT, INT]) as "+case_;
     conn.run(script);
     ASSERT_ANY_THROW(dolphindb::MultithreadedTableWriter(HOST, PORT, USER, PASSWD, NULL, case_, false));
+}
+
+TEST_F(MultithreadedTableWriterTest, type_any)
+{
+    std::string case_=getCaseName();
+    std::string script = "share table(1000:0, [`data],[ANY]) as "+case_;
+    conn.run(script);
+    dolphindb::ErrorCodeInfo pErrorInfo;
+    dolphindb::MultithreadedTableWriter mulwrite{HOST, PORT, USER, PASSWD, "", case_, false, false, nullptr, 1, 0.01};
+    dolphindb::ConstantSP scalar_ = dolphindb::Util::createInt(1);
+    dolphindb::VectorSP pair_ = dolphindb::Util::createPair(dolphindb::DT_INT);
+    pair_->set(0,scalar_);
+    pair_->set(1,scalar_);
+    dolphindb::VectorSP vector_ = dolphindb::Util::createVector(dolphindb::DT_INT,0,2);
+    vector_->append(scalar_);
+    vector_->append(scalar_);
+    vector_->append(scalar_);
+    dolphindb::VectorSP array_vector_ = dolphindb::Util::createArrayVector(dolphindb::DT_INT_ARRAY,0,2);
+    array_vector_->append(vector_);
+    array_vector_->append(vector_);
+    dolphindb::VectorSP matrix_ = dolphindb::Util::createMatrix(dolphindb::DT_INT, 2, 2, 2);
+    dolphindb::SetSP set_ = dolphindb::Util::createSet(dolphindb::DT_INT,0);
+    set_->append(scalar_);
+    dolphindb::DictionarySP dict_ = dolphindb::Util::createDictionary(dolphindb::DT_INT,dolphindb::DT_INT);
+    dict_->set(scalar_,scalar_);
+    dolphindb::TableSP table_ = dolphindb::Util::createTable({"a"},{vector_});
+    std::vector<dolphindb::ConstantSP> data{scalar_, pair_, vector_, array_vector_, matrix_, set_, dict_, table_};
+    for (auto& i : data){
+        bool ret = mulwrite.insert(pErrorInfo,i);
+        ASSERT_TRUE(ret);
+    }
+    mulwrite.waitForThreadCompletion();
+    dolphindb::TableSP table = conn.run(case_);
+    std::vector<std::string> expect{"1", "1 : 1", "[1,1,1]", "[[1,1,1],[1,1,1]]", "#0 #1\n-- --\n0  0 \n0  0 \n", "set(1)", "1->1\n", "a\n-\n1\n1\n1\n"};
+    for (size_t i=0;i<8;++i)
+        ASSERT_EQ(table->getColumn(0)->getRow(i)->getString(), expect[i]);
 }
 
 TEST_F(MultithreadedTableWriterTest, insertValueLongerThanMemoryTable)

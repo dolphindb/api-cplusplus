@@ -109,7 +109,7 @@ bool DBConnectionImpl::connect() {
 
     if (numObject == 1) {
         uint16_t flag;
-        if ((ret = in->readShort(flag)) != OK)
+        if ((ret = in->read(flag)) != OK)
             throw IOException("Failed to read object flag from the socket with IO error type " + std::to_string(ret));
         auto form = static_cast<DATA_FORM>(flag >> 8U);
 
@@ -142,31 +142,6 @@ bool DBConnectionImpl::connect() {
         }
     }
 
-    ConstantSP requiredVersion;
-
-    try {
-        if(asynTask_) {
-            DBConnection newConn(false, false);
-            newConn.connect(hostName_, port_, userId_, pwd_);
-            requiredVersion = newConn.run("getRequiredAPIVersion()");
-        }else{
-            requiredVersion = run("getRequiredAPIVersion()");
-        }
-    }
-    catch(...){
-        return true;
-    }
-    if(!requiredVersion->isTuple()){
-        return true;
-    }
-    int apiVersion = requiredVersion->get(0)->getInt();
-    if(apiVersion > APIMinVersionRequirement){
-        close();
-        throw IOException("Required C++ API version at least "  + std::to_string(apiVersion) + ". Current C++ API version is "+ std::to_string(APIMinVersionRequirement) +". Please update DolphinDB C++ API. ");
-    }
-    if(requiredVersion->size() >= 2 && !requiredVersion->get(1)->getString().empty()){
-        std::cout<<requiredVersion->get(1)->getString() <<std::endl;
-    }
     return true;
 }
 
@@ -381,6 +356,18 @@ long DBConnectionImpl::generateRequestFlag(bool clearSessionMemory, bool disable
 
 ConstantSP DBConnectionImpl::run(const std::string & script, const std::string & scriptType, std::vector<ConstantSP>& args,
             int priority, int parallelism, int fetchSize, bool clearMemory, long seqNum) {
+#ifdef DDB_FAULT_INJECTION
+    std::unique_lock<std::mutex> lock(faultMutex_);
+    std::vector<std::string> loginScript{"login", "getDynamicPublicKey", "scramClientFirst", "scramClientFinal", "isNodeInitialized"};
+    // std::cout << "script: " << script << ", fail " << faultCnt_ << std::endl;
+    if (faultCnt_ > 0 && std::find(loginScript.begin(), loginScript.end(), script) == loginScript.end()) {
+        --faultCnt_;
+        if (faultType_ == FaultType::DISCONNECT) {
+            close();
+        }
+        throw RuntimeException("Fault injection on script: " + script);
+    }
+#endif
     if (!isConnected_)
         throw IOException("Couldn't send script/function to the remote host because the connection has been closed");
 
@@ -488,7 +475,7 @@ ConstantSP DBConnectionImpl::run(const std::string & script, const std::string &
     }
 
     uint16_t flag;
-    if ((ret = inputStream_->readShort(flag)) != OK) {
+    if ((ret = inputStream_->read(flag)) != OK) {
         close();
         throw IOException("Failed to read object flag from the socket with IO error type " + std::to_string(ret));
     }

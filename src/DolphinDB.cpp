@@ -117,7 +117,7 @@ DBConnection::DBConnection(bool enableSSL, bool asyncTask, int keepAliveTime, bo
 
 DBConnection::DBConnection(DBConnection&& oth) noexcept :
 		conn_(std::move(oth.conn_)), uid_(std::move(oth.uid_)), pwd_(std::move(oth.pwd_)),
-		initialScript_(std::move(oth.initialScript_)), ha_(oth.ha_), enableSSL_(oth.enableSSL_), enableSCRAM_(oth.enableSCRAM_),
+		initialScript_(std::move(oth.initialScript_)), ha_(oth.ha_), keepAliveTime_(oth.keepAliveTime_), enableSSL_(oth.enableSSL_), enableSCRAM_(oth.enableSCRAM_),
 		asynTask_(oth.asynTask_),compress_(oth.compress_),nodes_(std::move(oth.nodes_)),lastConnNodeIndex_(0),
 		reconnect_(oth.reconnect_), runSeqNo_(oth.runSeqNo_)
 {
@@ -152,6 +152,7 @@ DBConnection::~DBConnection() {
 
 bool DBConnection::connect() {
     if (nodes_.empty()) {
+        closed_ = false;
         if (!connectNode(host_, port_, keepAliveTime_)) {
             return false;
         }
@@ -318,6 +319,21 @@ bool DBConnection::connect(const std::string & hostName, int port, const std::st
             conn_->setClientId(clientId_);
         }
     }
+	if (!initialScript_.empty()) {
+		run(initialScript_);
+	}
+	return true;
+}
+
+bool DBConnection::reconnect() {
+    if (!nodes_.empty()) {
+        throw RuntimeException("Manual reconnect is not allowed when auto reconnect is set.");
+    }
+    state_ = ConnectionState::Initializing;
+	closed_ = false;
+	if (!connectNode(host_, port_, keepAliveTime_))
+		return false;
+
 	if (!initialScript_.empty()) {
 		run(initialScript_);
 	}
@@ -638,9 +654,9 @@ void DBConnection::setInitScript(const std::string & script) {
 
 BlockReader::BlockReader(const DataInputStreamSP& in ) : in_(in), total_(0), currentIndex_(0){
     int rowNum, colNum;
-    if(in->readInt(rowNum) != OK)
+    if(in->read(rowNum) != OK)
         throw IOException("Failed to read rows for data block.");
-    if(in->readInt(colNum) != OK)
+    if(in->read(colNum) != OK)
         throw IOException("Faield to read col for data block.");
     total_ = (long long)rowNum * (long long)colNum;
 }
@@ -650,7 +666,7 @@ ConstantSP BlockReader::read(){
         return nullptr;
     IO_ERR ret;
     uint16_t flag;
-    if ((ret = in_->readShort(flag)) != OK)
+    if ((ret = in_->read(flag)) != OK)
         throw IOException("Failed to read object flag from the socket with IO error type " + std::to_string(ret));
 
     auto form = static_cast<DATA_FORM>(flag >> 8U);

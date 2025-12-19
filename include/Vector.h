@@ -28,7 +28,7 @@ public:
     bool isLargeConstant() const override { return isMatrix() || size()>1024; }
     virtual void initialize(){}
     virtual INDEX getCapacity() const = 0;
-    virtual	INDEX reserve(INDEX capacity) {throw RuntimeException("Vector::reserve method not supported");}
+    virtual	INDEX reserve(INDEX capacity) = 0;
     virtual	void resize(INDEX sz) {throw RuntimeException("Vector::resize method not supported");}
     virtual INDEX getValueSize() const {throw RuntimeException("Vector::getValueSize method not supported");}
     virtual size_t getUnitLength() const = 0;

@@ -2769,3 +2769,72 @@ TEST_P(ScalarTest_download, test_download_scalar) {
     ASSERT_TRUE(res->isScalar());
     ASSERT_EQ(res->getType(), type == dolphindb::DT_SYMBOL? dolphindb::DT_STRING : type);
 }
+
+TEST_F(ScalarTest, UDL_success){
+    using dolphindb::operator ""_d;
+    using dolphindb::operator ""_M;
+    using dolphindb::operator ""_t;
+    using dolphindb::operator ""_m;
+    using dolphindb::operator ""_s;
+    using dolphindb::operator ""_D;
+    using dolphindb::operator ""_T;
+    using dolphindb::operator ""_n;
+    using dolphindb::operator ""_N;
+    dolphindb::ConstantSP date = "2025.12.19"_d;
+    dolphindb::ConstantSP month = "2025.12"_M;
+    dolphindb::ConstantSP time = "09:35:24.123"_t;
+    dolphindb::ConstantSP minute = "09:35"_m;
+    dolphindb::ConstantSP second = "09:35:24"_s;
+    dolphindb::ConstantSP datetime = "2025.12.19T09:35:24"_D;
+    dolphindb::ConstantSP timestamp = "2025.12.19T09:35:24.123"_T;
+    dolphindb::ConstantSP nanotime = "09:35:24.123456789"_n;
+    dolphindb::ConstantSP nanotimestamp = "2025.12.19T09:35:24.123456789"_N;
+    ASSERT_EQ(date->getString(), "2025.12.19");
+    ASSERT_EQ(date->getType(), dolphindb::DT_DATE);
+    ASSERT_EQ(month->getString(), "2025.12M");
+    ASSERT_EQ(month->getType(), dolphindb::DT_MONTH);
+    ASSERT_EQ(time->getString(), "09:35:24.123");
+    ASSERT_EQ(time->getType(), dolphindb::DT_TIME);
+    ASSERT_EQ(minute->getString(), "09:35m");
+    ASSERT_EQ(minute->getType(), dolphindb::DT_MINUTE);
+    ASSERT_EQ(second->getString(), "09:35:24");
+    ASSERT_EQ(second->getType(), dolphindb::DT_SECOND);
+    ASSERT_EQ(datetime->getString(), "2025.12.19T09:35:24");
+    ASSERT_EQ(datetime->getType(), dolphindb::DT_DATETIME);
+    ASSERT_EQ(timestamp->getString(), "2025.12.19T09:35:24.123");
+    ASSERT_EQ(timestamp->getType(), dolphindb::DT_TIMESTAMP);
+    ASSERT_EQ(nanotime->getString(), "09:35:24.123456789");
+    ASSERT_EQ(nanotime->getType(), dolphindb::DT_NANOTIME);
+    ASSERT_EQ(nanotimestamp->getString(), "2025.12.19T09:35:24.123456789");
+    ASSERT_EQ(nanotimestamp->getType(), dolphindb::DT_NANOTIMESTAMP);
+}
+
+TEST_F(ScalarTest, UDL_error){
+    using dolphindb::operator ""_d;
+    using dolphindb::operator ""_M;
+    using dolphindb::operator ""_t;
+    using dolphindb::operator ""_m;
+    using dolphindb::operator ""_s;
+    using dolphindb::operator ""_D;
+    using dolphindb::operator ""_T;
+    using dolphindb::operator ""_n;
+    using dolphindb::operator ""_N;
+    dolphindb::ConstantSP date = ""_d;
+    dolphindb::ConstantSP month = ""_M;
+    dolphindb::ConstantSP time = ""_t;
+    dolphindb::ConstantSP minute = ""_m;
+    dolphindb::ConstantSP second = ""_s;
+    dolphindb::ConstantSP datetime = ""_D;
+    dolphindb::ConstantSP timestamp = ""_T;
+    dolphindb::ConstantSP nanotime = ""_n;
+    dolphindb::ConstantSP nanotimestamp = ""_N;
+    ASSERT_TRUE(date.isNull());
+    ASSERT_TRUE(month.isNull());
+    ASSERT_TRUE(time.isNull());
+    ASSERT_TRUE(minute.isNull());
+    ASSERT_TRUE(second.isNull());
+    ASSERT_TRUE(datetime.isNull());
+    ASSERT_TRUE(timestamp.isNull());
+    ASSERT_TRUE(nanotime.isNull());
+    ASSERT_TRUE(nanotimestamp.isNull());
+}

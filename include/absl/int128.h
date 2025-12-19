@@ -26,6 +26,8 @@
 #ifndef ABSL_NUMERIC_INT128_H_
 #define ABSL_NUMERIC_INT128_H_
 
+#include "../Exports.h"
+
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -440,7 +442,7 @@ namespace absl {
 //     int64_t i = v;                        // Error
 //     int64_t i = static_cast<int64_t>(v);  // OK
 //
-class int128 {
+class EXPORT_DECL int128 {
  public:
   int128() = default;
 
@@ -1192,7 +1194,7 @@ constexpr int128 operator-(int128 v);
 constexpr int128 operator+(int128 lhs, int128 rhs);
 constexpr int128 operator-(int128 lhs, int128 rhs);
 int128 operator*(int128 lhs, int128 rhs);
-int128 operator/(int128 lhs, int128 rhs);
+EXPORT_DECL int128 operator/(int128 lhs, int128 rhs);
 int128 operator%(int128 lhs, int128 rhs);
 constexpr int128 operator|(int128 lhs, int128 rhs);
 constexpr int128 operator&(int128 lhs, int128 rhs);
@@ -1270,9 +1272,9 @@ constexpr int64_t BitCastToSigned(uint64_t v) {
 }  // namespace int128_internal
 
 #if defined(ABSL_HAVE_INTRINSIC_INT128)
-#include "absl/int128_have_intrinsic.inc"  // IWYU pragma: export
+#include "int128_have_intrinsic.inc"  // IWYU pragma: export
 #else  // ABSL_HAVE_INTRINSIC_INT128
-#include "absl/int128_no_intrinsic.inc"  // IWYU pragma: export
+#include "int128_no_intrinsic.inc"  // IWYU pragma: export
 #endif  // ABSL_HAVE_INTRINSIC_INT128
 
 }  // namespace absl

@@ -20,36 +20,3 @@ std::string getRandString(int len);
 std::string getCaseName();
 std::string getCaseNameHash();
 dolphindb::TableSP AnyVectorToTable(dolphindb::VectorSP vec);
-
-// clear all memory variables and database in DolphinDB
-// #define CLEAR_ENV(_session) \
-//     _session.run("\
-//         def clear_env(){\
-//             for (name in (exec name from objs(true) where shared=true))\
-//             {\
-//                 try{dropStreamTable(name, true)}catch(ex){};go;\
-//                 try{undef(name, SHARED)}catch(ex){};go;\
-//             };\
-//         };\
-//         pnodeRun(clear_env);\
-//         for(db in getClusterDFSDatabases())\
-//         {\
-//             try{dropDatabase(db)}catch(ex){};go;\
-//         };\
-//         undef all;go");
-
-// #define CLEAR_ENV2(_sessionsp) \
-//     _sessionsp->run("\
-//         def clear_env(){\
-//             for (name in (exec name from objs(true) where shared=true))\
-//             {\
-//                 try{dropStreamTable(name, true)}catch(ex){};go;\
-//                 try{undef(name, SHARED)}catch(ex){};go;\
-//             };\
-//         };\
-//         pnodeRun(clear_env);\
-//         for(db in getClusterDFSDatabases())\
-//         {\
-//             try{dropDatabase(db)}catch(ex){};go;\
-//         };\
-//         undef all;go");

@@ -845,7 +845,7 @@ bool UDPStreamingImpl::parseMessage(DataInputStreamSP data, SubscribeClient &cli
         client.offset = msgOffset;
     }
     char littleEndian;
-    ret = data->readChar(littleEndian);
+    ret = data->read(littleEndian);
     if(ret != OK) {
         return false;
     }
@@ -869,7 +869,7 @@ bool UDPStreamingImpl::parseMessage(DataInputStreamSP data, SubscribeClient &cli
         return true;
     }
     short flag;
-    ret = data->readShort(flag);
+    ret = data->read(flag);
     if(ret != OK) {
         return false;
     }
@@ -1218,7 +1218,7 @@ void StreamingClientImpl::parseMessage(const DataInputStreamSP &in)
         }
 
         char littleEndian;
-        ret = in->readChar(littleEndian);
+        ret = in->read(littleEndian);
         if (ret != OK)
             continue;
 
@@ -1226,10 +1226,10 @@ void StreamingClientImpl::parseMessage(const DataInputStreamSP &in)
         if (ret != OK)
             continue;
 
-        ret = in->readLong(sentTime);
+        ret = in->read(sentTime);
         if (ret != OK)
             continue;
-        ret = in->readLong(offset);
+        ret = in->read(offset);
         if (ret != OK)
             continue;
 
@@ -1243,7 +1243,7 @@ void StreamingClientImpl::parseMessage(const DataInputStreamSP &in)
         aliasTableName = stripActionName(topics[0]);
 
         short flag;
-        ret = in->readShort(flag);
+        ret = in->read(flag);
         if (ret != OK)
             continue;
 

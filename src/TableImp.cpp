@@ -502,8 +502,9 @@ ConstantSP BasicTable::getInstance(int sz) const {
 	newCols.reserve(cols_.size());
 	for(unsigned int i=0;i<cols_.size();i++)
 		newCols.push_back(((Vector*)cols_[i].get())->getInstance(sz));
-	ConstantSP copy = ConstantSP(new BasicTable(newCols, colNames_));
-	((Table*)copy.get())->setName(name_);
+	TableSP copy = ConstantSP(new BasicTable(newCols, colNames_));
+	copy->setName(name_);
+	copy->setColumnCompressMethods(colCompresses_);
 	return copy;
 }
 
@@ -595,9 +596,27 @@ bool BasicTable::append(vector<ConstantSP>& valueVec, INDEX& insertedRows, strin
 			errMsg = "The number of table columns doesn't match the number of columns to append.";
 			return false;
 		}
-		rowNum=valueVec[0]->size();
-		for(int i=1;i<num;++i){
-			if(valueVec[i]->size()!=rowNum ){
+		bool hasArrayVector = false;
+		rowNum = 1;
+		for(int i=0;i<num;++i){
+			if(cols_[i]->getType() < ARRAY_TYPE_BASE){
+				rowNum = valueVec[i]->size();
+				break;
+			}else{
+				hasArrayVector = true;
+				if(valueVec[i]->getType() == DT_ANY){
+					errMsg = "Cannot insert a vector of type ANY into a column of type arrayVector.";
+					return false;
+				}
+			}
+		}
+		if(hasArrayVector && rowNum != 1){
+			errMsg = "Only supports inserting one row when the table contains ArrayVector columns.";
+			return false;
+		}
+		
+		for(int i=0;i<num;++i){
+			if(valueVec[i]->size()!=rowNum && cols_[i]->getType() < ARRAY_TYPE_BASE){
 				errMsg = "Inconsistent length of values to insert.";
 				return false;
 			}
@@ -865,8 +884,19 @@ bool BasicTable::increaseCapacity(long long newCapacity, string& errMsg){
 					cols_[i] = vec->getValue(capacity);
 					cols_[i]->setTemporary(false);
 				}
-				else
-					((Vector*)cols_[i].get())->reserve(capacity);
+				else{
+					if(cols_[i]->getType() >= ARRAY_TYPE_BASE){
+						double ratio = static_cast<double>(vec->columns()) / vec->rows();
+						INDEX newValueCapacity = static_cast<INDEX>(capacity * ratio);
+						VectorSP sourceValueVec = reinterpret_cast<FastArrayVector*>(vec)->getSourceValue();
+						if(newValueCapacity > sourceValueVec->getCapacity()){
+							reinterpret_cast<FastArrayVector*>(vec)->reserveValue(newValueCapacity);
+						}
+						reinterpret_cast<FastArrayVector*>(vec)->reserveIndex(capacity);
+					}else{
+						((Vector*)cols_[i].get())->reserve(capacity);
+					}
+				}
 				vec = (Vector*)cols_[i].get();
 			}
 			finalCapacity = (std::min)(finalCapacity, vec->getCapacity());

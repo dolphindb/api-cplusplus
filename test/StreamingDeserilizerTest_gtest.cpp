@@ -237,7 +237,7 @@ dolphindb::StreamDeserializerSP createStreamDeserializer_witharrayVector(dolphin
     return sdsp;
 }
 
-INSTANTIATE_TEST_SUITE_P(, StreamingDeserilizerTester_basic, testing::Values(-1, rand() % 1000 + 13000));
+INSTANTIATE_TEST_SUITE_P(, StreamingDeserilizerTester_basic, testing::Values(0, rand() % 1000 + 13000));
 TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeWithstreamDeserilizer)
 {
     std::string case_=getCaseName();
@@ -285,7 +285,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
         }
     };
 
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     auto thread1 = threadedClient.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     notify.wait();
 
@@ -348,7 +348,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
             }
         }
     };
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     auto thread2 = threadedClient.subscribe(HOST, PORT, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, true, 1, 1.0, false, USER, PASSWD, sdsp);
     notify.wait();
 
@@ -436,7 +436,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
     dolphindb::AutoFitTableAppender appender1("", case_+"_res1_SDT", *pConn);
     dolphindb::AutoFitTableAppender appender2("", case_+"_res2_SDT", *pConn);
 
-    dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+    dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
     auto queue = client.subscribe(HOST, PORT, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
 
     dolphindb::Message msg;
@@ -539,7 +539,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_1_s
         }
     };
 
-    dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, 1) : dolphindb::ThreadPooledClient(listenport, 1);
+    dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 1);
     auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     ASSERT_EQ(threadVec.size(), 1);
     notify.wait();
@@ -604,7 +604,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_2_s
         }
     };
 
-    dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, 2) : dolphindb::ThreadPooledClient(listenport, 2);
+    dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
     auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     ASSERT_EQ(threadVec.size(), 2);
     notify.wait();
@@ -633,7 +633,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_with_msgAsTable_True)
         // std::cout << symbol << std::endl;
     };
 
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     ASSERT_ANY_THROW(auto thread1 = threadedClient.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, true, false, USER, PASSWD, sdsp));
 }
 
@@ -670,7 +670,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_with_msgAsTable_True
     {
         const std::string &symbol = msg.getSymbol();
     };
-    dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+    dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
     ASSERT_ANY_THROW(client.subscribe(HOST, PORT, st, "actionTest", 0, true, nullptr, true, false, USER, PASSWD, sdsp));
 }
 
@@ -684,7 +684,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_with_msgAsTable
     {
         const std::string &symbol = msg.getSymbol();
     };
-    dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 1);
+    dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 1);
     ASSERT_ANY_THROW(auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, true, false, USER, PASSWD, sdsp));
 }
 
@@ -731,7 +731,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
             notify.set();
         }
     };
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     auto thread1 = threadedClient.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     notify.wait();
     threadedClient.unsubscribe(HOST, PORT, st, "test_SD");
@@ -850,7 +850,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
             }
         }
     };
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     auto thread2 = threadedClient.subscribe(HOST, PORT, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, true, 1, 1.0, false, USER, PASSWD, sdsp);
     notify.wait();
     threadedClient.unsubscribe(HOST, PORT, st, "mutiSchemaBatch");
@@ -873,7 +873,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
     dolphindb::StreamDeserializerSP sdsp = createStreamDeserializer_2(*pConn, st);
     dolphindb::AutoFitTableAppender appender1("", case_+"_res1_SDT", *pConn);
     dolphindb::AutoFitTableAppender appender2("", case_+"_res2_SDT", *pConn);
-    dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+    dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
     auto queue = client.subscribe(HOST, PORT, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     dolphindb::Message msg;
     dolphindb::Signal notify;
@@ -968,7 +968,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_1_s
             notify.set();
         }
     };
-    dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, 1) : dolphindb::ThreadPooledClient(listenport, 1);
+    dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 1);
     auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     ASSERT_EQ(threadVec.size(), 1);
     notify.wait();
@@ -1027,7 +1027,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_2_s
             notify.set();
         }
     };
-    dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, 2) : dolphindb::ThreadPooledClient(listenport, 2);
+    dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
     auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     ASSERT_EQ(threadVec.size(), 2);
     notify.wait();
@@ -1053,7 +1053,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_with_msgAsTable_True_
         const std::string &symbol = msg.getSymbol();
         std::cout << symbol << std::endl;
     };
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     ASSERT_ANY_THROW(auto thread1 = threadedClient.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, true, false, USER, PASSWD, sdsp));
 }
 
@@ -1068,7 +1068,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_with_msgAsTable_True
         const std::string &symbol = msg.getSymbol();
         std::cout << symbol << std::endl;
     };
-    dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+    dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
     ASSERT_ANY_THROW(client.subscribe(HOST, PORT, st, "actionTest", 0, true, nullptr, true, false, USER, PASSWD, sdsp));
 }
 
@@ -1083,7 +1083,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_with_msgAsTable
         const std::string &symbol = msg.getSymbol();
     };
 
-    dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 1);
+    dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 1);
 
     ASSERT_ANY_THROW(auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, true, false, USER, PASSWD, sdsp));
 }
@@ -1130,7 +1130,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_onehandler_subscribeW
             notify.set();
         }
     };
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     auto thread1 = threadedClient.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     notify.wait();
     threadedClient.unsubscribe(HOST, PORT, st, "test_SD");
@@ -1248,7 +1248,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_batchhandler_subscrib
             }
         }
     };
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     auto thread2 = threadedClient.subscribe(HOST, PORT, batchhandler, st, "mutiSchemaBatch", 0, true, nullptr, true, 1, 1.0, false, USER, PASSWD, sdsp);
     notify.wait();
     threadedClient.unsubscribe(HOST, PORT, st, "mutiSchemaBatch");
@@ -1271,7 +1271,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_subscribeWithstreamD
     dolphindb::StreamDeserializerSP sdsp = createStreamDeserializer_3(*pConn, st);
     dolphindb::AutoFitTableAppender appender1("", case_+"_res1_SDT", *pConn);
     dolphindb::AutoFitTableAppender appender2("", case_+"_res2_SDT", *pConn);
-    dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+    dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
     auto queue = client.subscribe(HOST, PORT, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     dolphindb::Message msg;
     dolphindb::Signal notify;
@@ -1366,7 +1366,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_1_s
         }
     };
 
-    dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, 1) : dolphindb::ThreadPooledClient(listenport, 1);
+    dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 1);
     auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     ASSERT_EQ(threadVec.size(), 1);
     notify.wait();
@@ -1425,7 +1425,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_threadCount_3_s
             notify.set();
         }
     };
-    dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport);
+    dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport);
     auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     ASSERT_EQ(threadVec.size(), 3);
     notify.wait();
@@ -1451,7 +1451,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadclient_with_msgAsTable_True_
         const std::string &symbol = msg.getSymbol();
         std::cout << symbol << std::endl;
     };
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     ASSERT_ANY_THROW(auto thread1 = threadedClient.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, true, false, USER, PASSWD, sdsp));
 }
 
@@ -1466,7 +1466,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Pollingclient_with_msgAsTable_True
         const std::string &symbol = msg.getSymbol();
         std::cout << symbol << std::endl;
     };
-    dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+    dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
     ASSERT_ANY_THROW(client.subscribe(HOST, PORT, st, "actionTest", 0, true, nullptr, true, false, USER, PASSWD, sdsp));
 }
 
@@ -1481,7 +1481,7 @@ TEST_P(StreamingDeserilizerTester_basic, test_Threadpooledclient_with_msgAsTable
         const std::string &symbol = msg.getSymbol();
         std::cout << symbol << std::endl;
     };
-    dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 1);
+    dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 1);
 
     ASSERT_ANY_THROW(auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, true, false, USER, PASSWD, sdsp));
 }
@@ -1567,7 +1567,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadclient_onehandler_subscri
             notify.set();
         }
     };
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     auto thread1 = threadedClient.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, false, nullptr, false, false, USER, PASSWD, sdsp);
     notify.wait();
     threadedClient.unsubscribe(HOST, PORT, st, "test_SD");
@@ -1689,7 +1689,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadclient_batchhandler_subsc
             }
         }
     };
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     auto thread2 = threadedClient.subscribe(HOST, PORT, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, true, 1, 1.0, false, USER, PASSWD, sdsp);
     notify.wait();
     threadedClient.unsubscribe(HOST, PORT, st, "mutiSchemaBatch");
@@ -1714,7 +1714,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Pollingclient_subscribeWithstre
     dolphindb::StreamDeserializerSP sdsp = createStreamDeserializer_withallTypes(*pConn, st, ttp, scr);
     dolphindb::AutoFitTableAppender appender1("", case_+"_res1_SDT", *pConn);
     dolphindb::AutoFitTableAppender appender2("", case_+"_res2_SDT", *pConn);
-    dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+    dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
     auto queue = client.subscribe(HOST, PORT, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     dolphindb::Message msg;
     dolphindb::Signal notify;
@@ -1811,7 +1811,7 @@ TEST_P(StreamingDeserilizerTester_allTypes, test_Threadpooledclient_subscribeWit
         }
     };
     int threadCount = rand() % 10 + 1;
-    dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, threadCount);
+    dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, threadCount);
     auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     ASSERT_EQ(threadVec.size(), threadCount);
     notify.wait();
@@ -1906,7 +1906,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadclient_onehandler_subs
             notify.set();
         }
     };
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     auto thread1 = threadedClient.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, false, nullptr, false, false, USER, PASSWD, sdsp);
     notify.wait();
     threadedClient.unsubscribe(HOST, PORT, st, "test_SD");
@@ -2028,7 +2028,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadclient_batchhandler_su
             }
         }
     };
-    dolphindb::ThreadedClient threadedClient = listenport == -1? dolphindb::ThreadedClient() : dolphindb::ThreadedClient(listenport);
+    dolphindb::ThreadedClient threadedClient = dolphindb::ThreadedClient(listenport);
     auto thread2 = threadedClient.subscribe(HOST, PORT, batchhandler, st, "mutiSchemaBatch", 0, false, nullptr, true, 1, 1.0, false, USER, PASSWD, sdsp);
     notify.wait();
     threadedClient.unsubscribe(HOST, PORT, st, "mutiSchemaBatch");
@@ -2053,7 +2053,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Pollingclient_subscribeWiths
     dolphindb::StreamDeserializerSP sdsp = createStreamDeserializer_witharrayVector(*pConn, st, ttp, scr);
     dolphindb::AutoFitTableAppender appender1("", case_+"_res1_SDT", *pConn);
     dolphindb::AutoFitTableAppender appender2("", case_+"_res2_SDT", *pConn);
-    dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+    dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
     auto queue = client.subscribe(HOST, PORT, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     dolphindb::Message msg;
     dolphindb::Signal notify;
@@ -2152,7 +2152,7 @@ TEST_P(StreamingDeserilizerTester_arrayVector, test_Threadpooledclient_subscribe
         }
     };
     int threadCount = rand() % 10 + 1;
-    dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, threadCount);
+    dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, threadCount);
     auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "test_SD", 0, true, nullptr, false, false, USER, PASSWD, sdsp);
     ASSERT_EQ(threadVec.size(), threadCount);
     notify.wait();

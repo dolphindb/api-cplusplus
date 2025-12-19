@@ -28,7 +28,7 @@ const std::string PASSWD_CLUSTER = "123456";
 
 std::vector<std::string> sites = {"192.168.0.54:9902:dnode9902", "192.168.0.54:9903:dnode9903", "192.168.0.54:9904:dnode9904"};
 std::vector<std::string> nodeNames = {"dnode9902", "dnode9903", "dnode9904"};
-dolphindb::DLogger::Level default_level = dolphindb::DLogger::LevelCount;
+dolphindb::DLogger::Level default_level = dolphindb::DLogger::LevelError;
 
 std::string getRandString(int len){
     std::string alphas = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";

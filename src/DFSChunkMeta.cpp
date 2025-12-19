@@ -39,10 +39,10 @@ DFSChunkMeta::DFSChunkMeta(const DataInputStreamSP& in) : Constant(2051), sites_
 
     char guid[16];
     in->read(guid, 16);
-    in->readInt(version_);
-    in->readIndex(size_);
-    in->readChar(type_);
-    ret = in->readChar(replicaCount_);
+    in->read(version_);
+    in->read(size_);
+    in->read(type_);
+    ret = in->read(replicaCount_);
     if (ret != OK)
         throw RuntimeException("Failed to deserialize DFSChunkMeta object.");
     if (replicaCount_ > 0)
@@ -54,7 +54,7 @@ DFSChunkMeta::DFSChunkMeta(const DataInputStreamSP& in) : Constant(2051), sites_
         sites_[i] = site;
     }
     id_ = Guid((unsigned char*)guid);
-    if (in->readLong(cid_) != OK)
+    if (in->read(cid_) != OK)
         throw RuntimeException("Failed to deserialize DFSChunkMeta object.");
 }
 

@@ -227,11 +227,12 @@ public:
 	static void SetOrThrowErrorInfo(ErrorCodeInfo *errorCodeInfo, int errorCode, const std::string &errorInfo);
 	template<typename T>
 	static bool setValue(ConstantSP& data, DATA_TYPE dataType, T val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0) {
-		SetOrThrowErrorInfo(&errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "It cannot be converted to " + getDataTypeString(dataType) + " in setValue");
+		SetOrThrowErrorInfo(&errorCodeInfo, ErrorCodeInfo::EC_InvalidObject, "The type of inserted value is not supported in setValue");
 		return false;
 	}
 	static bool setValue(ConstantSP& data, DATA_TYPE dataType, std::nullptr_t val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
 	static bool setValue(ConstantSP& data, DATA_TYPE dataType, Constant* val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
+	static bool setValue(ConstantSP& data, DATA_TYPE dataType, const VectorSP& val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
 	static bool setValue(ConstantSP& data, DATA_TYPE dataType, const ConstantSP& val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
 	static bool setValue(ConstantSP& data, DATA_TYPE dataType, bool val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
 	static bool setValue(ConstantSP& data, DATA_TYPE dataType, char val, ErrorCodeInfo &errorCodeInfo, int extraParam = 0);
@@ -412,28 +413,22 @@ private:
 	}
 };
 
-template <typename T>
-inline T getNullValue();
-template <>
-inline char getNullValue<char>() { return CHAR_MIN; }
-template <>
-inline short getNullValue<short>() { return SHRT_MIN; }
-template <>
-inline int getNullValue<int>() { return INT_MIN; }
-template <>
-inline long int getNullValue<long int>() { return LONG_MIN; }
-template <>
-inline long long getNullValue<long long>() { return LLONG_MIN; }
-template <>
-inline float getNullValue<float>() { return FLT_NMIN; }
-template <>
-inline double getNullValue<double>() { return DBL_NMIN; }
-template <>
-inline std::string getNullValue<std::string>() { return ""; }
-template <>
-inline Guid getNullValue<Guid>() { return Guid(); }
-template <>
-inline wide_integer::int128 getNullValue<wide_integer::int128>() { return std::numeric_limits<wide_integer::int128>::min(); }
+template <typename T> inline T getNullValue();
+template <> inline char getNullValue() { return CHAR_MIN; }
+template <> inline short getNullValue() { return SHRT_MIN; }
+template <> inline int getNullValue() { return INT_MIN; }
+template <> inline int64_t getNullValue() { return LLONG_MIN; }
+#ifdef __linux__
+template <> inline long long getNullValue() { return LLONG_MIN; }
+#endif
+template <> inline float getNullValue() { return FLT_NMIN; }
+template <> inline double getNullValue() { return DBL_NMIN; }
+template <> inline std::string getNullValue() { return ""; }
+template <> inline Guid getNullValue() { return Guid(); }
+template <> inline wide_integer::int128 getNullValue()
+{
+    return std::numeric_limits<wide_integer::int128>::min();
+}
 
 template <class T>
 class DdbVector {

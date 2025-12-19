@@ -36,6 +36,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     SetImp.cpp
     Streaming.cpp
     StreamingUtil.cpp
+    StreamReplicator.cpp
     SymbolBase.cpp
     SysIO.cpp
     TableImp.cpp

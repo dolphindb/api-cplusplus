@@ -98,87 +98,151 @@ private:
 	size_t length_;
 };
 
-class EXPORT_DECL DataInputStream{
-public:
-	explicit DataInputStream(STREAM_TYPE type, std::size_t bufSize = 2048);
-	DataInputStream(const char* data, std::size_t size, bool copy = true);
-	explicit DataInputStream(const SocketSP& socket, std::size_t bufSize = 2048);
-	explicit DataInputStream(FILE* file, std::size_t bufSize = 2048);
-	explicit DataInputStream(const DataQueueSP& dataQueue);
-	virtual ~DataInputStream();
-	IO_ERR close();
-	void enableReverseIntegerByteOrder() { reverseOrder_ = true;}
-	void disableReverseIntegerByteOrder() { reverseOrder_ = false;}
-	IO_ERR bufferBytes(size_t length);
-	IO_ERR read(char* buf, size_t length) { return readBytes(buf, length, false);}
-	IO_ERR readBytes(char* buf, size_t length, bool reverseOrder);
+class EXPORT_DECL DataInputStream
+{
+  public:
+    explicit DataInputStream(STREAM_TYPE type, std::size_t bufSize = 2048);
+    DataInputStream(const char *data, std::size_t size, bool copy = true);
+    explicit DataInputStream(const SocketSP &socket, std::size_t bufSize = 2048);
+    explicit DataInputStream(FILE *file, std::size_t bufSize = 2048);
+    explicit DataInputStream(const DataQueueSP &dataQueue);
+    virtual ~DataInputStream();
+    IO_ERR close();
+    void enableReverseIntegerByteOrder() { reverseOrder_ = true; }
+    void disableReverseIntegerByteOrder() { reverseOrder_ = false; }
+    IO_ERR bufferBytes(size_t length);
+    IO_ERR read(char *buf, size_t length) { return readBytes(buf, length, false); }
+    IO_ERR readBytes(char *buf, size_t length, bool reverseOrder);
 
-	/**
-	 * This method is designed to read a large block of stream data.  When the length is too small, say less than 8192,
-	 * it may affect IO throughput. This method first retrieves data from the buffer and reads the remaining from the
-	 * underlying device.
-	 */
-	IO_ERR readBytes(char* buf, size_t length, size_t& actualLength);
-	IO_ERR readBytes(char* buf, size_t unitLength, size_t length, size_t& actualLength);
-	IO_ERR readBool(bool& value);
-	IO_ERR readBool(char& value);
-	IO_ERR readChar(char& value);
-	IO_ERR readUnsignedChar(unsigned char& value);
-	IO_ERR readShort(short& value);
-	IO_ERR readShort(uint16_t& value);
-	IO_ERR readUnsignedShort(unsigned short& value);
-	IO_ERR readInt(int& value);
-	IO_ERR readUnsignedInt(unsigned int& value);
-	IO_ERR readLong(long long& value);
-	IO_ERR readIndex(INDEX& value);
-	IO_ERR readFloat(float& value);
-	IO_ERR readDouble(double& value);
-	IO_ERR readString(std::string& value);
-	IO_ERR readString(std::string& value, size_t length);
-	IO_ERR readLine(std::string& value);
-	/**
-	 * Preview the given size of stream data from the current position. The internal current position will not change
-	 * after this operation. If the available data in the internal buffer from the current position is less than the
-	 * requested size, the method will read data from the socket and be blocked or immediately return an error if there
-	 * is not data available unfortunately depending on the socket mode, blocking or non-blocking.
-	 */
-	IO_ERR peekBuffer(char* buf, size_t size);
-	IO_ERR peekLine(std::string& value);
+    /**
+     * This method is designed to read a large block of stream data.  When the length is too small, say less than 8192,
+     * it may affect IO throughput. This method first retrieves data from the buffer and reads the remaining from the
+     * underlying device.
+     */
+    IO_ERR readBytes(char *buf, size_t length, size_t &actualLength);
+    IO_ERR readBytes(char *buf, size_t unitLength, size_t length, size_t &actualLength);
+    template <typename T> IO_ERR read(T &value) { return readBytes((char *)&value, sizeof(T), reverseOrder_); }
+    IO_ERR readBool(bool &value) { return read(value); }
+    IO_ERR readShort(short &value) { return read(value); }
+    IO_ERR readInt(int &value) { return read(value); }
+    IO_ERR readLong(long long &value) { return read(value); }
+    IO_ERR readFloat(float &value) { return read(value); }
+    IO_ERR readIndex(INDEX &value) { return read(value); }
+    IO_ERR readString(std::string &value)
+    {
+        if (source_ == QUEUE_STREAM) {
+            value.clear();
+            bool isStringFinished = true;
+            size_t endPos = 0;
+            IO_ERR result = OK;
+            while (true) {
+                result = prepareData();
+                if (result != OK)
+                    return result;
+                isStringFinished = isHaveBytesEndWith(0, endPos);
+                if (isStringFinished) {
+                    size_t lineLength = endPos - cursor_;
+                    value.append(buf_ + cursor_, lineLength);
+                    size_ -= endPos - cursor_ + 1;
+                    cursor_ = endPos + 1;
+                    break;
+                }
+                value.append(buf_ + cursor_, size_);
+                size_ = 0;
+                cursor_ = capacity_;
+            }
+            return OK;
+        }
+        size_t endPos;
+        IO_ERR ret = prepareBytesEndWith(0, endPos);
+        if (ret != OK)
+            return ret;
 
-	bool isSocketStream() const {return source_ == SOCKET_STREAM;}
-	bool isFileStream() const { return source_ == FILE_STREAM;}
-	bool isArrayStream() const {return source_ == ARRAY_STREAM;}
-	STREAM_TYPE getStreamType() const {return source_;}
-	SocketSP getSocket() const { return socket_;}
-	FILE* getFileHandle() const { return file_;}
+        size_ -= endPos - cursor_ + 1;
+        size_t lineLength = endPos - cursor_;
+        if (lineLength > 0 && buf_[endPos - 1] == '\r')
+            lineLength--;
+        value.clear();
+        value.append(buf_ + cursor_, lineLength);
+        cursor_ = endPos + 1;
+        return OK;
+    }
+    IO_ERR readString(std::string &value, size_t length)
+    {
 
-	std::size_t getDataSizeInArray() const { return size_;}
-	bool isIntegerReversed() const {return reverseOrder_;}
+        if (source_ == QUEUE_STREAM) {
+            value.clear();
+            size_t left = length;
+            IO_ERR result = OK;
+            while (left > 0) {
+                result = prepareData();
+                if (result != OK)
+                    return result;
+                std::size_t num = std::min(size_, left);
+                value.append(buf_ + cursor_, num);
+                size_ -= num;
+                cursor_ += num;
+                left -= num;
+            }
+            return OK;
+        }
+        if (size_ < length) {
+            IO_ERR ret = prepareBytes(length);
+            if (ret != OK)
+                return ret;
+        }
 
-	/**
-	 * Reset the size of an external buffer. The cursor moves to the beginning of the buffer.
-	 */
-	bool reset(int size);
+        value.clear();
+        value.append(buf_ + cursor_, length);
+        size_ -= length;
+        cursor_ += length;
+        return OK;
+    }
+    IO_ERR readLine(std::string &value);
+    /**
+     * Preview the given size of stream data from the current position. The internal current position will not change
+     * after this operation. If the available data in the internal buffer from the current position is less than the
+     * requested size, the method will read data from the socket and be blocked or immediately return an error if there
+     * is not data available unfortunately depending on the socket mode, blocking or non-blocking.
+     */
+    IO_ERR peekBuffer(char *buf, size_t size);
+    IO_ERR peekLine(std::string &value);
 
-private:
-	IO_ERR prepareBytes(size_t length);
-	IO_ERR prepareBytesEndWith(char endChar, size_t& endPos);
-	//use in QUEUE_STREAM, if there is already data to read, return immediately, or block util data ready
-	IO_ERR prepareData();
-	//use in QUEUE_STREAM, if there is a #endChar in buf_, record #endPos and return true, or return false
-	bool   isHaveBytesEndWith(char endChar, size_t& endPos);
-protected:
-	SocketSP socket_;
-	FILE* file_;
-	char* buf_;
-	STREAM_TYPE source_;
-	bool reverseOrder_;
-	bool externalBuf_;
-	bool closed_;
-	size_t capacity_;
-	size_t size_;
-	size_t cursor_;
-	DataQueueSP dataQueue_;
+    bool isSocketStream() const { return source_ == SOCKET_STREAM; }
+    bool isFileStream() const { return source_ == FILE_STREAM; }
+    bool isArrayStream() const { return source_ == ARRAY_STREAM; }
+    STREAM_TYPE getStreamType() const { return source_; }
+    SocketSP getSocket() const { return socket_; }
+    FILE *getFileHandle() const { return file_; }
+
+    std::size_t getDataSizeInArray() const { return size_; }
+    bool isIntegerReversed() const { return reverseOrder_; }
+
+    /**
+     * Reset the size of an external buffer. The cursor moves to the beginning of the buffer.
+     */
+    bool reset(int size);
+
+  private:
+    IO_ERR prepareBytes(size_t length);
+    IO_ERR prepareBytesEndWith(char endChar, size_t &endPos);
+    // use in QUEUE_STREAM, if there is already data to read, return immediately, or block util data ready
+    IO_ERR prepareData();
+    // use in QUEUE_STREAM, if there is a #endChar in buf_, record #endPos and return true, or return false
+    bool isHaveBytesEndWith(char endChar, size_t &endPos);
+
+  protected:
+    SocketSP socket_;
+    FILE *file_;
+    char *buf_;
+    STREAM_TYPE source_;
+    bool reverseOrder_;
+    bool externalBuf_;
+    bool closed_;
+    size_t capacity_;
+    size_t size_;
+    size_t cursor_;
+    DataQueueSP dataQueue_;
 };
 
 class EXPORT_DECL DataOutputStream {

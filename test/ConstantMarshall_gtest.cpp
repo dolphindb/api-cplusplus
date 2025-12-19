@@ -1576,7 +1576,7 @@ TEST_F(MarshallTest, NumberFormat_TemporalFormat){
     ASSERT_ANY_THROW(dolphindb::TemporalFormat f1(""));
     ASSERT_ANY_THROW(dolphindb::TemporalFormat f2("12345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"));
     ASSERT_ANY_THROW(dolphindb::TemporalFormat f3("yyyy\\"));
-    char format[]{-5, 'y', 'y', 'y', 'y'};
+    char format[]{-5, 'y', 'y', 'y', 'y', '\0'};
     dolphindb::TemporalFormat f4(format);
     dolphindb::TemporalFormat f5("yy");
     ASSERT_EQ("70", f5.format(200, dolphindb::DT_MINUTE));

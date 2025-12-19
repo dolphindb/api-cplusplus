@@ -121,7 +121,7 @@ namespace SPCT
         StreamingPollingClientTester::conn.run(replayScript);
     }
 
-    INSTANTIATE_TEST_SUITE_P(, StreamingPollingClientTester, testing::Values(-1, rand() % 1000 + 13000));
+    INSTANTIATE_TEST_SUITE_P(, StreamingPollingClientTester, testing::Values(0, rand() % 1000 + 13000));
     TEST_P(StreamingPollingClientTester, test_subscribeUnsubscribe_normal)
     {
         std::string case_=getCaseName();
@@ -129,7 +129,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay(st, 1000);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, USER, PASSWD);
         dolphindb::Message msg;
         dolphindb::Signal notify;
@@ -180,7 +180,7 @@ namespace SPCT
     TEST_P(StreamingPollingClientTester, test_subscribeUnsubscribe_notExistTable)
     {
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, "st_notExist", DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, USER, PASSWD);
         dolphindb::Util::sleep(1000);
         client.unsubscribe(HOST, PORT, "st_notExist", DEFAULT_ACTION_NAME);
@@ -190,7 +190,7 @@ namespace SPCT
     {
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         ASSERT_ANY_THROW(client.subscribe("", PORT, "st", DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, USER, PASSWD));
     }
 
@@ -198,7 +198,7 @@ namespace SPCT
     {
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         ASSERT_ANY_THROW(client.subscribe(HOST, NULL, "st", DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, USER, PASSWD));
     }
 
@@ -206,7 +206,7 @@ namespace SPCT
     {
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         ASSERT_ANY_THROW(auto queue = client.subscribe(HOST, PORT, "", DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, USER, PASSWD));
     }
 
@@ -217,7 +217,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay(st, 1000);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         bool enableClientAuth = conn.run("bool(getConfig('enableClientAuth'))")->getBool();
         if (enableClientAuth){
             ASSERT_ANY_THROW(auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, false));
@@ -238,7 +238,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay(st, 1000);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, "", 0, true, nullptr, false, false, USER, PASSWD);
         dolphindb::Message msg;
         dolphindb::Signal notify;
@@ -294,7 +294,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay(st, 1000);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, -1, true, nullptr, false, false, USER, PASSWD);
         dolphindb::Message msg;
         dolphindb::Signal notify;
@@ -351,7 +351,7 @@ namespace SPCT
         dolphindb::VectorSP filter = dolphindb::Util::createVector(dolphindb::DT_SYMBOL, 1, 1);
         filter->setString(0, "a");
 
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
             auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, true, filter, false, false, USER, PASSWD);
             dolphindb::Message msg;
             dolphindb::Signal notify;
@@ -407,7 +407,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay(st, 1000);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, true, nullptr, true, false, USER, PASSWD);
         dolphindb::Message msg;
         dolphindb::Signal notify;
@@ -463,7 +463,7 @@ namespace SPCT
         GTEST_SKIP() << "server还没有修复allowExists的问题, jira: https://dolphindb1.atlassian.net/browse/D20-14283";
         std::string case_=getCaseName();
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         std::string st = case_;
         SPCT::createSharedTableAndReplay(st, 1000);
         int msg_total = 0, msg_total2 = 0;
@@ -505,7 +505,7 @@ namespace SPCT
     {
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         ASSERT_ANY_THROW(auto queue = client.subscribe(HOST, PORT, "st", DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, USER, PASSWD));
     }
 
@@ -513,7 +513,7 @@ namespace SPCT
     {
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, "nonExistTable", "resubTest", 0, true, nullptr, false, false, USER, PASSWD);
         dolphindb::Util::sleep(1000);
         client.unsubscribe(HOST, PORT, "nonExistTable", "resubTest");
@@ -526,7 +526,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay(st, 1000);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, USER, PASSWD);
         dolphindb::Message msg;
         dolphindb::Signal notify;
@@ -565,7 +565,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay(st, 1000);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, USER, PASSWD);
         dolphindb::Message msg;
         dolphindb::Signal notify;
@@ -604,7 +604,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay(st, 1000);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, USER, PASSWD);
         dolphindb::Message msg;
         dolphindb::Signal notify;
@@ -640,7 +640,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay(st, 1000);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, USER, PASSWD);
         dolphindb::Message msg;
         dolphindb::Signal notify;
@@ -680,7 +680,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay(st, 1000);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, false, nullptr, false, false, USER, PASSWD);
         dolphindb::Message msg;
         dolphindb::Signal notify;
@@ -717,7 +717,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay_withAllDataType(st);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, USER, PASSWD);
         int index = 0;
         dolphindb::Message msg;
@@ -774,7 +774,7 @@ namespace SPCT
         int msg_total = 0;
         int index = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, "arrayVectorTableTest", 0, true, nullptr, false, false, USER, PASSWD);
         dolphindb::Util::sleep(1000);
         dolphindb::Message msg;
@@ -829,7 +829,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay(st, 1000000);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, USER, PASSWD);
 
         dolphindb::Message msg;
@@ -878,7 +878,7 @@ namespace SPCT
         SPCT::createSharedTableAndReplay(st, 10000000);
         int msg_total = 0;
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         auto queue = client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, false, nullptr, true, false, USER, PASSWD);
 
         dolphindb::Message msg;
@@ -1067,7 +1067,7 @@ namespace SPCT
         dolphindb::Message msg;
         dolphindb::AutoFitTableAppender appender("", case_+"_res_SPCT", conn);
         int listenport = std::get<0>(GetParam());
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
         std::string dataScript = std::get<1>(GetParam()).second;
         std::thread th = std::thread([&]() {
             insertData(conn, st, dataScript);
@@ -1113,8 +1113,8 @@ namespace SPCT
         std::string st = case_;
         SPCT::createSharedTableAndReplay(st, 1000);
         int listenport = GetParam();
-        dolphindb::PollingClient client = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
-        dolphindb::PollingClient client1 = listenport == -1? dolphindb::PollingClient() : dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client = dolphindb::PollingClient(listenport);
+        dolphindb::PollingClient client1 = dolphindb::PollingClient(listenport);
         unsigned int resubscribeTimeout = 500;
         client.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, USER, PASSWD);
         auto queue1 = client1.subscribe(HOST, PORT, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, USER, PASSWD, nullptr, {}, 100, resubscribeTimeout);

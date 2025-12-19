@@ -599,7 +599,7 @@ bool ScalarUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 	if(type == DT_FUNCTIONDEF){
 		isCodeObject_ = true;
 		functionType_ = -1;
-		if((ret = in_->readChar(functionType_)) != OK)
+		if((ret = in_->read(functionType_)) != OK)
 			return false;
 		if(functionType_ < 0){
 			ret = INVALIDDATA;
@@ -613,7 +613,7 @@ bool ScalarUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 	isCodeObject_ = false;
 	if (Util::getCategory(type) == DENARY) {
 		scale_ = -1;
-		ret = in_->readInt(scale_);
+		ret = in_->read(scale_);
 		if (ret != OK) {
 			return false;
 		}
@@ -644,7 +644,7 @@ bool SymbolBaseUnmarshall::start(bool blocking, IO_ERR& ret){
 	symbaseId_ = -1;
 	size_ = -1;
 
-	if((ret = in_->readInt(symbaseId_)) != OK)
+	if((ret = in_->read(symbaseId_)) != OK)
 		return false;
 	if(symbaseId_ < 0){
 		ret = INVALIDDATA;
@@ -701,13 +701,13 @@ bool VectorUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 	//If fllowing part modified, remember to modify Compress.writeVectorMetaValue function
 	rows_ = -1;
 	columns_ = -1;
-	if((ret = input->readInt(rows_)) != OK)
+	if((ret = input->read(rows_)) != OK)
 		return false;
 	if(rows_ < 0){
 		ret = INVALIDDATA;
 		return false;
 	}
-	if((ret = input->readInt(columns_)) != OK)
+	if((ret = input->read(columns_)) != OK)
 		return false;
 	if(columns_ < 0){
 		ret = INVALIDDATA;
@@ -726,7 +726,7 @@ bool VectorUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 		actualType = DT_STRING;
 	}
 	if (Util::getCategory(actualType) == DENARY || actualType == DT_DECIMAL32_ARRAY || actualType == DT_DECIMAL64_ARRAY || actualType == DT_DECIMAL128_ARRAY) {
-		ret = input->readInt(scale_);
+		ret = input->read(scale_);
 		if (ret != OK) {
 			return false;
 		}
@@ -771,7 +771,7 @@ bool VectorUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 		if(!unmarshall_.isNull())
 			unmarshall_.clear();
 		while(ret == OK && nextStart_ < rows_){
-			ret = input->readShort(flag);
+			ret = input->read(flag);
 			if(ret == OK){
 				decodeFlag(flag, form, type);
 				unmarshall_ = ConstantUnmarshallFactory::getInstance(form, input);
@@ -829,7 +829,7 @@ bool MatrixUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 	rowLabel_ = Constant::void_;
 	columnLabel_ = Constant::void_;
 
-	if((ret = in_->readChar(labelFlag_)) != OK)
+	if((ret = in_->read(labelFlag_)) != OK)
 		return false;
 	if(labelFlag_ < 0){
 		ret = INVALIDDATA;
@@ -837,7 +837,7 @@ bool MatrixUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 	}
 
 	if(((unsigned char)labelFlag_ & 1U) != 0U) {
-		ret = in_->readShort(flag);
+		ret = in_->read(flag);
 		if(ret != OK)
 			return false;
 		inProgress_ = true;
@@ -849,7 +849,7 @@ bool MatrixUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 	rowLabelReceived_ = true;
 
 	if(((unsigned char)labelFlag_ & 2U) != 0) {
-		ret = in_->readShort(flag);
+		ret = in_->read(flag);
 		if(ret != OK)
 			return false;
 		inProgress_ = true;
@@ -860,7 +860,7 @@ bool MatrixUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 	}
 	columnLabelReceived_ = true;
 
-	ret = in_->readShort(flag);
+	ret = in_->read(flag);
 	if(ret != OK)
 		return false;
 	inProgress_ = true;
@@ -892,13 +892,13 @@ bool TableUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret)
 	columns_ = -1;
 	tableNameReceived_ = false;
 
-	if((ret = in_->readInt(rows_)) != OK)
+	if((ret = in_->read(rows_)) != OK)
 		return false;
 	if(rows_ < 0){
 		ret = INVALIDDATA;
 		return false;
 	}
-	if((ret = in_->readInt(columns_)) != OK)
+	if((ret = in_->read(columns_)) != OK)
 		return false;
 	if(columns_ <= 0){
 		ret = INVALIDDATA;
@@ -924,7 +924,7 @@ bool TableUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret)
 	inProgress_ = false;
 	colObjs_.clear();
 	while(nextColumn_ < columns_){
-		ret = in_->readShort(flag);
+		ret = in_->read(flag);
 		if(ret != OK)
 			return false;
 		inProgress_ = true;
@@ -953,7 +953,7 @@ bool SetUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 	inProgress_ = false;
 
 	//read key vector
-	ret = in_->readShort(flag);
+	ret = in_->read(flag);
 	if(ret != OK)
 		return false;
 
@@ -979,7 +979,7 @@ bool DictionaryUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 	inProgress_ = false;
 
 	//read key vector
-	ret = in_->readShort(flag);
+	ret = in_->read(flag);
 	if(ret != OK)
 		return false;
 
@@ -993,7 +993,7 @@ bool DictionaryUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 		return false;
 
 	//read value vector
-	ret = in_->readShort(flag);
+	ret = in_->read(flag);
 	if(ret != OK)
 		return false;
 
@@ -1020,7 +1020,7 @@ bool ChunkUnmarshall::start(uint16_t flag, bool blocking, IO_ERR& ret){
 	std::ignore = flag;
 	std::ignore = blocking;
 	size_ = -1;
-	ret = in_->readShort(size_);
+	ret = in_->read(size_);
 	if(ret != OK)
 		return false;
 	if(size_ <= 0 || size_ > MARSHALL_BUFFER_SIZE){
@@ -1051,11 +1051,11 @@ IO_ERR  ChunkUnmarshall::parsing(const char* buf){
 		return ret;
 
 	in->read(guid, 16);
-	in->readInt(version);
-	in->readInt(size);
-	in->readChar(chunkType);
+	in->read(version);
+	in->read(size);
+	in->read(chunkType);
 	char copyCount;
-	ret = in->readChar(copyCount);
+	ret = in->read(copyCount);
 	if(ret != OK)
 		return ret;
 	sites.reserve(copyCount);
@@ -1065,7 +1065,7 @@ IO_ERR  ChunkUnmarshall::parsing(const char* buf){
 			return ret;
 		sites.push_back(site);
 	}
-	ret = in->readLong(cid);
+	ret = in->read(cid);
 	if(ret != OK)
 		return ret;
 

@@ -6,7 +6,19 @@
 #include "Version.h"
 #include <sstream>
 #include <string>
+
+#ifdef DDB_FAULT_INJECTION
+#include <mutex>
+#endif
+
 namespace dolphindb {
+
+#ifdef DDB_FAULT_INJECTION
+enum class FaultType {
+    DISCONNECT,
+    EXCEPTION,
+};
+#endif
 
 class DdbInit {
 public:
@@ -77,6 +89,15 @@ private:
     bool isReverseStreaming_;
     std::string runClientId_;
     DataInputStreamSP inputStream_;
+#ifdef DDB_FAULT_INJECTION
+    std::mutex faultMutex_;
+    int faultCnt_{0};
+    FaultType faultType_{FaultType::DISCONNECT};
+    void fault(int cnt, FaultType type) {
+        faultCnt_ = cnt;
+        faultType_ = type;
+    }
+#endif
 };
 
 } // namespace dolphindb

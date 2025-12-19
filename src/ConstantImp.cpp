@@ -51,7 +51,7 @@ IO_ERR StringVector::deserialize(DataInputStream* in, INDEX indexStart, INDEX ta
     auto readBlob = [&](std::string& value) -> IO_ERR {
         IO_ERR ret;
         int len;
-        if ((ret = in->readInt(len)) != OK)
+        if ((ret = in->read(len)) != OK)
             return ret;
         std::unique_ptr<char[]> buf(new char[len]);
         if ((ret = in->read(buf.get(), len)) != OK)
@@ -2595,10 +2595,10 @@ IO_ERR FastArrayVector::deserializeFixedLength(DataInputStream* in, INDEX indexS
 			ret = in->bufferBytes(4);
 			if(ret != OK)
 				return ret;
-			in->readUnsignedShort(rowCount_);
-			in->readUnsignedChar(countBytes_);
+			in->read(rowCount_);
+			in->read(countBytes_);
 			char reserved;
-			in->readChar(reserved);
+			in->read(reserved);
 			if(countBytes_ < 1 || countBytes_ > 4)
 				return INVALIDDATA;
 			rowsRead_ = 0;
@@ -2619,7 +2619,7 @@ IO_ERR FastArrayVector::deserializeFixedLength(DataInputStream* in, INDEX indexS
 				if(countBytes_ == 1){
 					unsigned char curRowCount;
 					for(int i=0; i<counts; ++i){
-						in->readUnsignedChar(curRowCount);
+						in->read(curRowCount);
 						prevStart += curRowCount;
 						pindex[indexStart + rowsRead_ + i] = prevStart;
 					}
@@ -2627,7 +2627,7 @@ IO_ERR FastArrayVector::deserializeFixedLength(DataInputStream* in, INDEX indexS
 				else if(countBytes_ == 2){
 					unsigned short curRowCount;
 					for(int i=0; i<counts; ++i){
-						in->readUnsignedShort(curRowCount);
+						in->read(curRowCount);
 						prevStart += curRowCount;
 						pindex[indexStart + rowsRead_ + i] = prevStart;
 					}
@@ -2635,7 +2635,7 @@ IO_ERR FastArrayVector::deserializeFixedLength(DataInputStream* in, INDEX indexS
 				else {
 					unsigned int curRowCount;
 					for(int i=0; i<counts; ++i){
-						in->readUnsignedInt(curRowCount);
+						in->read(curRowCount);
 						prevStart += curRowCount;
 						pindex[indexStart + rowsRead_ + i] = prevStart;
 					}

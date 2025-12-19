@@ -112,7 +112,7 @@ ConstantSP EventHandler::deserializeFastArray(DATA_TYPE type, int extraParam, co
     ret = input->peekBuffer((char*)&count, sizeof(short));
     if(ret != OK) return nullptr;
     if(count == 0){
-        input->readShort(count);
+        input->read(count);
         return Util::createVector(type, 0, 0, true, extraParam);
     }
     ConstantSP data = Util::createVector(static_cast<DATA_TYPE>(type + ARRAY_TYPE_BASE), 1, 1, true, extraParam);
@@ -123,7 +123,7 @@ ConstantSP EventHandler::deserializeFastArray(DATA_TYPE type, int extraParam, co
 
 ConstantSP EventHandler::deserializeAny(DATA_TYPE type, DATA_FORM form, const DataInputStreamSP& input, IO_ERR& ret){
     uint16_t flag;
-    ret = input->readShort(flag);
+    ret = input->read(flag);
     if (ret != OK) 
         return nullptr;
     auto readForm = static_cast<DATA_FORM>(flag >> 8U);

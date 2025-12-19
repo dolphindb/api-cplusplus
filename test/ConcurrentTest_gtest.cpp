@@ -124,8 +124,7 @@ TEST_F(ConcurrentTest, test_threadedClient_multi_client_subscribe_concurrent){
     int subNum = 10;
     int test_rows = 100000;
     std::string script = "\
-            st1 = streamTable(100:0, `datetimev`timestampv`sym`price1`price2,[DATETIME,TIMESTAMP,SYMBOL,DOUBLE,DOUBLE])\n\
-            enableTableShareAndPersistence(table=st1, tableName=`"+tab+")\n\
+            share streamTable(100:0, `datetimev`timestampv`sym`price1`price2,[DATETIME,TIMESTAMP,SYMBOL,DOUBLE,DOUBLE]) as `"+tab+"\n\
             go\n\
             setStreamTableFilterColumn("+tab+", `sym)";
     conn.run(script);
@@ -177,8 +176,7 @@ TEST_F(ConcurrentTest, test_threadedClient_single_client_multi_subscribe_concurr
     int subNum = 10;
     int test_rows = 100000;
     std::string script = "\
-            st1 = streamTable(100:0, `datetimev`timestampv`sym`price1`price2,[DATETIME,TIMESTAMP,SYMBOL,DOUBLE,DOUBLE])\n\
-            enableTableShareAndPersistence(table=st1, tableName=`"+tab+")\n\
+            share streamTable(100:0, `datetimev`timestampv`sym`price1`price2,[DATETIME,TIMESTAMP,SYMBOL,DOUBLE,DOUBLE]) as `"+tab+"\n\
             go\n\
             setStreamTableFilterColumn("+tab+", `sym)";
     conn.run(script);

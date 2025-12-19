@@ -610,7 +610,7 @@ IO_ERR CompressDeltaofDelta::decode(DataInputStreamSP compressSrc, DataOutputStr
 	while (fileCursor < byteSize && start < len) {
 		//new here, after out.start(), it's handled and deleted in DataIutputStreamSP
 		char *decompressedBuf = new char[maxDecompressedSize_];
-		ret = compressSrc->readInt(blockSize);
+		ret = compressSrc->read(blockSize);
 		if (ret != OK)
 			return ret; 
 		if (calcChecksum)
@@ -668,7 +668,7 @@ IO_ERR CompressDeltaofDelta::decode(DataInputStreamSP compressSrc, DataOutputStr
 
 		if (containLSN && fileCursor + 8 <= byteSize) {
 			fileCursor += 8;
-			ret = compressSrc->readLong(lsn);
+			ret = compressSrc->read(lsn);
 			if (ret != OK)
 				return ret;
 			if (calcChecksum)
@@ -804,7 +804,7 @@ IO_ERR CompressLZ4::decode(DataInputStreamSP compressSrc, DataOutputStreamSP &un
 	while (fileCursor < byteSize && start < len) {
 		//new here, after out.start(), it's handled and deleted in DataIutputStreamSP
 		char *decompressedBuf = new char[MAX_DECOMPRESSED_SIZE];
-		ret = compressSrc->readInt(blockSize);
+		ret = compressSrc->read(blockSize);
 		if (ret != OK)
 			return ret;
 		if (blockSize < 0) {

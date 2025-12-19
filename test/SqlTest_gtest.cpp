@@ -64,8 +64,8 @@ TEST_F(SqlTest, test_selectNULL)
     std::vector<std::string> names = {"t1_snull","t2_snull"};
 
     conn.upload(names,tabs);
-    std::string assert_s1 = "res = bool([]);res.append!(eqObj(t1_snull.column(0), 1..100));res.append!(t1_snull.column(1).isNull());all(res)";
-    std::string assert_s2 = "res = bool([]);res.append!(t2_snull.column(0).isNull());all(res)";
+    std::string assert_s1 = "res = bool([]);res.append!(eqObj(t1_snull.column(0), 1..100));res.append!(t1_snull.column(1).isNull());all(all(res))";
+    std::string assert_s2 = "res = bool([]);res.append!(t2_snull.column(0).isNull());all(all(res))";
     ASSERT_TRUE(conn.run(assert_s1)->getBool());
     ASSERT_TRUE(conn.run(assert_s2)->getBool());
 

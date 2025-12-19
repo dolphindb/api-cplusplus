@@ -96,6 +96,17 @@ enum class ConnectionState {
     Reconnecting,
 };
 
+inline std::ostream &operator<<(std::ostream &out, ConnectionState state) {
+    switch (state) {
+    case ConnectionState::Initializing: out << "Initializing"; break;
+    case ConnectionState::Connected: out << "Connected"; break;
+    case ConnectionState::Terminated: out << "Terminated"; break;
+    case ConnectionState::Reconnecting: out << "Reconnecting"; break;
+    default: out << "Invalid connection state";
+    }
+    return out;
+}
+
 class EXPORT_DECL DBConnection {
 public:
     explicit DBConnection(bool enableSSL = false, bool asyncTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false, bool isReverseStreaming = false, bool enableSCRAM = false);
@@ -143,7 +154,10 @@ public:
     }
     void setCompress(bool compress) { compress_ = compress; }
     void setAsync(bool async) { asynTask_ = async; }
+    void setHostLabel(std::string hostLabel) { hostLabel_ = std::move(hostLabel); }
+    std::string getHostLabel() { return hostLabel_; }
     bool connect();
+    bool reconnect();
 
 	/**
 	 * Connect to the specified DolphinDB server. If userId and password are specified, authentication
@@ -288,7 +302,7 @@ private:
     std::string host_;
     int port_;
     size_t haSitesNum_;
-    int keepAliveTime_;
+    int keepAliveTime_{7200};
     bool enableSSL_;
     bool enableSCRAM_;
     bool asynTask_;
@@ -306,6 +320,7 @@ private:
     static constexpr int udpPort_{1234};
 	stateCallbackT callback_{[](const ConnectionState, const std::string&, const int){ return true; }};
 	ConnectionState state_{ConnectionState::Initializing};
+    std::string hostLabel_;
 };
 
 class EXPORT_DECL BlockReader : public Constant{

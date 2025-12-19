@@ -14,7 +14,7 @@ namespace dolphindb {
 SymbolBase::SymbolBase(int id, const DataInputStreamSP& in, IO_ERR& ret){
     id_ = id;
     int sz;
-    ret =  in->readInt(sz);
+    ret =  in->read(sz);
     if(ret != OK)
         return;
     for(int i = 0; i < sz; i++){

@@ -1876,7 +1876,6 @@ TEST_F(MultithreadedTableWriterNewTest, insertVectorPartitionTableHASHIntType)
     {
         std::vector<dolphindb::ConstantSP> *prow = new std::vector<dolphindb::ConstantSP>;
         std::vector<dolphindb::ConstantSP> &row = *prow;
-        ;
         row.push_back(dolphindb::Util::createString(sym[rand() % 4]));
         row.push_back(dolphindb::Util::createInt(i));
         row.push_back(dolphindb::Util::createInt(i + 64));

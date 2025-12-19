@@ -1,25 +1,10 @@
-.idea
-cmake-build-debug
-project
-cmake-build-debug-coverage
-makefile
-Makefile
-libDolphinDBAPI.so
-copytest
-/vs
+# IDE
 .vscode/
-.clangd/
-.cache
+
+# CI
 build/
-CMakeFiles/
-test/*example*.*
-obj/
-*.dll
-test/*.dos
-libtest/
-report/coverage/*
-bin/*
-__pycache__
-demo/bin
-demo/lib
-demo/build
+compile_commands.json
+
+# deb package
+dolphindb
+dolphindb.deb

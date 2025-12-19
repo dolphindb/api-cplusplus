@@ -118,7 +118,7 @@ namespace STPCT
         StreamingThreadPooledClientTester::conn.run(replayScript);
     }
 
-    INSTANTIATE_TEST_SUITE_P(, StreamingThreadPooledClientTester, testing::Values(-1, rand() % 1000 + 13000));
+    INSTANTIATE_TEST_SUITE_P(, StreamingThreadPooledClientTester, testing::Values(0, rand() % 1000 + 13000));
     TEST_P(StreamingThreadPooledClientTester, test_client_threadCount_1)
     {
         std::string case_=getCaseName();
@@ -155,7 +155,7 @@ namespace STPCT
 
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, 1) : dolphindb::ThreadPooledClient(listenport, 1);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 1);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD);
         ASSERT_EQ(threadVec.size(), 1);
 
@@ -213,7 +213,7 @@ namespace STPCT
 
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, 2) : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD);
         ASSERT_EQ(threadVec.size(), 2);
 
@@ -271,7 +271,7 @@ namespace STPCT
 
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, 4) : dolphindb::ThreadPooledClient(listenport, 4);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 4);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD);
         ASSERT_EQ(threadVec.size(), 4);
 
@@ -329,7 +329,7 @@ namespace STPCT
 
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, 8) : dolphindb::ThreadPooledClient(listenport, 8);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 8);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD);
         ASSERT_EQ(threadVec.size(), 8);
 
@@ -387,7 +387,7 @@ namespace STPCT
 
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, 16) : dolphindb::ThreadPooledClient(listenport, 16);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 16);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD);
         ASSERT_EQ(threadVec.size(), 16);
 
@@ -445,7 +445,7 @@ namespace STPCT
 
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, 32) : dolphindb::ThreadPooledClient(listenport, 32);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 32);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD);
         ASSERT_EQ(threadVec.size(), 32);
 
@@ -472,7 +472,7 @@ namespace STPCT
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
 
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
         auto queue = client.subscribe(HOST, PORT, [](dolphindb::Message msg){}, "st_notExist", "actionTest", 0, true, nullptr, false, false, USER, PASSWD);
         dolphindb::Util::sleep(1000);
         client.unsubscribe(HOST, PORT, "st_notExist", "actionTest");
@@ -491,7 +491,7 @@ namespace STPCT
 
         dolphindb::Util::sleep(1000);
         ASSERT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
         ASSERT_ANY_THROW(client.subscribe("", PORT, onehandler, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD));
     }
 
@@ -507,7 +507,7 @@ namespace STPCT
 
         dolphindb::Util::sleep(1000);
         ASSERT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
         ASSERT_ANY_THROW(client.subscribe(HOST, NULL, onehandler, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD));
     }
 
@@ -533,7 +533,7 @@ namespace STPCT
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
 
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "", 0, true, nullptr, false, false, USER, PASSWD);
         notify.wait();
         dolphindb::TableSP stat = conn.run("select * from getStreamingStat().pubTables where tableName=`"+case_);
@@ -572,7 +572,7 @@ namespace STPCT
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
 
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
         ASSERT_ANY_THROW(auto threadVec = client.subscribe(HOST, PORT, onehandler, "", "actionTest", 0, false, nullptr, false, false, USER, PASSWD));
     }
 
@@ -585,7 +585,7 @@ namespace STPCT
 
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
         bool enableClientAuth = conn.run("bool(getConfig('enableClientAuth'))")->getBool();
         if (enableClientAuth){
             ASSERT_ANY_THROW(auto threadVec = client.subscribe(HOST, PORT, [=](dolphindb::Message msg){}, st, DEFAULT_ACTION_NAME, -1, false));
@@ -615,7 +615,7 @@ namespace STPCT
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
 
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", -1, true, nullptr, false, false, USER, PASSWD);
         std::cout << "total size:" << msg_total << std::endl;
         client.unsubscribe(HOST, PORT, st, "actionTest");
@@ -669,7 +669,7 @@ namespace STPCT
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
 
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
         dolphindb::VectorSP filter = dolphindb::Util::createVector(dolphindb::DT_SYMBOL, 1, 1);
         filter->setString(0, "b");
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, true, filter, false, false, USER, PASSWD);
@@ -729,7 +729,7 @@ namespace STPCT
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
 
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, true, nullptr, true, false, USER, PASSWD);
         notify.wait();
         std::cout << "total size:" << msg_total << std::endl;
@@ -783,7 +783,7 @@ namespace STPCT
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
 
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
         dolphindb::ThreadPooledClient client2(listenport, 5);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, false, nullptr, false, true, USER, PASSWD);
         auto threadVec2 = client2.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, false, nullptr, false, true, USER, PASSWD);
@@ -816,7 +816,7 @@ namespace STPCT
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
 
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 1);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 1);
         ASSERT_ANY_THROW(auto threadVec = client.subscribe(HOST, PORT, onehandler, "st", "actionTest", 0, false, nullptr, false, false, USER, PASSWD));
     }
 
@@ -831,7 +831,7 @@ namespace STPCT
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
 
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, 1);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 1);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, "nonExistTable", "resubTest", 0, true, nullptr, false, false, USER, PASSWD);
         dolphindb::Util::sleep(1000);
         client.unsubscribe(HOST, PORT, "nonExistTable", "resubTest");
@@ -874,7 +874,7 @@ namespace STPCT
         std::cout << "current listenport is " << listenport << std::endl;
 
         int threadCount = rand() % 10 + 1;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, threadCount) : dolphindb::ThreadPooledClient(listenport, threadCount);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, threadCount);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, false, nullptr, false, false, USER, PASSWD);
         ASSERT_ANY_THROW(auto threadVec1 = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, false, nullptr, false, false, USER, PASSWD));
         ASSERT_EQ(threadVec.size(), threadCount);
@@ -935,7 +935,7 @@ namespace STPCT
         std::cout << "current listenport is " << listenport << std::endl;
 
         int threadCount = rand() % 10 + 1;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, threadCount) : dolphindb::ThreadPooledClient(listenport, threadCount);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, threadCount);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD);
         ASSERT_EQ(threadVec.size(), threadCount);
 
@@ -995,7 +995,7 @@ namespace STPCT
         std::cout << "current listenport is " << listenport << std::endl;
 
         int threadCount = rand() % 10 + 1;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, threadCount) : dolphindb::ThreadPooledClient(listenport, threadCount);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, threadCount);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "arrayVectorTableTest", 0, true, nullptr, false, false, USER, PASSWD);
         ASSERT_EQ(threadVec.size(), threadCount);
 
@@ -1040,7 +1040,7 @@ namespace STPCT
 
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, true, nullptr, false, false, USER, PASSWD);
         ASSERT_EQ(threadVec.size(), 3);
 
@@ -1096,7 +1096,7 @@ namespace STPCT
 
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport);
         auto threadVec = client.subscribe(HOST, PORT, onehandler, st, "actionTest", 0, false, nullptr, true, false, USER, PASSWD);
         ASSERT_EQ(threadVec.size(), 3);
 
@@ -1287,7 +1287,7 @@ namespace STPCT
         std::cout << "current listenport is " << listenport << std::endl;
 
         int threadCount = rand() % 10 + 1;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient() : dolphindb::ThreadPooledClient(listenport, threadCount);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, threadCount);
         std::string dataScript = std::get<1>(GetParam()).second;
         std::thread th = std::thread([&]() {
             insertData(conn, st, dataScript);
@@ -1323,9 +1323,9 @@ namespace STPCT
 
         int listenport = GetParam();
         std::cout << "current listenport is " << listenport << std::endl;
-        dolphindb::ThreadPooledClient client = listenport == -1? dolphindb::ThreadPooledClient(0, 2) : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client = dolphindb::ThreadPooledClient(listenport, 2);
         unsigned int resubscribeTimeout = 500;
-        dolphindb::ThreadPooledClient client1 = listenport == -1? dolphindb::ThreadPooledClient(0, 2) : dolphindb::ThreadPooledClient(listenport, 2);
+        dolphindb::ThreadPooledClient client1 = dolphindb::ThreadPooledClient(listenport, 2);
         client.subscribe(HOST, PORT, [](dolphindb::Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, USER, PASSWD);
         auto ths = client1.subscribe(HOST, PORT, [](dolphindb::Message msg){}, st, DEFAULT_ACTION_NAME, 0, true, nullptr, false, false, USER, PASSWD, nullptr, {}, 100, false, resubscribeTimeout);
 
