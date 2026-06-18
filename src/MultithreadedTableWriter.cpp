@@ -183,7 +183,7 @@ MultithreadedTableWriter::MultithreadedTableWriter(const MTWConfig &config)
             int partitionType;
             DATA_TYPE partitionColType;
             partitionColumnIdx_ = config.schema_->getMember("partitionColumnIndex")->getInt(index);
-            partitionSchema = config.schema_->getMember("partitionSchema")->get(index);
+            partitionSchema = config.schema_->getMember("partitionSchema");
             partitionType = config.schema_->getMember("partitionType")->getInt(index);
             partitionColType = (DATA_TYPE)config.schema_->getMember("partitionColumnType")->getInt(index);
             partitionDomain_ = Util::createDomain((PARTITION_TYPE)partitionType, partitionColType, partitionSchema);
@@ -206,7 +206,7 @@ MultithreadedTableWriter::MultithreadedTableWriter(const MTWConfig &config)
     // init done, start thread now.
     perBlockSize_ = batchSize_ < 65535 ? 65535 : batchSize_;
     threads_.resize(threadCount_);
-    for (unsigned int i = 0; i < threads_.size(); i++) {
+    for (size_t i = 0; i < threads_.size(); i++) {
         WriterThread& writerThread = threads_[i];
         writerThread.threadId = 0;
         writerThread.sentRows = 0;
@@ -224,6 +224,13 @@ MultithreadedTableWriter::MultithreadedTableWriter(const MTWConfig &config)
 
         writerThread.writeThread = new Thread(new SendExecutor(*this, writerThread));
         writerThread.writeThread->start();
+#ifdef __linux__
+        if (!config.sched_affinity_.empty()) {
+            if (writerThread.writeThread->setAffinity(config.sched_affinity_) != 0) {
+                DLogger::Warn("Failed to set thread affinity for thread " + std::to_string(i));
+            }
+        }
+#endif
     }
 }
 
@@ -515,25 +522,6 @@ bool MultithreadedTableWriter::insert(std::vector<ConstantSP>** records, int rec
         errorInfo.set(ErrorCodeInfo::EC_DestroyedObject, "Thread is exiting.");
         return false;
     }
-    //To speed up, ignore check
-    /*
-    for (auto &row : vectorOfVector) {
-        if (row.size() != colNames_.size()) {
-            errorInfo.set(ErrorCodeInfo::EC_InvalidObject, "Invalid vector size " + std::to_string(row.size()) + ", expect " + std::to_string(colNames_.size()));
-            return false;
-        }
-        int index = 0;
-        DATA_TYPE dataType;
-        for (auto &param : row) {
-            dataType = getColDataType(index);
-            if (param->getType() != dataType && dataType != DATA_TYPE::DT_SYMBOL) {
-                errorInfo.set(ErrorCodeInfo::EC_InvalidObject, "Object type mismatch " + Util::getDataTypeString(param->getType()) + ", expect " + Util::getDataTypeString(dataType));
-                return false;
-            }
-            index++;
-        }
-    }
-    */
     if (threads_.size() > 1) {
         if (isPartionedTable_) {
             VectorSP pvector = Util::createVector(getColDataType(partitionColumnIdx_), recordCount, 0);
@@ -542,20 +530,20 @@ bool MultithreadedTableWriter::insert(std::vector<ConstantSP>** records, int rec
             }
             vector<int> threadindexes = partitionDomain_->getPartitionKeys((ConstantSP)pvector);
             for (unsigned int row = 0; row < threadindexes.size(); row++) {
-                insertThreadWrite(threadindexes[row], records[row]);
+                insertThreadWrite(threadindexes[row], *records[row]);
             }
         }
         else {
             int threadindex;
             for (int i = 0; i < recordCount; i++) {
                 threadindex = records[i]->at(threadByColIndexForNonPartion_)->getHash(static_cast<int>(threads_.size()));
-                insertThreadWrite(threadindex, records[i]);
+                insertThreadWrite(threadindex, *records[i]);
             }
         }
     }
     else {
         for (int i = 0; i < recordCount; i++) {
-            insertThreadWrite(0, records[i]);
+            insertThreadWrite(0, *records[i]);
         }
     }
     if(isNeedReleaseMemory){
@@ -611,7 +599,18 @@ void MultithreadedTableWriter::getUnwrittenData(std::vector<std::vector<Constant
     }
 }
 
-void MultithreadedTableWriter::insertThreadWrite(int threadhashkey, std::vector<ConstantSP>* prow) {
+#ifdef __linux__
+std::vector<pthread_t> MultithreadedTableWriter::getThreadHandles() const {
+    std::vector<pthread_t> threadHandles;
+    threadHandles.reserve(threads_.size());
+    for (const auto& thread : threads_) {
+        threadHandles.push_back(thread.writeThread->getHandle());
+    }
+    return threadHandles;
+}
+#endif
+
+void MultithreadedTableWriter::insertThreadWrite(int threadhashkey, const std::vector<ConstantSP> &data) {
     threadhashkey = std::max(threadhashkey, 0);
     int threadIndex = threadhashkey % threads_.size();
     WriterThread& writerThread = threads_[threadIndex];
@@ -621,9 +620,9 @@ void MultithreadedTableWriter::insertThreadWrite(int threadhashkey, std::vector<
             writerThread.writeQueue_.push_back(createColumnBlock());
         }
         std::vector<ConstantSP>* q = writerThread.writeQueue_.back();
-        size_t size = prow->size();
+        size_t const size = data.size();
         for(size_t i = 0; i < size; ++i){
-            reinterpret_cast<Vector*>(q->at(i).get())->append(prow->at(i));
+            reinterpret_cast<Vector*>(q->at(i).get())->append(data[i]);
         }
     }
     writerThread.nonemptySignal.set();

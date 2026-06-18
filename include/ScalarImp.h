@@ -2006,6 +2006,8 @@ class DateHour : public TemporalScalar
     }
 };
 
+#if !defined(__GNUC__) || __GNUC__ >= 5
+
 inline ConstantSP operator ""_d(const char *s, size_t len)
 {
     return Date::parseDate(s);
@@ -2050,6 +2052,8 @@ inline ConstantSP operator ""_N(const char *s, size_t len)
 {
     return NanoTimestamp::parseNanoTimestamp(s);
 }
+
+#endif
 
 } // namespace dolphindb
 

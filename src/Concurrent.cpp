@@ -10,6 +10,7 @@
 
 #ifdef __linux__
 #include <pthread.h>
+#include <sched.h>
 #include <semaphore.h>
 #endif
 #ifdef MAC
@@ -465,5 +466,20 @@ void Thread::join(){
 	pthread_join(thread_, nullptr);
 #endif
 }
+
+#ifdef __linux__
+int Thread::setAffinity(const std::vector<size_t>& cpu){
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	for (size_t i = 0; i < cpu.size(); ++i) {
+		CPU_SET(cpu[i], &cpuset);
+	}
+	return pthread_setaffinity_np(thread_, sizeof(cpu_set_t), &cpuset);
+}
+
+pthread_t Thread::getHandle() const{
+	return thread_;
+}
+#endif
 
 } // namespace dolphindb

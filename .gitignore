@@ -1,5 +1,6 @@
 # IDE
 .vscode/
+.codex
 
 # CI
 build/

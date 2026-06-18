@@ -346,6 +346,10 @@ public:
 	bool isRunning(){return run_.isNull() ? false : run_->isRunning();}
 	bool isComplete() {return run_.isNull()? false : run_->isComplete();}
 	bool isStarted() {return run_.isNull()? false : run_->isStarted();}
+#ifdef __linux__
+	int setAffinity(const std::vector<size_t>& cpu);
+	pthread_t getHandle() const;
+#endif
 
 private:
 	static void* startFunc(void* data){

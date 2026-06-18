@@ -4657,3 +4657,524 @@ TEST_F(MultithreadedTableWriterNewTest, MTW_with_SCRAM_user){
     ASSERT_TRUE(conn_scram->run("res = select * from "+case_+" order by c1;ex = select * from t order by c1;all(each(eqObj, res.values(), ex.values()))")->getBool());
     conn_scram->close();
 }
+
+TEST_F(MultithreadedTableWriterNewTest, insertVectorMemoryTable_in_vector)
+{
+    std::string case_=getCaseName();
+    std::string script = "share table(1000:0, `bool`char`short`long`date`month`datetime`second`timestamp`nanotime`nanotimestamp`float`double`symbol`string`uuid`ipaddr`int128`id`blob`decimal32`decimal64`decimal128`datehour`minute`time,"
+                    "[BOOL,CHAR,SHORT,LONG,DATE,MONTH,DATETIME,SECOND,TIMESTAMP,NANOTIME,NANOTIMESTAMP,FLOAT,DOUBLE,SYMBOL,STRING,UUID, IPADDR, INT128,INT,BLOB,DECIMAL32(2),DECIMAL64(6),DECIMAL128(8),DATEHOUR,MINUTE,TIME]) as "+case_;
+    pConn->run(script);
+    dolphindb::MTWConfig config(pConn, case_);
+    dolphindb::SmartPointer<dolphindb::MultithreadedTableWriter> mtwsp = new dolphindb::MultithreadedTableWriter(config);
+    dolphindb::ErrorCodeInfo pErrorInfo;
+    int data[] = {0, 1};
+    for (int i = 0; i < 1024; i++)
+    {
+        std::vector<dolphindb::ConstantSP> datas;
+        datas.emplace_back(dolphindb::Util::createBool((char)(data[i % 2])));
+        datas.emplace_back(dolphindb::Util::createChar(i * 2));
+        datas.emplace_back(dolphindb::Util::createShort(i + 12));
+        datas.emplace_back(dolphindb::Util::createLong((long)i * 100));
+        datas.emplace_back(dolphindb::Util::createDate(i + 432));
+        datas.emplace_back(dolphindb::Util::createMonth(i + 21));
+        datas.emplace_back(dolphindb::Util::createDateTime(i * 192));
+        datas.emplace_back(dolphindb::Util::createSecond(i % 86399));
+        datas.emplace_back(dolphindb::Util::createTimestamp((long long)i * 2342));
+        datas.emplace_back(dolphindb::Util::createNanoTime((long long)i * 4214));
+        datas.emplace_back(dolphindb::Util::createNanoTimestamp((long long)i * 4264));
+        datas.emplace_back(dolphindb::Util::createFloat(i * 42.64));
+        datas.emplace_back(dolphindb::Util::createDouble(i * 4.264));
+        datas.emplace_back(dolphindb::Util::createString(std::to_string(i % 10)));
+        datas.emplace_back(dolphindb::Util::createString("A" + std::to_string(i % 10)));
+        datas.emplace_back(dolphindb::Util::parseConstant(dolphindb::DT_UUID, "0f0e0d0c-0b0a-0908-0706-050403020100"));
+        datas.emplace_back(dolphindb::Util::parseConstant(dolphindb::DT_IP, "192.168.2." + std::to_string(i % 255)));
+        datas.emplace_back(dolphindb::Util::parseConstant(dolphindb::DT_INT128, "0f0e0d0c0b0a09080706050403020100"));
+        datas.emplace_back(dolphindb::Util::createInt(i));
+        datas.emplace_back(dolphindb::Util::createBlob("0f0e0d0c0b0a0908070605040302010" + std::to_string(i)));
+        datas.emplace_back(dolphindb::Util::createDecimal32(2, i / 100));
+        datas.emplace_back(dolphindb::Util::createDecimal64(6, i / 1000000));
+        datas.emplace_back(dolphindb::Util::createDecimal128(8, i / 100000000));
+        datas.emplace_back(dolphindb::Util::createDateHour(i + 21));
+        datas.emplace_back(dolphindb::Util::createMinute(i + 21));
+        datas.emplace_back(dolphindb::Util::createTime(i + 21));
+        mtwsp->insert(datas, pErrorInfo);
+    }
+    mtwsp->waitForThreadCompletion();
+    dolphindb::ConstantSP t1 = pConn->run("select * from "+case_+" order by long limit 1024;");
+    for (int i = 0; i < 1024; i++)
+    {
+        ASSERT_EQ(t1->getColumn(0)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createBool((char)(data[i % 2])))->getString());
+        ASSERT_EQ(t1->getColumn(1)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createChar(i * 2))->getString());
+        ASSERT_EQ(t1->getColumn(2)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createShort(i + 12))->getString());
+        ASSERT_EQ(t1->getColumn(3)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createLong((long)i * 100))->getString());
+        ASSERT_EQ(t1->getColumn(4)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDate(i + 432))->getString());
+        ASSERT_EQ(t1->getColumn(5)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createMonth(i + 21))->getString());
+        ASSERT_EQ(t1->getColumn(6)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDateTime(i * 192))->getString());
+        ASSERT_EQ(t1->getColumn(7)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createSecond(i % 86399))->getString());
+        ASSERT_EQ(t1->getColumn(8)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createTimestamp((long long)i * 2342))->getString());
+        ASSERT_EQ(t1->getColumn(9)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createNanoTime((long long)i * 4214))->getString());
+        ASSERT_EQ(t1->getColumn(10)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createNanoTimestamp((long long)i * 4264))->getString());
+        ASSERT_EQ(t1->getColumn(11)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createFloat(i * 42.64))->getString());
+        ASSERT_EQ(t1->getColumn(12)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDouble(i * 4.264))->getString());
+        ASSERT_EQ(t1->getColumn(13)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createString(std::to_string(i % 10)))->getString());
+        ASSERT_EQ(t1->getColumn(14)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createString("A" + std::to_string(i % 10)))->getString());
+        ASSERT_EQ(t1->getColumn(15)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::parseConstant(dolphindb::DT_UUID, "0f0e0d0c-0b0a-0908-0706-050403020100"))->getString());
+        ASSERT_EQ(t1->getColumn(16)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::parseConstant(dolphindb::DT_IP, "192.168.2." + std::to_string(i % 255)))->getString());
+        ASSERT_EQ(t1->getColumn(17)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::parseConstant(dolphindb::DT_INT128, "0f0e0d0c0b0a09080706050403020100"))->getString());
+        ASSERT_EQ(t1->getColumn(18)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createInt(i))->getString());
+        ASSERT_EQ(t1->getColumn(19)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createString("0f0e0d0c0b0a0908070605040302010" + std::to_string(i)))->getString());
+        ASSERT_EQ(t1->getColumn(20)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDecimal32(2, i / 100))->getString());
+        ASSERT_EQ(t1->getColumn(21)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDecimal64(6, i / 1000000))->getString());
+        ASSERT_EQ(t1->getColumn(23)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDateHour(i + 21))->getString());
+        ASSERT_EQ(t1->getColumn(24)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createMinute(i + 21))->getString());
+        ASSERT_EQ(t1->getColumn(25)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createTime(i + 21))->getString());
+    }
+}
+
+TEST_F(MultithreadedTableWriterNewTest, insertVectorMemoryTable_arrayVector_in_vector)
+{
+    std::string case_=getCaseName();
+    std::string script = "share table(1000:0, `bool`char`short`long`date`month`datetime`second`timestamp`nanotime`nanotimestamp`float`double`uuid`ipaddr`int128`id`decimal32`decimal64`decimal128`datehour`minute`time,"
+                    "[BOOL[],CHAR[],SHORT[],LONG[],DATE[],MONTH[],DATETIME[],SECOND[],TIMESTAMP[],NANOTIME[],NANOTIMESTAMP[],FLOAT[],DOUBLE[],UUID[],IPADDR[],INT128[],INT[],DECIMAL32(2)[],DECIMAL64(6)[],DECIMAL128(8)[],DATEHOUR[],MINUTE[],TIME[]]) as "+case_;
+    pConn->run(script);
+    dolphindb::MTWConfig config(pConn, case_);
+    dolphindb::SmartPointer<dolphindb::MultithreadedTableWriter> mtwsp = new dolphindb::MultithreadedTableWriter(config);
+    dolphindb::ErrorCodeInfo pErrorInfo;
+    // BOOL[]
+    dolphindb::VectorSP bool_1 = dolphindb::Util::createVector(dolphindb::DT_BOOL,0,3);
+    dolphindb::ConstantSP bool_true = dolphindb::Util::createBool(true);
+    dolphindb::ConstantSP bool_false = dolphindb::Util::createBool(false);
+    dolphindb::ConstantSP bool_null = dolphindb::Util::createNullConstant(dolphindb::DT_BOOL);
+    bool_1->append(bool_true);
+    bool_1->append(bool_false);
+    bool_1->append(bool_null);
+    // CHAR[]
+    dolphindb::VectorSP char_1 = dolphindb::Util::createVector(dolphindb::DT_CHAR,0,3);
+    dolphindb::ConstantSP char_max = dolphindb::Util::createChar(127);
+    dolphindb::ConstantSP char_min = dolphindb::Util::createChar(-127);
+    dolphindb::ConstantSP char_0 = dolphindb::Util::createChar(0);
+    dolphindb::ConstantSP char_null = dolphindb::Util::createNullConstant(dolphindb::DT_CHAR);
+    char_1->append(char_max);
+    char_1->append(char_min);
+    char_1->append(char_0);
+    char_1->append(char_null);
+    // SHORT[]
+    dolphindb::VectorSP short_1 = dolphindb::Util::createVector(dolphindb::DT_SHORT,0,3);
+    dolphindb::ConstantSP short_max = dolphindb::Util::createShort(32767);
+    dolphindb::ConstantSP short_min = dolphindb::Util::createShort(-32767);
+    dolphindb::ConstantSP short_0 = dolphindb::Util::createShort(0);
+    dolphindb::ConstantSP short_null = dolphindb::Util::createNullConstant(dolphindb::DT_SHORT);
+    short_1->append(short_max);
+    short_1->append(short_min);
+    short_1->append(short_0);
+    short_1->append(short_null);
+    // LONG[]
+    dolphindb::VectorSP long_1 = dolphindb::Util::createVector(dolphindb::DT_LONG,0,3);
+    dolphindb::ConstantSP long_max = dolphindb::Util::createLong(9223372036854775807);
+    dolphindb::ConstantSP long_min = dolphindb::Util::createLong(-9223372036854775807);
+    dolphindb::ConstantSP long_0 = dolphindb::Util::createLong(0);
+    dolphindb::ConstantSP long_null = dolphindb::Util::createNullConstant(dolphindb::DT_LONG);
+    long_1->append(long_max);
+    long_1->append(long_min);
+    long_1->append(long_0);
+    long_1->append(long_null);
+    // DATE[]
+    dolphindb::VectorSP date_1 = dolphindb::Util::createVector(dolphindb::DT_DATE,0,2);
+    dolphindb::ConstantSP date_0 = dolphindb::Util::createDate(0);
+    dolphindb::ConstantSP date_ = dolphindb::Util::createDate(19132);
+    dolphindb::ConstantSP date_null = dolphindb::Util::createNullConstant(dolphindb::DT_DATE);
+    date_1->append(date_0);
+    date_1->append(date_);
+    date_1->append(date_null);
+    // MONTH[]
+    dolphindb::VectorSP month_1 = dolphindb::Util::createVector(dolphindb::DT_MONTH,0,2);
+    dolphindb::ConstantSP month_0 = dolphindb::Util::createMonth(0);
+    dolphindb::ConstantSP month_ = dolphindb::Util::createMonth(23640);
+    dolphindb::ConstantSP month_null = dolphindb::Util::createNullConstant(dolphindb::DT_MONTH);
+    month_1->append(month_0);
+    month_1->append(month_);
+    month_1->append(month_null);
+    // DATETIME[]
+    dolphindb::VectorSP datetime_1 = dolphindb::Util::createVector(dolphindb::DT_DATETIME,0,2);
+    dolphindb::ConstantSP datetime_0 = dolphindb::Util::createDateTime(0);
+    dolphindb::ConstantSP datetime_ = dolphindb::Util::createDateTime(1);
+    dolphindb::ConstantSP datetime_null = dolphindb::Util::createNullConstant(dolphindb::DT_DATETIME);
+    datetime_1->append(datetime_0);
+    datetime_1->append(datetime_);
+    datetime_1->append(datetime_null);
+    // SECOND[]
+    dolphindb::VectorSP second_1 = dolphindb::Util::createVector(dolphindb::DT_SECOND,0,2);
+    dolphindb::ConstantSP second_0 = dolphindb::Util::createSecond(0);
+    dolphindb::ConstantSP second_ = dolphindb::Util::createSecond(1);
+    dolphindb::ConstantSP second_null = dolphindb::Util::createNullConstant(dolphindb::DT_SECOND);
+    second_1->append(second_0);
+    second_1->append(second_);
+    second_1->append(second_null);
+    // TIMESTAMP[]
+    dolphindb::VectorSP timestamp_1 = dolphindb::Util::createVector(dolphindb::DT_TIMESTAMP,0,2);
+    dolphindb::ConstantSP timestamp_0 = dolphindb::Util::createTimestamp(0);
+    dolphindb::ConstantSP timestamp_ = dolphindb::Util::createTimestamp(1);
+    dolphindb::ConstantSP timestamp_null = dolphindb::Util::createNullConstant(dolphindb::DT_TIMESTAMP);
+    timestamp_1->append(timestamp_0);
+    timestamp_1->append(timestamp_);
+    timestamp_1->append(timestamp_null);
+    // NANOTIME[]
+    dolphindb::VectorSP nanotime_1 = dolphindb::Util::createVector(dolphindb::DT_NANOTIME,0,2);
+    dolphindb::ConstantSP nanotime_0 = dolphindb::Util::createNanoTime(0);
+    dolphindb::ConstantSP nanotime_ = dolphindb::Util::createNanoTime(1);
+    dolphindb::ConstantSP nanotime_null = dolphindb::Util::createNullConstant(dolphindb::DT_NANOTIME);
+    nanotime_1->append(nanotime_0);
+    nanotime_1->append(nanotime_);
+    nanotime_1->append(nanotime_null);
+    // NANOTIMESTAMP[]
+    dolphindb::VectorSP nanotimestamp_1 = dolphindb::Util::createVector(dolphindb::DT_NANOTIMESTAMP,0,2);
+    dolphindb::ConstantSP nanotimestamp_0 = dolphindb::Util::createNanoTimestamp(0);
+    dolphindb::ConstantSP nanotimestamp_ = dolphindb::Util::createNanoTimestamp(1);
+    dolphindb::ConstantSP nanotimestamp_null = dolphindb::Util::createNullConstant(dolphindb::DT_NANOTIMESTAMP);
+    nanotimestamp_1->append(nanotimestamp_0);
+    nanotimestamp_1->append(nanotimestamp_);
+    nanotimestamp_1->append(nanotimestamp_null);
+    // FLOAT[]
+    dolphindb::VectorSP float_1 = dolphindb::Util::createVector(dolphindb::DT_FLOAT,0,2);
+    dolphindb::ConstantSP float_ = dolphindb::Util::createFloat(3.14);
+    dolphindb::ConstantSP float_nan = dolphindb::Util::createFloat(NAN);
+    dolphindb::ConstantSP float_inf = dolphindb::Util::createFloat(INFINITY);
+    dolphindb::ConstantSP float_null = dolphindb::Util::createNullConstant(dolphindb::DT_FLOAT);
+    float_1->append(float_);
+    float_1->append(float_nan);
+    float_1->append(float_inf);
+    float_1->append(float_null);
+    // DOUBLE[]
+    dolphindb::VectorSP double_1 = dolphindb::Util::createVector(dolphindb::DT_DOUBLE,0,2);
+    dolphindb::ConstantSP double_ = dolphindb::Util::createDouble(3.14);
+    dolphindb::ConstantSP double_nan = dolphindb::Util::createDouble(NAN);
+    dolphindb::ConstantSP double_inf = dolphindb::Util::createDouble(INFINITY);
+    dolphindb::ConstantSP double_null = dolphindb::Util::createNullConstant(dolphindb::DT_DOUBLE);
+    double_1->append(double_);
+    double_1->append(double_nan);
+    double_1->append(double_inf);
+    double_1->append(double_null);
+    // UUID[]
+    dolphindb::VectorSP uuid_1 = dolphindb::Util::createVector(dolphindb::DT_UUID,0,2);
+    dolphindb::ConstantSP uuid_normal = dolphindb::Util::parseConstant(dolphindb::DT_UUID,"5d212a78-cc48-e3b1-4235-b4d91473ee87");
+    dolphindb::ConstantSP uuid_null = dolphindb::Util::createNullConstant(dolphindb::DT_UUID);
+    uuid_1->append(uuid_normal);
+    uuid_1->append(uuid_normal);
+    uuid_1->append(uuid_normal);
+    // IPADDR[]
+    dolphindb::VectorSP ip_1 = dolphindb::Util::createVector(dolphindb::DT_IP,0,2);
+    dolphindb::ConstantSP ip_normal = dolphindb::Util::parseConstant(dolphindb::DT_IP,"127.0.0.1");
+    dolphindb::ConstantSP ip_null = dolphindb::Util::createNullConstant(dolphindb::DT_IP);
+    ip_1->append(ip_normal);
+    ip_1->append(ip_normal);
+    ip_1->append(ip_normal);
+    // INT128[]
+    dolphindb::VectorSP int128_1 = dolphindb::Util::createVector(dolphindb::DT_INT128,0,2);
+    dolphindb::ConstantSP int128_normal = dolphindb::Util::parseConstant(dolphindb::DT_INT128,"e1671797c52e15f763380b45e841ec32");
+    dolphindb::ConstantSP int128_null = dolphindb::Util::createNullConstant(dolphindb::DT_INT128);
+    int128_1->append(int128_normal);
+    int128_1->append(int128_normal);
+    int128_1->append(int128_normal);
+    // INT[]
+    dolphindb::VectorSP int_1 = dolphindb::Util::createVector(dolphindb::DT_INT,0,3);
+    dolphindb::ConstantSP int_max = dolphindb::Util::createInt(2147483647);
+    dolphindb::ConstantSP int_min = dolphindb::Util::createInt(-2147483647);
+    dolphindb::ConstantSP int_0 = dolphindb::Util::createInt(0);
+    dolphindb::ConstantSP int_null = dolphindb::Util::createNullConstant(dolphindb::DT_INT);
+    int_1->append(int_max);
+    int_1->append(int_min);
+    int_1->append(int_0);
+    int_1->append(int_null);
+    // DECIMAL32(2)[]
+    dolphindb::VectorSP decimal32_1 = dolphindb::Util::createVector(dolphindb::DT_DECIMAL32,0,2,true,2);
+    dolphindb::ConstantSP decimal32_314 = dolphindb::Util::createDecimal32(2, 3.14);
+    dolphindb::ConstantSP decimal32_315 = dolphindb::Util::createDecimal32(2, 3.15);
+    dolphindb::ConstantSP decimal32_null = dolphindb::Util::createNullConstant(dolphindb::DT_DECIMAL32, 2);
+    decimal32_1->append(decimal32_314);
+    decimal32_1->append(decimal32_315);
+    decimal32_1->append(decimal32_null);
+    // DECIMAL64(6)[]
+    dolphindb::VectorSP decimal64_1 = dolphindb::Util::createVector(dolphindb::DT_DECIMAL64,0,2,true,6);
+    dolphindb::ConstantSP decimal64_3141592 = dolphindb::Util::createDecimal64(6, 3.141592);
+    dolphindb::ConstantSP decimal64_3141593 = dolphindb::Util::createDecimal64(6, 3.141593);
+    dolphindb::ConstantSP decimal64_null = dolphindb::Util::createNullConstant(dolphindb::DT_DECIMAL64, 6);
+    decimal64_1->append(decimal64_3141592);
+    decimal64_1->append(decimal64_3141593);
+    decimal64_1->append(decimal64_null);
+    // DECIMAL128(8)[]
+    dolphindb::VectorSP decimal128_1 = dolphindb::Util::createVector(dolphindb::DT_DECIMAL128,0,2,true,8);
+    dolphindb::ConstantSP decimal128_314159265 = dolphindb::Util::createDecimal32(8, 3.14159265);
+    dolphindb::ConstantSP decimal128_314159266 = dolphindb::Util::createDecimal32(8, 3.14159266);
+    dolphindb::ConstantSP decimal128_null = dolphindb::Util::createNullConstant(dolphindb::DT_DECIMAL128, 8);
+    decimal128_1->append(decimal128_314159265);
+    decimal128_1->append(decimal128_314159266);
+    decimal128_1->append(decimal128_null);
+    // DATEHOUR[]
+    dolphindb::VectorSP datehour_1 = dolphindb::Util::createVector(dolphindb::DT_DATEHOUR,0,2);
+    dolphindb::ConstantSP datehour_0 = dolphindb::Util::createDateHour(0);
+    dolphindb::ConstantSP datehour_ = dolphindb::Util::createDateHour(1);
+    dolphindb::ConstantSP datehour_null = dolphindb::Util::createNullConstant(dolphindb::DT_DATEHOUR);
+    datehour_1->append(datehour_0);
+    datehour_1->append(datehour_);
+    datehour_1->append(datehour_null);
+    // MINUTE[]
+    dolphindb::VectorSP minute_1 = dolphindb::Util::createVector(dolphindb::DT_MINUTE,0,2);
+    dolphindb::ConstantSP minute_0 = dolphindb::Util::createMinute(0);
+    dolphindb::ConstantSP minute_ = dolphindb::Util::createMinute(1);
+    dolphindb::ConstantSP minute_null = dolphindb::Util::createNullConstant(dolphindb::DT_MINUTE);
+    minute_1->append(minute_0);
+    minute_1->append(minute_);
+    minute_1->append(minute_null);
+    // TIME[]
+    dolphindb::VectorSP time_1 = dolphindb::Util::createVector(dolphindb::DT_TIME,0,2);
+    dolphindb::ConstantSP time_0 = dolphindb::Util::createTime(0);
+    dolphindb::ConstantSP time_ = dolphindb::Util::createTime(1);
+    dolphindb::ConstantSP time_null = dolphindb::Util::createNullConstant(dolphindb::DT_TIME);
+    time_1->append(time_0);
+    time_1->append(time_);
+    time_1->append(time_null);
+    std::vector<dolphindb::ConstantSP> datas;
+    datas.emplace_back(bool_1);
+    datas.emplace_back(char_1);
+    datas.emplace_back(short_1);
+    datas.emplace_back(long_1);
+    datas.emplace_back(date_1);
+    datas.emplace_back(month_1);
+    datas.emplace_back(datetime_1);
+    datas.emplace_back(second_1);
+    datas.emplace_back(timestamp_1);
+    datas.emplace_back(nanotime_1);
+    datas.emplace_back(nanotimestamp_1);
+    datas.emplace_back(float_1);
+    datas.emplace_back(double_1);
+    datas.emplace_back(uuid_1);
+    datas.emplace_back(ip_1);
+    datas.emplace_back(int128_1);
+    datas.emplace_back(int_1);
+    datas.emplace_back(decimal32_1);
+    datas.emplace_back(decimal64_1);
+    datas.emplace_back(decimal128_1);
+    datas.emplace_back(datehour_1);
+    datas.emplace_back(minute_1);
+    datas.emplace_back(time_1);
+    for (int i = 0; i < 1024; i++)
+        mtwsp->insert(datas, pErrorInfo);
+    mtwsp->waitForThreadCompletion();
+    dolphindb::ConstantSP t1 = pConn->run("select * from "+case_+" limit 1024;");
+    for (int i = 0; i < 1024; i++)
+    {
+        ASSERT_EQ(t1->getColumn(0)->getRow(i)->getString(), datas[0]->getString());
+        ASSERT_EQ(t1->getColumn(1)->getRow(i)->getString(), datas[1]->getString());
+        ASSERT_EQ(t1->getColumn(2)->getRow(i)->getString(), datas[2]->getString());
+        ASSERT_EQ(t1->getColumn(3)->getRow(i)->getString(), datas[3]->getString());
+        ASSERT_EQ(t1->getColumn(4)->getRow(i)->getString(), datas[4]->getString());
+        ASSERT_EQ(t1->getColumn(5)->getRow(i)->getString(), datas[5]->getString());
+        ASSERT_EQ(t1->getColumn(6)->getRow(i)->getString(), datas[6]->getString());
+        ASSERT_EQ(t1->getColumn(7)->getRow(i)->getString(), datas[7]->getString());
+        ASSERT_EQ(t1->getColumn(8)->getRow(i)->getString(), datas[8]->getString());
+        ASSERT_EQ(t1->getColumn(9)->getRow(i)->getString(), datas[9]->getString());
+        ASSERT_EQ(t1->getColumn(10)->getRow(i)->getString(), datas[10]->getString());
+        ASSERT_EQ(t1->getColumn(11)->getRow(i)->getString(), datas[11]->getString());
+        ASSERT_EQ(t1->getColumn(12)->getRow(i)->getString(), datas[12]->getString());
+        ASSERT_EQ(t1->getColumn(13)->getRow(i)->getString(), datas[13]->getString());
+        ASSERT_EQ(t1->getColumn(14)->getRow(i)->getString(), datas[14]->getString());
+        ASSERT_EQ(t1->getColumn(15)->getRow(i)->getString(), datas[15]->getString());
+        ASSERT_EQ(t1->getColumn(16)->getRow(i)->getString(), datas[16]->getString());
+        ASSERT_EQ(t1->getColumn(17)->getRow(i)->getString(), datas[17]->getString());
+        ASSERT_EQ(t1->getColumn(18)->getRow(i)->getString(), datas[18]->getString());
+        ASSERT_EQ(t1->getColumn(19)->getRow(i)->getString(), datas[19]->getString());
+        ASSERT_EQ(t1->getColumn(20)->getRow(i)->getString(), datas[20]->getString());
+        ASSERT_EQ(t1->getColumn(21)->getRow(i)->getString(), datas[21]->getString());
+        ASSERT_EQ(t1->getColumn(22)->getRow(i)->getString(), datas[22]->getString());
+    }
+}
+
+#ifdef __linux__
+
+TEST_F(MultithreadedTableWriterNewTest, insert_bind_cpu)
+{
+    std::string case_=getCaseName();
+    std::string dbName="dfs://" + case_;
+    std::string script = "dbName = \"" + dbName + "\"\n"
+                        "if(exists(dbName)){\n"
+                        "\tdropDatabase(dbName)\t\n"
+                        "}\n"
+                        "db  = database(dbName, VALUE,`A`B`C`D);\n";
+    script += "t = table(1000:0, `bool`char`short`long`date`month`datetime`second`timestamp`nanotime`nanotimestamp`float`double`symbol`string`uuid`ipaddr`int128`id`decimal32`decimal64`decimal128`datehour`minute`time,"
+              "[BOOL,CHAR,SHORT,LONG,DATE,MONTH,DATETIME,SECOND,TIMESTAMP,NANOTIME,NANOTIMESTAMP,FLOAT,DOUBLE,SYMBOL,STRING,UUID, IPADDR, INT128,INT,DECIMAL32(2),DECIMAL64(6),DECIMAL128(8),DATEHOUR,MINUTE,TIME]);"
+              "pt = db.createPartitionedTable(t,`pt,`symbol);";
+    pConn->run(script);
+    dolphindb::MTWConfig config(pConn, dolphindb::TableScript(dbName, "pt"));
+    config.setThreads(4, "symbol");
+    std::vector<size_t> cpu{1, 2, 3, 4};
+    config.setCpuIds(cpu);
+    dolphindb::SmartPointer<dolphindb::MultithreadedTableWriter> mtwsp = new dolphindb::MultithreadedTableWriter(config);
+    dolphindb::ErrorCodeInfo pErrorInfo;
+    int data[] = {0, 1};
+    std::string sym[] = {"A", "B", "C", "D"};
+    for (int i = 0; i < 1024; i++)
+    {
+        std::vector<dolphindb::ConstantSP> datas;
+        datas.emplace_back(dolphindb::Util::createBool((char)(data[i % 2])));
+        datas.emplace_back(dolphindb::Util::createChar(i * 2));
+        datas.emplace_back(dolphindb::Util::createShort(i + 12));
+        datas.emplace_back(dolphindb::Util::createLong((long)i * 100));
+        datas.emplace_back(dolphindb::Util::createDate(i + 432));
+        datas.emplace_back(dolphindb::Util::createMonth(i + 21));
+        datas.emplace_back(dolphindb::Util::createDateTime(i * 192));
+        datas.emplace_back(dolphindb::Util::createSecond(((long long)i * 1932)%86400));
+        datas.emplace_back(dolphindb::Util::createTimestamp((long long)i * 2342));
+        datas.emplace_back(dolphindb::Util::createNanoTime((long long)i * 4214));
+        datas.emplace_back(dolphindb::Util::createNanoTimestamp((long long)i * 4264));
+        datas.emplace_back(dolphindb::Util::createFloat(i * 42.64));
+        datas.emplace_back(dolphindb::Util::createDouble(i * 4.264));
+        datas.emplace_back(dolphindb::Util::createString(sym[rand() % 4]));
+        datas.emplace_back(dolphindb::Util::createString("A" + std::to_string(i)));
+        // uuid,ipAddr, int128, blob
+        datas.emplace_back(dolphindb::Util::parseConstant(dolphindb::DT_UUID, "0f0e0d0c-0b0a-0908-0706-050403020100"));
+        datas.emplace_back(dolphindb::Util::parseConstant(dolphindb::DT_IP, "192.168.2." + std::to_string(i % 255)));
+        datas.emplace_back(dolphindb::Util::parseConstant(dolphindb::DT_INT128, "0f0e0d0c0b0a09080706050403020100"));
+        datas.emplace_back(dolphindb::Util::createInt(i));
+        datas.emplace_back(dolphindb::Util::createDecimal32(2, i / 100));
+        datas.emplace_back(dolphindb::Util::createDecimal64(6, i / 1000000));
+        datas.emplace_back(dolphindb::Util::createDecimal128(8, i / 100000000));
+        datas.emplace_back(dolphindb::Util::createDateHour(i + 21));
+        datas.emplace_back(dolphindb::Util::createMinute(i + 21));
+        datas.emplace_back(dolphindb::Util::createTime(i + 21));
+        mtwsp->insert(datas, pErrorInfo);
+    }
+    mtwsp->getThreadHandles();
+    mtwsp->waitForThreadCompletion();
+    dolphindb::ConstantSP t1 = pConn->run("select * from loadTable(dbName,`pt) order by long limit 1024;");
+    for (int i = 0; i < 1024; i++)
+    {
+        ASSERT_EQ(t1->getColumn(0)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createBool((char)(data[i % 2])))->getString());
+        ASSERT_EQ(t1->getColumn(1)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createChar(i * 2))->getString());
+        ASSERT_EQ(t1->getColumn(2)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createShort(i + 12))->getString());
+        ASSERT_EQ(t1->getColumn(3)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createLong((long)i * 100))->getString());
+        ASSERT_EQ(t1->getColumn(4)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDate(i + 432))->getString());
+        ASSERT_EQ(t1->getColumn(5)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createMonth(i + 21))->getString());
+        ASSERT_EQ(t1->getColumn(6)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDateTime(i * 192))->getString());
+        ASSERT_EQ(t1->getColumn(7)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createSecond(((long long)i * 1932)%86400))->getString());
+        ASSERT_EQ(t1->getColumn(8)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createTimestamp((long long)i * 2342))->getString());
+        ASSERT_EQ(t1->getColumn(9)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createNanoTime((long long)i * 4214))->getString());
+        ASSERT_EQ(t1->getColumn(10)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createNanoTimestamp((long long)i * 4264))->getString());
+        ASSERT_EQ(t1->getColumn(11)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createFloat(i * 42.64))->getString());
+        ASSERT_EQ(t1->getColumn(12)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDouble(i * 4.264))->getString());
+        ASSERT_EQ(t1->getColumn(14)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createString("A" + std::to_string(i)))->getString());
+        ASSERT_EQ(t1->getColumn(15)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::parseConstant(dolphindb::DT_UUID, "0f0e0d0c-0b0a-0908-0706-050403020100"))->getString());
+        ASSERT_EQ(t1->getColumn(16)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::parseConstant(dolphindb::DT_IP, "192.168.2." + std::to_string(i % 255)))->getString());
+        ASSERT_EQ(t1->getColumn(17)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::parseConstant(dolphindb::DT_INT128, "0f0e0d0c0b0a09080706050403020100"))->getString());
+        ASSERT_EQ(t1->getColumn(18)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createInt(i))->getString());
+        ASSERT_EQ(t1->getColumn(19)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDecimal32(2, i / 100))->getString());
+        ASSERT_EQ(t1->getColumn(20)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDecimal64(6, i / 1000000))->getString());
+        ASSERT_EQ(t1->getColumn(21)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDecimal128(8, i / 100000000))->getString());
+        ASSERT_EQ(t1->getColumn(22)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDateHour(i + 21))->getString());
+        ASSERT_EQ(t1->getColumn(23)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createMinute(i + 21))->getString());
+        ASSERT_EQ(t1->getColumn(24)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createTime(i + 21))->getString());
+    }
+}
+
+TEST_F(MultithreadedTableWriterNewTest, insert_bind_cpu_same)
+{
+    std::string case_=getCaseName();
+    std::string dbName="dfs://" + case_;
+    std::string script = "dbName = \"" + dbName + "\"\n"
+                        "if(exists(dbName)){\n"
+                        "\tdropDatabase(dbName)\t\n"
+                        "}\n"
+                        "db  = database(dbName, VALUE,`A`B`C`D);\n";
+    script += "t = table(1000:0, `bool`char`short`long`date`month`datetime`second`timestamp`nanotime`nanotimestamp`float`double`symbol`string`uuid`ipaddr`int128`id`decimal32`decimal64`decimal128`datehour`minute`time,"
+              "[BOOL,CHAR,SHORT,LONG,DATE,MONTH,DATETIME,SECOND,TIMESTAMP,NANOTIME,NANOTIMESTAMP,FLOAT,DOUBLE,SYMBOL,STRING,UUID, IPADDR, INT128,INT,DECIMAL32(2),DECIMAL64(6),DECIMAL128(8),DATEHOUR,MINUTE,TIME]);"
+              "pt = db.createPartitionedTable(t,`pt,`symbol);";
+    pConn->run(script);
+    dolphindb::MTWConfig config(pConn, dolphindb::TableScript(dbName, "pt"));
+    config.setThreads(4, "symbol");
+    std::vector<size_t> cpu{1, 1, 2};
+    config.setCpuIds(cpu);
+    dolphindb::SmartPointer<dolphindb::MultithreadedTableWriter> mtwsp = new dolphindb::MultithreadedTableWriter(config);
+    dolphindb::ErrorCodeInfo pErrorInfo;
+    int data[] = {0, 1};
+    std::string sym[] = {"A", "B", "C", "D"};
+    for (int i = 0; i < 1024; i++)
+    {
+        std::vector<dolphindb::ConstantSP> datas;
+        datas.emplace_back(dolphindb::Util::createBool((char)(data[i % 2])));
+        datas.emplace_back(dolphindb::Util::createChar(i * 2));
+        datas.emplace_back(dolphindb::Util::createShort(i + 12));
+        datas.emplace_back(dolphindb::Util::createLong((long)i * 100));
+        datas.emplace_back(dolphindb::Util::createDate(i + 432));
+        datas.emplace_back(dolphindb::Util::createMonth(i + 21));
+        datas.emplace_back(dolphindb::Util::createDateTime(i * 192));
+        datas.emplace_back(dolphindb::Util::createSecond(((long long)i * 1932)%86400));
+        datas.emplace_back(dolphindb::Util::createTimestamp((long long)i * 2342));
+        datas.emplace_back(dolphindb::Util::createNanoTime((long long)i * 4214));
+        datas.emplace_back(dolphindb::Util::createNanoTimestamp((long long)i * 4264));
+        datas.emplace_back(dolphindb::Util::createFloat(i * 42.64));
+        datas.emplace_back(dolphindb::Util::createDouble(i * 4.264));
+        datas.emplace_back(dolphindb::Util::createString(sym[rand() % 4]));
+        datas.emplace_back(dolphindb::Util::createString("A" + std::to_string(i)));
+        // uuid,ipAddr, int128, blob
+        datas.emplace_back(dolphindb::Util::parseConstant(dolphindb::DT_UUID, "0f0e0d0c-0b0a-0908-0706-050403020100"));
+        datas.emplace_back(dolphindb::Util::parseConstant(dolphindb::DT_IP, "192.168.2." + std::to_string(i % 255)));
+        datas.emplace_back(dolphindb::Util::parseConstant(dolphindb::DT_INT128, "0f0e0d0c0b0a09080706050403020100"));
+        datas.emplace_back(dolphindb::Util::createInt(i));
+        datas.emplace_back(dolphindb::Util::createDecimal32(2, i / 100));
+        datas.emplace_back(dolphindb::Util::createDecimal64(6, i / 1000000));
+        datas.emplace_back(dolphindb::Util::createDecimal128(8, i / 100000000));
+        datas.emplace_back(dolphindb::Util::createDateHour(i + 21));
+        datas.emplace_back(dolphindb::Util::createMinute(i + 21));
+        datas.emplace_back(dolphindb::Util::createTime(i + 21));
+        mtwsp->insert(datas, pErrorInfo);
+    }
+    mtwsp->waitForThreadCompletion();
+    dolphindb::ConstantSP t1 = pConn->run("select * from loadTable(dbName,`pt) order by long limit 1024;");
+    for (int i = 0; i < 1024; i++)
+    {
+        ASSERT_EQ(t1->getColumn(0)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createBool((char)(data[i % 2])))->getString());
+        ASSERT_EQ(t1->getColumn(1)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createChar(i * 2))->getString());
+        ASSERT_EQ(t1->getColumn(2)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createShort(i + 12))->getString());
+        ASSERT_EQ(t1->getColumn(3)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createLong((long)i * 100))->getString());
+        ASSERT_EQ(t1->getColumn(4)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDate(i + 432))->getString());
+        ASSERT_EQ(t1->getColumn(5)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createMonth(i + 21))->getString());
+        ASSERT_EQ(t1->getColumn(6)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDateTime(i * 192))->getString());
+        ASSERT_EQ(t1->getColumn(7)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createSecond(((long long)i * 1932)%86400))->getString());
+        ASSERT_EQ(t1->getColumn(8)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createTimestamp((long long)i * 2342))->getString());
+        ASSERT_EQ(t1->getColumn(9)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createNanoTime((long long)i * 4214))->getString());
+        ASSERT_EQ(t1->getColumn(10)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createNanoTimestamp((long long)i * 4264))->getString());
+        ASSERT_EQ(t1->getColumn(11)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createFloat(i * 42.64))->getString());
+        ASSERT_EQ(t1->getColumn(12)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDouble(i * 4.264))->getString());
+        ASSERT_EQ(t1->getColumn(14)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createString("A" + std::to_string(i)))->getString());
+        ASSERT_EQ(t1->getColumn(15)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::parseConstant(dolphindb::DT_UUID, "0f0e0d0c-0b0a-0908-0706-050403020100"))->getString());
+        ASSERT_EQ(t1->getColumn(16)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::parseConstant(dolphindb::DT_IP, "192.168.2." + std::to_string(i % 255)))->getString());
+        ASSERT_EQ(t1->getColumn(17)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::parseConstant(dolphindb::DT_INT128, "0f0e0d0c0b0a09080706050403020100"))->getString());
+        ASSERT_EQ(t1->getColumn(18)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createInt(i))->getString());
+        ASSERT_EQ(t1->getColumn(19)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDecimal32(2, i / 100))->getString());
+        ASSERT_EQ(t1->getColumn(20)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDecimal64(6, i / 1000000))->getString());
+        ASSERT_EQ(t1->getColumn(21)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDecimal128(8, i / 100000000))->getString());
+        ASSERT_EQ(t1->getColumn(22)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createDateHour(i + 21))->getString());
+        ASSERT_EQ(t1->getColumn(23)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createMinute(i + 21))->getString());
+        ASSERT_EQ(t1->getColumn(24)->getRow(i)->getString(), ((dolphindb::ConstantSP)dolphindb::Util::createTime(i + 21))->getString());
+    }
+}
+
+TEST_F(MultithreadedTableWriterNewTest, bind_cpu_id_error)
+{
+    std::string case_=getCaseName();
+    std::string dbName="dfs://" + case_;
+    std::string script = "dbName = \"" + dbName + "\"\n"
+                        "if(exists(dbName)){\n"
+                        "\tdropDatabase(dbName)\t\n"
+                        "}\n"
+                        "db  = database(dbName, VALUE,`A`B`C`D);\n";
+    script += "t = table(1000:0, `bool`char`short`long`date`month`datetime`second`timestamp`nanotime`nanotimestamp`float`double`symbol`string`uuid`ipaddr`int128`id`decimal32`decimal64`decimal128`datehour`minute`time,"
+              "[BOOL,CHAR,SHORT,LONG,DATE,MONTH,DATETIME,SECOND,TIMESTAMP,NANOTIME,NANOTIMESTAMP,FLOAT,DOUBLE,SYMBOL,STRING,UUID, IPADDR, INT128,INT,DECIMAL32(2),DECIMAL64(6),DECIMAL128(8),DATEHOUR,MINUTE,TIME]);"
+              "pt = db.createPartitionedTable(t,`pt,`symbol);";
+    pConn->run(script);
+    dolphindb::MTWConfig config(pConn, dolphindb::TableScript(dbName, "pt"));
+    config.setThreads(4, "symbol");
+    std::vector<size_t> cpu{1, 2, 3, 100};
+    ASSERT_ANY_THROW(config.setCpuIds(cpu));
+}
+
+#endif

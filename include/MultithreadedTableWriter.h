@@ -6,8 +6,8 @@
 #include "Concurrent.h"
 #include "Dictionary.h"
 #include "DolphinDB.h"
+#include "Domain.h"
 #include "Exceptions.h"
-#include "ScalarImp.h"
 #include "Types.h"
 #include "Util.h"
 #include <cassert>
@@ -16,8 +16,7 @@
 #include <list>
 #include <mutex>
 #include <string>
-#include <tuple>
-#include <unordered_map>
+#include <thread>
 #include <vector>
 
 #ifdef _MSC_VER
@@ -67,6 +66,16 @@ public:
     }
     MTWConfig& setCompression(const std::vector<COMPRESS_METHOD> &compressMethods);
     MTWConfig& setThreads(const size_t threadNum, const std::string& partitionColumnName);
+    MTWConfig& setCpuIds(const std::vector<size_t> &cpuIds)
+    {
+        for (size_t cpu : cpuIds) {
+            if (cpu >= std::thread::hardware_concurrency()) {
+                throw RuntimeException("Invalid CPU id " + std::to_string(cpu));
+            }
+        }
+        sched_affinity_ = cpuIds;
+        return *this;
+    }
     MTWConfig& setWriteMode(const WriteMode mode, const std::vector<std::string> &option = std::vector<std::string>());
     MTWConfig& setStreamTableTimestamp();
     using dataCallbackT = std::function<void(ConstantSP)>;
@@ -96,6 +105,7 @@ private:
     WriteMode writeMode_{WriteMode::Append};
     std::vector<std::string> writeOptions_;
     size_t threadNum_{1};
+    std::vector<size_t> sched_affinity_;
     std::string partitionColumnName_;
     size_t batchSize_{1};
     size_t throttleTimeMs_{10};
@@ -150,10 +160,32 @@ public:
     MultithreadedTableWriter& operator=(MultithreadedTableWriter &&) = delete;
     virtual ~MultithreadedTableWriter();
 
+    bool insert(std::vector<ConstantSP> &data, ErrorCodeInfo &errorInfo)
+    {
+        if (hasError_) {
+            errorInfo.set(ErrorCodeInfo::EC_DestroyedObject, "Thread is exiting.");
+            return false;
+        }
+        if (threads_.size() == 1) {
+            insertThreadWrite(0, data);
+            return true;
+        }
+        if (!isPartionedTable_) {
+            int threadindex = data.at(threadByColIndexForNonPartion_)->getHash(static_cast<int>(threads_.size()));
+            insertThreadWrite(threadindex, data);
+            return true;
+        }
+        VectorSP const pvector = Util::createVector(getColDataType(partitionColumnIdx_), 1, 0);
+        pvector->set(0, data.at(partitionColumnIdx_));
+        std::vector<int> threadindexes = partitionDomain_->getPartitionKeys((ConstantSP)pvector);
+        insertThreadWrite(threadindexes[0], data);
+        return true;
+    }
+
     template<typename... TArgs>
     bool insert(ErrorCodeInfo &errorInfo, TArgs... args) {
-        RWLockGuard<RWLock> guard(&insertRWLock_, true);
-        if (hasError_.load()) {
+        RWLockGuard<RWLock> const guard(&insertRWLock_, true);
+        if (hasError_) {
             throw RuntimeException("Thread is exiting for " + errorInfo_.errorInfo);
         }
         {
@@ -194,6 +226,9 @@ public:
     void waitForThreadCompletion();
     void getStatus(Status &status);
     void getUnwrittenData(std::vector<std::vector<ConstantSP>*> &unwrittenData);
+#ifdef __linux__
+    std::vector<pthread_t> getThreadHandles() const;
+#endif
     bool insertUnwrittenData(std::vector<std::vector<ConstantSP>*> &records, ErrorCodeInfo &errorInfo) { return insert(records.data(), static_cast<int>(records.size()), errorInfo, true); }
 
 private:
@@ -207,7 +242,7 @@ private:
             dataType = (DATA_TYPE)(dataType - ARRAY_TYPE_BASE);
         return dataType;
     }
-    void insertThreadWrite(int threadhashkey, std::vector<ConstantSP> *prow);
+    void insertThreadWrite(int threadhashkey, const std::vector<ConstantSP> &data);
     static void callBack(const std::function<void(ConstantSP)>& callbackFunc, bool result, std::vector<ConstantSP>* block);
     std::vector<ConstantSP>* createColumnBlock();
     struct WriterThread {

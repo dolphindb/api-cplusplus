@@ -17,23 +17,13 @@
 #ifndef AERON_EMBEDDED_MEDIA_DRIVER_H
 #define AERON_EMBEDDED_MEDIA_DRIVER_H
 
-#if defined(__linux__)
-#ifndef _BSD_SOURCE
-#define _BSD_SOURCE
-#endif
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-#endif
-
-#include <string>
-#include <thread>
 #include <atomic>
 #include <stdexcept>
+#include <thread>
 
 extern "C"
 {
-#include "aeronmd/aeronmd.h"
+#include "aeronmd.h"
 }
 
 namespace aeron
@@ -111,7 +101,6 @@ private:
         return 0;
     }
 
-private:
     std::atomic<bool> m_running = { true };
     std::thread m_thread;
     aeron_driver_context_t *m_context = nullptr;

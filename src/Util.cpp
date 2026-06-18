@@ -60,9 +60,9 @@ using std::vector;
 
 static SmartPointer<ConstantFactory> s_constFactory(new ConstantFactory());
 const bool Util::LITTLE_ENDIAN_ORDER = isLittleEndian();
-std::string Util::VER = "3.00.3.2";
+std::string Util::VER = "3.00.3.3";
 int Util::VERNUM = 30033;
-std::string Util::BUILD = "2025.12.17";
+std::string Util::BUILD = "2026.06.15";
 
 int Util::SEQUENCE_SEARCH_NUM_THRESHOLD = 10;
 int Util::MAX_LENGTH_FOR_ANY_VECTOR = 1048576;
