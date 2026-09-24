@@ -42,6 +42,8 @@ using SubscribeCallbackT = std::function<bool(const SubscribeState state, const 
 struct StreamingClientConfig {
     TransportationProtocol protocol{TransportationProtocol::TCP};
     SubscribeCallbackT callback;
+    // Network failure detection timeout in milliseconds. Zero uses the 30-second default.
+    int netTimeout{30000};
 };
 
 class EXPORT_DECL StreamingClient {
@@ -102,6 +104,8 @@ public:
 
 class EXPORT_DECL ThreadPooledClient : public StreamingClient {
 public:
+	explicit ThreadPooledClient(const StreamingClientConfig &config, int threadCount = 3)
+		: StreamingClient(config), threadCount_(threadCount) {}
 	//listeningPort > 0 : listen mode, wait for server connection
 	//listeningPort = 0 : active mode, connect server by DBConnection socket
     explicit ThreadPooledClient(int listeningPort = 0, int threadCount = 3);

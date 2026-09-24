@@ -381,10 +381,10 @@ class String : public Constant
     {
         std::ignore = indexStart;
         int len = static_cast<int>(val_.size());
-        if (len >= 262144) {
-            throw RuntimeException("String too long, Serialization failed, length must be less than 256K bytes");
-        }
         if (!blob_) {
+            if (len >= 262144) {
+                throw RuntimeException("String too long, Serialization failed, length must be less than 256K bytes");
+            }
             if (offset > len)
                 return -1;
             if (bufSize >= len - offset + 1) {

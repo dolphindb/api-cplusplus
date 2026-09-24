@@ -263,7 +263,7 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
         throw RuntimeException("The parameter partitionCol must be specified when threadCount is greater than 1");
     }
     bool isCompress = false;
-    int keepAliveTime = 7200;
+    int keepAliveTime = 30;
     if (pCompressMethods != nullptr && !pCompressMethods->empty()) {
         for (auto one : *pCompressMethods) {
             if (one != COMPRESS_DELTA && one != COMPRESS_LZ4) {
@@ -278,7 +278,7 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
     if (pHighAvailabilitySites != nullptr) {
         highAvailabilitySites.assign(pHighAvailabilitySites->begin(), pHighAvailabilitySites->end());
     }
-    bool ret = pConn->connect(hostName, port, userId, password, "", enableHighAvailability, highAvailabilitySites, 30);
+    bool ret = pConn->connect(hostName, port, userId, password, "", enableHighAvailability, highAvailabilitySites, keepAliveTime);
     if (!ret) {
         throw RuntimeException("Failed to connect to server " + hostName + ":" + std::to_string(port));
     }
@@ -424,7 +424,7 @@ MultithreadedTableWriter::MultithreadedTableWriter(const std::string& hostName, 
         LockGuard<Mutex> _(&writerThread.mutex_);
 
         writerThread.conn = std::make_shared<DBConnection>(useSSL, false, keepAliveTime, isCompress);
-        if (writerThread.conn->connect(hostName, port, userId, password, "", enableHighAvailability, highAvailabilitySites, 30, true) == false) {
+        if (writerThread.conn->connect(hostName, port, userId, password, "", enableHighAvailability, highAvailabilitySites, keepAliveTime, true) == false) {
             throw RuntimeException("Failed to connect to server " + hostName + ":" + std::to_string(port));
         }
 

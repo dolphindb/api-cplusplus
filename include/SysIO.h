@@ -41,8 +41,9 @@ using DataQueueSP = SmartPointer<BlockingQueue<DataBlock>>;
 class EXPORT_DECL Socket{
 public:
 	Socket();
-	Socket(const std::string& host, int port, bool blocking, int keepAliveTime, bool enableSSL = false);
-	Socket(SOCKET handle, bool blocking, int keepAliveTime);
+	Socket(const std::string& host, int port, bool blocking, int keepAliveTime,
+		   bool enableSSL = false, int connectTime = -1);
+	Socket(SOCKET handle, bool blocking, int keepAliveTime, int connectTime = -1);
 	~Socket();
 	const std::string& getHost() const {return host_;}
 	int getPort() const {return port_;}
@@ -50,8 +51,10 @@ public:
 	IO_ERR write(const char* buffer, size_t length, size_t& actualLength);
 	IO_ERR bind();
 	IO_ERR listen();
-	IO_ERR connect(const std::string& host, int port, bool blocking, int keepAliveTime, bool enableSSL = false);
+	IO_ERR connect(const std::string& host, int port, bool blocking, int keepAliveTime,
+		           bool enableSSL = false, int connectTime = -1);
 	IO_ERR connect();
+	void setReceiveTimeout(int timeoutMs);
 	IO_ERR close();
 	Socket* accept();
 	SOCKET getHandle();
@@ -64,7 +67,6 @@ public:
 
 private:
 	void getTimeout(int &timeoutMs);
-	void setTimeout(int timeoutMs);
 	bool setNonBlocking();
 	bool setBlocking();
 	bool setTcpNoDelay();
@@ -82,7 +84,8 @@ private:
 	bool enableSSL_;
 	void* ctx_;
 	void* ssl_;
-	int keepAliveTime_;
+	int keepAliveTimeMs_;
+	int connectTimeMs_;
 };
 
 using SocketSP = SmartPointer<Socket>;

@@ -431,10 +431,14 @@ class StreamingClientImpl {
     };
 
 public:
-    explicit StreamingClientImpl(int listeningPort) : listeningPort_(listeningPort), publishers_(5)
+    explicit StreamingClientImpl(int listeningPort, int netTimeout = 0)
+        : listeningPort_(listeningPort), netTimeout_(netTimeout), publishers_(5)
     {
 		if (listeningPort_ < 0) {
 			throw RuntimeException("Invalid listening port value " + std::to_string(listeningPort));
+		}
+		if (netTimeout_ < 0) {
+			throw RuntimeException("Invalid network timeout value " + std::to_string(netTimeout));
 		}
 #ifdef _WIN32
         if (!WSAStarted && startWSA()) {
@@ -527,6 +531,10 @@ public:
         callback_ = callback;
     }
 
+    DBConnection createConnection(const std::string &host, int port,
+                                  const std::string &userName = "",
+                                  const std::string &password = "") const;
+
 private:
     //if server support reverse connect, set the port to 0
     //if server Not support reverse connect and the port is 0, throw a RuntimeException
@@ -536,8 +544,9 @@ private:
 		return listeningPort_ > 0;
 	}
     void parseMessage(const DataInputStreamSP& in);
-	void sendPublishRequest(DBConnection &conn, SubscribeParam &info);
+    void sendPublishRequest(DBConnection &conn, SubscribeParam &info);
     void reconnect();
+    int getKeepAliveTime() const;
 	static bool initSocket(const SocketSP &socket) {
 		if (socket.isNull())
 			return false;
@@ -645,6 +654,7 @@ private:
     ThreadSP reconnectThread_;
     std::vector<SocketThread> parseSocketThread_;
 	int listeningPort_;
+    int netTimeout_;
     string localIP_;
     Hashmap<string, SubscribeParam> topicSubInfos_;
     Hashmap<string, int> actionCntOnTable_;
@@ -941,7 +951,7 @@ void StreamingClientImpl::init(){
     }
     isInitialized_ = true;
     if (isListenMode()) {
-        listenerSocket_ = new Socket("", listeningPort_, true, 30);
+        listenerSocket_ = new Socket("", listeningPort_, true, 30000);
         if (listenerSocket_->bind() != OK) {
             throw RuntimeException("Failed to bind the socket on port " + Util::convert(listeningPort_) +
                 ". Couldn't start the subscription daemon.");
@@ -959,12 +969,33 @@ void StreamingClientImpl::init(){
     });
 }
 
+int StreamingClientImpl::getKeepAliveTime() const {
+    const int netTimeout = netTimeout_ > 0 ? netTimeout_ : 30000;
+    return std::max(netTimeout / 1000, 1);
+}
+
+DBConnection StreamingClientImpl::createConnection(const std::string &host, int port,
+                                                    const std::string &userName,
+                                                    const std::string &password) const {
+    // Use the network-failure detection setting configured for the stream socket.
+    // Fall back to 30 seconds when netTimeout is zero.
+    const int keepAliveTime = getKeepAliveTime();
+    DBConnection conn(false, false, keepAliveTime);
+	if (netTimeout_ > 0)
+		conn.setNetTimeout(netTimeout_);
+    if (!conn.connect(host, port, userName, password, "", false,
+                      std::vector<std::string>(), keepAliveTime)) {
+        throw RuntimeException("Failed to connect to server: " + host + ":" + std::to_string(port));
+    }
+    return conn;
+}
+
 void StreamingClientImpl::checkServerVersion(std::string host, int port, const std::vector<std::string>& backupSites){
     DBConnection conn;
     unsigned index = 0;
     while(true){
         try{
-            conn = DBConnection(host, port, "", "");
+            conn = createConnection(host, port);
             break;
         }
         catch(const std::exception& e){
@@ -1019,7 +1050,7 @@ void StreamingClientImpl::reconnect() {
                         }
                         callback_(SubscribeState::Resubscribing, info.info_);
                         try {
-                            auto conn = DBConnection(host, port, info.userName_, info.password_);
+                            auto conn = createConnection(host, port, info.userName_, info.password_);
                             LockGuard<Mutex> lock(&readyMutex_);
                             newTopic = subscribeInternal(conn, info);
                             if (newTopic != topic) {
@@ -1072,7 +1103,7 @@ void StreamingClientImpl::reconnect() {
                                 return;
                             }
                             try {
-                                auto conn = DBConnection(host, port, info.userName_, info.password_);
+                                auto conn = createConnection(host, port, info.userName_, info.password_);
                                 LockGuard<Mutex> lock(&readyMutex_);
                                 newTopic = subscribeInternal(conn, info);
                                 if (newTopic != topic) {
@@ -1138,7 +1169,8 @@ void StreamingClientImpl::reconnect() {
                     continue;
                 }
                 try {
-                    DBConnection conn = DBConnection(info.info_.hostName, info.info_.port, info.userName_, info.password_);
+                    DBConnection conn = createConnection(info.info_.hostName, info.info_.port,
+                                                         info.userName_, info.password_);
                     LockGuard<Mutex> lock(&readyMutex_);
                     auto topic = subscribeInternal(conn, info);
                     insertMeta(info, topic);
@@ -1400,8 +1432,11 @@ std::string StreamingClientImpl::subscribeInternal(DBConnection &conn, Subscribe
 	info.attributes_ = colNames;
 
 	if (isListenMode() == false) {
-		std::shared_ptr<DBConnection> activeConn = std::make_shared<DBConnection>(false, false, 30, false, false, true);
-		if (!activeConn->connect(info.info_.hostName, info.info_.port, "", "", "", false, vector<string>(), 30)) {
+		const int keepAliveTime = getKeepAliveTime();
+		std::shared_ptr<DBConnection> activeConn = std::make_shared<DBConnection>(false, false, keepAliveTime, false, false, true);
+		if (netTimeout_ > 0)
+			activeConn->setNetTimeout(netTimeout_);
+		if (!activeConn->connect(info.info_.hostName, info.info_.port, "", "", "", false, vector<string>(), keepAliveTime)) {
 			throw RuntimeException("Failed to connect to server: " + info.info_.hostName + " " + std::to_string(info.info_.port));
 		}
 		sendPublishRequest(*activeConn, info);
@@ -1480,7 +1515,7 @@ SubscribeQueue StreamingClientImpl::subscribeInternal(const SubscribeInfo &subIn
         try {
             info.info_.hostName = _host;
             info.info_.port = _port;
-            DBConnection conn = DBConnection(_host, _port, userName, password);
+            DBConnection conn = createConnection(_host, _port, userName, password);
 			LockGuard<Mutex> lock(&readyMutex_);
 			topic = subscribeInternal(conn, info);
 			insertMeta(info, topic);
@@ -1563,14 +1598,14 @@ bool StreamingClientImpl::unsubscribeInternal(const SubscribeInfo &subInfo) {
         initResub_.erase(info);
     }
 	if (isListenMode()) {
-        conn = DBConnection(host_, port_, info.userName_, info.password_);
+		conn = createConnection(host_, port_, info.userName_, info.password_);
     	run(conn, "stopPublishTable", getLocalIP(), listeningPort_, subInfo.tableName, subInfo.actionName);
 	}
     return true;
 }
 
 StreamingClient::StreamingClient(const StreamingClientConfig &config)
-    : impl_(new StreamingClientImpl(0))
+    : impl_(new StreamingClientImpl(0, config.netTimeout))
 {
     if (config.protocol == TransportationProtocol::UDP) {
 #ifdef USE_AERON
@@ -1982,14 +2017,12 @@ ThreadSP ThreadedClient::subscribe(string host, int port, const MessageHandler &
         SubscribeInfo info { std::move(host), port, std::move(tableName), std::move(actionName) };
 #ifdef USE_AERON
     if (udpImpl_ != nullptr) {
-        auto conn = std::make_shared<DBConnection>(info.hostName, info.port);
+        auto conn = std::make_shared<DBConnection>(
+            impl_->createConnection(info.hostName, info.port, userName, password));
         if (!conn->checkVersion({{3,0,0}})) {
             throw RuntimeException("UDP connection only supports server version at least 3.00.0");
         }
         SubscribeConfig config { offset, msgAsTable, allowExists, false };
-        if (!userName.empty()) {
-            conn->login(userName, password, HAS_OPENSSL);
-        }
         udpImpl_->subscribe(info, config, conn, handler, blobDeserializer);
         return nullptr;
     }
@@ -2074,10 +2107,7 @@ ThreadSP EventClient::subscribe(const std::string & host, int port, const EventM
         throw RuntimeException("tableName must not be empty.");
     }
 
-    DBConnection tempConn;
-    if(!tempConn.connect(host, port, userName, password)){
-        throw RuntimeException("Subscribe Fail, cannot connect to " + host + " : " + std::to_string(port));
-    }
+    DBConnection tempConn = impl_->createConnection(host, port, userName, password);
     std::string sql = "select top 0 * from " + tableName;
     std::string errMsg;
     ConstantSP outputTable = tempConn.run(sql);

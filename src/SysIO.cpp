@@ -67,11 +67,70 @@ void LOG_INFO(const std::string& msg){
 	DLogger::Info(msg);
 }
 
+namespace {
+
+bool waitForConnect(SOCKET handle, int timeoutMs, int& errorCode){
+	fd_set writeSet;
+	FD_ZERO(&writeSet);
+	FD_SET(handle, &writeSet);
+
+	struct timeval timeout;
+	timeout.tv_sec = timeoutMs / 1000;
+	timeout.tv_usec = (timeoutMs % 1000) * 1000;
+
+#ifdef _WIN32
+	int ready = select(0, nullptr, &writeSet, nullptr, &timeout);
+#else
+	int ready;
+	do {
+		ready = select(handle + 1, nullptr, &writeSet, nullptr, &timeout);
+	} while(ready < 0 && errno == EINTR);
+#endif
+	if(ready == 0){
+#ifdef _WIN32
+		errorCode = WSAETIMEDOUT;
+#else
+		errorCode = ETIMEDOUT;
+#endif
+		return false;
+	}
+	if(ready < 0){
+#ifdef _WIN32
+		errorCode = WSAGetLastError();
+#else
+		errorCode = errno;
+#endif
+		return false;
+	}
+
+	int socketError = 0;
+#ifdef _WIN32
+	int length = sizeof(socketError);
+	if(getsockopt(handle, SOL_SOCKET, SO_ERROR, (char*)&socketError, &length) == SOCKET_ERROR){
+		errorCode = WSAGetLastError();
+		return false;
+	}
+#else
+	socklen_t length = sizeof(socketError);
+	if(getsockopt(handle, SOL_SOCKET, SO_ERROR, &socketError, &length) < 0){
+		errorCode = errno;
+		return false;
+	}
+#endif
+	if(socketError != 0){
+		errorCode = socketError;
+		return false;
+	}
+	return true;
+}
+
+}
+
 Socket::Socket(): port_(-1), blocking_(true), autoClose_(true), enableSSL_(false),
 #ifdef USE_OPENSSL
     ctx_(nullptr), ssl_(nullptr),
 #endif
-    keepAliveTime_(30) {
+    keepAliveTimeMs_(30000), connectTimeMs_(30000) {
     handle_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(INVALID_SOCKET == handle_) {
         throw IOException("Couldn't create a socket with error code " + std::to_string(getErrorCode()));
@@ -83,11 +142,12 @@ Socket::Socket(): port_(-1), blocking_(true), autoClose_(true), enableSSL_(false
         setTcpNoDelay();
 }
 
-Socket::Socket(const std::string& host, int port, bool blocking, int keepAliveTime, bool enableSSL) : host_(host), port_(port), blocking_(blocking), autoClose_(true), enableSSL_(enableSSL),
+Socket::Socket(const std::string& host, int port, bool blocking, int keepAliveTime, bool enableSSL, int connectTime)
+    : host_(host), port_(port), blocking_(blocking), autoClose_(true), enableSSL_(enableSSL),
 #ifdef USE_OPENSSL
     ctx_(nullptr), ssl_(nullptr),
 #endif
-    keepAliveTime_(keepAliveTime) {
+    keepAliveTimeMs_(keepAliveTime), connectTimeMs_(connectTime) {
 #ifndef USE_OPENSSL
     enableSSL_ = false;
 #endif
@@ -111,11 +171,12 @@ Socket::Socket(const std::string& host, int port, bool blocking, int keepAliveTi
         handle_ = INVALID_SOCKET;
 }
 
-Socket::Socket(SOCKET handle, bool blocking, int keepAliveTime) : port_(-1), handle_(handle), blocking_(blocking), autoClose_(true), enableSSL_(false),
+Socket::Socket(SOCKET handle, bool blocking, int keepAliveTime, int connectTime)
+    : port_(-1), handle_(handle), blocking_(blocking), autoClose_(true), enableSSL_(false),
 #ifdef USE_OPENSSL
     ctx_(nullptr), ssl_(nullptr),
 #endif
-    keepAliveTime_(keepAliveTime) {
+    keepAliveTimeMs_(keepAliveTime), connectTimeMs_(connectTime) {
     if(INVALID_SOCKET == handle_) {
         throw IOException("The given socket is invalid.");
     }
@@ -141,8 +202,8 @@ IO_ERR Socket::read(char* buffer, size_t length, size_t& actualLength, bool msgP
 		actualLength = 0;
 		int ret = recv(handle_, buffer, static_cast<int>(length), msgPeek ? MSG_PEEK : 0);
 		if (ret == SOCKET_ERROR) {
-			DLogger::Error("socket read error", actualLength);
 			int error = WSAGetLastError();
+			DLogger::Error("socket read error", error);
 			if (error == WSAENOTCONN || error == WSAESHUTDOWN || error == WSAENETRESET)
 				return DISCONNECTED;
 			if (error == WSAEWOULDBLOCK)
@@ -279,7 +340,8 @@ void Socket::enableTcpNoDelay(bool enable){
 	 ENABLE_TCP_NODELAY = enable;
 }
 
-IO_ERR Socket::connect(const std::string& host, int port, bool blocking, int keepAliveTime, bool sslEnable){
+IO_ERR Socket::connect(const std::string& host, int port, bool blocking, int keepAliveTime,
+                       bool sslEnable, int connectTime){
 	host_ = host;
 	port_ = port;
 	blocking_ = blocking;
@@ -287,7 +349,8 @@ IO_ERR Socket::connect(const std::string& host, int port, bool blocking, int kee
 #ifndef USE_OPENSSL
     enableSSL_ = false;
 #endif
-	keepAliveTime_ = keepAliveTime;
+	keepAliveTimeMs_ = keepAliveTime;
+	connectTimeMs_ = connectTime;
 	return connect();
 }
 
@@ -318,37 +381,42 @@ IO_ERR Socket::connect(){
 	    	return OTHERERR;
 	    }
 
-        int enabled = 1;
+		if (keepAliveTimeMs_ > 0) {
+			bool keepAliveConfigured = true;
 #ifdef _WIN32
-        if(::setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, (const char*)&enabled, sizeof(int)) != 0)
-            LOG_ERR("Subscription socket failed to enable TCP_KEEPALIVE with error: " +  std::to_string(getErrorCode()));
-
-		struct tcp_keepalive kavars;
-		kavars.onoff = TRUE;
-		kavars.keepalivetime = keepAliveTime_ * 1000;
-		kavars.keepaliveinterval = 5 * 1000;
-
-		unsigned long ulBytesReturn = 0;
-		WSAIoctl(handle_, SIO_KEEPALIVE_VALS, &kavars, sizeof(kavars), nullptr, 0, &ulBytesReturn, nullptr, nullptr);
+			// Windows Vista and later always use 10 keepalive probes. SIO_KEEPALIVE_VALS
+			// only controls the initial idle time and the interval between probes.
+			constexpr int windowsKeepCount = 10;
+			const int keepTime = std::max(keepAliveTimeMs_ / (windowsKeepCount + 1), 1000);
+			int enabled = 1;
+			if (::setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, (const char*)&enabled, sizeof(enabled)) != 0) {
+				keepAliveConfigured = false;
+			} else {
+				struct tcp_keepalive keepaliveParams;
+				keepaliveParams.onoff = TRUE;
+				keepaliveParams.keepalivetime = keepTime;
+				keepaliveParams.keepaliveinterval = keepTime;
+				unsigned long bytesReturned = 0;
+				keepAliveConfigured = WSAIoctl(handle_, SIO_KEEPALIVE_VALS, &keepaliveParams,
+					sizeof(keepaliveParams), nullptr, 0, &bytesReturned, nullptr, nullptr) == 0;
+			}
 #elif defined MAC
-		if(::setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, (const char*)&enabled, sizeof(int)) != 0)
-            LOG_ERR("Subscription socket failed to enable TCP_KEEPALIVE with error: " +  std::to_string(getErrorCode()));
+			int enabled = 1;
+			keepAliveConfigured = ::setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, &enabled, sizeof(enabled)) == 0;
 #else
-        int idleTime = keepAliveTime_;
-        int interval = 5;
-        int count = 3;
-        unsigned int timeout = 30000;
-        if(::setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, &enabled, sizeof(enabled)) != 0)
-            LOG_ERR("Failed to enable SO_KEEPALIVE with error: " +  std::to_string(getErrorCode()));
-        if(::setsockopt(handle_, SOL_TCP, TCP_KEEPIDLE, &idleTime, sizeof(idleTime)) != 0)
-            LOG_ERR("Failed to enable TCP_KEEPIDLE with error: " +  std::to_string(getErrorCode()));
-        if(::setsockopt(handle_, SOL_TCP, TCP_KEEPINTVL, &interval, sizeof(interval)) != 0)
-            LOG_ERR("Failed to enable TCP_KEEPINTVL with error: " +  std::to_string(getErrorCode()));
-        if(::setsockopt(handle_, SOL_TCP, TCP_KEEPCNT, &count, sizeof(count)) != 0)
-            LOG_ERR("Failed to enable TCP_KEEPCNT with error: " +  std::to_string(getErrorCode()));
-        if(::setsockopt(handle_, IPPROTO_TCP, TCP_USER_TIMEOUT, &timeout, sizeof(timeout)) != 0)
-            LOG_ERR("Failed to enable TCP_USER_TIMEOUT with error: " +  std::to_string(getErrorCode()));
+			const int keepCount = 3;
+			const int enabled = 1;
+			const int keepTime = std::max(keepAliveTimeMs_ / 1000 / keepCount, 1);
+			const unsigned int userTimeout = static_cast<unsigned int>(keepAliveTimeMs_);
+			keepAliveConfigured = ::setsockopt(handle_, SOL_SOCKET, SO_KEEPALIVE, &enabled, sizeof(enabled)) == 0 &&
+				::setsockopt(handle_, SOL_TCP, TCP_KEEPIDLE, &keepTime, sizeof(keepTime)) == 0 &&
+				::setsockopt(handle_, SOL_TCP, TCP_KEEPINTVL, &keepTime, sizeof(keepTime)) == 0 &&
+				::setsockopt(handle_, SOL_TCP, TCP_KEEPCNT, &keepCount, sizeof(keepCount)) == 0 &&
+				::setsockopt(handle_, IPPROTO_TCP, TCP_USER_TIMEOUT, &userTimeout, sizeof(userTimeout)) == 0;
 #endif
+			if (!keepAliveConfigured)
+				LOG_ERR("Failed to configure TCP keepalive with error: " + std::to_string(getErrorCode()));
+		}
 
 		//struct linger so_linger;
 		//so_linger.l_onoff = 1;
@@ -359,21 +427,50 @@ IO_ERR Socket::connect(){
 		if (setsockopt(handle_, SOL_SOCKET, SO_REUSEADDR, (char*)&flag, sizeof(int)) != 0) {
 			LOG_ERR("Failed to set SO_REUSEADDR with error: " + std::to_string(getErrorCode()));
 		}
-		
-		if(::connect(handle_, p->ai_addr, static_cast<int>(p->ai_addrlen)) == SOCKET_ERROR) {
-			if(!blocking_){
-#ifdef _WIN32
-				if(WSAGetLastError () == WSAEWOULDBLOCK){
-					freeaddrinfo(servinfo);
-					return INPROGRESS;
-				}
-#else
-				if(errno == EINPROGRESS){
-					freeaddrinfo(servinfo);
-					return INPROGRESS;
-				}
-#endif
+
+		if(blocking_ && connectTimeMs_ > 0){
+			if(!setNonBlocking()){
+				LOG_ERR("Failed to set socket to non-blocking mode with error code " + std::to_string(getErrorCode()));
+				closesocket(handle_);
+				handle_ = INVALID_SOCKET;
+				continue;
 			}
+			int connectResult = ::connect(handle_, p->ai_addr, static_cast<int>(p->ai_addrlen));
+			if(connectResult == SOCKET_ERROR){
+				int errorCode = getErrorCode();
+#ifdef _WIN32
+				bool const connecting = errorCode == WSAEWOULDBLOCK;
+#else
+				bool const connecting = errorCode == EINPROGRESS;
+#endif
+				if(!connecting || !waitForConnect(handle_, connectTimeMs_, errorCode)){
+					LOG_ERR("Failed to connect to host = " + host_ + " port = " + portStr + " with error code " + std::to_string(errorCode));
+					closesocket(handle_);
+					handle_ = INVALID_SOCKET;
+					continue;
+				}
+			}
+			if(!setBlocking()){
+				LOG_ERR("Failed to restore socket blocking mode with error code " + std::to_string(getErrorCode()));
+				closesocket(handle_);
+				handle_ = INVALID_SOCKET;
+				continue;
+			}
+			break;
+		}
+
+		if(::connect(handle_, p->ai_addr, static_cast<int>(p->ai_addrlen)) == SOCKET_ERROR) {
+#ifdef _WIN32
+			if(WSAGetLastError () == WSAEWOULDBLOCK){
+				freeaddrinfo(servinfo);
+				return INPROGRESS;
+			}
+#else
+			if(errno == EINPROGRESS){
+				freeaddrinfo(servinfo);
+				return INPROGRESS;
+			}
+#endif
 			LOG_ERR("Failed to connect to host = " + host_ + " port = " + portStr + " with error code " + std::to_string(getErrorCode()));
 			closesocket(handle_);
 			handle_=INVALID_SOCKET;
@@ -444,23 +541,21 @@ Socket* Socket::accept(){
 #endif
 		return nullptr;
 	}
-	return new Socket(t, blocking_, keepAliveTime_);
+	return new Socket(t, blocking_, keepAliveTimeMs_, connectTimeMs_);
 }
 
 SOCKET Socket::getHandle(){
 	return handle_;
 }
 
-void Socket::setTimeout(int timeoutMs){
+void Socket::setReceiveTimeout(int timeoutMs){
 #ifdef _WIN32
 	int iTimeOut = timeoutMs;
     setsockopt(handle_, SOL_SOCKET, SO_RCVTIMEO,(char*)&iTimeOut,sizeof(iTimeOut));
-    setsockopt(handle_, SOL_SOCKET, SO_SNDTIMEO,(char*)&iTimeOut,sizeof(iTimeOut));
 #else
 	struct timeval timeout; // NOLINT(misc-include-cleaner): the suggested header is not standard Linux API
     timeout.tv_sec = timeoutMs / 1000;
     timeout.tv_usec = (timeoutMs%1000) * 1000;
-    setsockopt(handle_, SOL_SOCKET,SO_SNDTIMEO, &timeout, sizeof(timeout));
 	setsockopt(handle_, SOL_SOCKET,SO_RCVTIMEO, &timeout, sizeof(timeout));
 #endif
 }
@@ -521,7 +616,7 @@ bool Socket::skipAll(){
 		getTimeout(oldTimeout);
 		//printf("oldTimeout: %d\n",oldTimeout);
 	}
-	setTimeout(50);
+	setReceiveTimeout(50);
 	const int bufsize=256;
 	char buf[bufsize];
 	size_t readlen;
@@ -533,7 +628,7 @@ bool Socket::skipAll(){
 		setNonBlocking();
 	}else{
 		if(oldTimeout != -2)
-			setTimeout(oldTimeout);
+			setReceiveTimeout(oldTimeout);
 	}
 	return true;
 }

@@ -7892,7 +7892,6 @@ TEST_F(DataformVectorTest, test_upload_download_vector_with_huge_value_string)
     }
     v1->append(dolphindb::Util::createString(val));
     ASSERT_ANY_THROW(conn.upload("b", {v1}));
-
 }
 
 TEST_F(DataformVectorTest, test_upload_download_vector_with_huge_value_blob)
@@ -7909,12 +7908,14 @@ TEST_F(DataformVectorTest, test_upload_download_vector_with_huge_value_blob)
     dolphindb::VectorSP v1 = dolphindb::Util::createVector(dolphindb::DT_BLOB, 0, 1);
     std::string init = "1";
     std::string val;
-    for (auto i = 0; i < 256 * 1024; i++){
+    for (auto i = 0; i < 256*1024*1024; i++){
         val += init;
     }
     v1->append(dolphindb::Util::createBlob(val));
     conn.upload("b", {v1});
-    ASSERT_TRUE(conn.run("eqObj(b, blob([concat(take(`1, 256 * 1024))]))")->getBool());
+    conn.upload("c", dolphindb::Util::createBlob(val));
+    ASSERT_TRUE(conn.run("eqObj(b, blob([concat(take(`1, 256*1024*1024))]))")->getBool());
+    ASSERT_TRUE(conn.run("eqObj(c, blob(concat(take(`1, 256*1024*1024))))")->getBool());
 }
 
 TEST_F(DataformVectorTest, test_upload_download_vector_with_huge_value_symbol)

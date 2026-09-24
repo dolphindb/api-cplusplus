@@ -109,7 +109,7 @@ inline std::ostream &operator<<(std::ostream &out, ConnectionState state) {
 
 class EXPORT_DECL DBConnection {
 public:
-    explicit DBConnection(bool enableSSL = false, bool asyncTask = false, int keepAliveTime = 7200, bool compress = false, bool python = false, bool isReverseStreaming = false, bool enableSCRAM = false);
+    explicit DBConnection(bool enableSSL = false, bool asyncTask = false, int keepAliveTime = 30, bool compress = false, bool python = false, bool isReverseStreaming = false, bool enableSCRAM = false);
     DBConnection(const std::string &host, int port, const std::string &userName="", const std::string &password="")
         :DBConnection(false)
     {
@@ -144,7 +144,8 @@ public:
         ret->state_ = ConnectionState::Initializing;
         ret->initialScript_ = initialScript_;
         ret->closed_ = false;
-        ret->keepAliveTime_ = keepAliveTime_;
+        ret->keepAliveTimeMs_ = keepAliveTimeMs_;
+        ret->connectTimeMs_ = connectTimeMs_;
 
         // deprecated
         ret->ha_ = ha_;
@@ -154,6 +155,12 @@ public:
     }
     void setCompress(bool compress) { compress_ = compress; }
     void setAsync(bool async) { asynTask_ = async; }
+    /**
+     * Set the network timeout in milliseconds for subsequent connections.
+     * The value limits TCP connection establishment and reduces the current
+     * TCP keepalive detection interval when it is shorter.
+     */
+    void setNetTimeout(int timeoutMs);
     void setHostLabel(std::string hostLabel) { hostLabel_ = std::move(hostLabel); }
     std::string getHostLabel() { return hostLabel_; }
     bool connect();
@@ -163,9 +170,11 @@ public:
 	 * Connect to the specified DolphinDB server. If userId and password are specified, authentication
 	 * will be performed along with connecting. If one would send userId and password in encrypted mode,
 	 * please use the login function for authentication separately.
+	 * keepAliveTime must be -1, 0, or a positive number of seconds. -1 and 0 preserve the
+	 * current keepalive setting; a positive value updates it.
 	 */
 	bool connect(const std::string& hostName, int port, const std::string& userId = "", const std::string& password = "", const std::string& initialScript = "",
-		bool highAvailability = false, const std::vector<std::string>& highAvailabilitySites = std::vector<std::string>(), int keepAliveTime=7200, bool reconnect = false);
+		bool highAvailability = false, const std::vector<std::string>& highAvailabilitySites = std::vector<std::string>(), int keepAliveTime=-1, bool reconnect = false);
 
     bool checkVersion(const std::vector<VersionT> &vers)
     {
@@ -270,7 +279,7 @@ private:
 		ET_NODENOTAVAIL = 3,
 	};
     void switchDataNode(const std::string &host = "", int port = -1);
-	bool connectNode(std::string hostName, int port, int keepAliveTime = -1);
+	bool connectNode(std::string hostName, int port);
     bool connected();
 	//0 - ignored exception, eg : other data node not avail;
 	//1 - throw exception;
@@ -302,7 +311,8 @@ private:
     std::string host_;
     int port_;
     size_t haSitesNum_;
-    int keepAliveTime_{7200};
+    int keepAliveTimeMs_{30000};
+    int connectTimeMs_{-1};
     bool enableSSL_;
     bool enableSCRAM_;
     bool asynTask_;

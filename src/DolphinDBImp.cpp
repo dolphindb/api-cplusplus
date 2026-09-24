@@ -32,7 +32,7 @@ namespace dolphindb {
 DdbInit DBConnectionImpl::ddbInit_;
 DBConnectionImpl::DBConnectionImpl(bool sslEnable, bool asynTask, int keepAliveTime, bool compress, bool python, bool isReverseStreaming, bool enableSCRAM)
     : port_(0), encrypted_(false), isConnected_(false), littleEndian_(Util::isLittleEndian()), sslEnable_(sslEnable),enableSCRAM_(enableSCRAM),asynTask_(asynTask)
-    , keepAliveTime_(keepAliveTime), compress_(compress), enablePickle_(false), python_(python), isReverseStreaming_(isReverseStreaming)
+    , keepAliveTimeMs_(keepAliveTime * 1000), connectTimeMs_(-1), compress_(compress), enablePickle_(false), python_(python), isReverseStreaming_(isReverseStreaming)
 {
 }
 
@@ -51,8 +51,8 @@ void DBConnectionImpl::close() {
 }
 
 bool DBConnectionImpl::connect(const std::string & hostName, int port, const std::string & userId,
-        const std::string & password, bool sslEnable,bool asynTask, int keepAliveTime, bool compress,
-        bool python) {
+        const std::string & password, bool sslEnable, bool asynTask, int keepAliveTimeMs,
+        int connectTimeMs, bool compress, bool python) {
     hostName_ = hostName;
     port_ = port;
     userId_ = userId;
@@ -60,9 +60,8 @@ bool DBConnectionImpl::connect(const std::string & hostName, int port, const std
     encrypted_ = false;
     sslEnable_ = sslEnable;
     asynTask_ = asynTask;
-    if(keepAliveTime > 0){
-        keepAliveTime_ = keepAliveTime;
-    }
+    keepAliveTimeMs_ = keepAliveTimeMs;
+    connectTimeMs_ = connectTimeMs;
     compress_ = compress;
     python_ = python;
     return connect();
@@ -71,7 +70,7 @@ bool DBConnectionImpl::connect(const std::string & hostName, int port, const std
 bool DBConnectionImpl::connect() {
     close();
 
-    SocketSP conn = new Socket(hostName_, port_, true, keepAliveTime_, sslEnable_);
+    SocketSP conn = new Socket(hostName_, port_, true, keepAliveTimeMs_, sslEnable_, connectTimeMs_);
     IO_ERR ret = conn->connect();
     if (ret != OK) {
         return false;

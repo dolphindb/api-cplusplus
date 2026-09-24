@@ -108,8 +108,9 @@ const std::string DBConnection::udpIP_{"224.1.1.1"};
 
 DBConnection::DBConnection(bool enableSSL, bool asyncTask, int keepAliveTime, bool compress, bool python, bool isReverseStreaming, bool enableSCRAM) :
 	conn_(new DBConnectionImpl(enableSSL, asyncTask, keepAliveTime, compress, python, isReverseStreaming, enableSCRAM)), ha_(false),
-		enableSSL_(enableSSL), enableSCRAM_(enableSCRAM), asynTask_(asyncTask), compress_(compress), nodes_({}),
-		lastConnNodeIndex_(0), python_(python), reconnect_(false), closed_(true), runSeqNo_(0){
+		keepAliveTimeMs_(keepAliveTime * 1000), enableSSL_(enableSSL), enableSCRAM_(enableSCRAM),
+		asynTask_(asyncTask), compress_(compress), nodes_({}), lastConnNodeIndex_(0),
+		python_(python), reconnect_(false), closed_(true), runSeqNo_(0){
         if (asyncTask && enableSCRAM) {
             throw IOException("SCRAM login is not supported in async mode.");
         }
@@ -117,9 +118,9 @@ DBConnection::DBConnection(bool enableSSL, bool asyncTask, int keepAliveTime, bo
 
 DBConnection::DBConnection(DBConnection&& oth) noexcept :
 		conn_(std::move(oth.conn_)), uid_(std::move(oth.uid_)), pwd_(std::move(oth.pwd_)),
-		initialScript_(std::move(oth.initialScript_)), ha_(oth.ha_), keepAliveTime_(oth.keepAliveTime_), enableSSL_(oth.enableSSL_), enableSCRAM_(oth.enableSCRAM_),
+		initialScript_(std::move(oth.initialScript_)), ha_(oth.ha_), keepAliveTimeMs_(oth.keepAliveTimeMs_), connectTimeMs_(oth.connectTimeMs_), enableSSL_(oth.enableSSL_), enableSCRAM_(oth.enableSCRAM_),
 		asynTask_(oth.asynTask_),compress_(oth.compress_),nodes_(std::move(oth.nodes_)),lastConnNodeIndex_(0),
-		reconnect_(oth.reconnect_), runSeqNo_(oth.runSeqNo_)
+		reconnect_(oth.reconnect_), runSeqNo_(oth.runSeqNo_), version_(oth.version_)
 {
     closed_ = oth.closed_.load();
 }
@@ -138,6 +139,8 @@ DBConnection& DBConnection::operator=(DBConnection&& oth) noexcept
     enableSCRAM_ = oth.enableSCRAM_;
     asynTask_ = oth.asynTask_;
 	compress_ = oth.compress_;
+	keepAliveTimeMs_ = oth.keepAliveTimeMs_;
+	connectTimeMs_ = oth.connectTimeMs_;
 	lastConnNodeIndex_ = oth.lastConnNodeIndex_;
 	reconnect_ = oth.reconnect_;
 	closed_ = oth.closed_.load();
@@ -150,10 +153,17 @@ DBConnection::~DBConnection() {
     close();
 }
 
+void DBConnection::setNetTimeout(int timeoutMs) {
+    if (timeoutMs <= 0)
+        throw IllegalArgumentException(DDB_FUNCNAME, "netTimeout must be greater than 0.");
+    connectTimeMs_ = timeoutMs;
+    keepAliveTimeMs_ = std::min(keepAliveTimeMs_, timeoutMs);
+}
+
 bool DBConnection::connect() {
     if (nodes_.empty()) {
         closed_ = false;
-        if (!connectNode(host_, port_, keepAliveTime_)) {
+        if (!connectNode(host_, port_)) {
             return false;
         }
     } else {
@@ -180,6 +190,10 @@ bool DBConnection::connect() {
 
 bool DBConnection::connect(const std::string & hostName, int port, const std::string & userId, const std::string & password, const std::string & startup,
                            bool ha, const vector<string>& highAvailabilitySites, int keepAliveTime, bool reconnect) {
+	if (keepAliveTime < 0 && keepAliveTime != -1)
+		throw IllegalArgumentException(DDB_FUNCNAME, "keepAliveTime must be -1, 0, or greater than 0.");
+    if (keepAliveTime > 0)
+		keepAliveTimeMs_ = keepAliveTime * 1000;
     host_ = hostName;
     port_ = port;
     state_ = ConnectionState::Initializing;
@@ -212,7 +226,7 @@ bool DBConnection::connect(const std::string & hostName, int port, const std::st
 		while (closed_ == false) {
 			while(conn_->isConnected()==false && closed_ == false) {
 				for (auto &one : nodes_) {
-					if (connectNode(one.hostName_, one.port_, keepAliveTime)) {
+                if (connectNode(one.hostName_, one.port_)) {
 						connectedNode = one;
 						break;
 					}
@@ -306,7 +320,7 @@ bool DBConnection::connect(const std::string & hostName, int port, const std::st
 			haSitesNum_ = nodes_.size();
 			switchDataNode();
 		} else {
-			if (!connectNode(hostName, port, keepAliveTime))
+            if (!connectNode(hostName, port))
 				return false;
 		}
     }
@@ -331,7 +345,7 @@ bool DBConnection::reconnect() {
     }
     state_ = ConnectionState::Initializing;
 	closed_ = false;
-	if (!connectNode(host_, port_, keepAliveTime_))
+    if (!connectNode(host_, port_))
 		return false;
 
 	if (!initialScript_.empty()) {
@@ -349,10 +363,10 @@ bool DBConnection::connected() {
     return true;
 }
 
-bool DBConnection::connectNode(string hostName, int port, int keepAliveTime) {
+bool DBConnection::connectNode(string hostName, int port) {
     while (closed_ == false) {
         try {
-            bool online = conn_->connect(hostName, port, uid_, pwd_, enableSSL_, asynTask_, keepAliveTime, compress_,python_);
+            bool online = conn_->connect(hostName, port, uid_, pwd_, enableSSL_, asynTask_, keepAliveTimeMs_, connectTimeMs_, compress_, python_);
             if (!online) {
                 return false;
             }

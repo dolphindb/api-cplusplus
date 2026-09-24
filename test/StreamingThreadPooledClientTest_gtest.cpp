@@ -1339,4 +1339,142 @@ namespace STPCT
         ASSERT_TRUE(conn.run("(exec count(*) from getStreamingStat()[`pubConns] where tables =`"+st+") ==0")->getBool());
     }
 
+    TEST_F(StreamingThreadPooledClientTester, test_subscribe_backupSites_should_serial)
+    {
+        std::string case_=getCaseName();
+        dolphindb::DBConnection conn;
+        dolphindb::DBConnection conn1;
+        dolphindb::DBConnection conn2;
+        dolphindb::DBConnection conn3;
+        conn.connect(HOST_CLUSTER, PORT_CONTROLLER, USER_CLUSTER, PASSWD_CLUSTER, "", false, {}, 3, true);
+        conn1.connect(HOST_CLUSTER, PORT_DNODE1, USER_CLUSTER, PASSWD_CLUSTER, "", false, {}, 3, true);
+        conn2.connect(HOST_CLUSTER, PORT_DNODE2, USER_CLUSTER, PASSWD_CLUSTER, "", false, {}, 3, true);
+        conn3.connect(HOST_CLUSTER, PORT_DNODE3, USER_CLUSTER, PASSWD_CLUSTER, "", false, {}, 3, true);
+        std::string script = R"(
+            share streamTable(100:0,[`a,`b],[INT,STRING]) as `)" + case_ + R"(
+        )";
+        conn1.run(script);
+        conn2.run(script);
+        conn3.run(script);
+        int msg_total = 1;
+        dolphindb::Signal notify;
+        dolphindb::Mutex mutex;
+        auto onehandler = [&](dolphindb::Message msg)
+        {
+            dolphindb::LockGuard<dolphindb::Mutex> lock(&mutex);
+            ++msg_total;
+            std::cout << msg->getString() << std::endl;
+            if (msg->get(0)->getInt()<10)
+                EXPECT_EQ(msg->get(1)->getString(), "DataNode1");
+            else if (msg->get(0)->getInt()<20)
+                EXPECT_EQ(msg->get(1)->getString(), "DataNode2");
+            else if (msg->get(0)->getInt()<30)
+                EXPECT_EQ(msg->get(1)->getString(), "DataNode3");
+            else
+                EXPECT_EQ(msg->get(1)->getString(), "DataNode1");
+        };
+        dolphindb::ThreadPooledClient client;
+        std::vector<std::string> backupSites{HOST_CLUSTER+":"+std::to_string(PORT_DNODE1), HOST_CLUSTER+":"+std::to_string(PORT_DNODE2), HOST_CLUSTER+":"+std::to_string(PORT_DNODE3)};
+        client.subscribe(HOST_CLUSTER, PORT_DNODE1, onehandler, case_, "test", -1, true, nullptr, false, false, USER_CLUSTER, PASSWD_CLUSTER, nullptr, backupSites);
+        for (int i=0;i<30;++i){
+            if (i<10)
+                conn1.run("insert into "+case_+" values("+std::to_string(i)+",'DataNode1')");
+            if (i<20)
+                conn2.run("insert into "+case_+" values("+std::to_string(i)+",'DataNode2')");
+            conn3.run("insert into "+case_+" values("+std::to_string(i)+",'DataNode3')");
+        }
+        while (msg_total<10)
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        conn.run("stopDataNode('"+ HOST_CLUSTER +":"+std::to_string(PORT_DNODE1)+"');true");
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        while (msg_total<20)
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        conn.run("stopDataNode('"+ HOST_CLUSTER +":"+std::to_string(PORT_DNODE2)+"');true");
+        conn.run("startDataNode('"+ HOST_CLUSTER +":"+std::to_string(PORT_DNODE1)+"');true");
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        while (msg_total<30)
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        conn.run("startDataNode('"+ HOST_CLUSTER +":"+std::to_string(PORT_DNODE2)+"');true");
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        conn1.run(script);
+        for (int i=0;i<40;++i)
+            conn1.run("insert into "+case_+" values("+std::to_string(i)+",'DataNode1');true");
+        conn.run("stopDataNode('"+ HOST_CLUSTER +":"+std::to_string(PORT_DNODE3)+"')");
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        while (msg_total<40)
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        conn.run("startDataNode('"+ HOST_CLUSTER +":"+std::to_string(PORT_DNODE3)+"');true");
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+
+    TEST_F(StreamingThreadPooledClientTester, test_subscribe_backupSites_subOnce_should_serial)
+    {
+        std::string case_=getCaseName();
+        dolphindb::DBConnection conn;
+        dolphindb::DBConnection conn1;
+        dolphindb::DBConnection conn2;
+        dolphindb::DBConnection conn3;
+        conn.connect(HOST_CLUSTER, PORT_CONTROLLER, USER_CLUSTER, PASSWD_CLUSTER, "", false, {}, 3, true);
+        conn1.connect(HOST_CLUSTER, PORT_DNODE1, USER_CLUSTER, PASSWD_CLUSTER, "", false, {}, 3, true);
+        conn2.connect(HOST_CLUSTER, PORT_DNODE2, USER_CLUSTER, PASSWD_CLUSTER, "", false, {}, 3, true);
+        conn3.connect(HOST_CLUSTER, PORT_DNODE3, USER_CLUSTER, PASSWD_CLUSTER, "", false, {}, 3, true);
+        std::string script = R"(
+            share streamTable(100:0,[`a,`b],[INT,STRING]) as `)" + case_ + R"(
+        )";
+        conn1.run(script);
+        conn2.run(script);
+        conn3.run(script);
+        int msg_total = 1;
+        dolphindb::Signal notify;
+        dolphindb::Mutex mutex;
+        auto batchhandler = [&](std::vector<dolphindb::Message> msgs)
+        {
+            dolphindb::LockGuard<dolphindb::Mutex> lock(&mutex);
+            msg_total+=msgs.size();
+            for (dolphindb::VectorSP msg : msgs){
+                std::cout << msg->getString() << std::endl;
+                if (msg->get(0)->getInt()<10)
+                    EXPECT_EQ(msg->get(1)->getString(), "DataNode1");
+                else if (msg->get(0)->getInt()<20)
+                    EXPECT_EQ(msg->get(1)->getString(), "DataNode2");
+                else if (msg->get(0)->getInt()<30)
+                    EXPECT_EQ(msg->get(1)->getString(), "DataNode3");
+                else
+                    EXPECT_EQ(msg->get(1)->getString(), "DataNode1");
+            }
+        };
+        dolphindb::ThreadedClient client;
+        std::vector<std::string> backupSites{HOST_CLUSTER+":"+std::to_string(PORT_DNODE2), HOST_CLUSTER+":"+std::to_string(PORT_DNODE3), HOST_CLUSTER+":"+std::to_string(PORT_DNODE1)};
+        client.subscribe(HOST_CLUSTER, PORT_DNODE1, batchhandler, case_, "test", -1, true, nullptr, false, 1, 1, false, USER_CLUSTER, PASSWD_CLUSTER, nullptr, backupSites, 100, true);
+        for (int i=0;i<30;++i){
+            if (i<10)
+                conn1.run("insert into "+case_+" values("+std::to_string(i)+",'DataNode1')");
+            if (i<20)
+                conn2.run("insert into "+case_+" values("+std::to_string(i)+",'DataNode2')");
+            conn3.run("insert into "+case_+" values("+std::to_string(i)+",'DataNode3')");
+        }
+        while (msg_total<10)
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        conn.run("stopDataNode('"+ HOST_CLUSTER +":"+std::to_string(PORT_DNODE1)+"')");
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        while (msg_total<20)
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        conn.run("stopDataNode('"+ HOST_CLUSTER +":"+std::to_string(PORT_DNODE2)+"')");
+        conn.run("startDataNode('"+ HOST_CLUSTER +":"+std::to_string(PORT_DNODE1)+"')");
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        while (msg_total<30)
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        conn.run("startDataNode('"+ HOST_CLUSTER +":"+std::to_string(PORT_DNODE2)+"')");
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        conn1.run(script);
+        for (int i=0;i<40;++i)
+            conn1.run("insert into "+case_+" values("+std::to_string(i)+",'DataNode1')");
+        conn.run("stopDataNode('"+ HOST_CLUSTER +":"+std::to_string(PORT_DNODE3)+"')");
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        conn.run("startDataNode('"+ HOST_CLUSTER +":"+std::to_string(PORT_DNODE3)+"')");
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+
 }
+
+

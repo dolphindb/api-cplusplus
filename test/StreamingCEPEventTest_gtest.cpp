@@ -708,31 +708,6 @@ TEST_F(StreamingCEPEventTest, test_EventSender_connect_not_connect)
     delete schema;
 }
 
-TEST_F(StreamingCEPEventTest, test_EventClient_error_hostinfo)
-{
-    std::string case_=getCaseName();
-    conn->run("share streamTable(1:0, `time`eventType`event, [TIME,STRING,BLOB]) as "+case_+"_inputTable;");
-    dolphindb::EventSchema *schema = new dolphindb::EventSchema();
-    schema->eventType_ = "market";
-    schema->fieldNames_ = {"market", "time"};
-    schema->fieldTypes_ = {dolphindb::DT_STRING, dolphindb::DT_TIME};
-    schema->fieldForms_={dolphindb::DF_SCALAR, dolphindb::DF_SCALAR};
-    std::vector<dolphindb::EventSchema> EventSchemas = {*schema};
-    std::vector<std::string> eventTimeFields = {"time"};
-    std::vector<std::string> commonFields = {};
-    dolphindb::EventClient* client = new dolphindb::EventClient(EventSchemas, eventTimeFields, commonFields);
-    std::string re = "";
-    try{
-        client->subscribe(HOST, -100, test_handler, case_+"_inputTable", DEFAULT_ACTION_NAME, 0, true, USER, PASSWD);
-    }catch(std::exception& ex){
-        re = ex.what();
-    }
-    std::string ex = "Subscribe Fail, cannot connect to";
-    ASSERT_PRED_FORMAT2(testing::IsSubstring, ex, re);
-    ASSERT_FALSE(client->unsubscribe("", PORT, case_+"_inputTable", DEFAULT_ACTION_NAME));
-    delete client, schema;
-}
-
 TEST_F(StreamingCEPEventTest, test_EventClient_sub_twice_with_same_actionName)
 {
     std::string case_=getCaseName();

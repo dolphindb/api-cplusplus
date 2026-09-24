@@ -1,0 +1,12 @@
+[submodule "thirdparty/aeron"]
+	path = thirdparty/aeron
+	url = https://github.com/real-logic/aeron.git
+[submodule "thirdparty/openssl"]
+	path = thirdparty/openssl
+	url = https://github.com/openssl/openssl.git
+[submodule "thirdparty/spdlog"]
+	path = thirdparty/spdlog
+	url = https://github.com/gabime/spdlog.git
+[submodule "thirdparty/lz4"]
+	path = thirdparty/lz4
+	url = https://github.com/lz4/lz4.git

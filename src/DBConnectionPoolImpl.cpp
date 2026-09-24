@@ -22,8 +22,8 @@ DBConnectionPoolImpl::DBConnectionPoolImpl(const std::string& hostName, int port
     latch_ = new CountDownLatch(threadNum);
     if(!loadBalance){
         for(int i = 0 ;i < threadNum; i++){
-            auto conn = std::make_shared<DBConnection>(false, false, 7200, compress, python);
-            bool ret = conn->connect(hostName, port, userId, password, "", highAvailability, {},7200, reConnect);
+            auto conn = std::make_shared<DBConnection>(false, false, 30, compress, python);
+            bool ret = conn->connect(hostName, port, userId, password, "", highAvailability, {},30, reConnect);
             if(!ret)
                 throw IOException("Failed to connect to " + hostName + ":" + std::to_string(port));
             workers_.push_back(new Thread(new AsynWorker(*this,latch_, conn, queue_, taskStatus_, hostName, userId, password)));
@@ -31,8 +31,8 @@ DBConnectionPoolImpl::DBConnectionPoolImpl(const std::string& hostName, int port
         }
     }
     else{
-        DBConnection entryPoint(false, false, 7200, compress, python);
-        bool ret = entryPoint.connect(hostName, port, userId, password, "", highAvailability, {},7200, reConnect);
+        DBConnection entryPoint(false, false, 30, compress, python);
+        bool ret = entryPoint.connect(hostName, port, userId, password, "", highAvailability, {},30, reConnect);
         if(!ret)
            throw IOException("Failed to connect to " + hostName + ":" + std::to_string(port));
         ConstantSP nodes = entryPoint.run("rpc(getControllerAlias(), getClusterLiveDataNodes{false})");
@@ -48,10 +48,10 @@ DBConnectionPoolImpl::DBConnectionPoolImpl(const std::string& hostName, int port
             ports[i] = std::atoi(fields.substr(p + 1, fields.size()).data());
         }
         for(int i = 0 ;i < threadNum; i++){
-            auto conn = std::make_shared<DBConnection>(false, false, 7200, compress, python);
+            auto conn = std::make_shared<DBConnection>(false, false, 30, compress, python);
             std::string &curhost = hosts[i % nodeCount];
             int &curport = ports[i % nodeCount];
-            ret = conn->connect(curhost, curport, userId, password, "", highAvailability, {}, 7200, reConnect);
+            ret = conn->connect(curhost, curport, userId, password, "", highAvailability, {}, 30, reConnect);
             if(!ret)
                 throw IOException("Failed to connect to " + curhost + ":" + std::to_string(curport));
             workers_.push_back(new Thread(new AsynWorker(*this,latch_, conn, queue_, taskStatus_, curhost, userId, password)));
